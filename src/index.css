@@ -10,27 +10,28 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 210 25% 97%;
-    --foreground: 0 0% 17%;
-    --card: 210 25% 97%;
-    --card-foreground: 0 0% 17%;
-    --popover: 210 25% 97%;
-    --popover-foreground: 0 0% 17%;
-    --primary: 4 100% 44%;
-    --primary-foreground: 0 0% 100%;
-    --primary-hover: 4 100% 38%;
-    --secondary: 210 12% 46%;
-    --secondary-foreground: 0 0% 100%;
-    --secondary-hover: 210 12% 52%;
-    --muted: 210 25% 95%;
+    /* Modern SaaS Pro EV Colors */
+    --background: 0 0% 98%; /* #FAFAFA - light grey page background */
+    --foreground: 0 0% 20%; /* #333333 - dark grey text */
+    --card: 0 0% 100%; /* #FFFFFF - white cards */
+    --card-foreground: 0 0% 20%; /* #333333 - dark grey card text */
+    --popover: 0 0% 100%; /* #FFFFFF - white popovers */
+    --popover-foreground: 0 0% 20%; /* #333333 - dark grey popover text */
+    --primary: 348 99% 45%; /* #E30613 - brand red */
+    --primary-foreground: 0 0% 100%; /* #FFFFFF - white text on red */
+    --primary-hover: 348 99% 39%; /* #C50511 - darker red hover */
+    --secondary: 0 0% 100%; /* #FFFFFF - white secondary buttons */
+    --secondary-foreground: 348 99% 45%; /* #E30613 - red text on white */
+    --secondary-hover: 348 99% 97%; /* #FCE8E8 - light red tint hover */
+    --muted: 0 0% 97%; /* #F7F7F7 - light grey for tab backgrounds */
     --muted-foreground: 0 0% 45%;
-    --accent: 210 25% 90%;
-    --accent-foreground: 0 0% 17%;
+    --accent: 0 0% 97%; /* #F7F7F7 - light grey accents */
+    --accent-foreground: 0 0% 20%; /* #333333 - dark grey accent text */
     --destructive: 354 70% 54%;
     --destructive-foreground: 0 0% 100%;
-    --border: 210 20% 85%;
-    --input: 0 0% 100%;
-    --ring: 4 100% 44%;
+    --border: 220 13% 91%; /* lighter border */
+    --input: 0 0% 100%; /* white inputs */
+    --ring: 348 99% 45%; /* #E30613 - brand red focus ring */
     --radius: 0.5rem;
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
@@ -39,16 +40,19 @@ All colors MUST be HSL.
     --chart-5: 27 87% 67%;
 
     /* Pro EV Modern SaaS Colors */
-    --brand-red: 4 100% 44%;
-    --brand-red-hover: 4 100% 38%;
-    --dark-grey: 240 24% 15%;
-    --light-grey: 210 25% 97%;
-    --link-blue: 212 100% 35%;
+    --brand-red: 348 99% 45%; /* #E30613 */
+    --brand-red-hover: 348 99% 39%; /* #C50511 */
+    --dark-grey: 0 0% 20%; /* #333333 */
+    --light-grey: 0 0% 98%; /* #FAFAFA */
+    --link-blue: 211 100% 35%;
     
-    /* Status Colors */
-    --status-pending: 40 100% 56%;
-    --status-sent: 188 78% 41%;
-    --status-accepted: 134 61% 41%;
+    /* Modern Status Colors with backgrounds */
+    --status-pending: 45 98% 72%; /* #FBC02D text */
+    --status-pending-bg: 45 100% 95%; /* #FFF8E1 background */
+    --status-sent: 36 100% 49%; /* #FB8C00 text */
+    --status-sent-bg: 36 100% 94%; /* #FFF3E0 background */
+    --status-accepted: 122 39% 49%; /* #43A047 text */
+    --status-accepted-bg: 122 39% 92%; /* #E8F5E9 background */
     --status-rejected: 354 70% 54%;
 
     /* Legacy brand colors for backward compatibility */
@@ -73,47 +77,47 @@ All colors MUST be HSL.
     --accent-green: 134 61% 41%;
     --accent-cream: 210 25% 97%;
 
-    /* Sidebar variables */
-    --sidebar-background: 240 24% 15%;
-    --sidebar-foreground: 210 25% 97%;
-    --sidebar-primary: 4 100% 44%;
+    /* Sidebar variables - Modern SaaS style */
+    --sidebar-background: 0 0% 100%; /* #FFFFFF - white header */
+    --sidebar-foreground: 0 0% 20%; /* #333333 - dark grey text */
+    --sidebar-primary: 348 99% 45%; /* #E30613 - brand red */
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 24% 20%;
-    --sidebar-accent-foreground: 210 25% 97%;
-    --sidebar-border: 210 20% 85%;
-    --sidebar-ring: 4 100% 44%;
+    --sidebar-accent: 0 0% 97%; /* #F7F7F7 - light grey */
+    --sidebar-accent-foreground: 0 0% 20%; /* #333333 - dark grey */
+    --sidebar-border: 220 13% 91%; /* lighter border */
+    --sidebar-ring: 348 99% 45%; /* #E30613 - brand red */
   }
 
   .dark {
-    --background: 240 24% 15%;
-    --foreground: 210 25% 97%;
-    --card: 240 24% 18%;
-    --card-foreground: 210 25% 97%;
-    --popover: 240 24% 18%;
-    --popover-foreground: 210 25% 97%;
-    --primary: 4 100% 44%;
-    --primary-foreground: 0 0% 100%;
-    --primary-hover: 4 100% 38%;
-    --secondary: 210 12% 46%;
-    --secondary-foreground: 0 0% 100%;
-    --secondary-hover: 210 12% 52%;
-    --muted: 240 24% 25%;
-    --muted-foreground: 210 25% 70%;
-    --accent: 240 24% 25%;
-    --accent-foreground: 210 25% 97%;
+    --background: 0 0% 98%; /* Keep light background even in dark mode for SaaS look */
+    --foreground: 0 0% 20%; /* #333333 - dark grey text */
+    --card: 0 0% 100%; /* #FFFFFF - white cards */
+    --card-foreground: 0 0% 20%; /* #333333 - dark grey card text */
+    --popover: 0 0% 100%; /* #FFFFFF - white popovers */
+    --popover-foreground: 0 0% 20%; /* #333333 - dark grey popover text */
+    --primary: 348 99% 45%; /* #E30613 - brand red */
+    --primary-foreground: 0 0% 100%; /* #FFFFFF - white text on red */
+    --primary-hover: 348 99% 39%; /* #C50511 - darker red hover */
+    --secondary: 0 0% 100%; /* #FFFFFF - white secondary buttons */
+    --secondary-foreground: 348 99% 45%; /* #E30613 - red text on white */
+    --secondary-hover: 348 99% 97%; /* #FCE8E8 - light red tint hover */
+    --muted: 0 0% 97%; /* #F7F7F7 - light grey for tab backgrounds */
+    --muted-foreground: 0 0% 45%;
+    --accent: 0 0% 97%; /* #F7F7F7 - light grey accents */
+    --accent-foreground: 0 0% 20%; /* #333333 - dark grey accent text */
     --destructive: 354 70% 54%;
     --destructive-foreground: 0 0% 100%;
-    --border: 240 24% 25%;
-    --input: 240 24% 20%;
-    --ring: 4 100% 44%;
-    --sidebar-background: 240 24% 12%;
-    --sidebar-foreground: 210 25% 97%;
-    --sidebar-primary: 4 100% 44%;
+    --border: 220 13% 91%; /* lighter border */
+    --input: 0 0% 100%; /* white inputs */
+    --ring: 348 99% 45%; /* #E30613 - brand red focus ring */
+    --sidebar-background: 0 0% 100%; /* #FFFFFF - white header */
+    --sidebar-foreground: 0 0% 20%; /* #333333 - dark grey text */
+    --sidebar-primary: 348 99% 45%; /* #E30613 - brand red */
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 24% 20%;
-    --sidebar-accent-foreground: 210 25% 97%;
-    --sidebar-border: 240 24% 25%;
-    --sidebar-ring: 4 100% 44%;
+    --sidebar-accent: 0 0% 97%; /* #F7F7F7 - light grey */
+    --sidebar-accent-foreground: 0 0% 20%; /* #333333 - dark grey */
+    --sidebar-border: 220 13% 91%; /* lighter border */
+    --sidebar-ring: 348 99% 45%; /* #E30613 - brand red */
   }
 }
 
@@ -127,33 +131,38 @@ All colors MUST be HSL.
     font-family: 'Montserrat', sans-serif;
   }
 
-  /* Typography - All headings use dark grey */
+  /* Typography - Modern SaaS style with consistent dark grey */
   .brand-heading-1, h1 {
     font-family: 'Montserrat', sans-serif;
-    font-weight: 500; /* Medium */
-    color: hsl(0 0% 17%);
+    font-weight: 600; /* Semi-bold for better hierarchy */
+    color: hsl(0 0% 20%); /* #333333 - dark grey */
+    font-size: 1.875rem; /* Slightly larger */
   }
 
   .brand-heading-2, h2 {
     font-family: 'Montserrat', sans-serif;
-    font-weight: 300; /* Light */
-    color: hsl(0 0% 17%);
+    font-weight: 500; /* Medium */
+    color: hsl(0 0% 20%); /* #333333 - dark grey */
+    font-size: 1.5rem;
   }
 
   .brand-heading-3, h3 {
     font-family: 'Montserrat', sans-serif;
     font-weight: 600; /* Semi-Bold */
-    color: hsl(0 0% 17%);
+    color: hsl(0 0% 20%); /* #333333 - dark grey */
+    font-size: 1.25rem;
   }
 
   .brand-body, .body-text {
     font-family: 'Montserrat', sans-serif;
     font-weight: 400; /* Regular */
+    color: hsl(0 0% 20%); /* #333333 - dark grey */
   }
 
   .brand-title {
     font-family: 'Montserrat', sans-serif;
     font-weight: 700; /* Bold for brand elements */
+    color: hsl(0 0% 0%); /* #000000 - black for Pro EV title */
   }
 
   /* Brand utility classes */
@@ -173,46 +182,67 @@ All colors MUST be HSL.
     background: linear-gradient(135deg, hsl(var(--background)), hsl(var(--muted)));
   }
 
-  /* Global link styles - Use new link blue */
+  /* Global link styles - Modern SaaS style */
   a {
-    color: hsl(212 100% 35%);
+    color: hsl(0 0% 20%); /* #333333 - dark grey */
     text-decoration: none;
+    transition: all 0.2s ease;
   }
 
   a:hover {
-    color: hsl(212 100% 30%);
+    color: hsl(348 99% 45%); /* #E30613 - brand red underline */
     text-decoration: underline;
   }
 
-  /* Status styles matching new colors */
+  /* Modern SaaS Status Styles - Pill-shaped with soft colors */
   .status-pending {
-    background: hsl(var(--status-pending));
-    color: white;
-    border-color: hsl(40 100% 50%);
+    background: hsl(var(--status-pending-bg)); /* #FFF8E1 */
+    color: hsl(var(--status-pending)); /* #FBC02D */
+    border: 1px solid hsl(var(--status-pending) / 0.2);
+    border-radius: 9999px; /* pill shape */
+    font-weight: 500;
+    padding: 4px 12px;
+    font-size: 0.875rem;
   }
 
-  .status-accepted, .status-completed, .status-approved {
-    background: hsl(var(--status-accepted));
-    color: white;
-    border-color: hsl(134 61% 35%);
+  .status-accepted, .status-completed, .status-approved, .status-active {
+    background: hsl(var(--status-accepted-bg)); /* #E8F5E9 */
+    color: hsl(var(--status-accepted)); /* #43A047 */
+    border: 1px solid hsl(var(--status-accepted) / 0.2);
+    border-radius: 9999px; /* pill shape */
+    font-weight: 500;
+    padding: 4px 12px;
+    font-size: 0.875rem;
   }
 
   .status-in_progress, .status-sent {
-    background: hsl(var(--status-sent));
-    color: white;
-    border-color: hsl(188 78% 35%);
+    background: hsl(var(--status-sent-bg)); /* #FFF3E0 */
+    color: hsl(var(--status-sent)); /* #FB8C00 */
+    border: 1px solid hsl(var(--status-sent) / 0.2);
+    border-radius: 9999px; /* pill shape */
+    font-weight: 500;
+    padding: 4px 12px;
+    font-size: 0.875rem;
   }
 
   .status-cancelled, .status-rejected {
-    background: hsl(var(--status-rejected));
-    color: white;
-    border-color: hsl(354 70% 48%);
+    background: hsl(var(--status-rejected) / 0.1);
+    color: hsl(var(--status-rejected));
+    border: 1px solid hsl(var(--status-rejected) / 0.2);
+    border-radius: 9999px; /* pill shape */
+    font-weight: 500;
+    padding: 4px 12px;
+    font-size: 0.875rem;
   }
 
   .status-draft {
-    background: hsl(210 12% 46%);
-    color: white;
-    border-color: hsl(210 12% 40%);
+    background: hsl(0 0% 97%);
+    color: hsl(0 0% 40%);
+    border: 1px solid hsl(0 0% 85%);
+    border-radius: 9999px; /* pill shape */
+    font-weight: 500;
+    padding: 4px 12px;
+    font-size: 0.875rem;
   }
 
   /* Notification styles matching new colors */
@@ -248,13 +278,30 @@ All colors MUST be HSL.
     @apply bg-brand-cream/50;
   }
 
-  /* Brand Card Styles */
+  /* Modern SaaS Card Styles */
   .brand-card {
     @apply bg-card border border-border rounded-lg shadow-sm hover:shadow-md transition-all duration-200;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
   }
   
   .brand-card-interactive {
-    @apply brand-card cursor-pointer hover:shadow-lg hover:border-brand-teal/30 hover:-translate-y-1;
+    @apply brand-card cursor-pointer hover:shadow-lg hover:border-primary/20 hover:-translate-y-0.5;
+    transition: all 0.2s ease;
+  }
+
+  /* Modern Tab Styles */
+  .tab-nav {
+    @apply bg-muted border-b border-border;
+    background: hsl(0 0% 97%); /* #F7F7F7 */
+  }
+
+  .tab-active {
+    @apply border-b-2 border-primary text-primary font-semibold;
+    border-bottom-color: hsl(348 99% 45%); /* #E30613 brand red underline */
+  }
+
+  .tab-inactive {
+    @apply text-muted-foreground hover:text-foreground transition-colors;
   }
 
   /* Brand Button Variants */
