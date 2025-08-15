@@ -20,7 +20,7 @@ export const ProEVLogo: React.FC<ProEVLogoProps> = ({
 
   return (
     <img 
-      src="/lovable-uploads/3add86aa-4857-42e8-9672-5ea09a594bb2.png"
+      src="/lovable-uploads/3dcd69bc-de64-4dd6-a9d1-b8ce69f1751d.png"
       className={`${sizeClasses[size]} w-auto ${className}`}
       alt="Pro EV Logo" 
     />
