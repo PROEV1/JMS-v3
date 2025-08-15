@@ -88,11 +88,11 @@ export default function EngineerJobDetail() {
   const [isChecklistComplete, setIsChecklistComplete] = useState(false);
 
   const uploadTypes = [
-    { key: 'pre_install', label: 'Pre-install stair space' },
-    { key: 'frame_fitted', label: 'Frame fitted (before drawers)' },
-    { key: 'drawers_in_place', label: 'Drawer units in place (drawers open)' },
-    { key: 'final_install', label: 'Final install (fully closed)' },
-    { key: 'push_mechanism', label: 'Close-up of push-to-open mechanism' },
+    { key: 'pre_install', label: 'Pre-install site survey' },
+    { key: 'electrical_work', label: 'Electrical preparation and cabling' },
+    { key: 'mounting_bracket', label: 'Wall mounting bracket installed' },
+    { key: 'final_install', label: 'Final installation (charging station mounted)' },
+    { key: 'testing_verification', label: 'Testing and verification complete' },
     { key: 'issues', label: 'Any issues or obstructions on site' }
   ];
 

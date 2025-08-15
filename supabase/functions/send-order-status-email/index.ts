@@ -77,13 +77,13 @@ const emailTemplates = {
       <ul>
         <li><strong>Date:</strong> ${data.installDate ? new Date(data.installDate).toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : 'TBC'}</li>
         ${data.engineerName ? `<li><strong>Engineer:</strong> ${data.engineerName}</li>` : ''}
-        <li><strong>What to expect:</strong> Professional installation of your under-stairs storage solution</li>
+        <li><strong>What to expect:</strong> Professional installation of your EV charging solution</li>
       </ul>
       <h2>Before Your Installation:</h2>
       <ul>
-        <li>Ensure the area is clear and accessible</li>
-        <li>Remove any items from under your stairs</li>
-        <li>Ensure adequate lighting in the area</li>
+        <li>Ensure the installation area is clear and accessible</li>
+        <li>Provide access to your electrical consumer unit</li>
+        <li>Ensure adequate parking space for our engineer</li>
       </ul>
       <p><a href="${Deno.env.get('SUPABASE_URL')}/client" style="background: #0066cc; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">View Installation Details</a></p>
       <p>Best regards,<br>The ProSpaces Team</p>
@@ -95,9 +95,9 @@ const emailTemplates = {
     template: (data: EmailRequest) => `
       <h1>Installation Complete!</h1>
       <p>Hi ${data.clientName},</p>
-      <p>Congratulations! Your under-stairs storage installation for order <strong>${data.orderNumber}</strong> is now complete.</p>
+      <p>Congratulations! Your EV charging installation for order <strong>${data.orderNumber}</strong> is now complete.</p>
       <h2>Your Warranty is Now Active</h2>
-      <p>Your 5-year warranty period has begun. We're confident you'll love your new storage solution!</p>
+      <p>Your 5-year warranty period has begun. We're confident you'll love your new EV charging solution!</p>
       <h2>Need Support?</h2>
       <p>If you have any questions or need assistance, we're here to help:</p>
       <ul>

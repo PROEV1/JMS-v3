@@ -26,9 +26,9 @@ const CHECKLIST_ITEMS: ChecklistItem[] = [
     description: 'Verify all doors open and close smoothly'
   },
   {
-    id: 'drawers_aligned',
-    label: 'Drawers properly aligned',
-    description: 'Check drawer alignment and smooth operation'
+    id: 'charging_station_aligned',
+    label: 'Charging station properly aligned',
+    description: 'Check charging station alignment and secure mounting'
   },
   {
     id: 'push_mechanism',
