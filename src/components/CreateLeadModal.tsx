@@ -404,7 +404,9 @@ export function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLeadModalP
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
                         setClientSearchOpen(!clientSearchOpen);
                         setProductSearchOpen(false);
                       }}
