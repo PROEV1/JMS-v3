@@ -290,14 +290,14 @@ export function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLeadModalP
   };
 
   // Filter clients and products based on search
-  const filteredClients = clients.filter(client => 
-    client.full_name.toLowerCase().includes(clientSearchTerm.toLowerCase()) ||
-    client.email.toLowerCase().includes(clientSearchTerm.toLowerCase())
+  const filteredClients = (clients || []).filter(client => 
+    client?.full_name?.toLowerCase().includes(clientSearchTerm.toLowerCase()) ||
+    client?.email?.toLowerCase().includes(clientSearchTerm.toLowerCase())
   );
 
-  const filteredProducts = products.filter(product =>
-    product.name.toLowerCase().includes(productSearchTerm.toLowerCase()) ||
-    product.category?.toLowerCase().includes(productSearchTerm.toLowerCase())
+  const filteredProducts = (products || []).filter(product =>
+    product?.name?.toLowerCase().includes(productSearchTerm.toLowerCase()) ||
+    product?.category?.toLowerCase().includes(productSearchTerm.toLowerCase())
   );
 
   const handleSubmit = async (e: React.FormEvent) => {
