@@ -631,7 +631,7 @@ export default function EnhancedClientOrderView() {
               ) : (
                 <div className="text-center py-8">
                   <Clock className="h-16 w-16 text-blue-600 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">Awaiting Scheduling by Pro Spaces Team</h3>
+                  <h3 className="text-lg font-semibold mb-2">Awaiting Scheduling by Pro EV Team</h3>
                   <p className="text-muted-foreground mb-6">
                     Our team will contact you shortly to schedule your installation
                   </p>

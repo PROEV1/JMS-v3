@@ -53,7 +53,7 @@ export function AgreementSigningModal({
         if (error) {
           console.error('AgreementSigningModal: Error fetching settings:', error);
           // Set fallback URL if there's an error
-          setAgreementDocumentUrl('https://www.prospaces.co.uk');
+          setAgreementDocumentUrl('https://www.proev.co.uk');
           return;
         }
 
@@ -71,17 +71,17 @@ export function AgreementSigningModal({
           } else {
             // Fallback if no URL configured
             console.log('AgreementSigningModal: No agreement_document_url found, using fallback');
-            setAgreementDocumentUrl('https://www.prospaces.co.uk');
+            setAgreementDocumentUrl('https://www.proev.co.uk');
           }
         } else {
           console.log('AgreementSigningModal: No system settings found, using fallback URL');
           // Set fallback URL if no settings found
-          setAgreementDocumentUrl('https://www.prospaces.co.uk');
+          setAgreementDocumentUrl('https://www.proev.co.uk');
         }
       } catch (error) {
         console.error('AgreementSigningModal: Error in fetchSystemSettings:', error);
         // Set fallback URL on error
-        setAgreementDocumentUrl('https://www.prospaces.co.uk');
+        setAgreementDocumentUrl('https://www.proev.co.uk');
       }
     };
 
@@ -259,7 +259,7 @@ export function AgreementSigningModal({
             <h3 className="text-lg font-semibold mb-4">Agreement Summary</h3>
             
             <p className="text-sm text-muted-foreground mb-4">
-              By signing below, you agree to the terms of the ProSpaces Installation Service Agreement. This includes:
+              By signing below, you agree to the terms of the Pro EV Installation Service Agreement. This includes:
             </p>
             
             <ul className="space-y-2 text-sm text-muted-foreground mb-4">

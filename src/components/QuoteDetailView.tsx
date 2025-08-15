@@ -207,7 +207,7 @@ export const QuoteDetailView: React.FC<QuoteDetailViewProps> = ({ quote, onBack,
         try {
           await navigator.share({
             title: `Quote ${quote.quote_number}`,
-            text: 'Check out this quote from ProSpaces',
+            text: 'Check out this quote from Pro EV',
             url: shareUrl,
           });
           return;
@@ -295,8 +295,8 @@ export const QuoteDetailView: React.FC<QuoteDetailViewProps> = ({ quote, onBack,
       }
 
       const shareUrl = `${window.location.origin}/quote/${shareToken}`;
-      const subject = `Quote ${quote.quote_number} from ProSpaces`;
-      const body = `Hi,\n\nI'm sharing a quote from ProSpaces with you.\n\nQuote Number: ${quote.quote_number}\nTotal: ${formatCurrency(quote.total_cost)}\n\nView the full quote here: ${shareUrl}\n\nBest regards`;
+      const subject = `Quote ${quote.quote_number} from Pro EV`;
+      const body = `Hi,\n\nI'm sharing a quote from Pro EV with you.\n\nQuote Number: ${quote.quote_number}\nTotal: ${formatCurrency(quote.total_cost)}\n\nView the full quote here: ${shareUrl}\n\nBest regards`;
       
       const mailtoLink = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
       window.open(mailtoLink, '_blank');
@@ -334,7 +334,7 @@ export const QuoteDetailView: React.FC<QuoteDetailViewProps> = ({ quote, onBack,
       }
 
       const shareUrl = `${window.location.origin}/quote/${shareToken}`;
-      const message = `Hi! I'm sharing a quote from ProSpaces with you.\n\n*Quote ${quote.quote_number}*\nTotal: ${formatCurrency(quote.total_cost)}\n\nView the full quote: ${shareUrl}`;
+      const message = `Hi! I'm sharing a quote from Pro EV with you.\n\n*Quote ${quote.quote_number}*\nTotal: ${formatCurrency(quote.total_cost)}\n\nView the full quote: ${shareUrl}`;
       
       const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
       window.open(whatsappUrl, '_blank');

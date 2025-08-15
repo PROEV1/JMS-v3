@@ -1,5 +1,5 @@
 /**
- * ProSpaces Brand Guidelines Utilities
+ * Pro EV Brand Guidelines Utilities
  * 
  * This file contains utility functions and constants to ensure
  * consistent application of brand guidelines across all components.

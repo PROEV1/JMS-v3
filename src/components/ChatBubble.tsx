@@ -60,7 +60,7 @@ export default function ChatBubble({ message, isOwn, showAvatar = true, senderNa
           <div className="flex items-center gap-2 mb-1 pl-1">
             <span className="text-xs font-medium text-muted-foreground">{senderName}</span>
             <Badge variant={message.sender_role === 'admin' ? 'default' : 'secondary'} className="text-[10px] px-1.5 py-0">
-              {message.sender_role === 'admin' ? 'ProSpaces Team' : message.sender_role === 'engineer' ? 'Engineer' : 'Client'}
+              {message.sender_role === 'admin' ? 'Pro EV Team' : message.sender_role === 'engineer' ? 'Engineer' : 'Client'}
             </Badge>
           </div>
         )}

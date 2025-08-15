@@ -10,63 +10,63 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    /* ProSpaces Brand Color Palette */
+    /* Pro EV Brand Color Palette - Green-focused design */
     --background: 0 0% 100%;
-    --foreground: 221 37% 19%; /* #2b2e3d */
+    --foreground: 210 40% 15%; /* Dark gray for text */
 
     --card: 0 0% 100%;
-    --card-foreground: 221 37% 19%;
+    --card-foreground: 210 40% 15%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 221 37% 19%;
+    --popover-foreground: 210 40% 15%;
 
-    /* Primary: #2b2e3d (dark blue-gray) */
-    --primary: 221 37% 19%;
+    /* Primary: Pro EV Green */
+    --primary: 105 65% 55%; /* Bright green matching logo */
     --primary-foreground: 0 0% 98%;
 
-    /* Secondary: #8ac4c2 (teal) */
-    --secondary: 177 29% 66%;
-    --secondary-foreground: 221 37% 19%;
+    /* Secondary: Lighter green for accents */
+    --secondary: 105 45% 70%;
+    --secondary-foreground: 210 40% 15%;
 
-    --muted: 44 44% 91%; /* #f5efe8 */
-    --muted-foreground: 221 20% 50%;
+    --muted: 120 20% 95%; /* Very light green-tinted background */
+    --muted-foreground: 210 20% 50%;
 
-    /* Accent colors from palette */
-    --accent: 104 47% 75%; /* #d1d9b0 */
-    --accent-foreground: 221 37% 19%;
+    /* Accent: Complementary colors */
+    --accent: 105 35% 80%; /* Light green accent */
+    --accent-foreground: 210 40% 15%;
 
-    /* Brand-specific colors */
-    --brand-teal: 177 29% 66%; /* #8ac4c2 */
-    --brand-teal-light: 177 29% 80%;
-    --brand-teal-dark: 177 29% 50%;
+    /* Pro EV Brand Colors */
+    --brand-teal: 105 65% 55%; /* Primary EV green */
+    --brand-teal-light: 105 55% 75%;
+    --brand-teal-dark: 105 75% 40%;
     
-    --brand-pink: 347 58% 88%; /* #f7ccd6 */
-    --brand-pink-light: 347 58% 92%;
-    --brand-pink-dark: 347 58% 75%;
+    --brand-pink: 335 65% 75%; /* Complementary pink accent */
+    --brand-pink-light: 335 55% 85%;
+    --brand-pink-dark: 335 75% 60%;
     
-    --brand-green: 104 47% 75%; /* #d1d9b0 */
-    --brand-green-light: 104 47% 85%;
-    --brand-green-dark: 104 47% 65%;
+    --brand-green: 105 65% 55%; /* Main EV green */
+    --brand-green-light: 105 55% 75%;
+    --brand-green-dark: 105 75% 40%;
     
-    --brand-cream: 44 44% 91%; /* #f5efe8 */
-    --brand-cream-light: 44 44% 95%;
-    --brand-cream-dark: 44 44% 85%;
+    --brand-cream: 45 25% 95%; /* Neutral cream */
+    --brand-cream-light: 45 25% 98%;
+    --brand-cream-dark: 45 25% 90%;
 
-    --brand-blue: 221 37% 19%; /* Primary blue */
-    --brand-blue-light: 221 37% 30%;
-    --brand-blue-dark: 221 37% 15%;
+    --brand-blue: 210 40% 15%; /* Dark blue for text/contrast */
+    --brand-blue-light: 210 40% 25%;
+    --brand-blue-dark: 210 40% 10%;
 
-    /* Additional ProSpaces colors */
-    --accent-pink: 347 58% 88%; /* #f7ccd6 */
-    --accent-green: 100 33% 89%; /* #e5f2e3 */
-    --accent-cream: 44 44% 91%; /* #f5efe8 */
+    /* Additional Pro EV colors */
+    --accent-pink: 335 65% 75%; /* Complementary accent */
+    --accent-green: 105 45% 85%; /* Light green backgrounds */
+    --accent-cream: 45 25% 95%; /* Neutral backgrounds */
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 177 29% 90%;
-    --input: 177 29% 90%;
-    --ring: 177 29% 66%;
+    --border: 105 25% 85%;
+    --input: 105 25% 90%;
+    --ring: 105 65% 55%;
 
     --radius: 0.75rem;
 
@@ -121,7 +121,7 @@ All colors MUST be HSL.
     font-family: 'Montserrat', sans-serif;
   }
 
-  /* ProSpaces Brand Typography */
+  /* Pro EV Brand Typography */
   .brand-heading-1, h1 {
     font-family: 'Montserrat', sans-serif;
     font-weight: 500; /* Medium */

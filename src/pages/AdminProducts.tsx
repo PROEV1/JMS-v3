@@ -137,7 +137,7 @@ export default function AdminProducts() {
       <div className="flex items-center justify-between mb-8">
         <ProEVLogo variant="main" size="lg" />
         <div className="text-right">
-          <p className="text-sm text-muted-foreground">ProSpaces Admin Portal</p>
+          <p className="text-sm text-muted-foreground">Pro EV Admin Portal</p>
           <p className="text-xs text-muted-foreground">Product Management</p>
         </div>
       </div>

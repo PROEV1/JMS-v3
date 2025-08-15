@@ -1,5 +1,5 @@
 /**
- * ProSpaces Brand Components
+ * Pro EV Brand Components
  * 
  * Import and use these components to ensure consistent brand styling
  * across all pages and features.

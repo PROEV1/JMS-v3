@@ -92,11 +92,11 @@ export default function AdminMessages() {
 
   return (
     <div className="container mx-auto py-6 space-y-6">
-      {/* ProSpaces Header */}
+      {/* Pro EV Header */}
       <div className="flex items-center justify-between mb-8">
         <ProEVLogo variant="main" size="lg" />
         <div className="text-right">
-          <p className="text-sm text-muted-foreground">ProSpaces Admin Portal</p>
+          <p className="text-sm text-muted-foreground">Pro EV Admin Portal</p>
           <p className="text-xs text-muted-foreground">Message Management</p>
         </div>
       </div>

@@ -144,7 +144,7 @@ const defaultSettings: AdminSettings = {
     smtp_username: '',
     smtp_password: '',
     from_email: '',
-    from_name: 'ProSpaces',
+    from_name: 'Pro EV',
     templates: {
       quote_sent: 'default',
       payment_received: 'default',
@@ -181,8 +181,8 @@ const defaultSettings: AdminSettings = {
       file_uploads: true,
       quote_sharing: true
     },
-    app_name: 'ProSpaces',
-    support_email: 'support@prospace.com',
+    app_name: 'Pro EV',
+    support_email: 'support@proev.co.uk',
     terms_conditions_url: 'https://prospace.com/terms',
     agreement_document_url: '',
     default_currency: 'USD',
@@ -678,7 +678,7 @@ export default function AdminSettings() {
                     <div className="space-y-3">
                       <Label>From Name</Label>
                       <Input
-                        placeholder="ProSpaces"
+                        placeholder="Pro EV"
                         value={settings.email_config.from_name}
                         onChange={(e) => updateSettings('email_config', { from_name: e.target.value })}
                       />

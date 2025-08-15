@@ -339,7 +339,7 @@ export default function WhatsAppChat({
                         message={message}
                         isOwn={!!isOwn}
                         showAvatar={showAvatar}
-                        senderName={message.sender_role === 'admin' ? 'ProSpaces Team' : 'Client'}
+                        senderName={message.sender_role === 'admin' ? 'Pro EV Team' : 'Client'}
                       />
                     </motion.div>
                   );
