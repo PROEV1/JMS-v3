@@ -7,8 +7,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, Eye } from 'lucide-react';
+import { Search, Plus, Eye, Trash2, Package, Clock, Calendar, CheckCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface Order {
@@ -42,6 +44,7 @@ export default function AdminOrders() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [deletingOrderId, setDeletingOrderId] = useState<string | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -100,14 +103,52 @@ export default function AdminOrders() {
     return matchesSearch && matchesStatus;
   });
 
+  // Calculate status counts
+  const statusCounts = {
+    total: orders.length,
+    awaiting_payment: orders.filter(o => o.status_enhanced === 'awaiting_payment').length,
+    scheduled: orders.filter(o => o.status_enhanced === 'scheduled').length,
+    completed: orders.filter(o => o.status_enhanced === 'completed').length,
+  };
+
+  const handleDeleteOrder = async (orderId: string) => {
+    setDeletingOrderId(orderId);
+    try {
+      const { error } = await supabase.functions.invoke('admin-delete-order', {
+        body: { orderId }
+      });
+
+      if (error) throw error;
+
+      setOrders(prev => prev.filter(order => order.id !== orderId));
+      toast({
+        title: "Success",
+        description: "Order deleted successfully",
+      });
+    } catch (error) {
+      console.error('Error deleting order:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete order",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingOrderId(null);
+    }
+  };
+
+  const handleStatusFilter = (status: string) => {
+    setStatusFilter(status === statusFilter ? 'all' : status);
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'awaiting_payment':
-        return 'bg-red-100 text-red-800';
+        return 'bg-yellow-500 text-white';
       case 'awaiting_agreement':
-        return 'bg-orange-100 text-orange-800';
+        return 'bg-orange-500 text-white';
       case 'awaiting_install_booking':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-blue-500 text-white';
       case 'scheduled':
         return 'bg-blue-100 text-blue-800';
       case 'in_progress':
@@ -143,22 +184,111 @@ export default function AdminOrders() {
     <BrandPage>
       <BrandContainer>
         <div className="space-y-6">
-          <div className="flex justify-between items-center">
-            <h1 className="text-3xl font-bold">Orders</h1>
-            <Button onClick={() => navigate('/admin/orders/new')}>
-              <Plus className="h-4 w-4 mr-2" />
-              New Order
-            </Button>
+          {/* Header */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => navigate('/admin/dashboard')}
+                className="text-muted-foreground"
+              >
+                ← Back to Dashboard
+              </Button>
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-slate-800">Orders Management</h1>
+              <p className="text-muted-foreground">View and manage all customer orders</p>
+            </div>
           </div>
 
-          {/* Filters */}
+          {/* Status Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card 
+              className={`cursor-pointer transition-all hover:shadow-md ${
+                statusFilter === 'all' ? 'ring-2 ring-blue-500' : ''
+              }`}
+              onClick={() => handleStatusFilter('all')}
+            >
+              <CardContent className="flex items-center p-6">
+                <div className="flex items-center space-x-4">
+                  <div className="p-2 bg-blue-100 rounded-full">
+                    <Package className="h-6 w-6 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-slate-800">{statusCounts.total}</p>
+                    <p className="text-sm text-muted-foreground">Total Orders</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card 
+              className={`cursor-pointer transition-all hover:shadow-md ${
+                statusFilter === 'awaiting_payment' ? 'ring-2 ring-yellow-500' : ''
+              }`}
+              onClick={() => handleStatusFilter('awaiting_payment')}
+            >
+              <CardContent className="flex items-center p-6">
+                <div className="flex items-center space-x-4">
+                  <div className="p-2 bg-yellow-100 rounded-full">
+                    <Clock className="h-6 w-6 text-yellow-600" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-slate-800">{statusCounts.awaiting_payment}</p>
+                    <p className="text-sm text-muted-foreground">Awaiting Payment</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card 
+              className={`cursor-pointer transition-all hover:shadow-md ${
+                statusFilter === 'scheduled' ? 'ring-2 ring-purple-500' : ''
+              }`}
+              onClick={() => handleStatusFilter('scheduled')}
+            >
+              <CardContent className="flex items-center p-6">
+                <div className="flex items-center space-x-4">
+                  <div className="p-2 bg-purple-100 rounded-full">
+                    <Calendar className="h-6 w-6 text-purple-600" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-slate-800">{statusCounts.scheduled}</p>
+                    <p className="text-sm text-muted-foreground">Scheduled</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card 
+              className={`cursor-pointer transition-all hover:shadow-md ${
+                statusFilter === 'completed' ? 'ring-2 ring-green-500' : ''
+              }`}
+              onClick={() => handleStatusFilter('completed')}
+            >
+              <CardContent className="flex items-center p-6">
+                <div className="flex items-center space-x-4">
+                  <div className="p-2 bg-green-100 rounded-full">
+                    <CheckCircle className="h-6 w-6 text-green-600" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-slate-800">{statusCounts.completed}</p>
+                    <p className="text-sm text-muted-foreground">Completed</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Filter Orders */}
           <Card>
             <CardContent className="pt-6">
               <div className="flex flex-col sm:flex-row gap-4">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Search orders..."
+                    placeholder="Search by order number, client name, or email..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-10"
@@ -166,13 +296,13 @@ export default function AdminOrders() {
                 </div>
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
                   <SelectTrigger className="w-full sm:w-48">
-                    <SelectValue placeholder="Filter by status" />
+                    <SelectValue placeholder="All Statuses" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Statuses</SelectItem>
                     <SelectItem value="awaiting_payment">Awaiting Payment</SelectItem>
                     <SelectItem value="awaiting_agreement">Awaiting Agreement</SelectItem>
-                    <SelectItem value="awaiting_install_booking">Awaiting Booking</SelectItem>
+                    <SelectItem value="awaiting_install_booking">Awaiting Install Booking</SelectItem>
                     <SelectItem value="scheduled">Scheduled</SelectItem>
                     <SelectItem value="in_progress">In Progress</SelectItem>
                     <SelectItem value="install_completed_pending_qa">Pending QA</SelectItem>
@@ -183,60 +313,138 @@ export default function AdminOrders() {
             </CardContent>
           </Card>
 
-          {/* Orders List */}
-          <div className="grid gap-4">
-            {filteredOrders.length === 0 ? (
-              <Card>
-                <CardContent className="text-center py-12">
-                  <p className="text-muted-foreground">No orders found</p>
-                </CardContent>
-              </Card>
-            ) : (
-              filteredOrders.map((order) => (
-                <Card key={order.id} className="hover:shadow-md transition-shadow">
-                  <CardContent className="pt-6">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-semibold text-lg">{order.order_number}</h3>
-                          <Badge className={getStatusColor(order.status_enhanced)}>
-                            {formatStatus(order.status_enhanced)}
-                          </Badge>
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          <p><strong>Client:</strong> {order.client.full_name}</p>
-                          <p><strong>Email:</strong> {order.client.email}</p>
-                          {order.engineer && (
-                            <p><strong>Engineer:</strong> {order.engineer.name}</p>
-                          )}
-                          <p><strong>Created:</strong> {new Date(order.created_at).toLocaleDateString()}</p>
-                          {order.scheduled_install_date && (
-                            <p><strong>Scheduled:</strong> {new Date(order.scheduled_install_date).toLocaleDateString()}</p>
-                          )}
-                        </div>
-                      </div>
-                      
-                      <div className="flex flex-col sm:items-end gap-2">
-                        <div className="text-right">
-                          <p className="font-semibold text-lg">£{order.total_amount.toLocaleString()}</p>
-                          <p className="text-sm text-muted-foreground">
-                            Paid: £{order.amount_paid.toLocaleString()}
-                          </p>
-                        </div>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => navigate(`/admin/order/${order.id}`)}
-                        >
-                          <Eye className="h-4 w-4 mr-2" />
-                          View Details
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
-            )}
+          {/* Orders Table */}
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-semibold text-slate-800">Orders</h2>
+              <p className="text-sm text-muted-foreground">
+                {filteredOrders.length} of {orders.length} orders
+              </p>
+            </div>
+
+            <Card>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Order Number</TableHead>
+                      <TableHead>Client</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Engineer Progress</TableHead>
+                      <TableHead>Total Amount</TableHead>
+                      <TableHead>Amount Paid</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead>Installation Date</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredOrders.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                          No orders found
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      filteredOrders.map((order) => (
+                        <TableRow key={order.id}>
+                          <TableCell className="font-medium">
+                            {order.order_number}
+                          </TableCell>
+                          <TableCell>
+                            <div>
+                              <p className="font-medium">{order.client.full_name}</p>
+                              <p className="text-sm text-muted-foreground">{order.client.email}</p>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={getStatusColor(order.status_enhanced)}>
+                              {order.status_enhanced === 'awaiting_payment' ? 'Awaiting Payment' : 
+                               order.status_enhanced === 'awaiting_install_booking' ? 'Awaiting Install Booking' :
+                               formatStatus(order.status_enhanced)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="text-sm">
+                              {order.engineer ? (
+                                <span className="text-blue-600">{order.engineer.name}</span>
+                              ) : (
+                                <span className="text-muted-foreground">No engineer assigned</span>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <span className="font-medium">£{order.total_amount.toLocaleString()}</span>
+                          </TableCell>
+                          <TableCell>
+                            <div>
+                              <span className="font-medium">£{order.amount_paid.toLocaleString()}</span>
+                              {order.amount_paid < order.total_amount && (
+                                <p className="text-xs text-red-600">
+                                  Outstanding: £{(order.total_amount - order.amount_paid).toLocaleString()}
+                                </p>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {new Date(order.created_at).toLocaleDateString('en-GB')}
+                          </TableCell>
+                          <TableCell>
+                            {order.scheduled_install_date ? (
+                              new Date(order.scheduled_install_date).toLocaleDateString('en-GB')
+                            ) : (
+                              <span className="text-muted-foreground">Not scheduled</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => navigate(`/admin/order/${order.id}`)}
+                              >
+                                <Eye className="h-4 w-4 mr-1" />
+                                View
+                              </Button>
+                              
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Delete Order</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Are you sure you want to delete order {order.order_number}? This action cannot be undone.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction 
+                                      onClick={() => handleDeleteOrder(order.id)}
+                                      className="bg-red-600 hover:bg-red-700"
+                                      disabled={deletingOrderId === order.id}
+                                    >
+                                      {deletingOrderId === order.id ? 'Deleting...' : 'Delete'}
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </BrandContainer>
