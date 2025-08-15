@@ -160,13 +160,16 @@ export default function AdminProducts() {
               <DialogTitle>Create New Product</DialogTitle>
               <DialogDescription>Add a new product to your catalog</DialogDescription>
             </DialogHeader>
-            <ProductForm
-              onSuccess={() => {
-                setShowCreateModal(false);
-                loadProducts();
-              }}
-              onCancel={() => setShowCreateModal(false)}
-            />
+            <div className="p-4">
+              <p>Product Form Component</p>
+              <ProductForm
+                onSuccess={() => {
+                  setShowCreateModal(false);
+                  loadProducts();
+                }}
+                onCancel={() => setShowCreateModal(false)}
+              />
+            </div>
           </DialogContent>
         </Dialog>
       </div>
