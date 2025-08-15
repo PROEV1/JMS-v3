@@ -165,7 +165,7 @@ export default function Dashboard() {
           client_id: quote.client_id,
           quote_id: quote.id,
           total_amount: quote.total_cost,
-          deposit_amount: quote.deposit_required || 0,
+          deposit_amount: quote.total_cost * 0.25 || 0,
           job_address: quote.client.address || null,
           status: 'awaiting_payment'
         } as any)

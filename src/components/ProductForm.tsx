@@ -40,11 +40,12 @@ interface ProductCompatibility {
 
 interface ProductFormProps {
   product?: Product;
-  onSave: (product: Product) => void;
+  onSave?: (product: Product) => void;
+  onSuccess?: () => void;
   onCancel: () => void;
 }
 
-export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCancel }) => {
+export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onSuccess, onCancel }) => {
   const [formData, setFormData] = useState({
     name: product?.name || '',
     description: product?.description || '',
@@ -172,7 +173,12 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
         description: `Product ${product?.id ? 'updated' : 'created'} successfully`,
       });
 
-      onSave(savedProduct);
+      if (onSave) {
+        onSave(savedProduct);
+      }
+      if (onSuccess) {
+        onSuccess();
+      }
     } catch (error) {
       console.error('Error saving product:', error);
       toast({

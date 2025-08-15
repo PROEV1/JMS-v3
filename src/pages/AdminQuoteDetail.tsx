@@ -74,7 +74,7 @@ export default function AdminQuoteDetail() {
       if (error) throw error;
       
       // Transform the data to match our interface, providing defaults for missing fields
-      const transformedQuote: Quote = {
+      const transformedQuote = {
         ...data,
         room_info: null,
         range: null,
@@ -240,7 +240,10 @@ export default function AdminQuoteDetail() {
     <BrandPage>
       <BrandContainer>
         <QuoteDetailView 
-          quote={quote} 
+          quote={{
+            ...quote,
+            deposit_required: quote.deposit_required || quote.total_cost * 0.25
+          }} 
           onBack={handleBack}
           onAccept={handleAcceptQuote}
           onReject={handleRejectQuote}

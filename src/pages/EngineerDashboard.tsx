@@ -10,7 +10,18 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { JobStatusCard } from '@/components/engineer/JobStatusCard';
-import { OrderStatusEnhanced } from '@/components/admin/EnhancedJobStatusBadge';
+type OrderStatusEnhanced = 
+  | 'quote_accepted'
+  | 'awaiting_payment'
+  | 'payment_received'
+  | 'awaiting_agreement'
+  | 'agreement_signed'
+  | 'awaiting_install_booking'
+  | 'scheduled'
+  | 'in_progress'
+  | 'install_completed_pending_qa'
+  | 'completed'
+  | 'revisit_required';
 import { isToday, isThisWeek, isWithinLastDays } from '@/utils/dateUtils';
 import { Calendar, MapPin, Package, User, AlertTriangle, Clock, CheckCircle, Upload } from 'lucide-react';
 
@@ -75,7 +86,6 @@ export default function EngineerDashboard() {
           id,
           order_number,
           status_enhanced,
-          engineer_status,
           job_address,
           scheduled_install_date,
           total_amount,
@@ -91,6 +101,13 @@ export default function EngineerDashboard() {
           )
         `)
         .eq('engineer_id', engineer.id);
+
+      if (jobsError) {
+        console.error('Error fetching jobs:', jobsError);
+        setErrorMessage('Failed to load engineer jobs');
+        setJobs([]);
+        return;
+      }
 
       // Get upload counts for each job
       let uploadCounts: Record<string, number> = {};
@@ -108,11 +125,6 @@ export default function EngineerDashboard() {
         }
       }
 
-      if (jobsError) {
-        setErrorMessage(`Jobs query error: ${jobsError.message}`);
-        return;
-      }
-
       if (!jobs || jobs.length === 0) {
         setJobs([]);
         return;
@@ -126,8 +138,8 @@ export default function EngineerDashboard() {
         client_phone: job.clients?.phone || 'No phone',
         job_address: job.job_address || 'Address not specified',
         scheduled_install_date: job.scheduled_install_date,
-        status_enhanced: job.status_enhanced,
-        engineer_status: job.engineer_status,
+        status_enhanced: job.status_enhanced as OrderStatusEnhanced,
+        engineer_status: 'pending', // Default value since column doesn't exist
         product_details: job.quotes?.product_details || 'No product details',
         total_amount: job.total_amount,
         engineer_signed_off_at: job.engineer_signed_off_at,

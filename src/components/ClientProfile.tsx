@@ -46,15 +46,29 @@ interface Project {
   scheduled_date: string | null;
   notes: string | null;
   installer_id: string | null;
+  installer_name?: string | null;
   quote_id: string | null;
   client_id: string;
-  // Optional field that might not exist
-  installer_name?: string;
 }
 
-export const ClientProfile: React.FC = () => {
-  const { clientId } = useParams<{ clientId: string }>();
-  const [client, setClient] = useState<Client | null>(null);
+interface ClientProfileProps {
+  client: {
+    id: string;
+    full_name: string;
+    email: string;
+    phone: string | null;
+    address: string | null;
+    created_at: string;
+    updated_at?: string;
+  };
+  onBack: () => void;
+}
+
+export const ClientProfile: React.FC<ClientProfileProps> = ({ client: initialClient, onBack }) => {
+  const [client, setClient] = useState<Client | null>({
+    ...initialClient,
+    updated_at: initialClient.updated_at || new Date().toISOString()
+  });
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -69,10 +83,10 @@ export const ClientProfile: React.FC = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    if (clientId) {
+    if (initialClient?.id) {
       fetchClientData();
     }
-  }, [clientId]);
+  }, [initialClient?.id]);
 
   const fetchClientData = async () => {
     try {
@@ -82,7 +96,7 @@ export const ClientProfile: React.FC = () => {
       const { data: clientData, error: clientError } = await supabase
         .from('clients')
         .select('*')
-        .eq('id', clientId)
+        .eq('id', initialClient.id)
         .single();
 
       if (clientError) throw clientError;
@@ -99,7 +113,7 @@ export const ClientProfile: React.FC = () => {
       const { data: quotesData, error: quotesError } = await supabase
         .from('quotes')
         .select('id, quote_number, status, total_cost, created_at')
-        .eq('client_id', clientId)
+        .eq('client_id', initialClient.id)
         .order('created_at', { ascending: false });
 
       if (quotesError) throw quotesError;
@@ -109,7 +123,7 @@ export const ClientProfile: React.FC = () => {
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
         .select('id, order_number, status, total_amount, created_at')
-        .eq('client_id', clientId)
+        .eq('client_id', initialClient.id)
         .order('created_at', { ascending: false });
 
       if (ordersError) throw ordersError;
@@ -130,7 +144,7 @@ export const ClientProfile: React.FC = () => {
           quote_id,
           client_id
         `)
-        .eq('client_id', clientId)
+        .eq('client_id', initialClient.id)
         .order('created_at', { ascending: false });
 
       if (projectsError) throw projectsError;
@@ -165,7 +179,7 @@ export const ClientProfile: React.FC = () => {
           phone: editForm.phone || null,
           address: editForm.address || null
         })
-        .eq('id', clientId)
+        .eq('id', initialClient.id)
         .select()
         .single();
 

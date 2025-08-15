@@ -130,7 +130,7 @@ export default function EngineerJobDetail() {
           order_number,
           status,
           status_enhanced,
-          engineer_status,
+          
           job_address,
           scheduled_install_date,
           total_amount,
@@ -162,7 +162,7 @@ export default function EngineerJobDetail() {
         scheduled_install_date: data.scheduled_install_date,
         status: data.status,
         status_enhanced: data.status_enhanced,
-        engineer_status: data.engineer_status || 'scheduled',
+        engineer_status: 'scheduled', // Default value since column doesn't exist
         product_details: data.quote.product_details,
         total_amount: data.total_amount,
         quote: {

@@ -37,22 +37,8 @@ export interface EngineerSuggestion {
 
 // Get scheduling settings from admin configuration
 export const getSchedulingSettings = async () => {
-  const { data, error } = await supabase
-    .rpc('get_scheduling_settings');
-  
-  if (error) {
-    console.error('Error fetching scheduling settings:', error);
-    return {
-      hours_advance_notice: 48,
-      max_distance_miles: 90,
-      max_jobs_per_day: 3,
-      allow_weekend_bookings: false,
-      working_hours_start: '08:00',
-      working_hours_end: '18:00'
-    };
-  }
-  
-  return data[0] || {
+  // Return default settings since RPC function doesn't exist
+  return {
     hours_advance_notice: 48,
     max_distance_miles: 90,
     max_jobs_per_day: 3,
@@ -289,6 +275,10 @@ export const findFirstAvailableSlot = async (
   estimatedHours: number = 2,
   clientId?: string
 ) => {
+  // Return null since RPC function doesn't exist
+  return null;
+  
+  /* TODO: Re-enable when RPC function is created
   const { data, error } = await supabase.rpc('find_first_available_slot', {
     p_engineer_ids: engineerIds,
     p_client_postcode: clientPostcode,
@@ -302,6 +292,7 @@ export const findFirstAvailableSlot = async (
   }
 
   return data || [];
+  */
 };
 
 // Smart engineer recommendations

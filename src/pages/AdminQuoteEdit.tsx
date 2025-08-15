@@ -156,13 +156,13 @@ export default function AdminQuoteEdit() {
       // Set form data from quote
       setFormData({
         client_id: data.client_id,
-        room_info: data.room_info || '',
-        range: data.range || '',
-        finish: data.finish || '',
+        room_info: '',
+        range: '',
+        finish: '',
         special_instructions: data.special_instructions || '',
         warranty_period: data.warranty_period || '5 years',
         includes_installation: data.includes_installation ?? true,
-        deposit_required: data.deposit_required || 0,
+        deposit_required: data.total_cost * 0.25 || 0,
         notes: data.notes || '',
         expires_at: data.expires_at ? new Date(data.expires_at).toISOString().split('T')[0] : '',
       });
