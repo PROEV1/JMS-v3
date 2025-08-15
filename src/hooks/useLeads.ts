@@ -1,5 +1,8 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { transformLeadData, mergeLeadWithStatusOverride, filterLeadsByStatus } from '@/utils/leadUtils';
+import { createOrFindClient, saveLeadHistory } from '@/utils/leadConversionUtils';
 
 export interface Lead {
   id: string;
@@ -14,14 +17,14 @@ export interface Lead {
   notes?: string;
   quote_number?: string;
   total_cost?: number;
-  total_price?: number; // New main price field
+  total_price?: number;
   product_details?: string;
   product_name?: string;
   product_price?: number;
   width_cm?: number;
-  finish?: string; // New field
-  luxe_upgrade?: boolean; // New field
-  accessories_data?: any; // JSONB field from database
+  finish?: string;
+  luxe_upgrade?: boolean;
+  accessories_data?: any;
   accessories?: Array<{
     name: string;
     price: number;
@@ -87,34 +90,14 @@ export const useLeads = (options: UseLeadsOptions = {}) => {
 
       console.log('Status overrides:', statusOverrides?.length || 0);
       
-      // Merge external leads with local status overrides
-      const mergedLeads = (data.leads || []).map((lead: Lead) => {
-        const override = statusOverrides?.find(o => o.external_lead_id === lead.id);
-        if (override) {
-          return {
-            ...lead,
-            status: override.status,
-            client_id: override.client_id,
-            notes: override.notes || lead.notes
-          };
-        }
-        return lead;
-      });
+      // Transform and merge external leads with local status overrides
+      const transformedLeads = (data.leads || []).map((lead: any) => transformLeadData(lead));
+      const mergedLeads = transformedLeads.map((lead: Lead) => 
+        mergeLeadWithStatusOverride(lead, statusOverrides || [])
+      );
 
-      // Apply status filter after merging (since edge function doesn't handle this now)
-      let finalLeads = mergedLeads;
-      if (options.status) {
-        finalLeads = mergedLeads.filter(lead => {
-          const matches = lead.status === options.status;
-          if (!matches) {
-            console.log(`Lead ${lead.id} status '${lead.status}' doesn't match filter '${options.status}'`);
-          }
-          return matches;
-        });
-        console.log(`Filtered leads by status '${options.status}':`, finalLeads.length, 'out of', mergedLeads.length);
-        console.log('Filtered leads:', finalLeads.map(l => ({ id: l.id, name: l.name, status: l.status })));
-      }
-
+      // Apply status filter after merging
+      const finalLeads = filterLeadsByStatus(mergedLeads, options.status);
       setLeads(finalLeads);
 
     } catch (err) {
@@ -173,77 +156,8 @@ export const useLeads = (options: UseLeadsOptions = {}) => {
 
   const convertToClient = useCallback(async (lead: Lead) => {
     try {
-      console.log('Converting lead to client:', lead.name);
-      
-      // First check if a client with this email already exists
-      const { data: existingClients, error: searchError } = await supabase
-        .from('clients')
-        .select('id, full_name')
-        .eq('email', lead.email)
-        .order('created_at', { ascending: false })
-        .limit(1);
-
-      if (searchError) {
-        console.error('Error searching for existing client:', searchError);
-        throw new Error(`Failed to search for existing client: ${searchError.message}`);
-      }
-
-      const existingClient = existingClients?.[0];
-
-      let clientData;
-      
-      if (existingClient) {
-        console.log('Using existing client:', existingClient);
-        clientData = existingClient;
-      } else {
-        // Create a new client record
-        const { data: newClient, error: clientError } = await supabase
-          .from('clients')
-          .insert({
-            user_id: null, // No user account initially
-            full_name: lead.name,
-            email: lead.email,
-            phone: lead.phone || null,
-            address: null
-          })
-          .select()
-          .single();
-
-        if (clientError) {
-          console.error('Error creating client record:', clientError);
-          throw new Error(`Failed to create client record: ${clientError.message}`);
-        }
-
-        console.log('Client created successfully:', newClient);
-        clientData = newClient;
-      }
-
-      // Save lead data to lead_history table with all new fields
-      const { error: historyError } = await supabase
-        .from('lead_history')
-        .insert({
-          client_id: clientData.id,
-          original_lead_id: lead.id,
-          lead_name: lead.name,
-          lead_email: lead.email,
-          lead_phone: lead.phone || null,
-          lead_notes: lead.notes || null,
-          product_name: lead.product_name || null,
-          product_price: lead.product_price || null,
-          width_cm: lead.width_cm || null,
-          lead_created_at: lead.created_at,
-          source: lead.source || null,
-          status: lead.status,
-          total_price: lead.total_price || null,
-          accessories_data: lead.accessories_data || null,
-          finish: lead.finish || lead.configuration?.finish || null,
-          luxe_upgrade: lead.luxe_upgrade || lead.configuration?.luxe_upgrade || null
-        });
-
-      if (historyError) {
-        console.error('Error saving lead history:', historyError);
-        throw new Error(`Failed to save lead history: ${historyError.message}`);
-      }
+      const clientData = await createOrFindClient(lead);
+      await saveLeadHistory(lead, clientData.id);
       
       // Update the lead status to converted with the actual client_id
       await updateLead(lead.id, { 
@@ -260,7 +174,7 @@ export const useLeads = (options: UseLeadsOptions = {}) => {
       console.error('Error converting lead to client:', err);
       throw err;
     }
-  }, [updateLead]);
+  }, [updateLead, fetchLeads]);
 
   useEffect(() => {
     fetchLeads();

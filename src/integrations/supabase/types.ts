@@ -7,10 +7,10 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "12.2.12 (cd3cf9e)"
+    PostgrestVersion: "13.0.4"
   }
   public: {
     Tables: {
@@ -79,7 +79,7 @@ export type Database = {
           id: string
           phone: string | null
           updated_at: string
-          user_id: string | null
+          user_id: string
         }
         Insert: {
           address?: string | null
@@ -89,7 +89,7 @@ export type Database = {
           id?: string
           phone?: string | null
           updated_at?: string
-          user_id?: string | null
+          user_id: string
         }
         Update: {
           address?: string | null
@@ -99,7 +99,7 @@ export type Database = {
           id?: string
           phone?: string | null
           updated_at?: string
-          user_id?: string | null
+          user_id?: string
         }
         Relationships: []
       }
@@ -479,63 +479,51 @@ export type Database = {
       }
       lead_history: {
         Row: {
-          accessories_data: Json | null
           client_id: string
           converted_at: string
-          finish: string | null
           id: string
           lead_created_at: string
           lead_email: string
           lead_name: string
           lead_notes: string | null
           lead_phone: string | null
-          luxe_upgrade: boolean | null
           original_lead_id: string
           product_name: string | null
           product_price: number | null
           source: string | null
           status: string | null
-          total_price: number | null
           width_cm: number | null
         }
         Insert: {
-          accessories_data?: Json | null
           client_id: string
           converted_at?: string
-          finish?: string | null
           id?: string
           lead_created_at: string
           lead_email: string
           lead_name: string
           lead_notes?: string | null
           lead_phone?: string | null
-          luxe_upgrade?: boolean | null
           original_lead_id: string
           product_name?: string | null
           product_price?: number | null
           source?: string | null
           status?: string | null
-          total_price?: number | null
           width_cm?: number | null
         }
         Update: {
-          accessories_data?: Json | null
           client_id?: string
           converted_at?: string
-          finish?: string | null
           id?: string
           lead_created_at?: string
           lead_email?: string
           lead_name?: string
           lead_notes?: string | null
           lead_phone?: string | null
-          luxe_upgrade?: boolean | null
           original_lead_id?: string
           product_name?: string | null
           product_price?: number | null
           source?: string | null
           status?: string | null
-          total_price?: number | null
           width_cm?: number | null
         }
         Relationships: [
@@ -550,41 +538,30 @@ export type Database = {
       }
       lead_status_overrides: {
         Row: {
-          client_id: string | null
-          external_lead_id: string
+          created_at: string
+          created_by: string
           id: string
+          lead_id: string
           notes: string | null
           status: string
-          updated_at: string
-          updated_by: string
         }
         Insert: {
-          client_id?: string | null
-          external_lead_id: string
+          created_at?: string
+          created_by: string
           id?: string
+          lead_id: string
           notes?: string | null
           status: string
-          updated_at?: string
-          updated_by: string
         }
         Update: {
-          client_id?: string | null
-          external_lead_id?: string
+          created_at?: string
+          created_by?: string
           id?: string
+          lead_id?: string
           notes?: string | null
           status?: string
-          updated_at?: string
-          updated_by?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "lead_status_overrides_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       messages: {
         Row: {
@@ -810,7 +787,6 @@ export type Database = {
           engineer_notes: string | null
           engineer_signature_data: string | null
           engineer_signed_off_at: string | null
-          engineer_status: string | null
           estimated_duration_hours: number | null
           id: string
           installation_date: string | null
@@ -845,7 +821,6 @@ export type Database = {
           engineer_notes?: string | null
           engineer_signature_data?: string | null
           engineer_signed_off_at?: string | null
-          engineer_status?: string | null
           estimated_duration_hours?: number | null
           id?: string
           installation_date?: string | null
@@ -880,7 +855,6 @@ export type Database = {
           engineer_notes?: string | null
           engineer_signature_data?: string | null
           engineer_signed_off_at?: string | null
-          engineer_status?: string | null
           estimated_duration_hours?: number | null
           id?: string
           installation_date?: string | null
@@ -929,30 +903,43 @@ export type Database = {
       }
       payments: {
         Row: {
-          amount_paid: number
+          amount: number
+          client_id: string
           created_at: string
           id: string
-          method: string
-          paid_on: string | null
+          payment_type: string
           quote_id: string | null
+          status: string
+          stripe_session_id: string | null
         }
         Insert: {
-          amount_paid?: number
+          amount: number
+          client_id: string
           created_at?: string
           id?: string
-          method: string
-          paid_on?: string | null
+          payment_type: string
           quote_id?: string | null
+          status?: string
+          stripe_session_id?: string | null
         }
         Update: {
-          amount_paid?: number
+          amount?: number
+          client_id?: string
           created_at?: string
           id?: string
-          method?: string
-          paid_on?: string | null
+          payment_type?: string
           quote_id?: string | null
+          status?: string
+          stripe_session_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "payments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "payments_quote_id_fkey"
             columns: ["quote_id"]
@@ -965,21 +952,27 @@ export type Database = {
       product_compatibility: {
         Row: {
           accessory_product_id: string
+          compatibility_type: string
           core_product_id: string
           created_at: string
           id: string
+          notes: string | null
         }
         Insert: {
           accessory_product_id: string
+          compatibility_type: string
           core_product_id: string
           created_at?: string
           id?: string
+          notes?: string | null
         }
         Update: {
           accessory_product_id?: string
+          compatibility_type?: string
           core_product_id?: string
           created_at?: string
           id?: string
+          notes?: string | null
         }
         Relationships: [
           {
@@ -992,6 +985,20 @@ export type Database = {
           {
             foreignKeyName: "product_compatibility_core_product_id_fkey"
             columns: ["core_product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_compatibility_product1_id_fkey"
+            columns: ["core_product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_compatibility_product2_id_fkey"
+            columns: ["accessory_product_id"]
             isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
@@ -1085,7 +1092,6 @@ export type Database = {
           description: string | null
           id: string
           is_active: boolean | null
-          min_width: number | null
           name: string
           specifications: Json | null
           updated_at: string
@@ -1097,7 +1103,6 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean | null
-          min_width?: number | null
           name: string
           specifications?: Json | null
           updated_at?: string
@@ -1109,7 +1114,6 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean | null
-          min_width?: number | null
           name?: string
           specifications?: Json | null
           updated_at?: string
@@ -1167,7 +1171,6 @@ export type Database = {
           created_at: string
           id: string
           installer_id: string | null
-          installer_name: string | null
           notes: string | null
           project_name: string
           quote_id: string | null
@@ -1180,7 +1183,6 @@ export type Database = {
           created_at?: string
           id?: string
           installer_id?: string | null
-          installer_name?: string | null
           notes?: string | null
           project_name: string
           quote_id?: string | null
@@ -1193,7 +1195,6 @@ export type Database = {
           created_at?: string
           id?: string
           installer_id?: string | null
-          installer_name?: string | null
           notes?: string | null
           project_name?: string
           quote_id?: string | null
@@ -1279,15 +1280,10 @@ export type Database = {
       quotes: {
         Row: {
           accepted_at: string | null
-          appointment_date: string | null
           client_id: string
           created_at: string
-          customer_reference: string | null
-          deposit_required: number | null
-          designer_name: string | null
           expires_at: string | null
           extras_cost: number
-          finish: string | null
           id: string
           includes_installation: boolean | null
           install_cost: number
@@ -1297,8 +1293,6 @@ export type Database = {
           product_details: string
           quote_number: string
           quote_template: string | null
-          range: string | null
-          room_info: string | null
           share_token: string | null
           special_instructions: string | null
           status: string
@@ -1308,15 +1302,10 @@ export type Database = {
         }
         Insert: {
           accepted_at?: string | null
-          appointment_date?: string | null
           client_id: string
           created_at?: string
-          customer_reference?: string | null
-          deposit_required?: number | null
-          designer_name?: string | null
           expires_at?: string | null
           extras_cost?: number
-          finish?: string | null
           id?: string
           includes_installation?: boolean | null
           install_cost?: number
@@ -1326,8 +1315,6 @@ export type Database = {
           product_details: string
           quote_number: string
           quote_template?: string | null
-          range?: string | null
-          room_info?: string | null
           share_token?: string | null
           special_instructions?: string | null
           status?: string
@@ -1337,15 +1324,10 @@ export type Database = {
         }
         Update: {
           accepted_at?: string | null
-          appointment_date?: string | null
           client_id?: string
           created_at?: string
-          customer_reference?: string | null
-          deposit_required?: number | null
-          designer_name?: string | null
           expires_at?: string | null
           extras_cost?: number
-          finish?: string | null
           id?: string
           includes_installation?: boolean | null
           install_cost?: number
@@ -1355,8 +1337,6 @@ export type Database = {
           product_details?: string
           quote_number?: string
           quote_template?: string | null
-          range?: string | null
-          room_info?: string | null
           share_token?: string | null
           special_instructions?: string | null
           status?: string
@@ -1433,8 +1413,8 @@ export type Database = {
       archive_engineer_work: {
         Args: {
           p_order_id: string
-          p_reset_reason: string
           p_reset_by?: string
+          p_reset_reason: string
           p_scheduled_date_after?: string
         }
         Returns: string
@@ -1447,46 +1427,8 @@ export type Database = {
         Args: { p_order_id: string }
         Returns: Json
       }
-      find_first_available_slot: {
-        Args: {
-          p_engineer_ids: string[]
-          p_client_postcode: string
-          p_estimated_hours?: number
-          p_client_id?: string
-        }
-        Returns: {
-          engineer_id: string
-          available_date: string
-          distance_miles: number
-          travel_time_minutes: number
-          recommendation_score: number
-        }[]
-      }
-      get_engineer_assigned_client_ids: {
-        Args: Record<PropertyKey, never>
-        Returns: string[]
-      }
-      get_engineer_assigned_quote_ids: {
-        Args: Record<PropertyKey, never>
-        Returns: string[]
-      }
       get_engineer_daily_workload: {
-        Args: { p_engineer_id: string; p_date: string }
-        Returns: number
-      }
-      get_scheduling_settings: {
-        Args: Record<PropertyKey, never>
-        Returns: {
-          hours_advance_notice: number
-          max_distance_miles: number
-          max_jobs_per_day: number
-          allow_weekend_bookings: boolean
-          working_hours_start: string
-          working_hours_end: string
-        }[]
-      }
-      get_user_assigned_jobs_count: {
-        Args: { user_id: string }
+        Args: { p_date: string; p_engineer_id: string }
         Returns: number
       }
       get_user_role: {
@@ -1495,24 +1437,24 @@ export type Database = {
       }
       log_order_activity: {
         Args: {
-          p_order_id: string
           p_activity_type: string
+          p_created_by?: string
           p_description: string
           p_details?: Json
-          p_created_by?: string
+          p_order_id: string
         }
         Returns: string
       }
       log_user_action: {
         Args: {
           p_action_type: string
-          p_target_user_id: string
           p_details?: Json
+          p_target_user_id: string
         }
         Returns: string
       }
       user_has_permission: {
-        Args: { user_id: string; permission_key: string }
+        Args: { permission_key: string; user_id: string }
         Returns: boolean
       }
     }
@@ -1530,7 +1472,7 @@ export type Database = {
         | "install_completed_pending_qa"
         | "completed"
         | "revisit_required"
-        | "awaiting_final_payment"
+        | "cancelled"
       user_role:
         | "admin"
         | "client"
@@ -1677,7 +1619,7 @@ export const Constants = {
         "install_completed_pending_qa",
         "completed",
         "revisit_required",
-        "awaiting_final_payment",
+        "cancelled",
       ],
       user_role: [
         "admin",
