@@ -8,7 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Check, ChevronsUpDown, Search, Plus, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -424,30 +424,32 @@ export function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLeadModalP
                             value={clientSearchTerm}
                             onValueChange={setClientSearchTerm}
                           />
-                          <CommandEmpty>
-                            {Array.isArray(clients) && clients.length === 0 
-                              ? "No clients found. Create a new client below." 
-                              : "No clients match your search."}
-                          </CommandEmpty>
-                          <CommandGroup className="max-h-48 overflow-y-auto">
-                            {filteredClients.map((client) => (
-                              <CommandItem
-                                key={client.id}
-                                onSelect={() => handleClientSelect(client)}
-                              >
-                                <Check
-                                  className={cn(
-                                    "mr-2 h-4 w-4",
-                                    selectedClient?.id === client.id ? "opacity-100" : "opacity-0"
-                                  )}
-                                />
-                                <div>
-                                  <div className="font-medium">{client.full_name}</div>
-                                  <div className="text-sm text-muted-foreground">{client.email}</div>
-                                </div>
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
+                          <CommandList>
+                            <CommandEmpty>
+                              {Array.isArray(clients) && clients.length === 0 
+                                ? "No clients found. Create a new client below." 
+                                : "No clients match your search."}
+                            </CommandEmpty>
+                            <CommandGroup className="max-h-48 overflow-y-auto">
+                              {filteredClients.map((client) => (
+                                <CommandItem
+                                  key={client.id}
+                                  onSelect={() => handleClientSelect(client)}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      selectedClient?.id === client.id ? "opacity-100" : "opacity-0"
+                                    )}
+                                  />
+                                  <div>
+                                    <div className="font-medium">{client.full_name}</div>
+                                    <div className="text-sm text-muted-foreground">{client.email}</div>
+                                  </div>
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
                         </Command>
                       </div>
                     )}
@@ -585,7 +587,9 @@ export function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLeadModalP
                       <Button
                         type="button"
                         variant="outline"
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
                           setProductSearchOpen(!productSearchOpen);
                           setClientSearchOpen(false);
                         }}
@@ -603,32 +607,34 @@ export function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLeadModalP
                               value={productSearchTerm}
                               onValueChange={setProductSearchTerm}
                             />
-                            <CommandEmpty>
-                              {Array.isArray(products) && products.length === 0 
-                                ? "No products available." 
-                                : "No products match your search."}
-                            </CommandEmpty>
-                            <CommandGroup className="max-h-48 overflow-y-auto">
-                              {filteredProducts.map((product) => (
-                                <CommandItem
-                                  key={product.id}
-                                  onSelect={() => handleProductSelect(product)}
-                                >
-                                  <Check
-                                    className={cn(
-                                      "mr-2 h-4 w-4",
-                                      selectedProduct?.id === product.id ? "opacity-100" : "opacity-0"
-                                    )}
-                                  />
-                                  <div className="flex-1">
-                                    <div className="font-medium">{product.name}</div>
-                                   <div className="text-sm text-muted-foreground">
-                                     £{product.base_price?.toLocaleString() || '0'} • {product.category || 'Uncategorized'}
+                            <CommandList>
+                              <CommandEmpty>
+                                {Array.isArray(products) && products.length === 0 
+                                  ? "No products available." 
+                                  : "No products match your search."}
+                              </CommandEmpty>
+                              <CommandGroup className="max-h-48 overflow-y-auto">
+                                {filteredProducts.map((product) => (
+                                  <CommandItem
+                                    key={product.id}
+                                    onSelect={() => handleProductSelect(product)}
+                                  >
+                                    <Check
+                                      className={cn(
+                                        "mr-2 h-4 w-4",
+                                        selectedProduct?.id === product.id ? "opacity-100" : "opacity-0"
+                                      )}
+                                    />
+                                    <div className="flex-1">
+                                      <div className="font-medium">{product.name}</div>
+                                     <div className="text-sm text-muted-foreground">
+                                       £{product.base_price?.toLocaleString() || '0'} • {product.category || 'Uncategorized'}
+                                     </div>
                                    </div>
-                                 </div>
-                               </CommandItem>
-                             ))}
-                           </CommandGroup>
+                                 </CommandItem>
+                               ))}
+                             </CommandGroup>
+                           </CommandList>
                          </Command>
                        </div>
                      )}
