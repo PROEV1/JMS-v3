@@ -72,32 +72,70 @@ serve(async (req) => {
     // Get client data from request
     const { full_name, email, phone, address } = await req.json();
 
-    // Generate temporary password
-    const tempPassword = Math.random().toString(36).slice(-12) + 'A1!';
+    console.log("Attempting to create/connect client with email:", email);
 
-    // Create the auth user using admin client (won't affect current session)
-    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email: email,
-      password: tempPassword,
-      user_metadata: {
-        full_name: full_name,
-      },
-      email_confirm: true
-    });
-
-    if (authError) {
-      throw new Error(`Auth creation failed: ${authError.message}`);
+    // First, check if a user with this email already exists
+    const { data: existingUser, error: userLookupError } = await supabaseAdmin.auth.admin.getUsersByEmail(email);
+    
+    if (userLookupError && userLookupError.message !== 'User not found') {
+      console.error("Error looking up existing user:", userLookupError);
+      throw new Error(`User lookup failed: ${userLookupError.message}`);
     }
 
-    if (!authData.user) {
-      throw new Error("Failed to create user");
+    let userId = null;
+    let tempPassword = null;
+
+    if (existingUser && existingUser.data && existingUser.data.users.length > 0) {
+      // User already exists, use their ID
+      userId = existingUser.data.users[0].id;
+      console.log("Found existing user with ID:", userId);
+      
+      // Check if this user already has a client record
+      const { data: existingClient, error: clientCheckError } = await supabaseAdmin
+        .from('clients')
+        .select('id')
+        .eq('user_id', userId)
+        .maybeSingle();
+        
+      if (clientCheckError) {
+        console.error("Error checking existing client:", clientCheckError);
+        throw new Error(`Client check failed: ${clientCheckError.message}`);
+      }
+      
+      if (existingClient) {
+        throw new Error("This email already has a client account");
+      }
+    } else {
+      // User doesn't exist, create new auth user
+      console.log("Creating new auth user");
+      tempPassword = Math.random().toString(36).slice(-12) + 'A1!';
+      
+      const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+        email: email,
+        password: tempPassword,
+        user_metadata: {
+          full_name: full_name,
+        },
+        email_confirm: true
+      });
+
+      if (authError) {
+        throw new Error(`Auth creation failed: ${authError.message}`);
+      }
+
+      if (!authData.user) {
+        throw new Error("Failed to create user");
+      }
+      
+      userId = authData.user.id;
+      console.log("Created new user with ID:", userId);
     }
 
     // Create client record using service role (bypasses RLS)
     const { data: clientData, error: clientError } = await supabaseAdmin
       .from('clients')
       .insert({
-        user_id: authData.user.id,
+        user_id: userId,
         full_name: full_name,
         email: email,
         phone: phone || null,
@@ -107,16 +145,22 @@ serve(async (req) => {
       .single();
 
     if (clientError) {
-      // If client creation fails, clean up the auth user
-      await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
+      console.error("Client creation failed:", clientError);
+      // If client creation fails and we created a new user, clean up the auth user
+      if (tempPassword && userId) {
+        await supabaseAdmin.auth.admin.deleteUser(userId);
+      }
       throw new Error(`Client creation failed: ${clientError.message}`);
     }
+
+    console.log("Client created successfully:", clientData.id);
 
     return new Response(
       JSON.stringify({ 
         success: true, 
         client: clientData,
-        temporaryPassword: tempPassword 
+        temporaryPassword: tempPassword,
+        isNewUser: !!tempPassword
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

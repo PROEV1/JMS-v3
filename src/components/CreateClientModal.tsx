@@ -20,8 +20,7 @@ export const CreateClientModal = ({ isOpen, onClose, onSuccess }: CreateClientMo
     full_name: '',
     email: '',
     phone: '',
-    address: '',
-    password: ''
+    address: ''
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -30,10 +29,10 @@ export const CreateClientModal = ({ isOpen, onClose, onSuccess }: CreateClientMo
 
     try {
       // Validate form data
-      if (!formData.full_name.trim() || !formData.email.trim() || !formData.password.trim()) {
+      if (!formData.full_name.trim() || !formData.email.trim()) {
         toast({
           title: "Validation Error",
-          description: "Name, email, and password are required",
+          description: "Name and email are required",
           variant: "destructive",
         });
         return;
@@ -45,8 +44,7 @@ export const CreateClientModal = ({ isOpen, onClose, onSuccess }: CreateClientMo
           full_name: formData.full_name.trim(),
           email: formData.email.trim(),
           phone: formData.phone.trim() || null,
-          address: formData.address.trim() || null,
-          password: formData.password
+          address: formData.address.trim() || null
         }
       });
 
@@ -62,8 +60,7 @@ export const CreateClientModal = ({ isOpen, onClose, onSuccess }: CreateClientMo
         full_name: '',
         email: '',
         phone: '',
-        address: '',
-        password: ''
+        address: ''
       });
       
       onClose();
@@ -71,7 +68,9 @@ export const CreateClientModal = ({ isOpen, onClose, onSuccess }: CreateClientMo
       
       toast({
         title: "Success",
-        description: "Client created successfully",
+        description: data.isNewUser 
+          ? `Client created successfully${data.temporaryPassword ? ` with temporary password: ${data.temporaryPassword}` : ''}`
+          : "Existing user connected as client successfully",
       });
 
     } catch (error) {
@@ -91,8 +90,7 @@ export const CreateClientModal = ({ isOpen, onClose, onSuccess }: CreateClientMo
       full_name: '',
       email: '',
       phone: '',
-      address: '',
-      password: ''
+      address: ''
     });
     onClose();
   };
@@ -126,17 +124,6 @@ export const CreateClientModal = ({ isOpen, onClose, onSuccess }: CreateClientMo
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="password">Password *</Label>
-            <Input
-              id="password"
-              type="password"
-              value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              required
-              placeholder="Minimum 6 characters"
-            />
-          </div>
 
           <div className="space-y-2">
             <Label htmlFor="phone">Phone</Label>
