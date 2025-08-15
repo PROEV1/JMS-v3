@@ -1,5 +1,5 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { useToast } from '@/hooks/use-toast';
 import { Lead } from '@/hooks/useLeads';
 import { validateLeadData } from '@/utils/leadUtils';
+import { Plus } from 'lucide-react';
 
 interface CreateLeadModalProps {
   isOpen: boolean;
@@ -20,6 +21,16 @@ interface CreateLeadModalProps {
 export const CreateLeadModal = ({ isOpen, onClose, onSuccess, clients = [] }: CreateLeadModalProps) => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [clientSearch, setClientSearch] = useState('');
+  const [filteredClients, setFilteredClients] = useState(clients);
+  const [isClientModalOpen, setIsClientModalOpen] = useState(false);
+  const [newClientData, setNewClientData] = useState({
+    full_name: '',
+    email: '',
+    phone: '',
+    address: ''
+  });
+  
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -36,29 +47,86 @@ export const CreateLeadModal = ({ isOpen, onClose, onSuccess, clients = [] }: Cr
     luxe_upgrade: false
   });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
+  // Update filtered clients when clients prop or search changes
+  useEffect(() => {
+    if (!clientSearch.trim()) {
+      setFilteredClients(clients);
+    } else {
+      const filtered = clients.filter(client => 
+        client.full_name.toLowerCase().includes(clientSearch.toLowerCase()) ||
+        client.email.toLowerCase().includes(clientSearch.toLowerCase())
+      );
+      setFilteredClients(filtered);
+    }
+  }, [clients, clientSearch]);
+
+  const handleClientSearch = (searchValue: string) => {
+    setClientSearch(searchValue);
+  };
+
+  const createClient = async () => {
+    if (!newClientData.full_name || !newClientData.email) {
+      toast({
+        title: "Validation Error",
+        description: "Name and email are required",
+        variant: "destructive",
+      });
+      return;
+    }
 
     try {
-      // Validate form data
-      const validationData = {
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone,
-        total_price: formData.total_price ? parseFloat(formData.total_price) : undefined,
-        product_price: formData.product_price ? parseFloat(formData.product_price) : undefined,
-        width_cm: formData.width_cm ? parseFloat(formData.width_cm) : undefined,
-      };
-      const errors = validateLeadData(validationData);
-      if (errors.length > 0) {
-        toast({
-          title: "Validation Error",
-          description: errors.join(', '),
-          variant: "destructive",
-        });
-        return;
-      }
+      const { data, error } = await supabase.functions.invoke('admin-create-client', {
+        body: newClientData
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Client created successfully",
+      });
+
+      // Select the new client
+      const newClient = data.client;
+      setFormData(prev => ({ ...prev, client_id: newClient.id }));
+      
+      // Clear search and close modal
+      setClientSearch('');
+      setIsClientModalOpen(false);
+      setNewClientData({ full_name: '', email: '', phone: '', address: '' });
+      
+    } catch (error) {
+      console.error('Error creating client:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create client",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const errors = validateLeadData({
+      name: formData.name,
+      email: formData.email,
+      phone: formData.phone,
+      product_price: formData.product_price ? parseFloat(formData.product_price) : undefined,
+      total_price: formData.total_price ? parseFloat(formData.total_price) : undefined,
+      width_cm: formData.width_cm ? parseFloat(formData.width_cm) : undefined,
+    } as any);
+    if (errors.length > 0) {
+      toast({
+        title: "Validation Error",
+        description: errors.join(', '),
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setLoading(true);
 
       // Create lead data object
       const leadData = {
@@ -79,7 +147,7 @@ export const CreateLeadModal = ({ isOpen, onClose, onSuccess, clients = [] }: Cr
       };
 
       // Call the success handler with the lead data
-      onSuccess(leadData as Lead);
+      await onSuccess(leadData as Lead);
       
       // Reset form
       setFormData({
@@ -97,14 +165,14 @@ export const CreateLeadModal = ({ isOpen, onClose, onSuccess, clients = [] }: Cr
         finish: '',
         luxe_upgrade: false
       });
-      
-      onClose();
+      setClientSearch('');
       
       toast({
         title: "Success",
         description: "Lead created successfully",
       });
-
+      
+      onClose();
     } catch (error) {
       console.error('Error creating lead:', error);
       toast({
@@ -169,23 +237,96 @@ export const CreateLeadModal = ({ isOpen, onClose, onSuccess, clients = [] }: Cr
             </div>
           </div>
 
-          {clients.length > 0 && (
+          <div className="space-y-2">
+            <Label htmlFor="client_id">Associate with Client (Optional)</Label>
             <div className="space-y-2">
-              <Label htmlFor="client_id">Associate with Client (Optional)</Label>
-              <Select value={formData.client_id} onValueChange={(value) => setFormData({ ...formData, client_id: value })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a client..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {clients.map((client) => (
-                    <SelectItem key={client.id} value={client.id}>
-                      {client.full_name} ({client.email})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Input
+                placeholder="Search clients..."
+                value={clientSearch}
+                onChange={(e) => handleClientSearch(e.target.value)}
+              />
+              <div className="flex gap-2">
+                <Select 
+                  value={formData.client_id} 
+                  onValueChange={(value) => setFormData({ ...formData, client_id: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a client..." />
+                  </SelectTrigger>
+                  <SelectContent className="bg-background z-50">
+                    {filteredClients.map((client) => (
+                      <SelectItem key={client.id} value={client.id}>
+                        {client.full_name} ({client.email})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Dialog open={isClientModalOpen} onOpenChange={setIsClientModalOpen}>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="icon"
+                    onClick={() => setIsClientModalOpen(true)}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Create New Client</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="new_client_name">Full Name *</Label>
+                        <Input
+                          id="new_client_name"
+                          value={newClientData.full_name}
+                          onChange={(e) => setNewClientData(prev => ({ ...prev, full_name: e.target.value }))}
+                          placeholder="Enter client name"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="new_client_email">Email *</Label>
+                        <Input
+                          id="new_client_email"
+                          type="email"
+                          value={newClientData.email}
+                          onChange={(e) => setNewClientData(prev => ({ ...prev, email: e.target.value }))}
+                          placeholder="Enter email address"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="new_client_phone">Phone</Label>
+                        <Input
+                          id="new_client_phone"
+                          value={newClientData.phone}
+                          onChange={(e) => setNewClientData(prev => ({ ...prev, phone: e.target.value }))}
+                          placeholder="Enter phone number"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="new_client_address">Address</Label>
+                        <Textarea
+                          id="new_client_address"
+                          value={newClientData.address}
+                          onChange={(e) => setNewClientData(prev => ({ ...prev, address: e.target.value }))}
+                          placeholder="Enter client address"
+                          rows={3}
+                        />
+                      </div>
+                      <div className="flex justify-end space-x-2">
+                        <Button type="button" variant="outline" onClick={() => setIsClientModalOpen(false)}>
+                          Cancel
+                        </Button>
+                        <Button type="button" onClick={createClient}>
+                          Create Client
+                        </Button>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
             </div>
-          )}
+          </div>
 
           <div className="space-y-2">
             <Label htmlFor="message">Message</Label>
