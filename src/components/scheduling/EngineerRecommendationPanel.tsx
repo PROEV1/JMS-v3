@@ -44,7 +44,7 @@ export function EngineerRecommendationPanel({
     setDebugInfo(`Job: ${order.order_number} | Postcode: ${order.postcode || 'Not available'}`);
     
     try {
-      const result = await getSmartEngineerRecommendations(order, engineers);
+      const result = await getSmartEngineerRecommendations(order, order.postcode);
       setSuggestions(result.recommendations);
       setSettings(result.settings);
       

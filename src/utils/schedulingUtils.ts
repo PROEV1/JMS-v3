@@ -17,7 +17,7 @@ export interface Order {
   amount_paid?: number;
   estimated_duration_hours?: number;
   installation_notes?: string;
-  scheduling_conflicts?: any[];
+  scheduling_conflicts?: any; // Allow Json or any[]
   client?: {
     full_name: string;
     email: string;
@@ -87,7 +87,12 @@ export const formatOrderForCalendar = (order: Order) => ({
   title: `${order.order_number} - ${order.client?.full_name || 'Unknown Client'}`,
   start: order.scheduled_install_date ? new Date(order.scheduled_install_date) : new Date(),
   end: order.scheduled_install_date ? new Date(new Date(order.scheduled_install_date).getTime() + 4 * 60 * 60 * 1000) : new Date(),
-  resource: order.engineer_id || '',
+  resource: {
+    order: order,
+    engineerId: order.engineer_id,
+    status: order.status_enhanced,
+    conflicts: Array.isArray(order.scheduling_conflicts) ? order.scheduling_conflicts : []
+  },
   extendedProps: {
     orderId: order.id,
     orderNumber: order.order_number,
@@ -98,11 +103,13 @@ export const formatOrderForCalendar = (order: Order) => ({
   }
 });
 
-export const updateOrderAssignment = async (orderId: string, engineerId: string | null, scheduledDate?: Date) => {
+export const updateOrderAssignment = async (orderId: string, engineerId: string | null, scheduledDate?: Date | string) => {
   try {
     const updateData: any = { engineer_id: engineerId };
     if (scheduledDate) {
-      updateData.scheduled_install_date = scheduledDate.toISOString();
+      // Handle both Date objects and strings
+      const dateToUpdate = scheduledDate instanceof Date ? scheduledDate.toISOString() : scheduledDate;
+      updateData.scheduled_install_date = dateToUpdate;
     }
 
     const { error } = await supabase
@@ -119,7 +126,7 @@ export const updateOrderAssignment = async (orderId: string, engineerId: string 
 };
 
 export const getSmartEngineerRecommendations = async (order: Order, postcode?: string) => {
-  // Simple implementation - return available engineers
+  // Simple implementation - return available engineers with required properties
   try {
     const { data: engineers, error } = await supabase
       .from('engineers')
@@ -131,7 +138,10 @@ export const getSmartEngineerRecommendations = async (order: Order, postcode?: s
     const recommendations = (engineers || []).map(engineer => ({
       engineer: engineer as Engineer,
       score: Math.random() * 100, // Placeholder scoring
-      reasons: ['Available engineer']
+      reasons: ['Available engineer'],
+      distance: Math.floor(Math.random() * 50), // Placeholder distance in miles
+      travelTime: Math.floor(Math.random() * 60) + 15, // Placeholder travel time in minutes
+      availableDate: new Date().toISOString().split('T')[0] // Today as placeholder
     }));
 
     return {
