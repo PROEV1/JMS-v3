@@ -30,6 +30,7 @@ import SetupPassword from "./pages/SetupPassword";
 import AdminMessages from "./pages/AdminMessages";
 import AdminSettings from "./pages/AdminSettings";
 import AdminUsers from "./pages/AdminUsers";
+import AdminClientUsers from "./pages/AdminClientUsers";
 import AdminUserDetail from "./pages/AdminUserDetail";
 import AdminUserInvite from "./pages/AdminUserInvite";
 import OrderDetail from "./pages/OrderDetail";
@@ -75,6 +76,7 @@ const App = () => (
             <Route path="/admin/quotes/:quoteId" element={<Layout><AdminQuoteDetail /></Layout>} />
             <Route path="/admin/messages" element={<Layout><AdminMessages /></Layout>} />
             <Route path="/admin/users" element={<Layout><AdminUsers /></Layout>} />
+            <Route path="/admin/client-users" element={<Layout><AdminClientUsers /></Layout>} />
             <Route path="/admin/users/new" element={<Layout><AdminUserInvite /></Layout>} />
             <Route path="/admin/users/:userId" element={<Layout><AdminUserDetail /></Layout>} />
             <Route path="/admin/settings" element={<Layout><AdminSettings /></Layout>} />
