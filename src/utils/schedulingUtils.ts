@@ -132,10 +132,50 @@ export const getSmartEngineerRecommendations = async (order: Order, postcode?: s
     // Get scheduling settings
     const settings = await getSchedulingSettings();
     
-    if (!postcode) {
-      console.log('No postcode provided for order');
-      return { recommendations: [], settings };
+    // Try to find postcode from multiple sources
+    let finalPostcode = postcode || order.postcode;
+    
+    if (!finalPostcode) {
+      // Try to get postcode from client data
+      try {
+        const { data: clientData, error: clientError } = await supabase
+          .from('clients')
+          .select('address')
+          .eq('id', order.client_id)
+          .single();
+        
+        if (clientError) throw clientError;
+        
+        // Try to extract postcode from client address
+        if (clientData?.address) {
+          const postcodeMatch = clientData.address.match(/([A-Z]{1,2}[0-9][A-Z0-9]?\s?[0-9][A-Z]{2})/i);
+          if (postcodeMatch) {
+            finalPostcode = postcodeMatch[1].replace(/\s/g, ' ').toUpperCase();
+          }
+        }
+      } catch (error) {
+        console.warn('Could not fetch client data for postcode:', error);
+      }
     }
+    
+    if (!finalPostcode && order.job_address) {
+      // Try to extract postcode from job address
+      const postcodeMatch = order.job_address.match(/([A-Z]{1,2}[0-9][A-Z0-9]?\s?[0-9][A-Z]{2})/i);
+      if (postcodeMatch) {
+        finalPostcode = postcodeMatch[1].replace(/\s/g, ' ').toUpperCase();
+      }
+    }
+    
+    if (!finalPostcode) {
+      console.log('No postcode found for order - checked order.postcode, client.address, and order.job_address');
+      return { 
+        recommendations: [], 
+        settings,
+        error: 'No postcode available - cannot calculate engineer recommendations without location data'
+      };
+    }
+
+    console.log('Using postcode for recommendations:', finalPostcode);
 
     // Get all engineers with complete settings
     const allEngineers = await getAllEngineersForScheduling();
@@ -162,9 +202,9 @@ export const getSmartEngineerRecommendations = async (order: Order, postcode?: s
           }
 
           // Check if engineer can serve this postcode
-          const serviceCheck = canEngineerServePostcode(engineer, postcode);
+          const serviceCheck = canEngineerServePostcode(engineer, finalPostcode);
           if (!serviceCheck.canServe) {
-            console.log(`Engineer ${engineer.name} cannot serve postcode ${postcode}`);
+            console.log(`Engineer ${engineer.name} cannot serve postcode ${finalPostcode}`);
             return null;
           }
 
@@ -174,7 +214,7 @@ export const getSmartEngineerRecommendations = async (order: Order, postcode?: s
           
           if (engineer.starting_postcode) {
             try {
-              const distanceResult = await getLiveDistance(engineer.starting_postcode, postcode);
+              const distanceResult = await getLiveDistance(engineer.starting_postcode, finalPostcode);
               distance = distanceResult.distance;
               travelTime = distanceResult.duration;
             } catch (error) {

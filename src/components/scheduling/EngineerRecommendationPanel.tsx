@@ -41,18 +41,22 @@ export function EngineerRecommendationPanel({
 
   const loadSmartRecommendations = async () => {
     setLoading(true);
-    setDebugInfo(`Job: ${order.order_number} | Postcode: ${order.postcode || 'Not available'}`);
+    setDebugInfo(`Job: ${order.order_number} | Checking postcode sources...`);
     
     try {
       const result = await getSmartEngineerRecommendations(order, order.postcode);
       setSuggestions(result.recommendations);
       setSettings(result.settings);
       
-      setDebugInfo(prev => prev + `\nFound ${result.recommendations.length} recommendations`);
+      if (result.error) {
+        setDebugInfo(`Job: ${order.order_number} | Error: ${result.error}`);
+      } else {
+        setDebugInfo(`Job: ${order.order_number} | Postcode: Available | Found ${result.recommendations.length} recommendations`);
+      }
     } catch (error) {
       console.error('Error loading smart recommendations:', error);
       setSuggestions([]);
-      setDebugInfo(prev => prev + `\nError: ${error.message}`);
+      setDebugInfo(`Job: ${order.order_number} | Error: ${error.message}`);
     } finally {
       setLoading(false);
     }
