@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 interface ProEVLogoProps {
   variant?: 'main' | 'icon';
@@ -11,6 +11,14 @@ export const ProEVLogo: React.FC<ProEVLogoProps> = ({
   size = 'md', 
   className = '' 
 }) => {
+  const [currentLogoIndex, setCurrentLogoIndex] = useState(0);
+  
+  const logoFallbacks = [
+    "/lovable-uploads/3add86aa-4857-42e8-9672-5ea09a594bb2.png",
+    "/pro-ev-logo.png",
+    "/lovable-uploads/97d9570a-a316-4ac2-8def-5eeab6670140.png"
+  ];
+
   const sizeClasses = {
     sm: 'h-8',
     md: 'h-12',
@@ -18,11 +26,18 @@ export const ProEVLogo: React.FC<ProEVLogoProps> = ({
     xl: 'h-20'
   };
 
+  const handleImageError = () => {
+    if (currentLogoIndex < logoFallbacks.length - 1) {
+      setCurrentLogoIndex(currentLogoIndex + 1);
+    }
+  };
+
   return (
     <img 
-      src="/lovable-uploads/3dcd69bc-de64-4dd6-a9d1-b8ce69f1751d.png"
+      src={logoFallbacks[currentLogoIndex]}
       className={`${sizeClasses[size]} w-auto ${className}`}
-      alt="Pro EV Logo" 
+      alt="Pro EV Logo"
+      onError={handleImageError}
     />
   );
 };
