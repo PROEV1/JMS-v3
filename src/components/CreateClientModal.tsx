@@ -10,7 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 interface CreateClientModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (client: any) => void;
 }
 
 export const CreateClientModal = ({ isOpen, onClose, onSuccess }: CreateClientModalProps) => {
@@ -63,8 +63,9 @@ export const CreateClientModal = ({ isOpen, onClose, onSuccess }: CreateClientMo
         address: ''
       });
       
+      // Close the modal and return the created client data
       onClose();
-      onSuccess();
+      onSuccess(data.client);
       
       toast({
         title: "Success",

@@ -161,13 +161,18 @@ export function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLeadModalP
     setShowCreateClientModal(true);
   };
 
-  const handleClientCreated = () => {
+  const handleClientCreated = (newClient: any) => {
     setShowCreateClientModal(false);
     loadClients(); // Refresh the clients list
-    toast({
-      title: "Success",
-      description: "Client created successfully",
-    });
+    // Auto-select the newly created client
+    setSelectedClient(newClient);
+    setFormData(prev => ({
+      ...prev,
+      name: newClient.full_name,
+      email: newClient.email,
+      phone: newClient.phone || '',
+      address: newClient.address || ''
+    }));
   };
 
   const resetForm = () => {
@@ -248,7 +253,15 @@ export function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLeadModalP
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent 
+        className="max-w-2xl max-h-[90vh] overflow-y-auto"
+        onInteractOutside={(e) => {
+          // Prevent closing when clicking on popovers
+          if (clientSearchOpen || productSearchOpen) {
+            e.preventDefault();
+          }
+        }}
+      >
         <DialogHeader>
           <DialogTitle>Create New Lead</DialogTitle>
         </DialogHeader>
@@ -294,31 +307,34 @@ export function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLeadModalP
                           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                         </Button>
                       </PopoverTrigger>
-                      <PopoverContent className="w-full p-0">
-                        <Command>
-                          <CommandInput placeholder="Search clients..." />
-                          <CommandEmpty>No clients found.</CommandEmpty>
-                          <CommandGroup className="max-h-48 overflow-y-auto">
-                            {clients.map((client) => (
-                              <CommandItem
-                                key={client.id}
-                                onSelect={() => handleClientSelect(client)}
-                              >
-                                <Check
-                                  className={cn(
-                                    "mr-2 h-4 w-4",
-                                    selectedClient?.id === client.id ? "opacity-100" : "opacity-0"
-                                  )}
-                                />
-                                <div>
-                                  <div className="font-medium">{client.full_name}</div>
-                                  <div className="text-sm text-muted-foreground">{client.email}</div>
-                                </div>
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </Command>
-                      </PopoverContent>
+                       <PopoverContent 
+                         className="w-full p-0"
+                         onInteractOutside={(e) => e.preventDefault()}
+                       >
+                         <Command>
+                           <CommandInput placeholder="Search clients..." />
+                           <CommandEmpty>No clients found.</CommandEmpty>
+                           <CommandGroup className="max-h-48 overflow-y-auto">
+                             {clients.map((client) => (
+                               <CommandItem
+                                 key={client.id}
+                                 onSelect={() => handleClientSelect(client)}
+                               >
+                                 <Check
+                                   className={cn(
+                                     "mr-2 h-4 w-4",
+                                     selectedClient?.id === client.id ? "opacity-100" : "opacity-0"
+                                   )}
+                                 />
+                                 <div>
+                                   <div className="font-medium">{client.full_name}</div>
+                                   <div className="text-sm text-muted-foreground">{client.email}</div>
+                                 </div>
+                               </CommandItem>
+                             ))}
+                           </CommandGroup>
+                         </Command>
+                       </PopoverContent>
                     </Popover>
 
                     <div className="flex items-center justify-center">
@@ -462,24 +478,27 @@ export function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLeadModalP
                           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                         </Button>
                       </PopoverTrigger>
-                      <PopoverContent className="w-full p-0">
-                        <Command>
-                          <CommandInput placeholder="Search products..." />
-                          <CommandEmpty>No products found.</CommandEmpty>
-                          <CommandGroup className="max-h-48 overflow-y-auto">
-                            {products.map((product) => (
-                              <CommandItem
-                                key={product.id}
-                                onSelect={() => handleProductSelect(product)}
-                              >
-                                <Check
-                                  className={cn(
-                                    "mr-2 h-4 w-4",
-                                    selectedProduct?.id === product.id ? "opacity-100" : "opacity-0"
-                                  )}
-                                />
-                                <div className="flex-1">
-                                  <div className="font-medium">{product.name}</div>
+                       <PopoverContent 
+                         className="w-full p-0"
+                         onInteractOutside={(e) => e.preventDefault()}
+                       >
+                         <Command>
+                           <CommandInput placeholder="Search products..." />
+                           <CommandEmpty>No products found.</CommandEmpty>
+                           <CommandGroup className="max-h-48 overflow-y-auto">
+                             {products.map((product) => (
+                               <CommandItem
+                                 key={product.id}
+                                 onSelect={() => handleProductSelect(product)}
+                               >
+                                 <Check
+                                   className={cn(
+                                     "mr-2 h-4 w-4",
+                                     selectedProduct?.id === product.id ? "opacity-100" : "opacity-0"
+                                   )}
+                                 />
+                                 <div className="flex-1">
+                                   <div className="font-medium">{product.name}</div>
                                   <div className="text-sm text-muted-foreground">
                                     £{product.base_price.toLocaleString()} • {product.category || 'Uncategorized'}
                                   </div>
