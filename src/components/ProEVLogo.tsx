@@ -22,10 +22,10 @@ export const ProEVLogo: React.FC<ProEVLogoProps> = ({
   ];
 
   const sizeClasses = {
-    sm: 'h-6',
-    md: 'h-9',
-    lg: 'h-12',
-    xl: 'h-15'
+    sm: 'h-4',
+    md: 'h-6',
+    lg: 'h-8',
+    xl: 'h-10'
   };
 
   const handleImageError = () => {
