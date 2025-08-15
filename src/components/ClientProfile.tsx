@@ -20,6 +20,7 @@ interface Client {
   address: string | null;
   postcode: string | null;
   user_id: string | null;
+  updated_at?: string;
 }
 
 interface ClientProfileProps {
@@ -58,8 +59,13 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({
         console.error('Error fetching client:', error);
         toast.error('Failed to load client');
       } else {
-        setClient(data);
-        setEditData(data);
+        // Ensure all required fields are present with defaults
+        const clientData = {
+          ...data,
+          postcode: (data as any).postcode || null
+        };
+        setClient(clientData);
+        setEditData(clientData);
       }
     } catch (error) {
       console.error('Error loading client:', error);

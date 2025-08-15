@@ -20,7 +20,7 @@ interface UserProfile {
   email: string;
   full_name: string;
   role: string;
-  status: 'active' | 'inactive';
+  status: string;
   last_login?: string;
 }
 

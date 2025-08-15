@@ -72,5 +72,5 @@ export default function ClientProfilePage() {
     );
   }
 
-  return <ClientProfile client={client} onBack={handleBack} />;
+  return <ClientProfile clientId={clientId!} onBack={handleBack} showBackButton />;
 }

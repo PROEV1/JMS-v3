@@ -1,5 +1,5 @@
 
-import WhatsAppChat from './WhatsAppChat';
+import { WhatsAppChat } from './WhatsAppChat';
 
 interface MessagesSectionProps {
   clientId?: string;
@@ -19,7 +19,6 @@ export default function MessagesSection({
       clientId={clientId}
       quoteId={quoteId}
       projectId={projectId}
-      title={title}
     />
   );
 }

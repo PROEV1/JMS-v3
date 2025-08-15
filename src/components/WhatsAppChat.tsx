@@ -7,15 +7,16 @@ import { Send, MessageCircle } from 'lucide-react';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
 import { Card } from './ui/card';
-import { ChatBubble } from './ChatBubble';
+import ChatBubble from './ChatBubble';
 
 interface Message {
   id: string;
   content: string;
   sender_id: string;
-  sender_role: 'admin' | 'client' | 'engineer';
+  sender_role: 'admin' | 'client' | 'engineer' | 'manager' | 'standard_office_user';
   created_at: string;
-  status: 'sent' | 'delivered' | 'read';
+  status?: 'sending' | 'sent' | 'delivered' | 'failed';
+  is_read: boolean;
   client_id?: string;
   quote_id?: string;
   project_id?: string;
@@ -178,7 +179,7 @@ export const WhatsAppChat: React.FC<WhatsAppChatProps> = ({
             <ChatBubble
               key={message.id}
               message={message}
-              isCurrentUser={message.sender_id === user?.id}
+              isOwn={message.sender_id === user?.id}
             />
           ))
         )}

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { BrandPage, BrandContainer } from '@/components/brand';
-import WhatsAppChat from '@/components/WhatsAppChat';
+import { WhatsAppChat } from '@/components/WhatsAppChat';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { MessageCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -89,7 +89,6 @@ export default function ClientMessages() {
             <CardContent className="h-[calc(100%-80px)]">
               <WhatsAppChat
                 clientId={clientId}
-                title="Support Chat"
               />
             </CardContent>
           </Card>

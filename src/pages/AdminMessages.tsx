@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import { ProEVLogo } from '@/components/ProEVLogo';
-import WhatsAppChat from '@/components/WhatsAppChat';
+import { WhatsAppChat } from '@/components/WhatsAppChat';
 
 interface Client {
   id: string;
@@ -185,7 +185,6 @@ export default function AdminMessages() {
           {selectedClientId ? (
             <WhatsAppChat 
               clientId={selectedClientId}
-              title={`Chat with ${filteredClients.find(c => c.id === selectedClientId)?.full_name || 'Client'}`}
             />
           ) : (
             <Card className="h-[600px] flex items-center justify-center">
