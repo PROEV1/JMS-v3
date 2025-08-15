@@ -24,6 +24,7 @@ export const CreateLeadModal = ({ isOpen, onClose, onSuccess, clients = [] }: Cr
   const [clientSearch, setClientSearch] = useState('');
   const [filteredClients, setFilteredClients] = useState(clients);
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
+  const [products, setProducts] = useState<Array<{ id: string; name: string; base_price: number }>>([]);
   const [newClientData, setNewClientData] = useState({
     full_name: '',
     email: '',
@@ -59,6 +60,33 @@ export const CreateLeadModal = ({ isOpen, onClose, onSuccess, clients = [] }: Cr
       setFilteredClients(filtered);
     }
   }, [clients, clientSearch]);
+
+  // Fetch products when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      fetchProducts();
+    }
+  }, [isOpen]);
+
+  const fetchProducts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('id, name, base_price')
+        .eq('is_active', true)
+        .order('name');
+
+      if (error) throw error;
+      setProducts(data || []);
+    } catch (error) {
+      console.error('Error fetching products:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load products",
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleClientSearch = (searchValue: string) => {
     setClientSearch(searchValue);
@@ -344,12 +372,28 @@ export const CreateLeadModal = ({ isOpen, onClose, onSuccess, clients = [] }: Cr
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="product_name">Product Name</Label>
-                <Input
-                  id="product_name"
+                <Select
                   value={formData.product_name}
-                  onChange={(e) => setFormData({ ...formData, product_name: e.target.value })}
-                  placeholder="e.g., 3-Drawers Only"
-                />
+                  onValueChange={(value) => {
+                    const selectedProduct = products.find(p => p.name === value);
+                    setFormData({ 
+                      ...formData, 
+                      product_name: value,
+                      product_price: selectedProduct ? selectedProduct.base_price.toString() : ''
+                    });
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a product..." />
+                  </SelectTrigger>
+                  <SelectContent className="bg-background z-50">
+                    {products.map((product) => (
+                      <SelectItem key={product.id} value={product.name}>
+                        {product.name} - £{product.base_price.toFixed(2)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               
               <div className="space-y-2">
