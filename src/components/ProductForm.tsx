@@ -504,77 +504,69 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onSuc
   };
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>{product?.id ? 'Edit Product' : 'Create Product'}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="name">Product Name</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  required
-                />
+    <form onSubmit={handleSubmit} className="flex flex-col h-full">
+      <div className="flex-1 space-y-6 overflow-y-auto pr-1">
+        <Card>
+          <CardHeader>
+            <CardTitle>{product?.id ? 'Edit Product' : 'Create Product'}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="name">Product Name</Label>
+                  <Input
+                    id="name"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="category">Category</Label>
+                  <Input
+                    id="category"
+                    value={formData.category}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="base_price">Base Price (£)</Label>
+                  <Input
+                    id="base_price"
+                    type="number"
+                    step="0.01"
+                    value={formData.base_price}
+                    onChange={(e) => setFormData({ ...formData, base_price: parseFloat(e.target.value) || 0 })}
+                    required
+                  />
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <input
+                    id="is_active"
+                    type="checkbox"
+                    checked={formData.is_active}
+                    onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+                  />
+                  <Label htmlFor="is_active">Active</Label>
+                </div>
               </div>
-              
-              <div>
-                <Label htmlFor="category">Category</Label>
-                <Input
-                  id="category"
-                  value={formData.category}
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="base_price">Base Price (£)</Label>
-                <Input
-                  id="base_price"
-                  type="number"
-                  step="0.01"
-                  value={formData.base_price}
-                  onChange={(e) => setFormData({ ...formData, base_price: parseFloat(e.target.value) || 0 })}
-                  required
-                />
-              </div>
-              
-              <div className="flex items-center space-x-2">
-                <input
-                  id="is_active"
-                  type="checkbox"
-                  checked={formData.is_active}
-                  onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-                />
-                <Label htmlFor="is_active">Active</Label>
-              </div>
-            </div>
 
-            <div>
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                rows={3}
-              />
+              <div>
+                <Label htmlFor="description">Description</Label>
+                <Textarea
+                  id="description"
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  rows={3}
+                />
+              </div>
             </div>
-
-            <div className="flex space-x-2">
-              <Button type="submit">
-                {product?.id ? 'Update Product' : 'Create Product'}
-              </Button>
-              <Button type="button" variant="outline" onClick={onCancel}>
-                Cancel
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
       <Card>
         <CardHeader>
@@ -821,6 +813,19 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onSuc
           </Card>
         </>
       )}
-    </div>
+      </div>
+      
+      {/* Sticky Footer with Buttons */}
+      <div className="flex-shrink-0 border-t pt-4 mt-6">
+        <div className="flex space-x-2 justify-end">
+          <Button type="button" variant="outline" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button type="submit">
+            {product?.id ? 'Update Product' : 'Create Product'}
+          </Button>
+        </div>
+      </div>
+    </form>
   );
 };

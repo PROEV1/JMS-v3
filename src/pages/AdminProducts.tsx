@@ -155,13 +155,12 @@ export default function AdminProducts() {
               Add Product
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
+          <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+            <DialogHeader className="flex-shrink-0">
               <DialogTitle>Create New Product</DialogTitle>
               <DialogDescription>Add a new product to your catalog</DialogDescription>
             </DialogHeader>
-            <div className="p-4">
-              <p>Product Form Component</p>
+            <div className="flex-1 overflow-y-auto p-1">
               <ProductForm
                 onSuccess={() => {
                   setShowCreateModal(false);
@@ -298,19 +297,21 @@ export default function AdminProducts() {
       {/* Edit Product Modal */}
       {editingProduct && (
         <Dialog open={!!editingProduct} onOpenChange={() => setEditingProduct(null)}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
+          <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+            <DialogHeader className="flex-shrink-0">
               <DialogTitle>Edit Product</DialogTitle>
               <DialogDescription>Update product information</DialogDescription>
             </DialogHeader>
-            <ProductForm
-              product={editingProduct}
-              onSuccess={() => {
-                setEditingProduct(null);
-                loadProducts();
-              }}
-              onCancel={() => setEditingProduct(null)}
-            />
+            <div className="flex-1 overflow-y-auto p-1">
+              <ProductForm
+                product={editingProduct}
+                onSuccess={() => {
+                  setEditingProduct(null);
+                  loadProducts();
+                }}
+                onCancel={() => setEditingProduct(null)}
+              />
+            </div>
           </DialogContent>
         </Dialog>
       )}
