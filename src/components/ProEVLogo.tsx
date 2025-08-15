@@ -14,6 +14,7 @@ export const ProEVLogo: React.FC<ProEVLogoProps> = ({
   const [currentLogoIndex, setCurrentLogoIndex] = useState(0);
   
   const logoFallbacks = [
+    "/lovable-uploads/041dd421-dd04-497f-945e-eb9b5fa0a8f8.png",
     "/lovable-uploads/548560c2-21a1-4b43-8030-675a4bcbd9ba.png",
     "/lovable-uploads/3add86aa-4857-42e8-9672-5ea09a594bb2.png",
     "/pro-ev-logo.png",
