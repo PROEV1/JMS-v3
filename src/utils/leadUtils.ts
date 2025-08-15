@@ -25,21 +25,9 @@ export const transformLeadData = (lead: any): Lead => {
     accessories_data: lead.accessories_data,
     accessories: lead.accessories,
     configuration: lead.configuration,
-    client_id: lead.client_id
+    client_id: lead.client_id,
+    created_by: lead.created_by
   };
-};
-
-export const mergeLeadWithStatusOverride = (lead: Lead, statusOverrides: any[]): Lead => {
-  const override = statusOverrides?.find(o => o.external_lead_id === lead.id);
-  if (override) {
-    return {
-      ...lead,
-      status: override.status,
-      client_id: override.client_id,
-      notes: override.notes || lead.notes
-    };
-  }
-  return lead;
 };
 
 export const filterLeadsByStatus = (leads: Lead[], status?: Lead['status']): Lead[] => {
@@ -57,4 +45,24 @@ export const filterLeadsByStatus = (leads: Lead[], status?: Lead['status']): Lea
   console.log('Filtered leads:', filtered.map(l => ({ id: l.id, name: l.name, status: l.status })));
   
   return filtered;
+};
+
+export const validateLeadData = (leadData: Partial<Lead>): string[] => {
+  const errors: string[] = [];
+  
+  if (!leadData.name?.trim()) {
+    errors.push('Name is required');
+  }
+  
+  if (!leadData.email?.trim()) {
+    errors.push('Email is required');
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(leadData.email)) {
+    errors.push('Valid email is required');
+  }
+  
+  if (leadData.phone && leadData.phone.trim() && !/^[\+]?[0-9\s\-\(\)]+$/.test(leadData.phone)) {
+    errors.push('Valid phone number is required');
+  }
+  
+  return errors;
 };

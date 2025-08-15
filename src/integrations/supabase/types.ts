@@ -563,6 +563,92 @@ export type Database = {
         }
         Relationships: []
       }
+      leads: {
+        Row: {
+          accessories_data: Json | null
+          client_id: string | null
+          configuration: Json | null
+          created_at: string
+          created_by: string | null
+          email: string
+          finish: string | null
+          id: string
+          luxe_upgrade: boolean | null
+          message: string | null
+          name: string
+          notes: string | null
+          phone: string | null
+          product_details: string | null
+          product_name: string | null
+          product_price: number | null
+          quote_number: string | null
+          source: string | null
+          status: string
+          total_cost: number | null
+          total_price: number | null
+          updated_at: string
+          width_cm: number | null
+        }
+        Insert: {
+          accessories_data?: Json | null
+          client_id?: string | null
+          configuration?: Json | null
+          created_at?: string
+          created_by?: string | null
+          email: string
+          finish?: string | null
+          id?: string
+          luxe_upgrade?: boolean | null
+          message?: string | null
+          name: string
+          notes?: string | null
+          phone?: string | null
+          product_details?: string | null
+          product_name?: string | null
+          product_price?: number | null
+          quote_number?: string | null
+          source?: string | null
+          status?: string
+          total_cost?: number | null
+          total_price?: number | null
+          updated_at?: string
+          width_cm?: number | null
+        }
+        Update: {
+          accessories_data?: Json | null
+          client_id?: string | null
+          configuration?: Json | null
+          created_at?: string
+          created_by?: string | null
+          email?: string
+          finish?: string | null
+          id?: string
+          luxe_upgrade?: boolean | null
+          message?: string | null
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          product_details?: string | null
+          product_name?: string | null
+          product_price?: number | null
+          quote_number?: string | null
+          source?: string | null
+          status?: string
+          total_cost?: number | null
+          total_price?: number | null
+          updated_at?: string
+          width_cm?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       messages: {
         Row: {
           content: string

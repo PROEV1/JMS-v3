@@ -1,7 +1,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { transformLeadData, mergeLeadWithStatusOverride, filterLeadsByStatus } from '@/utils/leadUtils';
 import { createOrFindClient, saveLeadHistory } from '@/utils/leadConversionUtils';
 
 export interface Lead {
@@ -37,6 +36,7 @@ export interface Lead {
     stud_wall_removal?: boolean;
   };
   client_id?: string;
+  created_by?: string;
 }
 
 interface UseLeadsOptions {
@@ -56,49 +56,42 @@ export const useLeads = (options: UseLeadsOptions = {}) => {
       setLoading(true);
       setError(null);
       
-      console.log('Fetching leads via edge function with options:', options);
+      console.log('Fetching leads from local database with options:', options);
 
-      // Use the edge function to fetch leads
-      const { data, error: functionError } = await supabase.functions.invoke('get-leads', {
-        body: {
-          limit: options.limit,
-          offset: options.offset,
-          search: options.search,
-          status: options.status,
-        }
-      });
+      let query = supabase
+        .from('leads')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-      if (functionError) {
-        console.error('Edge function error:', functionError);
-        throw new Error(functionError.message || 'Failed to fetch leads');
+      // Apply status filter
+      if (options.status) {
+        query = query.eq('status', options.status);
       }
 
-      if (!data) {
-        setLeads([]);
-        return;
+      // Apply search filter
+      if (options.search) {
+        query = query.or(
+          `name.ilike.%${options.search}%,email.ilike.%${options.search}%,product_details.ilike.%${options.search}%`
+        );
       }
 
-      console.log('Received leads from edge function:', data.leads?.length || 0);
-      console.log('Sample lead data structure:', data.leads?.[0] ? Object.keys(data.leads[0]) : 'No leads');
-      console.log('First lead sample:', data.leads?.[0]);
-      console.log('Debug info from edge function:', data.debug);
-      
-      // Fetch local status overrides and merge with external leads
-      const { data: statusOverrides } = await supabase
-        .from('lead_status_overrides')
-        .select('*');
+      // Apply pagination
+      if (options.limit) {
+        query = query.limit(options.limit);
+      }
+      if (options.offset) {
+        query = query.range(options.offset, options.offset + (options.limit || 50) - 1);
+      }
 
-      console.log('Status overrides:', statusOverrides?.length || 0);
-      
-      // Transform and merge external leads with local status overrides
-      const transformedLeads = (data.leads || []).map((lead: any) => transformLeadData(lead));
-      const mergedLeads = transformedLeads.map((lead: Lead) => 
-        mergeLeadWithStatusOverride(lead, statusOverrides || [])
-      );
+      const { data, error: fetchError } = await query;
 
-      // Apply status filter after merging
-      const finalLeads = filterLeadsByStatus(mergedLeads, options.status);
-      setLeads(finalLeads);
+      if (fetchError) {
+        console.error('Error fetching leads:', fetchError);
+        throw new Error(fetchError.message);
+      }
+
+      console.log('Successfully fetched leads:', data?.length || 0);
+      setLeads(data || []);
 
     } catch (err) {
       console.error('Error fetching leads:', err);
@@ -108,45 +101,65 @@ export const useLeads = (options: UseLeadsOptions = {}) => {
     }
   }, [options.status, options.search, options.limit, options.offset]);
 
+  const createLead = useCallback(async (leadData: Omit<Lead, 'id' | 'created_at' | 'updated_at'>) => {
+    try {
+      console.log('Creating new lead:', leadData);
+      
+      const { data: currentUser } = await supabase.auth.getUser();
+      if (!currentUser.user) {
+        throw new Error('User not authenticated');
+      }
+
+      const { data: newLead, error: createError } = await supabase
+        .from('leads')
+        .insert({
+          ...leadData,
+          created_by: currentUser.user.id
+        })
+        .select()
+        .single();
+
+      if (createError) {
+        console.error('Error creating lead:', createError);
+        throw new Error(`Failed to create lead: ${createError.message}`);
+      }
+
+      console.log('Lead created successfully:', newLead);
+      
+      // Refresh leads to show the new one
+      await fetchLeads();
+      
+      return newLead;
+    } catch (err) {
+      console.error('Error creating lead:', err);
+      throw err;
+    }
+  }, [fetchLeads]);
+
   const updateLead = useCallback(async (id: string, updates: Partial<Lead>) => {
     try {
       console.log('Updating lead:', id, updates);
       
-      // If status is being updated, save it to lead_status_overrides
-      if (updates.status) {
-        const { data: currentUser } = await supabase.auth.getUser();
-        if (!currentUser.user) {
-          throw new Error('User not authenticated');
-        }
+      const { data: updatedLead, error: updateError } = await supabase
+        .from('leads')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
 
-        console.log('Saving status override for lead:', id, 'status:', updates.status);
-
-        const { data: overrideData, error: overrideError } = await supabase
-          .from('lead_status_overrides')
-          .upsert({
-            lead_id: id, // Fixed: using lead_id instead of external_lead_id
-            status: updates.status,
-            created_by: currentUser.user.id,
-            notes: updates.notes || null
-          }, {
-            onConflict: 'lead_id'
-          })
-          .select();
-
-        if (overrideError) {
-          console.error('Error saving lead status override:', overrideError);
-          throw new Error(`Failed to save lead status: ${overrideError.message}`);
-        }
-
-        console.log('Status override saved successfully:', overrideData);
+      if (updateError) {
+        console.error('Error updating lead:', updateError);
+        throw new Error(`Failed to update lead: ${updateError.message}`);
       }
+
+      console.log('Lead updated successfully:', updatedLead);
       
       // Update local state immediately
       setLeads(prev => prev.map(lead => 
         lead.id === id ? { ...lead, ...updates } : lead
       ));
 
-      return { id, ...updates };
+      return updatedLead;
     } catch (err) {
       console.error('Error updating lead:', err);
       throw err;
@@ -184,6 +197,7 @@ export const useLeads = (options: UseLeadsOptions = {}) => {
     loading,
     error,
     fetchLeads,
+    createLead,
     updateLead,
     convertToClient,
   };
