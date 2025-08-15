@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ProSpacesLogo } from '@/components/ProSpacesLogo';
+import { ProEVLogo } from '@/components/ProEVLogo';
 import { Eye, EyeOff } from 'lucide-react';
 
 export default function SetupPassword() {
@@ -167,13 +167,13 @@ export default function SetupPassword() {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-md space-y-6">
         <div className="flex justify-center">
-          <ProSpacesLogo variant="main" size="lg" />
+          <ProEVLogo variant="main" size="lg" />
         </div>
         <Card className="w-full">
           <CardHeader>
             <CardTitle>Set Up Your Password</CardTitle>
             <CardDescription>
-              Welcome to ProSpaces Portal! Please create a secure password to complete your account setup.
+              Welcome to Pro EV Portal! Please create a secure password to complete your account setup.
             </CardDescription>
           </CardHeader>
           <CardContent>

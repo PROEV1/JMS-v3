@@ -4,7 +4,7 @@ import { Navigate, Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { LogOut, User, Settings, FileText, MessageCircle, FolderOpen, Users, Package, ChevronDown, ShoppingCart, UserCog, Calendar, Clock } from 'lucide-react';
 import { usePermissions } from '@/hooks/usePermissions';
-import { ProSpacesLogo } from '@/components/ProSpacesLogo';
+import { ProEVLogo } from '@/components/ProEVLogo';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
@@ -147,7 +147,7 @@ export default function Layout({ children }: LayoutProps) {
         <div className="container flex h-16 items-center justify-between">
           <div className="flex items-center space-x-6">
             <Link to={dashboardLink} className="flex items-center">
-              <ProSpacesLogo variant="main" size="md" />
+              <ProEVLogo variant="main" size="md" />
             </Link>
             
             {/* Navigation Menu */}

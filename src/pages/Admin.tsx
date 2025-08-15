@@ -12,7 +12,7 @@ import { Plus, Users, FileText, Briefcase, Mail, Eye, Send, Trash2, MessageSquar
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
-import { ProSpacesLogo } from '@/components/ProSpacesLogo';
+import { ProEVLogo } from '@/components/ProEVLogo';
 
 interface Client {
   id: string;
@@ -298,7 +298,7 @@ export default function Admin() {
     <div className="container mx-auto py-6 space-y-6">
       {/* ProSpaces Header */}
       <div className="flex items-center justify-between mb-8">
-        <ProSpacesLogo variant="main" size="lg" />
+        <ProEVLogo variant="main" size="lg" />
         <div className="text-right">
           <p className="text-sm text-muted-foreground">ProSpaces Admin Portal</p>
           <p className="text-xs text-muted-foreground">Management Dashboard</p>

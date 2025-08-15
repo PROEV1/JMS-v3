@@ -7,7 +7,7 @@ import { Card } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { ProSpacesLogo } from '@/components/ProSpacesLogo';
+import { ProEVLogo } from '@/components/ProEVLogo';
 import { BrandPage, BrandContainer, BrandLoading } from '@/components/brand/BrandLayout';
 import { BrandButton } from '@/components/brand/BrandButton';
 import { BrandHeading1, BrandHeading2, BrandBody } from '@/components/brand/BrandTypography';
@@ -128,12 +128,12 @@ export default function Auth() {
       <BrandContainer className="flex flex-col items-center justify-center min-h-screen py-12">
         {/* Logo Section */}
         <div className="mb-12">
-          <ProSpacesLogo variant="main" size="xl" />
+          <ProEVLogo variant="main" size="xl" />
         </div>
         
         {/* Main Heading */}
         <div className="text-center mb-8">
-          <BrandHeading1 className="mb-3">Welcome to ProSpaces</BrandHeading1>
+          <BrandHeading1 className="mb-3">Welcome to Pro EV</BrandHeading1>
           <BrandBody className="text-muted-foreground max-w-md">
             Access your personalized client portal to view quotes, track projects, and manage your home improvements.
           </BrandBody>
@@ -211,7 +211,7 @@ export default function Auth() {
                   <div className="text-center mb-6">
                     <BrandHeading2 className="mb-2">Create Account</BrandHeading2>
                     <BrandBody className="text-muted-foreground">
-                      Join ProSpaces to get started
+                      Join Pro EV to get started
                     </BrandBody>
                   </div>
                   
@@ -276,7 +276,7 @@ export default function Auth() {
         {/* Footer */}
         <div className="mt-12 text-center">
           <BrandBody className="text-muted-foreground text-sm">
-            © 2024 ProSpaces. All rights reserved.
+            © 2024 Pro EV. All rights reserved.
           </BrandBody>
         </div>
       </BrandContainer>

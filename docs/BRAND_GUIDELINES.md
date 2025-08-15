@@ -1,7 +1,8 @@
-# ProSpaces Brand Guidelines
+# Pro EV Brand Guidelines
 
 ## Overview
-This document outlines the brand guidelines for ProSpaces and how to implement them consistently across all pages and components.
+
+This document outlines the brand guidelines for Pro EV and how to implement them consistently across all pages and components.
 
 ## Brand Components
 
@@ -186,4 +187,4 @@ Available tile types:
 </BrandBadge>
 ```
 
-This ensures all current and future pages maintain consistent ProSpaces branding.
+This ensures all current and future pages maintain consistent Pro EV branding.

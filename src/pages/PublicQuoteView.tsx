@@ -8,7 +8,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Download, Share2, Calendar, Shield, Wrench, Mail, MessageCircle, Copy, Link } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { ProSpacesLogo } from '@/components/ProSpacesLogo';
+import { ProEVLogo } from '@/components/ProEVLogo';
 import livingRoomImg from '@/assets/living-room-placeholder.jpg';
 import laptopImg from '@/assets/laptop-placeholder.jpg';
 import workspaceImg from '@/assets/workspace-placeholder.jpg';
@@ -176,8 +176,8 @@ export default function PublicQuoteView() {
     if (!quote) return;
     
     const shareUrl = window.location.href;
-    const subject = `Quote ${quote.quote_number} from ProSpaces`;
-    const body = `Hi,\n\nI'm sharing a quote from ProSpaces with you.\n\nQuote Number: ${quote.quote_number}\nTotal: ${formatCurrency(quote.total_cost)}\n\nView the full quote here: ${shareUrl}\n\nBest regards`;
+    const subject = `Quote ${quote.quote_number} from Pro EV`;
+    const body = `Hi,\n\nI'm sharing a quote from Pro EV with you.\n\nQuote Number: ${quote.quote_number}\nTotal: ${formatCurrency(quote.total_cost)}\n\nView the full quote here: ${shareUrl}\n\nBest regards`;
     
     const mailtoLink = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     window.open(mailtoLink, '_blank');
@@ -187,7 +187,7 @@ export default function PublicQuoteView() {
     if (!quote) return;
     
     const shareUrl = window.location.href;
-    const message = `Hi! I'm sharing a quote from ProSpaces with you.\n\n*Quote ${quote.quote_number}*\nTotal: ${formatCurrency(quote.total_cost)}\n\nView the full quote: ${shareUrl}`;
+    const message = `Hi! I'm sharing a quote from Pro EV with you.\n\n*Quote ${quote.quote_number}*\nTotal: ${formatCurrency(quote.total_cost)}\n\nView the full quote: ${shareUrl}`;
     
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, '_blank');
@@ -216,7 +216,7 @@ export default function PublicQuoteView() {
       try {
         await navigator.share({
           title: `Quote ${quote.quote_number}`,
-          text: 'Check out this quote from ProSpaces',
+          text: 'Check out this quote from Pro EV',
           url: window.location.href,
         });
       } catch (error) {
@@ -259,7 +259,7 @@ export default function PublicQuoteView() {
       <div className="container mx-auto px-6 py-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
-          <ProSpacesLogo variant="main" size="lg" />
+          <ProEVLogo variant="main" size="lg" />
           <div className="flex space-x-2">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -562,7 +562,7 @@ export default function PublicQuoteView() {
           {/* Contact Information */}
           <Card>
             <CardHeader>
-              <CardTitle>Contact ProSpaces</CardTitle>
+              <CardTitle>Contact Pro EV</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-muted-foreground">

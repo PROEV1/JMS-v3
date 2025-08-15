@@ -24,7 +24,7 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { ProSpacesLogo } from "@/components/ProSpacesLogo";
+import { ProEVLogo } from "@/components/ProEVLogo";
 
 const mainItems = [
   { title: "Dashboard", url: "/admin", icon: LayoutDashboard },
@@ -69,7 +69,7 @@ export function AdminSidebar() {
         <div className="p-4 border-b">
           {!collapsed ? (
             <div className="flex items-center space-x-2">
-              <ProSpacesLogo variant="main" size="sm" />
+              <ProEVLogo variant="main" size="sm" />
               <div>
                 <p className="text-sm font-semibold">Admin Portal</p>
                 <p className="text-xs text-muted-foreground">Management</p>
@@ -77,7 +77,7 @@ export function AdminSidebar() {
             </div>
           ) : (
             <div className="flex justify-center">
-              <ProSpacesLogo variant="icon" size="sm" />
+              <ProEVLogo variant="icon" size="sm" />
             </div>
           )}
         </div>
