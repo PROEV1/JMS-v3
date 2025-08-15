@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,7 +9,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Check, ChevronsUpDown, Search, Plus, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -68,6 +67,10 @@ export function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLeadModalP
   const [productSearchOpen, setProductSearchOpen] = useState(false);
   const [newClientMode, setNewClientMode] = useState(false);
   const [showCreateClientModal, setShowCreateClientModal] = useState(false);
+  const [clientSearchTerm, setClientSearchTerm] = useState('');
+  const [productSearchTerm, setProductSearchTerm] = useState('');
+  const clientDropdownRef = useRef<HTMLDivElement>(null);
+  const productDropdownRef = useRef<HTMLDivElement>(null);
   const [formData, setFormData] = useState<FormData>({
     name: '',
     email: '',
@@ -103,6 +106,35 @@ export function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLeadModalP
       loadProducts();
     }
   }, [isOpen]);
+
+  // Handle clicking outside dropdowns
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (clientDropdownRef.current && !clientDropdownRef.current.contains(event.target as Node)) {
+        setClientSearchOpen(false);
+      }
+      if (productDropdownRef.current && !productDropdownRef.current.contains(event.target as Node)) {
+        setProductSearchOpen(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setClientSearchOpen(false);
+        setProductSearchOpen(false);
+      }
+    };
+
+    if (clientSearchOpen || productSearchOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleEscape);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [clientSearchOpen, productSearchOpen]);
 
   const loadClients = async () => {
     try {
@@ -233,6 +265,10 @@ export function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLeadModalP
     setSelectedClient(null);
     setSelectedProduct(null);
     setNewClientMode(false);
+    setClientSearchOpen(false);
+    setProductSearchOpen(false);
+    setClientSearchTerm('');
+    setProductSearchTerm('');
     setFormData({
       name: '',
       email: '',
@@ -252,6 +288,17 @@ export function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLeadModalP
       product_details: ''
     });
   };
+
+  // Filter clients and products based on search
+  const filteredClients = clients.filter(client => 
+    client.full_name.toLowerCase().includes(clientSearchTerm.toLowerCase()) ||
+    client.email.toLowerCase().includes(clientSearchTerm.toLowerCase())
+  );
+
+  const filteredProducts = products.filter(product =>
+    product.name.toLowerCase().includes(productSearchTerm.toLowerCase()) ||
+    product.category?.toLowerCase().includes(productSearchTerm.toLowerCase())
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -310,14 +357,10 @@ export function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLeadModalP
       <DialogContent 
         className="max-w-2xl max-h-[90vh] overflow-y-auto"
         onInteractOutside={(e) => {
-          // Prevent closing when interacting with popovers, dropdowns, or nested modals
+          // Prevent closing when interacting with dropdowns or nested modals
           const target = e.target as Element;
-          const isInteractingWithDropdown = target.closest('[role="listbox"]') || 
-                                           target.closest('[data-radix-popper-content-wrapper]') ||
-                                           target.closest('[data-radix-select-content]') ||
-                                           target.closest('[cmdk-root]') ||
-                                           clientSearchOpen || 
-                                           productSearchOpen || 
+          const isInteractingWithDropdown = target.closest('[data-radix-select-content]') ||
+                                           target.closest('.inline-dropdown-panel') ||
                                            showCreateClientModal;
           
           if (isInteractingWithDropdown) {
@@ -357,57 +400,55 @@ export function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLeadModalP
                     <Badge variant="secondary">Selected</Badge>
                   </div>
                 ) : (
-                  <div className="space-y-3">
-                    <Popover open={clientSearchOpen} onOpenChange={setClientSearchOpen} modal>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          role="combobox"
-                          aria-expanded={clientSearchOpen}
-                          className="w-full justify-between"
-                        >
-                          Search existing clients...
-                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </Button>
-                      </PopoverTrigger>
-                        <PopoverContent 
-                          className="w-full p-0 z-50"
-                          side="bottom"
-                          align="start"
-                          onInteractOutside={(e) => {
-                            // Allow clicking outside to close, but prevent event from reaching parent modal
-                            e.stopPropagation();
-                          }}
-                        >
-                         <Command>
-                           <CommandInput placeholder="Search clients..." />
-                           <CommandEmpty>
-                             {Array.isArray(clients) && clients.length === 0 
-                               ? "No clients found. Create a new client below." 
-                               : "No clients match your search."}
-                           </CommandEmpty>
-                           <CommandGroup className="max-h-48 overflow-y-auto">
-                             {Array.isArray(clients) && clients.map((client) => (
-                               <CommandItem
-                                 key={client.id}
-                                 onSelect={() => handleClientSelect(client)}
-                               >
-                                 <Check
-                                   className={cn(
-                                     "mr-2 h-4 w-4",
-                                     selectedClient?.id === client.id ? "opacity-100" : "opacity-0"
-                                   )}
-                                 />
-                                 <div>
-                                   <div className="font-medium">{client.full_name}</div>
-                                   <div className="text-sm text-muted-foreground">{client.email}</div>
-                                 </div>
-                               </CommandItem>
-                             ))}
-                           </CommandGroup>
-                         </Command>
-                       </PopoverContent>
-                    </Popover>
+                  <div className="space-y-3 relative" ref={clientDropdownRef}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setClientSearchOpen(!clientSearchOpen);
+                        setProductSearchOpen(false);
+                      }}
+                      className="w-full justify-between"
+                    >
+                      Search existing clients...
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+
+                    {clientSearchOpen && (
+                      <div className="absolute top-full left-0 right-0 z-50 bg-background border rounded-md shadow-lg inline-dropdown-panel">
+                        <Command>
+                          <CommandInput 
+                            placeholder="Search clients..." 
+                            value={clientSearchTerm}
+                            onValueChange={setClientSearchTerm}
+                          />
+                          <CommandEmpty>
+                            {Array.isArray(clients) && clients.length === 0 
+                              ? "No clients found. Create a new client below." 
+                              : "No clients match your search."}
+                          </CommandEmpty>
+                          <CommandGroup className="max-h-48 overflow-y-auto">
+                            {filteredClients.map((client) => (
+                              <CommandItem
+                                key={client.id}
+                                onSelect={() => handleClientSelect(client)}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    selectedClient?.id === client.id ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                <div>
+                                  <div className="font-medium">{client.full_name}</div>
+                                  <div className="text-sm text-muted-foreground">{client.email}</div>
+                                </div>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </Command>
+                      </div>
+                    )}
 
                     <div className="flex items-center justify-center">
                       <span className="text-sm text-muted-foreground">or</span>
@@ -538,59 +579,59 @@ export function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLeadModalP
                       </div>
                     </div>
                   ) : (
-                    <Popover open={productSearchOpen} onOpenChange={setProductSearchOpen} modal>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          role="combobox"
-                          aria-expanded={productSearchOpen}
-                          className="w-full justify-between"
-                        >
-                          Select product...
-                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </Button>
-                      </PopoverTrigger>
-                        <PopoverContent 
-                          className="w-full p-0 z-50"
-                          side="bottom"
-                          align="start"
-                          onInteractOutside={(e) => {
-                            // Allow clicking outside to close, but prevent event from reaching parent modal
-                            e.stopPropagation();
-                          }}
-                        >
-                         <Command>
-                           <CommandInput placeholder="Search products..." />
-                           <CommandEmpty>
-                             {Array.isArray(products) && products.length === 0 
-                               ? "No products available." 
-                               : "No products match your search."}
-                           </CommandEmpty>
-                           <CommandGroup className="max-h-48 overflow-y-auto">
-                             {Array.isArray(products) && products.map((product) => (
-                               <CommandItem
-                                 key={product.id}
-                                 onSelect={() => handleProductSelect(product)}
-                               >
-                                 <Check
-                                   className={cn(
-                                     "mr-2 h-4 w-4",
-                                     selectedProduct?.id === product.id ? "opacity-100" : "opacity-0"
-                                   )}
-                                 />
-                                 <div className="flex-1">
-                                   <div className="font-medium">{product.name}</div>
-                                  <div className="text-sm text-muted-foreground">
-                                    £{product.base_price?.toLocaleString() || '0'} • {product.category || 'Uncategorized'}
-                                  </div>
-                                </div>
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
-                  )}
+                    <div className="relative" ref={productDropdownRef}>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setProductSearchOpen(!productSearchOpen);
+                          setClientSearchOpen(false);
+                        }}
+                        className="w-full justify-between"
+                      >
+                        Select product...
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+
+                      {productSearchOpen && (
+                        <div className="absolute top-full left-0 right-0 z-50 bg-background border rounded-md shadow-lg inline-dropdown-panel">
+                          <Command>
+                            <CommandInput 
+                              placeholder="Search products..." 
+                              value={productSearchTerm}
+                              onValueChange={setProductSearchTerm}
+                            />
+                            <CommandEmpty>
+                              {Array.isArray(products) && products.length === 0 
+                                ? "No products available." 
+                                : "No products match your search."}
+                            </CommandEmpty>
+                            <CommandGroup className="max-h-48 overflow-y-auto">
+                              {filteredProducts.map((product) => (
+                                <CommandItem
+                                  key={product.id}
+                                  onSelect={() => handleProductSelect(product)}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      selectedProduct?.id === product.id ? "opacity-100" : "opacity-0"
+                                    )}
+                                  />
+                                  <div className="flex-1">
+                                    <div className="font-medium">{product.name}</div>
+                                   <div className="text-sm text-muted-foreground">
+                                     £{product.base_price?.toLocaleString() || '0'} • {product.category || 'Uncategorized'}
+                                   </div>
+                                 </div>
+                               </CommandItem>
+                             ))}
+                           </CommandGroup>
+                         </Command>
+                       </div>
+                     )}
+                   </div>
+                 )}
                 </div>
 
                 {/* Product Details Grid */}
