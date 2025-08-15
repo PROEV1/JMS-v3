@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { Mail, Phone, MapPin, User, Calendar, FileText, Wrench, Plus, Eye, MessageSquare } from 'lucide-react';
-import MessagesSection from './MessagesSection';
+import WhatsAppChat from './WhatsAppChat';
 
 interface Client {
   id: string;
@@ -253,6 +253,32 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ client: initialCli
 
   const handleViewOrder = (orderId: string) => {
     navigate(`/admin/order/${orderId}`);
+  };
+
+  const handleSendPasswordLink = async () => {
+    try {
+      const { error } = await supabase.functions.invoke('send-client-invite', {
+        body: {
+          clientId: client.id,
+          email: client.email,
+          isPasswordReset: true
+        }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Password setup link sent successfully",
+      });
+    } catch (error) {
+      console.error('Error sending password link:', error);
+      toast({
+        title: "Error", 
+        description: "Failed to send password setup link",
+        variant: "destructive",
+      });
+    }
   };
 
   if (loading) {
@@ -539,11 +565,8 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ client: initialCli
             Messages
           </CardTitle>
         </CardHeader>
-        <CardContent className="p-0">
-          <MessagesSection 
-            clientId={initialClient.id}
-            title={`Chat with ${client.full_name}`}
-          />
+        <CardContent className="h-[400px]">
+          <WhatsAppChat clientId={initialClient.id} title={`Chat with ${client.full_name}`} />
         </CardContent>
       </Card>
     </div>

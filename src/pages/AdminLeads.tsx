@@ -459,12 +459,11 @@ const AdminLeads = () => {
         ))}
       </div>
 
-      <CreateLeadModal
-        isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        onSuccess={handleCreateLead}
-        clients={clients}
-      />
+          <CreateLeadModal
+            isOpen={showCreateModal}
+            onClose={() => setShowCreateModal(false)}
+            onSuccess={handleCreateLead}
+          />
     </div>
   );
 };

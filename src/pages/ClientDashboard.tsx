@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
-import { FileText, Wrench, CreditCard, Calendar, Eye, Download } from 'lucide-react';
+import { FileText, Wrench, CreditCard, Calendar, Eye, Download, MessageCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface Quote {
@@ -441,6 +441,29 @@ export default function ClientDashboard() {
                   ))}
                 </div>
               )}
+            </CardContent>
+          </Card>
+
+          {/* Messages Section */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MessageCircle className="h-5 w-5" />
+                Messages
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8">
+                <MessageCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <p className="text-muted-foreground mb-4">Chat with our support team</p>
+                <Button 
+                  onClick={() => navigate('/client/messages')}
+                  className="flex items-center gap-2"
+                >
+                  <MessageCircle className="h-4 w-4" />
+                  Open Messages
+                </Button>
+              </div>
             </CardContent>
           </Card>
 

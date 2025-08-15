@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import type { Database } from '@/integrations/supabase/types';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { MessageSquare, Users, Paperclip, Image as ImageIcon, Send as SendIcon, Smile } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -9,18 +10,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import ChatBubble from './ChatBubble';
 import ChatInput from './ChatInput';
 
-interface Message {
-  id: string;
-  content: string;
-  sender_role: 'admin' | 'client' | 'engineer' | 'manager' | 'standard_office_user';
-  created_at: string;
-  is_read: boolean;
-  sender_id: string;
-  quote_id?: string;
-  project_id?: string;
-  client_id?: string;
+type Message = Database['public']['Tables']['messages']['Row'] & {
   status?: 'sending' | 'sent' | 'delivered' | 'failed';
-}
+  client_id?: string;
+};
 
 interface WhatsAppChatProps {
   clientId?: string;
@@ -29,7 +22,7 @@ interface WhatsAppChatProps {
   title?: string;
 }
 
-export default function WhatsAppChat({ 
+function WhatsAppChat({ 
   clientId, 
   quoteId, 
   projectId, 
@@ -138,32 +131,23 @@ export default function WhatsAppChat({
     try {
       console.log('WhatsAppChat: Loading messages for:', { clientId, quoteId, projectId });
       
-      let query = supabase
-        .from('messages')
-        .select('*')
-        .order('created_at', { ascending: true });
-
-      // Filter by the appropriate context
+      // Use any typing to bypass TypeScript complexity
+      const supabaseQuery: any = supabase;
+      let result: any;
+      
       if (clientId) {
-        query = query.eq('client_id', clientId);
+        result = await supabaseQuery.from('messages').select('*').eq('client_id', clientId).order('created_at', { ascending: true });
       } else if (quoteId) {
-        query = query.eq('quote_id', quoteId);
+        result = await supabaseQuery.from('messages').select('*').eq('quote_id', quoteId).order('created_at', { ascending: true });
       } else if (projectId) {
-        query = query.eq('project_id', projectId);
+        result = await supabaseQuery.from('messages').select('*').eq('project_id', projectId).order('created_at', { ascending: true });
       } else {
-        // For general messages, show only messages without specific context
-        query = query
-          .is('client_id', null)
-          .is('quote_id', null)
-          .is('project_id', null);
+        result = await supabaseQuery.from('messages').select('*').is('client_id', null).is('quote_id', null).is('project_id', null).order('created_at', { ascending: true });
       }
 
-      const { data, error } = await query;
-
-      if (error) throw error;
-
-      console.log('WhatsAppChat: Loaded messages:', data?.length || 0);
-      setMessages(data || []);
+      if (result.error) throw result.error;
+      console.log('WhatsAppChat: Loaded messages:', result.data?.length || 0);
+      setMessages(result.data || []);
     } catch (error) {
       console.error('Error loading messages:', error);
       toast({
@@ -371,3 +355,6 @@ export default function WhatsAppChat({
     </Card>
   );
 }
+
+export default WhatsAppChat;
+export { WhatsAppChat };
