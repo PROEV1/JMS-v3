@@ -30,7 +30,7 @@ export const transformLeadData = (lead: any): Lead => {
   };
 };
 
-export const filterLeadsByStatus = (leads: Lead[], status?: Lead['status']): Lead[] => {
+export const filterLeadsByStatus = (leads: Lead[], status?: string): Lead[] => {
   if (!status) return leads;
   
   const filtered = leads.filter(lead => {

@@ -9,7 +9,7 @@ export interface Lead {
   email: string;
   phone?: string;
   message?: string;
-  status: 'new' | 'contacted' | 'qualified' | 'converted' | 'unqualified' | 'closed';
+  status: string; // Changed from union type to string to match database
   created_at: string;
   updated_at: string;
   source?: string;
@@ -28,19 +28,13 @@ export interface Lead {
     name: string;
     price: number;
   }>;
-  configuration?: {
-    width?: string;
-    finish?: string;
-    luxe_upgrade?: boolean;
-    installation?: string;
-    stud_wall_removal?: boolean;
-  };
+  configuration?: any;
   client_id?: string;
   created_by?: string;
 }
 
 interface UseLeadsOptions {
-  status?: Lead['status'];
+  status?: string;
   search?: string;
   limit?: number;
   offset?: number;
@@ -91,7 +85,7 @@ export const useLeads = (options: UseLeadsOptions = {}) => {
       }
 
       console.log('Successfully fetched leads:', data?.length || 0);
-      setLeads(data || []);
+      setLeads((data || []) as Lead[]);
 
     } catch (err) {
       console.error('Error fetching leads:', err);

@@ -42,7 +42,15 @@ export const CreateLeadModal = ({ isOpen, onClose, onSuccess, clients = [] }: Cr
 
     try {
       // Validate form data
-      const errors = validateLeadData(formData);
+      const validationData = {
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        total_price: formData.total_price ? parseFloat(formData.total_price) : undefined,
+        product_price: formData.product_price ? parseFloat(formData.product_price) : undefined,
+        width_cm: formData.width_cm ? parseFloat(formData.width_cm) : undefined,
+      };
+      const errors = validateLeadData(validationData);
       if (errors.length > 0) {
         toast({
           title: "Validation Error",
