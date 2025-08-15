@@ -126,41 +126,354 @@ export const updateOrderAssignment = async (orderId: string, engineerId: string 
 };
 
 export const getSmartEngineerRecommendations = async (order: Order, postcode?: string) => {
-  // Simple implementation - return available engineers with required properties
   try {
-    const { data: engineers, error } = await supabase
-      .from('engineers')
-      .select('*')
-      .eq('availability', true);
+    console.log('Getting smart engineer recommendations for order:', order.order_number);
+    
+    // Get scheduling settings
+    const settings = await getSchedulingSettings();
+    
+    if (!postcode) {
+      console.log('No postcode provided for order');
+      return { recommendations: [], settings };
+    }
 
-    if (error) throw error;
+    // Get all engineers with complete settings
+    const allEngineers = await getAllEngineersForScheduling();
+    
+    if (allEngineers.length === 0) {
+      console.log('No available engineers found');
+      return { recommendations: [], settings };
+    }
 
-    const recommendations = (engineers || []).map(engineer => ({
-      engineer: engineer as Engineer,
-      score: Math.random() * 100, // Placeholder scoring
-      reasons: ['Available engineer'],
-      distance: Math.floor(Math.random() * 50), // Placeholder distance in miles
-      travelTime: Math.floor(Math.random() * 60) + 15, // Placeholder travel time in minutes
-      availableDate: new Date().toISOString().split('T')[0] // Today as placeholder
-    }));
+    console.log(`Found ${allEngineers.length} engineers to evaluate`);
+
+    // Calculate minimum booking date based on advance notice requirements
+    const now = new Date();
+    const minimumDate = new Date(now.getTime() + (settings.minimum_advance_hours * 60 * 60 * 1000));
+    
+    const recommendations = await Promise.all(
+      allEngineers.map(async (engineer) => {
+        try {
+          // Validate engineer setup
+          const setupValidation = validateEngineerSetup(engineer);
+          if (!setupValidation.isComplete) {
+            console.log(`Engineer ${engineer.name} setup incomplete:`, setupValidation.missingItems);
+            return null;
+          }
+
+          // Check if engineer can serve this postcode
+          const serviceCheck = canEngineerServePostcode(engineer, postcode);
+          if (!serviceCheck.canServe) {
+            console.log(`Engineer ${engineer.name} cannot serve postcode ${postcode}`);
+            return null;
+          }
+
+          // Get live distance and travel time from Mapbox
+          let distance = 0;
+          let travelTime = serviceCheck.travelTime || 60;
+          
+          if (engineer.starting_postcode) {
+            try {
+              const distanceResult = await getLiveDistance(engineer.starting_postcode, postcode);
+              distance = distanceResult.distance;
+              travelTime = distanceResult.duration;
+            } catch (error) {
+              console.warn(`Failed to get live distance for ${engineer.name}:`, error);
+              // Fallback to estimated travel time from service area
+              distance = serviceCheck.travelTime ? Math.round(serviceCheck.travelTime / 2) : 25; // Rough estimate
+              travelTime = serviceCheck.travelTime || 60;
+            }
+          }
+
+          // Check distance limits
+          if (distance > settings.max_distance_miles) {
+            console.log(`Engineer ${engineer.name} too far: ${distance} miles > ${settings.max_distance_miles} limit`);
+            return null;
+          }
+
+          // Find next available date
+          let availableDate: Date | null = null;
+          let checkDate = new Date(minimumDate);
+          const maxCheckDays = 30; // Don't check beyond 30 days
+          let daysChecked = 0;
+
+          while (!availableDate && daysChecked < maxCheckDays) {
+            // Check if engineer is available on this date
+            if (isEngineerAvailableOnDate(engineer, checkDate)) {
+              // Check weekend restrictions
+              const isWeekend = checkDate.getDay() === 0 || checkDate.getDay() === 6;
+              if (isWeekend && !settings.allow_weekend_bookings) {
+                checkDate.setDate(checkDate.getDate() + 1);
+                daysChecked++;
+                continue;
+              }
+
+              // Check daily workload
+              const dailyWorkload = await getEngineerDailyWorkload(engineer.id, checkDate.toISOString().split('T')[0]);
+              if (dailyWorkload >= settings.max_jobs_per_day) {
+                checkDate.setDate(checkDate.getDate() + 1);
+                daysChecked++;
+                continue;
+              }
+
+              availableDate = new Date(checkDate);
+            } else {
+              checkDate.setDate(checkDate.getDate() + 1);
+              daysChecked++;
+            }
+          }
+
+          if (!availableDate) {
+            console.log(`Engineer ${engineer.name} has no availability within ${maxCheckDays} days`);
+            return null;
+          }
+
+          // Calculate recommendation score
+          const score = calculateEngineerScore(engineer, distance, travelTime, availableDate);
+          
+          // Generate recommendation reasons
+          const reasons = generateRecommendationReasons(engineer, distance, travelTime, availableDate, minimumDate);
+
+          return {
+            engineer: engineer as Engineer,
+            distance,
+            travelTime,
+            score,
+            reasons,
+            availableDate: availableDate.toISOString().split('T')[0]
+          };
+        } catch (error) {
+          console.error(`Error evaluating engineer ${engineer.name}:`, error);
+          return null;
+        }
+      })
+    );
+
+    // Filter out null recommendations and sort by score
+    const validRecommendations = recommendations
+      .filter(rec => rec !== null)
+      .sort((a, b) => b!.score - a!.score);
+
+    console.log(`Generated ${validRecommendations.length} valid recommendations`);
 
     return {
-      recommendations,
-      settings: null // Placeholder
+      recommendations: validRecommendations,
+      settings
     };
   } catch (error) {
     console.error('Error getting engineer recommendations:', error);
     return {
       recommendations: [],
-      settings: null
+      settings: await getSchedulingSettings()
     };
   }
 };
 
+// Distance cache for Mapbox API calls
+let distanceCache = new Map<string, { distance: number; duration: number; timestamp: number }>();
+const CACHE_DURATION = 60 * 60 * 1000; // 1 hour in milliseconds
+
+/**
+ * Get live distance and travel time between two postcodes using Mapbox
+ */
+export async function getLiveDistance(fromPostcode: string, toPostcode: string): Promise<{ distance: number; duration: number }> {
+  const cacheKey = `${fromPostcode.toLowerCase()}-${toPostcode.toLowerCase()}`;
+  
+  // Check cache first
+  const cached = distanceCache.get(cacheKey);
+  if (cached && (Date.now() - cached.timestamp) < CACHE_DURATION) {
+    console.log(`Using cached distance for ${fromPostcode} -> ${toPostcode}:`, cached);
+    return { distance: cached.distance, duration: cached.duration };
+  }
+
+  try {
+    console.log(`Getting live distance from ${fromPostcode} to ${toPostcode}`);
+    
+    const { data, error } = await supabase.functions.invoke('mapbox-distance', {
+      body: {
+        origins: [fromPostcode],
+        destinations: [toPostcode]
+      }
+    });
+
+    if (error) throw error;
+
+    const distance = data.distances[0][0];
+    const duration = data.durations[0][0];
+
+    // Cache the result
+    distanceCache.set(cacheKey, {
+      distance,
+      duration,
+      timestamp: Date.now()
+    });
+
+    console.log(`Live distance result: ${distance} miles, ${duration} minutes`);
+    return { distance, duration };
+  } catch (error) {
+    console.error('Error getting live distance:', error);
+    throw error;
+  }
+}
+
+/**
+ * Clear the distance cache
+ */
 export const clearDistanceCache = () => {
-  // Placeholder for distance cache clearing
+  distanceCache.clear();
   console.log('Distance cache cleared');
 };
+
+/**
+ * Get engineer's daily workload for a specific date
+ */
+export async function getEngineerDailyWorkload(engineerId: string, date: string): Promise<number> {
+  try {
+    const { data, error } = await supabase
+      .rpc('get_engineer_daily_workload', {
+        p_engineer_id: engineerId,
+        p_date: date
+      });
+
+    if (error) throw error;
+    return data || 0;
+  } catch (error) {
+    console.error('Error getting engineer daily workload:', error);
+    return 0;
+  }
+}
+
+/**
+ * Get scheduling settings from admin_settings
+ */
+export async function getSchedulingSettings() {
+  try {
+    const { data: schedulingRules, error: schedulingError } = await supabase
+      .from('admin_settings')
+      .select('setting_value')
+      .eq('setting_key', 'scheduling_rules')
+      .single();
+
+    const { data: bookingRules, error: bookingError } = await supabase
+      .from('admin_settings')
+      .select('setting_value')
+      .eq('setting_key', 'booking_rules')
+      .single();
+
+    const defaultSettings = {
+      minimum_advance_hours: 48,
+      max_distance_miles: 50,
+      max_jobs_per_day: 3,
+      working_hours_start: "09:00",
+      working_hours_end: "17:00",
+      allow_weekend_bookings: false,
+      allow_holiday_bookings: false,
+      require_client_confirmation: true
+    };
+
+    // Safely merge settings, ensuring they're objects
+    const schedulingSettings = (schedulingRules?.setting_value && typeof schedulingRules.setting_value === 'object') 
+      ? schedulingRules.setting_value as Record<string, any> 
+      : {};
+    const bookingSettings = (bookingRules?.setting_value && typeof bookingRules.setting_value === 'object') 
+      ? bookingRules.setting_value as Record<string, any>
+      : {};
+
+    return {
+      ...defaultSettings,
+      ...schedulingSettings,
+      ...bookingSettings
+    };
+  } catch (error) {
+    console.error('Error fetching scheduling settings:', error);
+    return {
+      minimum_advance_hours: 48,
+      max_distance_miles: 50,
+      max_jobs_per_day: 3,
+      working_hours_start: "09:00",
+      working_hours_end: "17:00",
+      allow_weekend_bookings: false,
+      allow_holiday_bookings: false,
+      require_client_confirmation: true
+    };
+  }
+}
+
+/**
+ * Calculate engineer recommendation score
+ */
+function calculateEngineerScore(
+  engineer: EngineerSettings,
+  distance: number,
+  travelTime: number,
+  availableDate: Date
+): number {
+  let score = 100;
+
+  // Distance penalty (closer is better)
+  const distancePenalty = Math.min(distance * 2, 50); // Max 50 point penalty
+  score -= distancePenalty;
+
+  // Travel time penalty (shorter is better)
+  const travelTimePenalty = Math.min(travelTime * 0.5, 30); // Max 30 point penalty
+  score -= travelTimePenalty;
+
+  // Availability bonus (earlier available date is better)
+  const now = new Date();
+  const daysUntilAvailable = Math.ceil((availableDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  const availabilityBonus = Math.max(20 - daysUntilAvailable, 0); // Up to 20 point bonus
+  score += availabilityBonus;
+
+  // Ensure score stays within 0-100 range
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+
+/**
+ * Generate human-readable reasons for engineer recommendations
+ */
+function generateRecommendationReasons(
+  engineer: EngineerSettings,
+  distance: number,
+  travelTime: number,
+  availableDate: Date,
+  minimumDate: Date
+): string[] {
+  const reasons: string[] = [];
+
+  // Distance and travel time
+  if (distance <= 10) {
+    reasons.push(`Very close location (${distance} miles)`);
+  } else if (distance <= 25) {
+    reasons.push(`Reasonable distance (${distance} miles)`);
+  } else {
+    reasons.push(`Within service area (${distance} miles)`);
+  }
+
+  if (travelTime <= 30) {
+    reasons.push(`Short travel time (${travelTime} minutes)`);
+  } else if (travelTime <= 60) {
+    reasons.push(`Moderate travel time (${travelTime} minutes)`);
+  }
+
+  // Availability timing
+  const daysUntilAvailable = Math.ceil((availableDate.getTime() - minimumDate.getTime()) / (1000 * 60 * 60 * 24));
+  if (daysUntilAvailable === 0) {
+    reasons.push('Available from earliest possible date');
+  } else if (daysUntilAvailable <= 3) {
+    reasons.push(`Available very soon (${daysUntilAvailable} days)`);
+  } else if (daysUntilAvailable <= 7) {
+    reasons.push(`Available within a week (${daysUntilAvailable} days)`);
+  } else {
+    reasons.push(`Next availability: ${availableDate.toLocaleDateString()}`);
+  }
+
+  // Engineer qualifications
+  if (engineer.service_areas && engineer.service_areas.length > 1) {
+    reasons.push('Covers multiple service areas');
+  }
+
+  return reasons;
+}
 
 /**
  * Fetch complete engineer settings for scheduling system integration

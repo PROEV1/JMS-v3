@@ -1,6 +1,8 @@
 import React from 'react';
 import { AdminScheduleCalendar } from '@/components/scheduling/AdminScheduleCalendar';
+import { SchedulingSettingsPanel } from '@/components/admin/SchedulingSettingsPanel';
 import { useUserRole } from '@/hooks/useUserRole';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export default function AdminSchedule() {
   const { role: userRole, loading } = useUserRole();
@@ -26,7 +28,18 @@ export default function AdminSchedule() {
 
   return (
     <div className="container mx-auto py-6">
-      <AdminScheduleCalendar />
+      <Tabs defaultValue="calendar" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="calendar">Schedule Calendar</TabsTrigger>
+          <TabsTrigger value="settings">Scheduling Settings</TabsTrigger>
+        </TabsList>
+        <TabsContent value="calendar" className="mt-6">
+          <AdminScheduleCalendar />
+        </TabsContent>
+        <TabsContent value="settings" className="mt-6">
+          <SchedulingSettingsPanel />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
