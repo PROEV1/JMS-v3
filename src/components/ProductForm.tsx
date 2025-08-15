@@ -576,6 +576,62 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onSuc
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader>
+          <CardTitle>Specifications</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+              <Input
+                placeholder="Specification Key"
+                value={newSpec.key}
+                onChange={(e) => setNewSpec({ ...newSpec, key: e.target.value })}
+              />
+              <Input
+                placeholder="Specification Value"
+                value={newSpec.value}
+                onChange={(e) => setNewSpec({ ...newSpec, value: e.target.value })}
+              />
+              <Button type="button" onClick={addSpecification}>
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <div className="space-y-2">
+              {Object.entries(formData.specifications || {}).map(([key, value]) => (
+                <div key={key} className="flex items-center justify-between p-2 border rounded">
+                  <div>
+                    <strong>{key}:</strong> {value as string}
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    type="button"
+                    onClick={() => removeSpecification(key)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {!product?.id && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Product Images</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground">
+              Images can be added after creating the product. Save the product first, then edit it to upload images.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       {product?.id && (
         <>
           <Card>
@@ -629,52 +685,6 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onSuc
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Specifications</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                  <Input
-                    placeholder="Specification Key"
-                    value={newSpec.key}
-                    onChange={(e) => setNewSpec({ ...newSpec, key: e.target.value })}
-                  />
-                  <Input
-                    placeholder="Specification Value"
-                    value={newSpec.value}
-                    onChange={(e) => setNewSpec({ ...newSpec, value: e.target.value })}
-                  />
-                  <Button onClick={addSpecification}>
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-
-                <div className="space-y-2">
-                  {Object.entries(formData.specifications || {}).map(([key, value]) => (
-                    <div key={key} className="flex items-center justify-between p-2 border rounded">
-                      <div>
-                        <strong>{key}:</strong> {value as string}
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => removeSpecification(key)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </>
-      )}
-
-      {product?.id && (
-        <>
           <Card>
             <CardHeader>
               <CardTitle>Product Configurations</CardTitle>
