@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { createOrFindClient, saveLeadHistory } from '@/utils/leadConversionUtils';
+import { useAuth } from '@/hooks/useAuth';
 
 export interface Lead {
   id: string;
@@ -44,6 +45,7 @@ export const useLeads = (options: UseLeadsOptions = {}) => {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { user, session } = useAuth();
 
   const fetchLeads = useCallback(async () => {
     try {
@@ -99,16 +101,22 @@ export const useLeads = (options: UseLeadsOptions = {}) => {
     try {
       console.log('Creating new lead:', leadData);
       
-      const { data: currentUser } = await supabase.auth.getUser();
-      if (!currentUser.user) {
-        throw new Error('User not authenticated');
+      // Use the auth context instead of making a fresh auth call
+      if (!user || !session) {
+        console.error('Authentication check failed - user or session missing:', { 
+          hasUser: !!user, 
+          hasSession: !!session 
+        });
+        throw new Error('Please sign in to create leads');
       }
+
+      console.log('User authenticated, proceeding with lead creation:', user.id);
 
       const { data: newLead, error: createError } = await supabase
         .from('leads')
         .insert({
           ...leadData,
-          created_by: currentUser.user.id
+          created_by: user.id
         })
         .select()
         .single();
@@ -128,7 +136,7 @@ export const useLeads = (options: UseLeadsOptions = {}) => {
       console.error('Error creating lead:', err);
       throw err;
     }
-  }, [fetchLeads]);
+  }, [fetchLeads, user, session]);
 
   const updateLead = useCallback(async (id: string, updates: Partial<Lead>) => {
     try {
