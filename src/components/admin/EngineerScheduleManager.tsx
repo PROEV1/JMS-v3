@@ -200,15 +200,30 @@ export function EngineerScheduleManager({ engineerId, engineerName }: EngineerSc
 
   const addServiceArea = async () => {
     try {
+      // Validate required fields
+      if (!serviceAreaForm.postcode_area.trim()) {
+        toast({
+          title: "Validation Error",
+          description: "Postcode area is required",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log('Adding service area:', serviceAreaForm); // Debug log
+      
       const { error } = await supabase
         .from('engineer_service_areas')
         .insert({
           engineer_id: engineerId,
-          postcode_area: serviceAreaForm.postcode_area,
+          postcode_area: serviceAreaForm.postcode_area.trim().toUpperCase(),
           max_travel_minutes: serviceAreaForm.max_travel_minutes
         });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Service area insert error:', error);
+        throw error;
+      }
 
       toast({
         title: "Service Area Added",
@@ -222,7 +237,7 @@ export function EngineerScheduleManager({ engineerId, engineerName }: EngineerSc
       console.error('Error adding service area:', error);
       toast({
         title: "Error",
-        description: "Failed to add service area",
+        description: `Failed to add service area: ${error.message}`,
         variant: "destructive",
       });
     }

@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/table';
 import { Plus, Settings, User, MapPin, Calendar, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { EngineerScheduleManager } from '@/components/admin/EngineerScheduleManager';
+import { EngineerUserSetup } from '@/components/admin/EngineerUserSetup';
 import { useNavigate } from 'react-router-dom';
 
 interface Engineer {
@@ -47,6 +48,7 @@ export default function AdminEngineers() {
   const [saving, setSaving] = useState(false);
   const [showScheduleManager, setShowScheduleManager] = useState(false);
   const [selectedEngineer, setSelectedEngineer] = useState<Engineer | null>(null);
+  const [showUserSetup, setShowUserSetup] = useState(false);
   
   // Form states
   const [formData, setFormData] = useState({
@@ -437,6 +439,7 @@ export default function AdminEngineers() {
                     <TableHead>Status</TableHead>
                     <TableHead>Jobs Assigned</TableHead>
                     <TableHead>Jobs Completed</TableHead>
+                    <TableHead>User Account</TableHead>
                     <TableHead className="text-center">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -470,11 +473,24 @@ export default function AdminEngineers() {
                         <div className="font-medium">{engineer.completed_jobs}</div>
                       </TableCell>
                       <TableCell>
+                        {engineer.user_id ? (
+                          <Badge className="bg-green-100 text-green-800">
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                            Active
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary">
+                            No Account
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
                         <div className="flex space-x-2">
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => handleEdit(engineer)}
+                            title="Edit Engineer Details"
                           >
                             <Settings className="h-3 w-3" />
                           </Button>
@@ -485,13 +501,26 @@ export default function AdminEngineers() {
                               setSelectedEngineer(engineer);
                               setShowScheduleManager(true);
                             }}
+                            title="Schedule Management"
                           >
                             <Clock className="h-3 w-3" />
                           </Button>
                           <Button
                             variant="outline"
                             size="sm"
+                            onClick={() => {
+                              setSelectedEngineer(engineer);
+                              setShowUserSetup(true);
+                            }}
+                            title="User Account Setup"
+                          >
+                            <User className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
                             onClick={() => handleToggleAvailability(engineer)}
+                            title={engineer.availability ? "Mark Unavailable" : "Mark Available"}
                           >
                             {engineer.availability ? (
                               <XCircle className="h-3 w-3" />
@@ -519,6 +548,24 @@ export default function AdminEngineers() {
               <EngineerScheduleManager 
                 engineerId={selectedEngineer.id}
                 engineerName={selectedEngineer.name}
+              />
+            </DialogContent>
+          </Dialog>
+        )}
+
+        {/* User Setup Modal */}
+        {showUserSetup && selectedEngineer && (
+          <Dialog open={showUserSetup} onOpenChange={setShowUserSetup}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Engineer User Account Setup</DialogTitle>
+              </DialogHeader>
+              <EngineerUserSetup 
+                engineer={selectedEngineer}
+                onUpdate={() => {
+                  fetchEngineers();
+                  setShowUserSetup(false);
+                }}
               />
             </DialogContent>
           </Dialog>

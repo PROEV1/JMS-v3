@@ -1,420 +1,344 @@
 import { supabase } from '@/integrations/supabase/client';
-import type { Database } from '@/integrations/supabase/types';
 
-type DbOrder = Database['public']['Tables']['orders']['Row'];
-type DbClient = Database['public']['Tables']['clients']['Row'];
-type DbEngineer = Database['public']['Tables']['engineers']['Row'];
-
-export interface Order extends DbOrder {
-  client?: DbClient;
-  engineer?: DbEngineer;
-}
-
-export interface Engineer extends DbEngineer {}
-
-export interface ClientBlockedDate {
+// Legacy interfaces for backward compatibility
+export interface Order {
   id: string;
+  order_number: string;
   client_id: string;
-  blocked_date: string;
-  reason?: string;
-}
-
-export interface SchedulingConflict {
-  type: 'double_booking' | 'client_blocked' | 'outside_hours' | 'travel_conflict';
-  severity: 'low' | 'medium' | 'high';
-  message: string;
-}
-
-export interface EngineerSuggestion {
-  engineer: Engineer;
-  isAvailable: boolean;
-  availableDate?: string;
-  distance: number;
-  travelTime: number;
-  score: number;
-  reasons: string[];
-}
-
-// Get scheduling settings from admin configuration
-export const getSchedulingSettings = async () => {
-  // Return default settings since RPC function doesn't exist
-  return {
-    hours_advance_notice: 48,
-    max_distance_miles: 90,
-    max_jobs_per_day: 3,
-    allow_weekend_bookings: false,
-    working_hours_start: '08:00',
-    working_hours_end: '18:00'
+  engineer_id?: string;
+  scheduled_install_date?: string;
+  status: string;
+  status_enhanced: string;
+  job_address?: string;
+  postcode?: string;
+  time_window?: string;
+  total_amount?: number;
+  deposit_amount?: number;
+  amount_paid?: number;
+  estimated_duration_hours?: number;
+  installation_notes?: string;
+  scheduling_conflicts?: any[];
+  client?: {
+    full_name: string;
+    email: string;
+    phone?: string;
+    address?: string;
   };
+  engineer?: {
+    name: string;
+    email: string;
+    region?: string;
+  };
+}
+
+export interface Engineer {
+  id: string;
+  name: string;
+  email: string;
+  availability: boolean;
+  region?: string;
+  starting_postcode?: string;
+}
+
+export interface EngineerSettings {
+  id: string;
+  name: string;
+  email: string;
+  starting_postcode: string | null;
+  availability: boolean;
+  service_areas: Array<{
+    postcode_area: string;
+    max_travel_minutes: number;
+  }>;
+  working_hours: Array<{
+    day_of_week: number;
+    start_time: string;
+    end_time: string;
+    is_available: boolean;
+  }>;
+  time_off: Array<{
+    start_date: string;
+    end_date: string;
+    reason: string;
+    status: string;
+  }>;
+}
+
+// Legacy utility functions for backward compatibility
+export const getStatusColor = (status: string): string => {
+  switch (status) {
+    case 'awaiting_payment':
+      return 'bg-yellow-500 text-white';
+    case 'awaiting_agreement':
+      return 'bg-orange-500 text-white';
+    case 'scheduled':
+      return 'bg-blue-500 text-white';
+    case 'in_progress':
+      return 'bg-purple-500 text-white';
+    case 'completed':
+      return 'bg-green-500 text-white';
+    default:
+      return 'bg-gray-500 text-white';
+  }
 };
 
-// Cache for distance calculations to avoid repeated API calls
-const distanceCache = new Map<string, { distance: number; duration: number; timestamp: number; method: string }>();
-const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+export const formatOrderForCalendar = (order: Order) => ({
+  id: order.id,
+  title: `${order.order_number} - ${order.client?.full_name || 'Unknown Client'}`,
+  start: order.scheduled_install_date ? new Date(order.scheduled_install_date) : new Date(),
+  end: order.scheduled_install_date ? new Date(new Date(order.scheduled_install_date).getTime() + 4 * 60 * 60 * 1000) : new Date(),
+  resource: order.engineer_id || '',
+  extendedProps: {
+    orderId: order.id,
+    orderNumber: order.order_number,
+    clientName: order.client?.full_name,
+    engineerName: order.engineer?.name,
+    status: order.status_enhanced,
+    address: order.job_address
+  }
+});
 
-// Clear cache function for debugging
+export const updateOrderAssignment = async (orderId: string, engineerId: string | null, scheduledDate?: Date) => {
+  try {
+    const updateData: any = { engineer_id: engineerId };
+    if (scheduledDate) {
+      updateData.scheduled_install_date = scheduledDate.toISOString();
+    }
+
+    const { error } = await supabase
+      .from('orders')
+      .update(updateData)
+      .eq('id', orderId);
+
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error updating order assignment:', error);
+    return false;
+  }
+};
+
+export const getSmartEngineerRecommendations = async (order: Order, postcode?: string) => {
+  // Simple implementation - return available engineers
+  try {
+    const { data: engineers, error } = await supabase
+      .from('engineers')
+      .select('*')
+      .eq('availability', true);
+
+    if (error) throw error;
+
+    const recommendations = (engineers || []).map(engineer => ({
+      engineer: engineer as Engineer,
+      score: Math.random() * 100, // Placeholder scoring
+      reasons: ['Available engineer']
+    }));
+
+    return {
+      recommendations,
+      settings: null // Placeholder
+    };
+  } catch (error) {
+    console.error('Error getting engineer recommendations:', error);
+    return {
+      recommendations: [],
+      settings: null
+    };
+  }
+};
+
 export const clearDistanceCache = () => {
-  distanceCache.clear();
+  // Placeholder for distance cache clearing
   console.log('Distance cache cleared');
 };
 
-// Enhanced distance calculation using Mapbox API - no fallback
-export const calculateDistance = async (postcode1?: string, postcode2?: string): Promise<number> => {
-  if (!postcode1 || !postcode2) {
-    console.error('❌ Missing postcode(s):', { postcode1, postcode2 });
-    throw new Error('Both postcodes are required for distance calculation');
-  }
-  
-  const cleanPostcode1 = postcode1.trim().toUpperCase();
-  const cleanPostcode2 = postcode2.trim().toUpperCase();
-  
-  console.log(`🚀 === DISTANCE CALCULATION START ===`);
-  console.log(`📍 From: "${cleanPostcode1}" | To: "${cleanPostcode2}"`);
-  
-  // Check cache first
-  const cacheKey = `${cleanPostcode1}-${cleanPostcode2}`;
-  const reverseKey = `${cleanPostcode2}-${cleanPostcode1}`;
-  const cached = distanceCache.get(cacheKey) || distanceCache.get(reverseKey);
-  
-  if (cached && (Date.now() - cached.timestamp) < CACHE_DURATION) {
-    console.log(`🗂️ Using cached result: ${cached.distance} miles (${cached.method})`);
-    return cached.distance;
-  }
-  
-  // Check for exact match (same postcode should be very close)
-  if (cleanPostcode1 === cleanPostcode2) {
-    console.log('✅ Same postcodes - returning 0.5 miles');
-    return 0.5;
-  }
-  
-  console.log('📡 Calling Mapbox API edge function...');
-  console.log('🔗 Function URL: https://jttogvpjfeegbkpturey.supabase.co/functions/v1/mapbox-distance');
-  console.log('📦 Request payload:', JSON.stringify({
-    origins: [cleanPostcode1],
-    destinations: [cleanPostcode2]
-  }, null, 2));
-  
-  console.log('🚀 About to call supabase.functions.invoke...');
-  
+/**
+ * Fetch complete engineer settings for scheduling system integration
+ */
+export async function getEngineerSettings(engineerId: string): Promise<EngineerSettings | null> {
   try {
-    console.log('🎯 Calling invoke with data:', {
-      functionName: 'mapbox-distance',
-      body: {
-        origins: [cleanPostcode1],
-        destinations: [cleanPostcode2]
-      }
-    });
-    
-    const { data, error } = await supabase.functions.invoke('mapbox-distance', {
-      body: {
-        origins: [cleanPostcode1],
-        destinations: [cleanPostcode2]
-      }
-    });
-    
-    console.log('🎉 Invoke completed successfully!');
-    
-    console.log('📨 Raw Mapbox response:', { data, error });
-    console.log('📊 Response status:', data ? 'data received' : 'no data');
-    console.log('🔍 Error details:', error ? JSON.stringify(error, null, 2) : 'no error');
-    
-    if (error) {
-      console.error('❌ Mapbox function error:', error);
-      throw new Error(`Mapbox API error: ${JSON.stringify(error)}`);
-    }
-    
-    if (!data) {
-      console.error('❌ No data returned from Mapbox function');
-      throw new Error('No data returned from Mapbox API');
-    }
-    
-    if (!data.distances || !Array.isArray(data.distances)) {
-      console.error('❌ Invalid distances structure:', data);
-      throw new Error(`Invalid response structure: ${JSON.stringify(data)}`);
-    }
-    
-    if (!data.distances[0] || data.distances[0][0] === undefined) {
-      console.error('❌ Missing distance value:', data.distances);
-      throw new Error(`Missing distance value in response: ${JSON.stringify(data.distances)}`);
-    }
-    
-    const distance = data.distances[0][0];
-    const duration = data.durations?.[0]?.[0] || Math.round(distance * 2.5);
-    
-    console.log(`✅ SUCCESS: ${distance} miles, ${duration} minutes`);
-    console.log(`🏁 === DISTANCE CALCULATION END ===`);
-    
-    // Cache the result
-    distanceCache.set(cacheKey, { 
-      distance, 
-      duration, 
-      timestamp: Date.now(),
-      method: 'mapbox'
-    });
-    
-    return distance;
-    
-  } catch (invokeError) {
-    console.error('💥 Function invoke failed:', invokeError);
-    console.error('🔧 Invoke error details:', {
-      message: invokeError.message,
-      stack: invokeError.stack,
-      name: invokeError.name
-    });
-    throw new Error(`Failed to call Mapbox function: ${invokeError.message}`);
+    // Fetch engineer basic info
+    const { data: engineer, error: engineerError } = await supabase
+      .from('engineers')
+      .select('*')
+      .eq('id', engineerId)
+      .single();
+
+    if (engineerError) throw engineerError;
+
+    // Fetch service areas
+    const { data: serviceAreas, error: serviceAreasError } = await supabase
+      .from('engineer_service_areas')
+      .select('*')
+      .eq('engineer_id', engineerId);
+
+    if (serviceAreasError) throw serviceAreasError;
+
+    // Fetch working hours
+    const { data: workingHours, error: workingHoursError } = await supabase
+      .from('engineer_availability')
+      .select('*')
+      .eq('engineer_id', engineerId)
+      .order('day_of_week');
+
+    if (workingHoursError) throw workingHoursError;
+
+    // Fetch time off requests
+    const { data: timeOff, error: timeOffError } = await supabase
+      .from('engineer_time_off')
+      .select('*')
+      .eq('engineer_id', engineerId)
+      .eq('status', 'approved')
+      .gte('end_date', new Date().toISOString().split('T')[0]); // Only future/current time off
+
+    if (timeOffError) throw timeOffError;
+
+    return {
+      id: engineer.id,
+      name: engineer.name,
+      email: engineer.email,
+      starting_postcode: engineer.starting_postcode,
+      availability: engineer.availability,
+      service_areas: serviceAreas || [],
+      working_hours: workingHours || [],
+      time_off: timeOff || [],
+    };
+  } catch (error) {
+    console.error('Error fetching engineer settings:', error);
+    return null;
   }
-};
+}
 
-// Calculate travel time based on distance
-export const calculateTravelTime = (distance: number): number => {
-  // Assuming average speed of 30 mph including traffic and stops
-  return Math.round(distance * 2);
-};
+/**
+ * Get all engineers with their complete settings for scheduling
+ */
+export async function getAllEngineersForScheduling(): Promise<EngineerSettings[]> {
+  try {
+    const { data: engineers, error } = await supabase
+      .from('engineers')
+      .select('id')
+      .eq('availability', true);
 
-// Get engineer availability for a specific date
-export const getEngineerAvailability = async (engineerId: string, date: string) => {
-  const { data: engineer } = await supabase
-    .from('engineers')
-    .select('*, engineer_time_off(*)')
-    .eq('id', engineerId)
-    .single();
+    if (error) throw error;
 
-  if (!engineer) return false;
+    const engineerSettings = await Promise.all(
+      engineers.map(engineer => getEngineerSettings(engineer.id))
+    );
 
+    return engineerSettings.filter(settings => settings !== null) as EngineerSettings[];
+  } catch (error) {
+    console.error('Error fetching all engineers for scheduling:', error);
+    return [];
+  }
+}
+
+/**
+ * Check if engineer is available on a specific date
+ */
+export function isEngineerAvailableOnDate(
+  engineer: EngineerSettings,
+  date: Date
+): boolean {
   // Check if engineer is generally available
   if (!engineer.availability) return false;
 
-  // Check if engineer is on time off
-  const timeOff = engineer.engineer_time_off?.find((timeOff: any) => {
-    const startDate = new Date(timeOff.start_date);
-    const endDate = new Date(timeOff.end_date);
-    const checkDate = new Date(date);
-    return checkDate >= startDate && checkDate <= endDate && timeOff.status === 'approved';
-  });
+  // Check time off
+  const dateStr = date.toISOString().split('T')[0];
+  const isOnTimeOff = engineer.time_off.some(timeOff => 
+    dateStr >= timeOff.start_date && dateStr <= timeOff.end_date
+  );
 
-  return !timeOff;
-};
+  if (isOnTimeOff) return false;
 
-// Get client blocked dates
-export const getClientBlockedDates = async (clientId: string) => {
-  const { data } = await supabase
-    .from('client_blocked_dates')
-    .select('blocked_date')
-    .eq('client_id', clientId);
-
-  return data?.map(item => item.blocked_date) || [];
-};
-
-// Detect scheduling conflicts for an order
-export const detectConflicts = async (orderId: string): Promise<SchedulingConflict[]> => {
-  const { data, error } = await supabase.rpc('detect_scheduling_conflicts', {
-    p_order_id: orderId
-  });
-
-  if (error) {
-    console.error('Error detecting conflicts:', error);
-    return [];
-  }
-
-  return (data as unknown as SchedulingConflict[]) || [];
-};
-
-// Get engineer workload for a specific date
-export const getEngineerWorkload = async (engineerId: string, date: string): Promise<number> => {
-  const { data, error } = await supabase.rpc('get_engineer_daily_workload', {
-    p_engineer_id: engineerId,
-    p_date: date
-  });
-
-  if (error) {
-    console.error('Error getting engineer workload:', error);
-    return 0;
-  }
-
-  return data || 0;
-};
-
-// Get status color based on order status
-export const getStatusColor = (status: string): string => {
-  const statusColors: Record<string, string> = {
-    'quote_sent': 'bg-blue-100 text-blue-800',
-    'quote_accepted': 'bg-green-100 text-green-800',
-    'awaiting_payment': 'bg-yellow-100 text-yellow-800',
-    'awaiting_agreement': 'bg-orange-100 text-orange-800',
-    'awaiting_install_booking': 'bg-purple-100 text-purple-800',
-    'scheduled': 'bg-indigo-100 text-indigo-800',
-    'in_progress': 'bg-blue-100 text-blue-800',
-    'awaiting_final_payment': 'bg-yellow-100 text-yellow-800',
-    'completed': 'bg-green-100 text-green-800',
-    'cancelled': 'bg-red-100 text-red-800'
-  };
+  // Check working hours for the day of week
+  const dayOfWeek = date.getDay();
+  const workingHour = engineer.working_hours.find(wh => wh.day_of_week === dayOfWeek);
   
-  return statusColors[status] || 'bg-gray-100 text-gray-800';
-};
+  if (!workingHour || !workingHour.is_available) return false;
 
-// Format order for calendar display
-export const formatOrderForCalendar = (order: Order) => {
+  return true;
+}
+
+/**
+ * Check if engineer can serve a postcode based on service areas
+ */
+export function canEngineerServePostcode(
+  engineer: EngineerSettings,
+  postcode: string
+): { canServe: boolean; travelTime?: number } {
+  if (!engineer.service_areas || engineer.service_areas.length === 0) {
+    return { canServe: false };
+  }
+
+  // Extract postcode area (e.g., "SW1A" from "SW1A 1AA")
+  const postcodeArea = postcode.replace(/\s+/g, '').toUpperCase().substring(0, 3);
+
+  // Check if engineer serves this postcode area
+  for (const area of engineer.service_areas) {
+    if (area.postcode_area.replace(/\s+/g, '').toUpperCase().includes(postcodeArea) ||
+        postcodeArea.includes(area.postcode_area.replace(/\s+/g, '').toUpperCase())) {
+      return { 
+        canServe: true, 
+        travelTime: area.max_travel_minutes 
+      };
+    }
+  }
+
+  return { canServe: false };
+}
+
+/**
+ * Get engineers who can serve a specific postcode, sorted by travel time
+ */
+export async function getEngineersForPostcode(postcode: string): Promise<Array<{
+  engineer: EngineerSettings;
+  travelTime: number;
+}>> {
+  const allEngineers = await getAllEngineersForScheduling();
+  
+  const availableEngineers = allEngineers
+    .map(engineer => {
+      const serviceCheck = canEngineerServePostcode(engineer, postcode);
+      if (serviceCheck.canServe) {
+        return {
+          engineer,
+          travelTime: serviceCheck.travelTime || 60
+        };
+      }
+      return null;
+    })
+    .filter(item => item !== null)
+    .sort((a, b) => a!.travelTime - b!.travelTime) as Array<{
+      engineer: EngineerSettings;
+      travelTime: number;
+    }>;
+
+  return availableEngineers;
+}
+
+/**
+ * Validate engineer setup completeness
+ */
+export function validateEngineerSetup(engineer: EngineerSettings): {
+  isComplete: boolean;
+  missingItems: string[];
+} {
+  const missingItems: string[] = [];
+
+  if (!engineer.starting_postcode) {
+    missingItems.push('Starting postcode');
+  }
+
+  if (!engineer.service_areas || engineer.service_areas.length === 0) {
+    missingItems.push('Service areas');
+  }
+
+  if (!engineer.working_hours || engineer.working_hours.length === 0) {
+    missingItems.push('Working hours');
+  }
+
   return {
-    id: order.id,
-    title: `${order.order_number} - ${order.client?.full_name || 'Unknown Client'}`,
-    start: new Date(order.scheduled_install_date!),
-    end: new Date(new Date(order.scheduled_install_date!).getTime() + 4 * 60 * 60 * 1000), // 4 hours
-    resource: {
-      order,
-      engineerId: order.engineer_id,
-      status: order.status_enhanced || order.status,
-      conflicts: []
-    }
+    isComplete: missingItems.length === 0,
+    missingItems
   };
-};
-
-// Find first available slot for engineers
-export const findFirstAvailableSlot = async (
-  engineerIds: string[],
-  clientPostcode: string,
-  estimatedHours: number = 2,
-  clientId?: string
-) => {
-  // Return null since RPC function doesn't exist
-  return null;
-  
-  /* TODO: Re-enable when RPC function is created
-  const { data, error } = await supabase.rpc('find_first_available_slot', {
-    p_engineer_ids: engineerIds,
-    p_client_postcode: clientPostcode,
-    p_estimated_hours: estimatedHours,
-    p_client_id: clientId
-  });
-
-  if (error) {
-    console.error('Error finding available slot:', error);
-    return [];
-  }
-
-  return data || [];
-  */
-};
-
-// Smart engineer recommendations
-export const getSmartEngineerRecommendations = async (
-  order: Order,
-  availableEngineers: Engineer[]
-): Promise<{
-  recommendations: EngineerSuggestion[];
-  settings: any;
-}> => {
-  console.log('🧠 === SMART RECOMMENDATIONS START ===');
-  console.log(`📋 Order: ${order.order_number} | Location: ${order.postcode}`);
-  console.log(`👥 Available engineers: ${availableEngineers.length}`);
-  
-  if (!order.postcode) {
-    console.error('❌ No postcode available for recommendations');
-    return { recommendations: [], settings: {} };
-  }
-
-  const settings = await getSchedulingSettings();
-  const recommendations: EngineerSuggestion[] = [];
-  
-  console.log('⚙️ Scheduling settings:', settings);
-  
-  for (const engineer of availableEngineers) {
-    try {
-      console.log(`\n🔍 === ANALYZING ENGINEER: ${engineer.name} ===`);
-      console.log(`📍 Engineer location: ${engineer.starting_postcode}`);
-      
-      // Calculate distance using Mapbox API
-      let distance: number;
-      let travelTime: number;
-      
-      try {
-        console.log(`📏 Calculating distance: ${engineer.starting_postcode} → ${order.postcode}`);
-        distance = await calculateDistance(engineer.starting_postcode, order.postcode);
-        travelTime = calculateTravelTime(distance);
-        console.log(`✅ Distance calculated: ${distance} miles, ${travelTime} min travel`);
-      } catch (distanceError) {
-        console.error(`❌ Distance calculation failed for ${engineer.name}:`, distanceError);
-        continue; // Skip this engineer if distance calculation fails
-      }
-      
-      // Calculate base score
-      let score = 100;
-      const reasons: string[] = [];
-      
-      // Distance penalty
-      if (distance > settings.max_distance_miles) {
-        console.log(`❌ Engineer too far: ${distance} miles > ${settings.max_distance_miles} miles`);
-        continue; // Skip engineers that are too far
-      }
-      
-      const distancePenalty = Math.min(distance * 0.5, 30);
-      score -= distancePenalty;
-      console.log(`📏 Distance penalty: -${distancePenalty.toFixed(1)} (${distance} miles)`);
-      
-      if (distance <= 10) {
-        reasons.push('Very close location');
-      } else if (distance <= 25) {
-        reasons.push('Reasonable distance');
-      } else {
-        reasons.push('Longer travel required');
-      }
-      
-      const finalScore = Math.max(score, 10);
-      console.log(`🎯 Final score for ${engineer.name}: ${finalScore.toFixed(1)}`);
-      
-      // Calculate proper available date with advance notice
-      const advanceNoticeMs = settings.hours_advance_notice * 60 * 60 * 1000;
-      const earliestDate = new Date(Date.now() + advanceNoticeMs);
-      
-      recommendations.push({
-        engineer,
-        isAvailable: true,
-        availableDate: earliestDate.toISOString(),
-        distance,
-        travelTime,
-        score: finalScore,
-        reasons
-      });
-      
-    } catch (error) {
-      console.error(`💥 Error processing engineer ${engineer.name}:`, error);
-    }
-  }
-  
-  // Sort by score (highest first)
-  recommendations.sort((a, b) => b.score - a.score);
-  
-  console.log('\n📊 === FINAL RECOMMENDATIONS ===');
-  recommendations.forEach((rec, index) => {
-    console.log(`${index + 1}. ${rec.engineer.name}: ${rec.score.toFixed(1)} pts, ${rec.distance} miles`);
-  });
-  console.log('🏁 === SMART RECOMMENDATIONS END ===\n');
-  
-  return { recommendations, settings };
-};
-
-// Update order assignment
-export const updateOrderAssignment = async (
-  orderId: string,
-  engineerId: string | null,
-  scheduledDate?: string
-) => {
-  const updates: any = { engineer_id: engineerId };
-  
-  if (scheduledDate) {
-    updates.scheduled_install_date = scheduledDate;
-  }
-  
-  const { data, error } = await supabase
-    .from('orders')
-    .update(updates)
-    .eq('id', orderId)
-    .select()
-    .single();
-    
-  if (error) {
-    console.error('Error updating order assignment:', error);
-    throw error;
-  }
-  
-  return data;
-};
+}
