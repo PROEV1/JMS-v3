@@ -31,6 +31,7 @@ export interface Lead {
   configuration?: any;
   client_id?: string;
   created_by?: string;
+  address?: string;
 }
 
 interface UseLeadsOptions {

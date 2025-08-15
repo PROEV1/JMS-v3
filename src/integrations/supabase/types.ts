@@ -566,6 +566,7 @@ export type Database = {
       leads: {
         Row: {
           accessories_data: Json | null
+          address: string | null
           client_id: string | null
           configuration: Json | null
           created_at: string
@@ -591,6 +592,7 @@ export type Database = {
         }
         Insert: {
           accessories_data?: Json | null
+          address?: string | null
           client_id?: string | null
           configuration?: Json | null
           created_at?: string
@@ -616,6 +618,7 @@ export type Database = {
         }
         Update: {
           accessories_data?: Json | null
+          address?: string | null
           client_id?: string | null
           configuration?: Json | null
           created_at?: string

@@ -26,7 +26,8 @@ export const transformLeadData = (lead: any): Lead => {
     accessories: lead.accessories,
     configuration: lead.configuration,
     client_id: lead.client_id,
-    created_by: lead.created_by
+    created_by: lead.created_by,
+    address: lead.address
   };
 };
 
@@ -47,17 +48,20 @@ export const filterLeadsByStatus = (leads: Lead[], status?: string): Lead[] => {
   return filtered;
 };
 
-export const validateLeadData = (leadData: Partial<Lead>): string[] => {
+export const validateLeadData = (leadData: Partial<Lead>, hasSelectedClient: boolean = false): string[] => {
   const errors: string[] = [];
   
-  if (!leadData.name?.trim()) {
-    errors.push('Name is required');
-  }
-  
-  if (!leadData.email?.trim()) {
-    errors.push('Email is required');
-  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(leadData.email)) {
-    errors.push('Valid email is required');
+  // If a client is selected, we don't need to validate name/email as they're auto-filled
+  if (!hasSelectedClient) {
+    if (!leadData.name?.trim()) {
+      errors.push('Name is required');
+    }
+    
+    if (!leadData.email?.trim()) {
+      errors.push('Email is required');
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(leadData.email)) {
+      errors.push('Valid email is required');
+    }
   }
   
   if (leadData.phone && leadData.phone.trim() && !/^[\+]?[0-9\s\-\(\)]+$/.test(leadData.phone)) {

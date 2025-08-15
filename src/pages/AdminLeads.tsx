@@ -16,7 +16,7 @@ const AdminLeads = () => {
   
   const [statusFilter, setStatusFilter] = useState<Lead['status'] | 'all'>('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [clients, setClients] = useState<Array<{ id: string; full_name: string; email: string }>>([]);
+  const [clients, setClients] = useState<Array<{ id: string; full_name: string; email: string; phone?: string; address?: string }>>([]);
   
   console.log('Current statusFilter:', statusFilter);
   
@@ -36,7 +36,7 @@ const AdminLeads = () => {
     const fetchClients = async () => {
       const { data } = await supabase
         .from('clients')
-        .select('id, full_name, email')
+        .select('id, full_name, email, phone, address')
         .order('full_name');
       
       if (data) {

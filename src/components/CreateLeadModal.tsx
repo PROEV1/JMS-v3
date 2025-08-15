@@ -15,7 +15,7 @@ interface CreateLeadModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: (lead: Lead) => void;
-  clients?: Array<{ id: string; full_name: string; email: string }>;
+  clients?: Array<{ id: string; full_name: string; email: string; phone?: string; address?: string }>;
 }
 
 export const CreateLeadModal = ({ isOpen, onClose, onSuccess, clients = [] }: CreateLeadModalProps) => {
@@ -36,6 +36,7 @@ export const CreateLeadModal = ({ isOpen, onClose, onSuccess, clients = [] }: Cr
     name: '',
     email: '',
     phone: '',
+    address: '',
     message: '',
     source: '',
     notes: '',
@@ -47,6 +48,22 @@ export const CreateLeadModal = ({ isOpen, onClose, onSuccess, clients = [] }: Cr
     finish: '',
     luxe_upgrade: false
   });
+
+  // Auto-fill form when client is selected
+  useEffect(() => {
+    if (formData.client_id) {
+      const selectedClient = clients.find(c => c.id === formData.client_id);
+      if (selectedClient) {
+        setFormData(prev => ({
+          ...prev,
+          name: selectedClient.full_name,
+          email: selectedClient.email,
+          phone: selectedClient.phone || '',
+          address: selectedClient.address || ''
+        }));
+      }
+    }
+  }, [formData.client_id, clients]);
 
   // Update filtered clients when clients prop or search changes
   useEffect(() => {
@@ -143,7 +160,7 @@ export const CreateLeadModal = ({ isOpen, onClose, onSuccess, clients = [] }: Cr
       product_price: formData.product_price ? parseFloat(formData.product_price) : undefined,
       total_price: formData.total_price ? parseFloat(formData.total_price) : undefined,
       width_cm: formData.width_cm ? parseFloat(formData.width_cm) : undefined,
-    } as any);
+    } as any, !!formData.client_id);
     if (errors.length > 0) {
       toast({
         title: "Validation Error",
@@ -161,6 +178,7 @@ export const CreateLeadModal = ({ isOpen, onClose, onSuccess, clients = [] }: Cr
         name: formData.name.trim(),
         email: formData.email.trim(),
         phone: formData.phone.trim() || undefined,
+        address: formData.address.trim() || undefined,
         message: formData.message.trim() || undefined,
         source: formData.source.trim() || undefined,
         notes: formData.notes.trim() || undefined,
@@ -182,6 +200,7 @@ export const CreateLeadModal = ({ isOpen, onClose, onSuccess, clients = [] }: Cr
         name: '',
         email: '',
         phone: '',
+        address: '',
         message: '',
         source: '',
         notes: '',
@@ -228,7 +247,9 @@ export const CreateLeadModal = ({ isOpen, onClose, onSuccess, clients = [] }: Cr
                 id="name"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                required
+                disabled={!!formData.client_id}
+                placeholder={formData.client_id ? "Auto-filled from selected client" : "Enter name"}
+                required={!formData.client_id}
               />
             </div>
             
@@ -239,7 +260,9 @@ export const CreateLeadModal = ({ isOpen, onClose, onSuccess, clients = [] }: Cr
                 type="email"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                required
+                disabled={!!formData.client_id}
+                placeholder={formData.client_id ? "Auto-filled from selected client" : "Enter email"}
+                required={!formData.client_id}
               />
             </div>
           </div>
@@ -251,6 +274,8 @@ export const CreateLeadModal = ({ isOpen, onClose, onSuccess, clients = [] }: Cr
                 id="phone"
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                disabled={!!formData.client_id}
+                placeholder={formData.client_id ? "Auto-filled from selected client" : "Enter phone"}
               />
             </div>
             
@@ -263,6 +288,18 @@ export const CreateLeadModal = ({ isOpen, onClose, onSuccess, clients = [] }: Cr
                 placeholder="e.g., Website, Referral, etc."
               />
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="address">Address (Optional)</Label>
+            <Textarea
+              id="address"
+              value={formData.address}
+              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+              disabled={!!formData.client_id}
+              placeholder={formData.client_id ? "Auto-filled from selected client" : "Enter address"}
+              rows={2}
+            />
           </div>
 
           <div className="space-y-2">
