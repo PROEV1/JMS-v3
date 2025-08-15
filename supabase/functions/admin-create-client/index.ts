@@ -75,9 +75,9 @@ serve(async (req) => {
     console.log("Attempting to create/connect client with email:", email);
 
     // First, check if a user with this email already exists
-    const { data: existingUser, error: userLookupError } = await supabaseAdmin.auth.admin.getUsersByEmail(email);
+    const { data: existingUserResponse, error: userLookupError } = await supabaseAdmin.auth.admin.getUsersByEmail(email);
     
-    if (userLookupError && userLookupError.message !== 'User not found') {
+    if (userLookupError) {
       console.error("Error looking up existing user:", userLookupError);
       throw new Error(`User lookup failed: ${userLookupError.message}`);
     }
@@ -85,9 +85,10 @@ serve(async (req) => {
     let userId = null;
     let tempPassword = null;
 
-    if (existingUser && existingUser.data && existingUser.data.users.length > 0) {
+    // Check if users array exists and has users
+    if (existingUserResponse && existingUserResponse.users && existingUserResponse.users.length > 0) {
       // User already exists, use their ID
-      userId = existingUser.data.users[0].id;
+      userId = existingUserResponse.users[0].id;
       console.log("Found existing user with ID:", userId);
       
       // Check if this user already has a client record
