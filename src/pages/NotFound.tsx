@@ -28,7 +28,7 @@ const NotFound = () => {
         
         <Button 
           onClick={() => window.location.href = "/"} 
-          className="bg-brand-teal hover:bg-brand-teal-dark text-white px-6 py-3"
+          className="bg-primary hover:bg-[hsl(var(--primary-hover))] text-white px-6 py-3"
         >
           <Home className="h-4 w-4 mr-2" />
           Return to Home

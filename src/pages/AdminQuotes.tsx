@@ -89,8 +89,8 @@ export default function AdminQuotes() {
       title: 'Total Quotes',
       value: quotes.length,
       icon: FileText,
-      color: 'text-brand-teal',
-      bgColor: 'bg-brand-teal/10',
+      color: 'text-primary',
+      bgColor: 'bg-primary/10',
       filterValue: 'all'
     },
     {
@@ -249,7 +249,7 @@ export default function AdminQuotes() {
                       <CardTitle className="brand-heading-3">Quote {quote.quote_number}</CardTitle>
                       <CardDescription className="brand-body">
                         For <button 
-                          className="text-brand-teal hover:text-brand-teal-dark underline" 
+                          className="text-primary hover:text-[hsl(var(--primary-hover))] underline" 
                           onClick={(e) => {
                             e.stopPropagation();
                             handleClientClick(quote.client.id);

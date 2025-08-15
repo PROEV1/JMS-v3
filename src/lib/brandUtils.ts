@@ -98,9 +98,9 @@ export const getBadgeVariant = (variant: keyof typeof BADGE_VARIANTS): string =>
 export const DASHBOARD_TILES = {
   quotes: {
     iconBg: getIconBackground('teal'),
-    iconColor: 'text-brand-teal',
-    badgeBg: 'bg-brand-teal-light/20',
-    badgeText: 'text-brand-teal',
+    iconColor: 'text-primary',
+    badgeBg: 'bg-primary/20',
+    badgeText: 'text-primary',
   },
   projects: {
     iconBg: getIconBackground('green'),

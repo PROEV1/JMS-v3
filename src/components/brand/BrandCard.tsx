@@ -21,7 +21,7 @@ export const BrandCard: React.FC<BrandCardProps> = ({
   description,
   icon,
   iconBg = 'icon-bg-teal',
-  iconColor = 'text-brand-teal',
+  iconColor = 'text-primary',
   badge,
   onClick,
   className,

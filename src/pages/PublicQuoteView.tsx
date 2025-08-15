@@ -164,7 +164,7 @@ export default function PublicQuoteView() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'sent': return 'bg-brand-teal text-white';
+      case 'sent': return 'bg-primary text-white';
       case 'accepted': return 'bg-brand-green text-white';
       case 'declined': return 'bg-destructive text-destructive-foreground';
       case 'expired': return 'bg-muted text-muted-foreground';
@@ -513,28 +513,28 @@ export default function PublicQuoteView() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center">
-                <Calendar className="h-5 w-5 mr-2 text-brand-teal" />
+                <Calendar className="h-5 w-5 mr-2 text-primary" />
                 What Happens Next?
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 <div className="flex items-start space-x-3">
-                  <div className="w-6 h-6 bg-brand-teal text-white rounded-full flex items-center justify-center text-sm font-semibold">1</div>
+                  <div className="w-6 h-6 bg-primary text-white rounded-full flex items-center justify-center text-sm font-semibold">1</div>
                   <div>
                     <h4 className="font-medium">Accept Your Quote</h4>
                     <p className="text-sm text-muted-foreground">Review and accept your personalized quote</p>
                   </div>
                 </div>
                 <div className="flex items-start space-x-3">
-                  <div className="w-6 h-6 bg-brand-teal text-white rounded-full flex items-center justify-center text-sm font-semibold">2</div>
+                  <div className="w-6 h-6 bg-primary text-white rounded-full flex items-center justify-center text-sm font-semibold">2</div>
                   <div>
                     <h4 className="font-medium">Schedule Installation</h4>
                     <p className="text-sm text-muted-foreground">Book a convenient time for professional installation</p>
                   </div>
                 </div>
                 <div className="flex items-start space-x-3">
-                  <div className="w-6 h-6 bg-brand-teal text-white rounded-full flex items-center justify-center text-sm font-semibold">3</div>
+                  <div className="w-6 h-6 bg-primary text-white rounded-full flex items-center justify-center text-sm font-semibold">3</div>
                   <div>
                     <h4 className="font-medium">Enjoy Your New Space</h4>
                     <p className="text-sm text-muted-foreground">Relax while we transform your space</p>

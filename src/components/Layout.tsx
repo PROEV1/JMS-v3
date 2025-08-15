@@ -55,7 +55,7 @@ export default function Layout({ children }: LayoutProps) {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-brand-teal"></div>
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
       </div>
     );
   }
@@ -68,7 +68,7 @@ export default function Layout({ children }: LayoutProps) {
   if (roleLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-brand-teal"></div>
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
       </div>
     );
   }
@@ -143,7 +143,7 @@ export default function Layout({ children }: LayoutProps) {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b bg-card shadow-sm">
+      <header className="border-b bg-[#333333] text-[#f5f5f5] border-[#888888] shadow-sm">
         <div className="container flex h-16 items-center justify-between">
           <div className="flex items-center space-x-6">
             <Link to={dashboardLink} className="flex items-center">
@@ -153,7 +153,7 @@ export default function Layout({ children }: LayoutProps) {
             {/* Navigation Menu */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="flex items-center space-x-2 hover:bg-brand-teal/10 hover:text-brand-teal">
+                <Button variant="ghost" className="flex items-center space-x-2 hover:bg-primary/10 hover:text-primary text-[#f5f5f5]">
                   <span className="brand-body font-medium">Menu</span>
                   <ChevronDown className="h-4 w-4" />
                 </Button>
@@ -163,10 +163,10 @@ export default function Layout({ children }: LayoutProps) {
                   <DropdownMenuItem key={index} asChild>
                     <button
                       onClick={item.action}
-                      className={`flex items-center space-x-3 px-3 py-2 text-sm transition-colors hover:bg-brand-teal/10 hover:text-brand-teal brand-body w-full text-left ${
+                      className={`flex items-center space-x-3 px-3 py-2 text-sm transition-colors hover:bg-primary/10 hover:text-primary brand-body w-full text-left ${
                         location.pathname === item.href || 
                         (item.href.includes('#') && location.pathname === item.href.split('#')[0] && window.location.hash === '#' + item.href.split('#')[1])
-                          ? 'bg-brand-teal/10 text-brand-teal font-semibold' 
+                          ? 'bg-primary/10 text-primary font-semibold' 
                           : 'text-muted-foreground'
                       }`}
                     >
@@ -180,12 +180,12 @@ export default function Layout({ children }: LayoutProps) {
           </div>
           
           <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2 text-sm text-muted-foreground brand-body">
+            <div className="flex items-center space-x-2 text-sm text-[#f5f5f5] brand-body">
               <User className="h-4 w-4" />
               <span>{user.email}</span>
-              <span className="text-xs bg-brand-cream px-2 py-1 rounded text-primary">({userRole})</span>
+              <span className="text-xs bg-[#f5f5f5] px-2 py-1 rounded text-[#333333]">({userRole})</span>
             </div>
-            <Button variant="outline" size="sm" onClick={signOut} className="hover:bg-brand-teal hover:text-white">
+            <Button variant="outline" size="sm" onClick={signOut} className="border-[#888888] text-[#f5f5f5] hover:bg-primary hover:text-white hover:border-primary">
               <LogOut className="h-4 w-4 mr-2" />
               Sign Out
             </Button>

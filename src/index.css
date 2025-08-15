@@ -10,104 +10,97 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    /* Pro EV Brand Color Palette - Green-focused design */
-    --background: 0 0% 100%;
-    --foreground: 210 40% 15%; /* Dark gray for text */
-
-    --card: 0 0% 100%;
-    --card-foreground: 210 40% 15%;
-
-    --popover: 0 0% 100%;
-    --popover-foreground: 210 40% 15%;
-
-    /* Primary: Pro EV Green */
-    --primary: 105 65% 55%; /* Bright green matching logo */
-    --primary-foreground: 0 0% 98%;
-
-    /* Secondary: Lighter green for accents */
-    --secondary: 105 45% 70%;
-    --secondary-foreground: 210 40% 15%;
-
-    --muted: 120 20% 95%; /* Very light green-tinted background */
-    --muted-foreground: 210 20% 50%;
-
-    /* Accent: Complementary colors */
-    --accent: 105 35% 80%; /* Light green accent */
-    --accent-foreground: 210 40% 15%;
-
-    /* Pro EV Brand Colors */
-    --brand-teal: 105 65% 55%; /* Primary EV green */
-    --brand-teal-light: 105 55% 75%;
-    --brand-teal-dark: 105 75% 40%;
-    
-    --brand-pink: 335 65% 75%; /* Complementary pink accent */
-    --brand-pink-light: 335 55% 85%;
-    --brand-pink-dark: 335 75% 60%;
-    
-    --brand-green: 105 65% 55%; /* Main EV green */
-    --brand-green-light: 105 55% 75%;
-    --brand-green-dark: 105 75% 40%;
-    
-    --brand-cream: 45 25% 95%; /* Neutral cream */
-    --brand-cream-light: 45 25% 98%;
-    --brand-cream-dark: 45 25% 90%;
-
-    --brand-blue: 210 40% 15%; /* Dark blue for text/contrast */
-    --brand-blue-light: 210 40% 25%;
-    --brand-blue-dark: 210 40% 10%;
-
-    /* Additional Pro EV colors */
-    --accent-pink: 335 65% 75%; /* Complementary accent */
-    --accent-green: 105 45% 85%; /* Light green backgrounds */
-    --accent-cream: 45 25% 95%; /* Neutral backgrounds */
-
-    --destructive: 0 84.2% 60.2%;
+    --background: 0 0% 96%;
+    --foreground: 0 0% 10%;
+    --card: 0 0% 96%;
+    --card-foreground: 0 0% 10%;
+    --popover: 0 0% 96%;
+    --popover-foreground: 0 0% 10%;
+    --primary: 340 100% 45%;
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 341 100% 40%;
+    --secondary: 0 0% 20%;
+    --secondary-foreground: 0 0% 100%;
+    --secondary-hover: 0 0% 30%;
+    --muted: 0 0% 96.1%;
+    --muted-foreground: 0 0% 45.1%;
+    --accent: 0 0% 30%;
+    --accent-foreground: 0 0% 96%;
+    --destructive: 340 100% 45%;
     --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 53%;
+    --input: 0 0% 53%;
+    --ring: 340 100% 45%;
+    --radius: 0.5rem;
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
 
-    --border: 105 25% 85%;
-    --input: 105 25% 90%;
-    --ring: 105 65% 55%;
+    /* Brand colors - Pro EV palette */
+    --brand-teal: 340 100% 45%;
+    --brand-teal-light: 340 100% 55%;
+    --brand-teal-dark: 341 100% 40%;
+    --brand-pink: 340 100% 45%;
+    --brand-pink-light: 340 100% 55%;
+    --brand-pink-dark: 341 100% 40%;
+    --brand-green: 134 61% 41%;
+    --brand-green-light: 134 61% 51%;
+    --brand-green-dark: 134 61% 31%;
+    --brand-cream: 0 0% 96%;
+    --brand-cream-light: 0 0% 98%;
+    --brand-cream-dark: 0 0% 93%;
+    --brand-blue: 0 0% 20%;
+    --brand-blue-light: 0 0% 30%;
+    --brand-blue-dark: 0 0% 15%;
 
-    --radius: 0.75rem;
+    /* Accent colors */
+    --accent-pink: 340 100% 45%;
+    --accent-green: 134 61% 41%;
+    --accent-cream: 0 0% 96%;
 
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Sidebar variables */
+    --sidebar-background: 0 0% 20%;
+    --sidebar-foreground: 0 0% 96%;
+    --sidebar-primary: 340 100% 45%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 0% 30%;
+    --sidebar-accent-foreground: 0 0% 96%;
+    --sidebar-border: 0 0% 53%;
+    --sidebar-ring: 340 100% 45%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
+    --background: 0 0% 10%;
+    --foreground: 0 0% 96%;
+    --card: 0 0% 15%;
+    --card-foreground: 0 0% 96%;
+    --popover: 0 0% 15%;
+    --popover-foreground: 0 0% 96%;
+    --primary: 340 100% 45%;
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 341 100% 40%;
+    --secondary: 0 0% 25%;
+    --secondary-foreground: 0 0% 96%;
+    --secondary-hover: 0 0% 35%;
+    --muted: 0 0% 25%;
+    --muted-foreground: 0 0% 63.9%;
+    --accent: 0 0% 25%;
+    --accent-foreground: 0 0% 96%;
+    --destructive: 340 100% 45%;
+    --destructive-foreground: 0 0% 96%;
+    --border: 0 0% 25%;
+    --input: 0 0% 25%;
+    --ring: 340 100% 45%;
+    --sidebar-background: 0 0% 15%;
+    --sidebar-foreground: 0 0% 96%;
+    --sidebar-primary: 340 100% 45%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-accent: 0 0% 25%;
+    --sidebar-accent-foreground: 0 0% 96%;
+    --sidebar-border: 0 0% 25%;
+    --sidebar-ring: 340 100% 45%;
   }
 }
 
@@ -164,21 +157,62 @@ All colors MUST be HSL.
     background: linear-gradient(135deg, hsl(var(--background)), hsl(var(--muted)));
   }
 
-  /* Brand Status Colors */
-  .status-sent {
-    @apply bg-brand-teal text-white;
+  /* Global link styles */
+  a {
+    color: hsl(0 0% 20%);
+    text-decoration: none;
   }
-  
-  .status-accepted {
-    @apply bg-brand-green text-white;
+
+  a:hover {
+    color: hsl(340 100% 45%);
+    text-decoration: underline;
   }
-  
-  .status-declined {
-    @apply bg-destructive text-destructive-foreground;
-  }
-  
+
+  /* Status styles for various states */
   .status-pending {
-    @apply bg-brand-pink text-white;
+    background: hsl(45 93% 47%);
+    color: white;
+    border-color: hsl(45 93% 37%);
+  }
+
+  .status-accepted, .status-completed, .status-approved {
+    background: hsl(134 61% 41%);
+    color: white;
+    border-color: hsl(134 61% 31%);
+  }
+
+  .status-in_progress, .status-sent {
+    background: hsl(0 0% 20%);
+    color: hsl(0 0% 96%);
+    border-color: hsl(0 0% 30%);
+  }
+
+  .status-cancelled, .status-rejected {
+    background: hsl(340 100% 45%);
+    color: white;
+    border-color: hsl(341 100% 40%);
+  }
+
+  .status-draft {
+    background: hsl(0 0% 53%);
+    color: white;
+    border-color: hsl(0 0% 43%);
+  }
+
+  /* Success/Error/Info notification styles */
+  .toast-success {
+    background: hsl(134 61% 41%);
+    color: white;
+  }
+
+  .toast-error {
+    background: hsl(340 100% 45%);
+    color: white;
+  }
+
+  .toast-info {
+    background: hsl(0 0% 20%);
+    color: hsl(0 0% 96%);
   }
 
   /* Brand Icon Backgrounds */

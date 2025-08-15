@@ -128,7 +128,7 @@ export default function AdminClients() {
             <Card>
               <CardContent className="p-6">
                 <div className="flex items-center space-x-2">
-                  <User className="h-4 w-4 text-brand-teal" />
+                  <User className="h-4 w-4 text-primary" />
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Total Clients</p>
                     <p className="text-2xl font-bold text-primary">{clients.length}</p>
@@ -171,8 +171,8 @@ export default function AdminClients() {
                   <TableRow key={client.id} className="brand-card-interactive">
                     <TableCell>
                       <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 bg-brand-teal/10 rounded-full flex items-center justify-center">
-                          <User className="h-4 w-4 text-brand-teal" />
+                        <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
+                          <User className="h-4 w-4 text-primary" />
                         </div>
                         <div>
                           <p className="font-medium brand-heading-3">{client.full_name}</p>

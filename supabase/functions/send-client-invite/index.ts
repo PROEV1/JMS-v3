@@ -27,18 +27,18 @@ const handler = async (req: Request): Promise<Response> => {
     const { clientId, clientName, clientEmail, temporaryPassword, siteUrl }: ClientInviteRequest = await req.json();
 
     const emailResponse = await resend.emails.send({
-      from: "ProSpaces <onboarding@resend.dev>",
+      from: "Pro EV <onboarding@resend.dev>",
       to: [clientEmail],
-      subject: "Welcome to ProSpaces - Your Account Details",
+      subject: "Welcome to Pro EV - Your Account Details",
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <h1 style="color: #2563eb; border-bottom: 2px solid #2563eb; padding-bottom: 10px;">
-            Welcome to ProSpaces
+          <h1 style="color: #e6004e; border-bottom: 2px solid #e6004e; padding-bottom: 10px;">
+            Welcome to Pro EV
           </h1>
           
           <p>Hello ${clientName},</p>
           
-          <p>Your ProSpaces client account has been created. You can now access your personalized dashboard to view quotes, projects, and communicate with our team.</p>
+          <p>Your Pro EV client account has been created. You can now access your personalized dashboard to view quotes, projects, and communicate with our team.</p>
           
           <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
             <h3 style="margin-top: 0; color: #1e40af;">Your Login Details:</h3>
@@ -51,7 +51,7 @@ const handler = async (req: Request): Promise<Response> => {
           
           <div style="text-align: center; margin: 30px 0;">
             <a href="${siteUrl}/auth" 
-               style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">
+               style="background-color: #e6004e; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">
               Access Your Dashboard
             </a>
           </div>
@@ -66,7 +66,7 @@ const handler = async (req: Request): Promise<Response> => {
           
           <p>If you have any questions or need assistance, please don't hesitate to contact us.</p>
           
-          <p>Best regards,<br>The ProSpaces Team</p>
+          <p>Best regards,<br>The Pro EV Team</p>
           
           <hr style="margin-top: 30px; border: none; border-top: 1px solid #e5e7eb;">
           <p style="font-size: 12px; color: #6b7280; text-align: center;">

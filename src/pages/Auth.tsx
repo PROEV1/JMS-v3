@@ -147,13 +147,13 @@ export default function Auth() {
                 <TabsList className="grid w-full grid-cols-2 mb-8 h-11">
                   <TabsTrigger 
                     value="signin" 
-                    className="text-sm font-medium data-[state=active]:bg-brand-teal data-[state=active]:text-white"
+                    className="text-sm font-medium data-[state=active]:bg-primary data-[state=active]:text-white"
                   >
                     Sign In
                   </TabsTrigger>
                   <TabsTrigger 
                     value="signup"
-                    className="text-sm font-medium data-[state=active]:bg-brand-teal data-[state=active]:text-white"
+                    className="text-sm font-medium data-[state=active]:bg-primary data-[state=active]:text-white"
                   >
                     Sign Up
                   </TabsTrigger>

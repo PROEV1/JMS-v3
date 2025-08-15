@@ -36,8 +36,8 @@ const emailTemplates = {
         <li>Choose your preferred installation dates</li>
         <li>We'll schedule and complete your installation</li>
       </ul>
-      <p><a href="${Deno.env.get('SUPABASE_URL')}/client" style="background: #0066cc; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">View Your Order</a></p>
-      <p>Best regards,<br>The ProSpaces Team</p>
+      <p><a href="${Deno.env.get('SUPABASE_URL')}/client" style="background: #e6004e; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">View Your Order</a></p>
+      <p>Best regards,<br>The Pro EV Team</p>
     `
   },
   
@@ -49,8 +49,8 @@ const emailTemplates = {
       <p>We've received your payment for order <strong>${data.orderNumber}</strong>. Thank you!</p>
       <h2>Next Step: Sign Your Agreement</h2>
       <p>Please review and sign your installation agreement to move forward with scheduling.</p>
-      <p><a href="${Deno.env.get('SUPABASE_URL')}/client" style="background: #0066cc; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Sign Agreement</a></p>
-      <p>Best regards,<br>The ProSpaces Team</p>
+      <p><a href="${Deno.env.get('SUPABASE_URL')}/client" style="background: #e6004e; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Sign Agreement</a></p>
+      <p>Best regards,<br>The Pro EV Team</p>
     `
   },
   
@@ -62,8 +62,8 @@ const emailTemplates = {
       <p>Thank you for signing your installation agreement for order <strong>${data.orderNumber}</strong>.</p>
       <h2>Final Step: Installation Preferences</h2>
       <p>Please let us know your preferred installation dates and we'll schedule your appointment with one of our expert engineers.</p>
-      <p><a href="${Deno.env.get('SUPABASE_URL')}/client" style="background: #0066cc; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Submit Preferences</a></p>
-      <p>Best regards,<br>The ProSpaces Team</p>
+      <p><a href="${Deno.env.get('SUPABASE_URL')}/client" style="background: #e6004e; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Submit Preferences</a></p>
+      <p>Best regards,<br>The Pro EV Team</p>
     `
   },
   
@@ -85,8 +85,8 @@ const emailTemplates = {
         <li>Provide access to your electrical consumer unit</li>
         <li>Ensure adequate parking space for our engineer</li>
       </ul>
-      <p><a href="${Deno.env.get('SUPABASE_URL')}/client" style="background: #0066cc; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">View Installation Details</a></p>
-      <p>Best regards,<br>The ProSpaces Team</p>
+      <p><a href="${Deno.env.get('SUPABASE_URL')}/client" style="background: #e6004e; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">View Installation Details</a></p>
+      <p>Best regards,<br>The Pro EV Team</p>
     `
   },
   
@@ -101,14 +101,14 @@ const emailTemplates = {
       <h2>Need Support?</h2>
       <p>If you have any questions or need assistance, we're here to help:</p>
       <ul>
-        <li>Email: support@prospaces.co.uk</li>
+        <li>Email: support@proev.co.uk</li>
         <li>Phone: 01234 567890</li>
       </ul>
       <h2>Leave a Review</h2>
       <p>We'd love to hear about your experience! Please consider leaving us a review.</p>
-      <p><a href="${Deno.env.get('SUPABASE_URL')}/client" style="background: #0066cc; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">View Completed Order</a></p>
-      <p>Thank you for choosing ProSpaces!</p>
-      <p>Best regards,<br>The ProSpaces Team</p>
+      <p><a href="${Deno.env.get('SUPABASE_URL')}/client" style="background: #e6004e; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">View Completed Order</a></p>
+      <p>Thank you for choosing Pro EV!</p>
+      <p>Best regards,<br>The Pro EV Team</p>
     `
   },
   
@@ -121,11 +121,11 @@ const emailTemplates = {
       <p>Our team will be in touch shortly to discuss the next steps and ensure everything meets our high standards.</p>
       <p>If you have any immediate concerns, please don't hesitate to contact us:</p>
       <ul>
-        <li>Email: support@prospaces.co.uk</li>
+        <li>Email: support@proev.co.uk</li>
         <li>Phone: 01234 567890</li>
       </ul>
-      <p><a href="${Deno.env.get('SUPABASE_URL')}/client" style="background: #0066cc; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">View Your Order</a></p>
-      <p>Best regards,<br>The ProSpaces Team</p>
+      <p><a href="${Deno.env.get('SUPABASE_URL')}/client" style="background: #e6004e; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">View Your Order</a></p>
+      <p>Best regards,<br>The Pro EV Team</p>
     `
   }
 };
@@ -157,7 +157,7 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     const emailResponse = await resend.emails.send({
-      from: "ProSpaces <orders@prospaces.co.uk>",
+      from: "Pro EV <orders@proev.co.uk>",
       to: [emailData.clientEmail],
       subject: subject,
       html: template.template(emailData),
