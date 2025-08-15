@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, Plus } from 'lucide-react';
+import { Trash2, Plus, Upload, Star, StarOff, ArrowUp, ArrowDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface Product {
@@ -38,6 +38,15 @@ interface ProductCompatibility {
   notes: string | null;
 }
 
+interface ProductImage {
+  id: string;
+  product_id: string;
+  image_url: string;
+  image_name: string;
+  is_primary: boolean;
+  sort_order: number;
+}
+
 interface ProductFormProps {
   product?: Product;
   onSave?: (product: Product) => void;
@@ -58,6 +67,10 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onSuc
   const [configurations, setConfigurations] = useState<ProductConfiguration[]>([]);
   const [compatibilities, setCompatibilities] = useState<ProductCompatibility[]>([]);
   const [availableProducts, setAvailableProducts] = useState<Product[]>([]);
+  const [images, setImages] = useState<ProductImage[]>([]);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [newSpec, setNewSpec] = useState({ key: '', value: '' });
+  
   const [newConfig, setNewConfig] = useState({
     configuration_type: '',
     option_name: '',
@@ -78,6 +91,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onSuc
     if (product?.id) {
       fetchConfigurations();
       fetchCompatibilities();
+      fetchImages();
     }
     fetchAvailableProducts();
   }, [product?.id]);
@@ -123,11 +137,16 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onSuc
   };
 
   const fetchAvailableProducts = async () => {
-    const { data, error } = await supabase
+    let query = supabase
       .from('products')
       .select('*')
-      .eq('is_active', true)
-      .neq('id', product?.id || '');
+      .eq('is_active', true);
+    
+    if (product?.id) {
+      query = query.neq('id', product.id);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       toast({
@@ -139,6 +158,27 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onSuc
     }
 
     setAvailableProducts(data || []);
+  };
+
+  const fetchImages = async () => {
+    if (!product?.id) return;
+    
+    const { data, error } = await supabase
+      .from('product_images')
+      .select('*')
+      .eq('product_id', product.id)
+      .order('sort_order');
+
+    if (error) {
+      toast({
+        title: "Error",
+        description: "Failed to fetch product images",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setImages(data || []);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -329,6 +369,140 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onSuc
     }
   };
 
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !product?.id) return;
+
+    setUploadingImage(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${product.id}/${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('product-images')
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('product-images')
+        .getPublicUrl(fileName);
+
+      const { data, error } = await supabase
+        .from('product_images')
+        .insert([{
+          product_id: product.id,
+          image_url: publicUrl,
+          image_name: file.name,
+          is_primary: images.length === 0,
+          sort_order: images.length
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setImages([...images, data]);
+      toast({
+        title: "Success",
+        description: "Image uploaded successfully",
+      });
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      toast({
+        title: "Error",
+        description: "Failed to upload image",
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const deleteImage = async (imageId: string, imageUrl: string) => {
+    try {
+      const { error } = await supabase
+        .from('product_images')
+        .delete()
+        .eq('id', imageId);
+
+      if (error) throw error;
+
+      // Extract file path from URL for storage deletion
+      const urlParts = imageUrl.split('/');
+      const fileName = `${product?.id}/${urlParts[urlParts.length - 1]}`;
+      
+      await supabase.storage
+        .from('product-images')
+        .remove([fileName]);
+
+      setImages(images.filter(img => img.id !== imageId));
+      toast({
+        title: "Success",
+        description: "Image deleted successfully",
+      });
+    } catch (error) {
+      console.error('Error deleting image:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete image",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const setPrimaryImage = async (imageId: string) => {
+    try {
+      // First, unset all primary flags
+      await supabase
+        .from('product_images')
+        .update({ is_primary: false })
+        .eq('product_id', product?.id);
+
+      // Then set the selected image as primary
+      const { error } = await supabase
+        .from('product_images')
+        .update({ is_primary: true })
+        .eq('id', imageId);
+
+      if (error) throw error;
+
+      setImages(images.map(img => ({ ...img, is_primary: img.id === imageId })));
+      toast({
+        title: "Success",
+        description: "Primary image updated",
+      });
+    } catch (error) {
+      console.error('Error setting primary image:', error);
+      toast({
+        title: "Error",
+        description: "Failed to set primary image",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const addSpecification = () => {
+    if (!newSpec.key || !newSpec.value) {
+      toast({
+        title: "Error",
+        description: "Please enter both key and value",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const updatedSpecs = { ...formData.specifications, [newSpec.key]: newSpec.value };
+    setFormData({ ...formData, specifications: updatedSpecs });
+    setNewSpec({ key: '', value: '' });
+  };
+
+  const removeSpecification = (key: string) => {
+    const updatedSpecs = { ...formData.specifications };
+    delete updatedSpecs[key];
+    setFormData({ ...formData, specifications: updatedSpecs });
+  };
+
   return (
     <div className="space-y-6">
       <Card>
@@ -401,6 +575,103 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onSuc
           </form>
         </CardContent>
       </Card>
+
+      {product?.id && (
+        <>
+          <Card>
+            <CardHeader>
+              <CardTitle>Product Images</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="image-upload">Upload Image</Label>
+                  <Input
+                    id="image-upload"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    disabled={uploadingImage}
+                  />
+                  {uploadingImage && <p className="text-sm text-muted-foreground mt-1">Uploading...</p>}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {images.map((image) => (
+                    <div key={image.id} className="relative border rounded-lg p-2">
+                      <img
+                        src={image.image_url}
+                        alt={image.image_name}
+                        className="w-full h-32 object-cover rounded"
+                      />
+                      <div className="absolute top-2 right-2 flex space-x-1">
+                        <Button
+                          size="sm"
+                          variant={image.is_primary ? "default" : "outline"}
+                          onClick={() => setPrimaryImage(image.id)}
+                        >
+                          {image.is_primary ? <Star className="h-3 w-3" /> : <StarOff className="h-3 w-3" />}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => deleteImage(image.id, image.image_url)}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                      <p className="text-xs mt-1 truncate">{image.image_name}</p>
+                      {image.is_primary && <Badge className="mt-1">Primary</Badge>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Specifications</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                  <Input
+                    placeholder="Specification Key"
+                    value={newSpec.key}
+                    onChange={(e) => setNewSpec({ ...newSpec, key: e.target.value })}
+                  />
+                  <Input
+                    placeholder="Specification Value"
+                    value={newSpec.value}
+                    onChange={(e) => setNewSpec({ ...newSpec, value: e.target.value })}
+                  />
+                  <Button onClick={addSpecification}>
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                <div className="space-y-2">
+                  {Object.entries(formData.specifications || {}).map(([key, value]) => (
+                    <div key={key} className="flex items-center justify-between p-2 border rounded">
+                      <div>
+                        <strong>{key}:</strong> {value as string}
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => removeSpecification(key)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </>
+      )}
 
       {product?.id && (
         <>
