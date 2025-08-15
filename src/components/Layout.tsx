@@ -1,11 +1,11 @@
 
 import { useAuth } from '@/hooks/useAuth';
-import { Navigate, Link, useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { LogOut, User, Settings, FileText, MessageCircle, FolderOpen, Users, Package, ChevronDown, ShoppingCart, UserCog, Calendar, Clock } from 'lucide-react';
-import { usePermissions } from '@/hooks/usePermissions';
+import { LogOut } from 'lucide-react';
 import { ProEVLogo } from '@/components/ProEVLogo';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
+import { AppSidebar } from '@/components/AppSidebar';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -19,7 +19,6 @@ export default function Layout({ children }: LayoutProps) {
   const navigate = useNavigate();
   const [userRole, setUserRole] = useState<string | null>(null);
   const [roleLoading, setRoleLoading] = useState(true);
-  const { canManageUsers } = usePermissions();
 
   useEffect(() => {
     if (user) {
@@ -101,107 +100,41 @@ export default function Layout({ children }: LayoutProps) {
     }
   }
 
-  const adminMenuItems = [
-    { icon: FileText, label: 'Dashboard', href: '/dashboard', action: () => navigate('/dashboard') },
-    { icon: FileText, label: 'Quotes', href: '/admin/quotes', action: () => navigate('/admin/quotes') },
-    { icon: ShoppingCart, label: 'Orders', href: '/admin/orders', action: () => navigate('/admin/orders') },
-    { icon: Calendar, label: 'Schedule', href: '/admin/schedule', action: () => navigate('/admin/schedule') },
-    { icon: User, label: 'Engineers', href: '/admin/engineers', action: () => navigate('/admin/engineers') },
-    { icon: Users, label: 'Clients', href: '/admin/clients', action: () => navigate('/admin/clients') },
-    { icon: Users, label: 'Leads', href: '/admin/leads', action: () => navigate('/admin/leads') },
-    { icon: Package, label: 'Products', href: '/admin/products', action: () => navigate('/admin/products') },
-    { icon: MessageCircle, label: 'Messages', href: '/admin/messages', action: () => navigate('/admin/messages') },
-    ...(canManageUsers ? [{ icon: UserCog, label: 'Users', href: '/admin/users', action: () => navigate('/admin/users') }] : []),
-    { icon: Settings, label: 'Settings', href: '/admin/settings', action: () => navigate('/admin/settings') },
-  ];
-
-  const clientMenuItems = [
-    { icon: FileText, label: 'Dashboard', href: '/client', action: () => { navigate('/client'); window.history.replaceState(null, '', '/client'); window.dispatchEvent(new HashChangeEvent('hashchange')); } },
-    { icon: FileText, label: 'Quotes', href: '/client#quotes', action: () => { navigate('/client'); setTimeout(() => window.location.hash = 'quotes', 0); } },
-    { icon: Calendar, label: 'Availability', href: '/client/date-blocking', action: () => navigate('/client/date-blocking') },
-    { icon: MessageCircle, label: 'Messages', href: '/client#messages', action: () => { navigate('/client'); setTimeout(() => window.location.hash = 'messages', 0); } },
-    { icon: FolderOpen, label: 'Documents', href: '/client#documents', action: () => { navigate('/client'); setTimeout(() => window.location.hash = 'documents', 0); } },
-    { icon: User, label: 'Profile', href: '/client#profile', action: () => { navigate('/client'); setTimeout(() => window.location.hash = 'profile', 0); } },
-  ];
-
-  const engineerMenuItems = [
-    { icon: FileText, label: 'Dashboard', href: '/engineer', action: () => navigate('/engineer') },
-    { icon: FolderOpen, label: 'My Jobs', href: '/engineer', action: () => {
-      console.log('My Jobs clicked - refreshing engineer dashboard');
-      navigate('/engineer');
-      // Force a page refresh to reload all data
-      setTimeout(() => {
-        window.location.reload();
-      }, 100);
-    }},
-    { icon: Clock, label: 'Availability', href: '/engineer/availability', action: () => navigate('/engineer/availability') },
-    { icon: User, label: 'Profile', href: '/engineer/profile', action: () => navigate('/engineer/profile') },
-  ];
-
-  const menuItems = userRole === 'admin' ? adminMenuItems : userRole === 'engineer' ? engineerMenuItems : clientMenuItems;
-  const dashboardLink = userRole === 'admin' ? '/dashboard' : userRole === 'engineer' ? '/engineer' : '/client';
-
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 w-full border-b bg-sidebar-background text-sidebar-foreground shadow-md">
-        <div className="container mx-auto flex h-16 items-center justify-between px-4">
-          <div className="flex items-center gap-4">
+    <SidebarProvider>
+      <div className="min-h-screen flex w-full bg-background">
+        <AppSidebar userRole={userRole || 'client'} />
+        
+        <div className="flex-1 flex flex-col">
+          <header className="h-16 flex items-center border-b bg-white shadow-md px-4">
+            <SidebarTrigger className="mr-4" />
             <ProEVLogo size="md" />
-          </div>
-          
-          <div className="flex items-center gap-4">
-            {menuItems && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="flex items-center gap-2 text-foreground hover:text-primary">
-                    <span className="brand-body font-medium">Menu</span>
-                    <ChevronDown className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  {menuItems.map((item, index) => {
-                    const isActive = location.pathname === item.href || 
-                      (item.href !== '/' && location.pathname.startsWith(item.href));
-                    
-                    return (
-                      <DropdownMenuItem key={index} asChild>
-                        <button
-                          onClick={item.action}
-                          className={`flex items-center gap-2 w-full text-left ${isActive ? 'bg-primary/10 text-primary font-semibold' : 'text-foreground hover:text-primary'}`}
-                        >
-                          <item.icon className="h-4 w-4" />
-                          {item.label}
-                        </button>
-                      </DropdownMenuItem>
-                    );
-                  })}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
             
-            <div className="flex items-center gap-2 text-sm text-foreground">
-              <span>{user?.email}</span>
-              {userRole && (
-                <span className="text-xs text-muted-foreground">({userRole})</span>
-              )}
+            <div className="ml-auto flex items-center gap-4">
+              <div className="flex items-center gap-2 text-sm text-foreground">
+                <span>{user?.email}</span>
+                {userRole && (
+                  <span className="text-xs text-muted-foreground">({userRole})</span>
+                )}
+              </div>
+              
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={signOut}
+                className="border-border text-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary"
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Sign Out
+              </Button>
             </div>
-            
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={signOut}
-              className="border-border text-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary"
-            >
-              <LogOut className="h-4 w-4 mr-2" />
-              Sign Out
-            </Button>
-          </div>
+          </header>
+          
+          <main className="flex-1 p-6">
+            {children}
+          </main>
         </div>
-      </header>
-      
-      <main className="container mx-auto py-6">
-        {children}
-      </main>
-    </div>
+      </div>
+    </SidebarProvider>
   );
 }
