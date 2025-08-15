@@ -27,6 +27,10 @@ export default function AdminClients() {
   const { toast } = useToast();
   const navigate = useNavigate();
 
+  const handleAddClient = () => {
+    navigate('/admin/client-users');
+  };
+
   useEffect(() => {
     fetchClients();
   }, []);
@@ -102,7 +106,7 @@ export default function AdminClients() {
           {/* Header */}
           <div className="flex justify-between items-center">
             <BrandHeading1>Clients</BrandHeading1>
-            <Button className="btn-brand-primary">
+            <Button className="btn-brand-primary" onClick={handleAddClient}>
               <Plus className="h-4 w-4 mr-2" />
               Add Client
             </Button>
