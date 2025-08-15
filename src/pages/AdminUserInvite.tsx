@@ -19,7 +19,6 @@ export default function AdminUserInvite() {
     email: '',
     full_name: '',
     role: 'client' as 'admin' | 'client' | 'engineer' | 'manager' | 'standard_office_user',
-    region: '',
   });
 
   useEffect(() => {
@@ -44,7 +43,6 @@ export default function AdminUserInvite() {
           email: formData.email,
           full_name: formData.full_name,
           role: formData.role,
-          region: formData.region,
         }
       });
 
@@ -135,15 +133,6 @@ export default function AdminUserInvite() {
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="region">Region</Label>
-              <Input
-                id="region"
-                value={formData.region}
-                onChange={(e) => setFormData({ ...formData, region: e.target.value })}
-                placeholder="e.g., London, Manchester (optional)"
-              />
-            </div>
 
             <div className="pt-4">
               <Button type="submit" disabled={loading} className="w-full">

@@ -14,9 +14,9 @@ const handler = async (req: Request): Promise<Response> => {
   try {
     console.log('=== SEND USER INVITE FUNCTION START ===');
     const body = await req.json();
-    const { email, full_name, role, region } = body;
+    const { email, full_name, role } = body;
     
-    console.log('Request data:', { email, full_name, role, region });
+    console.log('Request data:', { email, full_name, role });
     
     // Get environment variables
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
@@ -75,7 +75,6 @@ const handler = async (req: Request): Promise<Response> => {
           email,
           full_name,
           role,
-          region: region || '',
           status: 'active',
         }, {
           onConflict: 'user_id'
@@ -99,7 +98,7 @@ const handler = async (req: Request): Promise<Response> => {
         email,
         password: temporaryPassword,
         email_confirm: true,
-        user_metadata: { full_name, role, region: region || '' },
+        user_metadata: { full_name, role },
       });
 
       console.log('User creation result:', { user: authData?.user?.id, error: authError });
@@ -126,7 +125,6 @@ const handler = async (req: Request): Promise<Response> => {
         .update({
           full_name,
           role,
-          region: region || '',
           status: 'active',
         })
         .eq('user_id', userId);
@@ -233,7 +231,7 @@ const handler = async (req: Request): Promise<Response> => {
                     <td style="padding: 0 40px;">
                       <div style="background-color: hsl(44, 39%, 95%); border-left: 4px solid hsl(178, 33%, 69%); padding: 20px; margin: 20px 0; border-radius: 8px;">
                         <p style="margin: 0; font-size: 16px; color: hsl(221, 20%, 30%); line-height: 1.5;">
-                          You've been invited to join ProSpaces Portal with the role of <strong style="color: hsl(178, 33%, 40%);">${role}</strong>${region ? ` in the <strong>${region}</strong> region` : ''}.
+                          You've been invited to join ProSpaces Portal with the role of <strong style="color: hsl(178, 33%, 40%);">${role}</strong>.
                         </p>
                       </div>
                       
@@ -269,10 +267,9 @@ const handler = async (req: Request): Promise<Response> => {
                         <p style="margin: 0 0 10px 0; font-size: 14px; color: hsl(221, 20%, 40%);">
                           <strong>Email:</strong> ${email}
                         </p>
-                        <p style="margin: 0 0 10px 0; font-size: 14px; color: hsl(221, 20%, 40%);">
-                          <strong>Role:</strong> ${role}
-                        </p>
-                        ${region ? `<p style="margin: 0; font-size: 14px; color: hsl(221, 20%, 40%);"><strong>Region:</strong> ${region}</p>` : ''}
+                         <p style="margin: 0; font-size: 14px; color: hsl(221, 20%, 40%);">
+                           <strong>Role:</strong> ${role}
+                         </p>
                       </div>
                     </td>
                   </tr>
