@@ -106,30 +106,58 @@ export function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLeadModalP
 
   const loadClients = async () => {
     try {
+      console.log('Loading clients...');
       const { data, error } = await supabase
         .from('clients')
         .select('id, full_name, email, phone, address')
         .order('full_name');
 
-      if (error) throw error;
-      setClients(data || []);
+      if (error) {
+        console.error('Supabase error loading clients:', error);
+        throw error;
+      }
+      
+      // Defensive array guard
+      const clientsArray = Array.isArray(data) ? data : [];
+      console.log('Loaded clients:', clientsArray.length);
+      setClients(clientsArray);
     } catch (error) {
       console.error('Error loading clients:', error);
+      setClients([]); // Ensure array is always set
+      toast({
+        title: "Warning",
+        description: "Could not load clients list",
+        variant: "destructive",
+      });
     }
   };
 
   const loadProducts = async () => {
     try {
+      console.log('Loading products...');
       const { data, error } = await supabase
         .from('products')
         .select('id, name, base_price, description, category')
         .eq('is_active', true)
         .order('name');
 
-      if (error) throw error;
-      setProducts(data || []);
+      if (error) {
+        console.error('Supabase error loading products:', error);
+        throw error;
+      }
+      
+      // Defensive array guard
+      const productsArray = Array.isArray(data) ? data : [];
+      console.log('Loaded products:', productsArray.length);
+      setProducts(productsArray);
     } catch (error) {
       console.error('Error loading products:', error);
+      setProducts([]); // Ensure array is always set
+      toast({
+        title: "Warning", 
+        description: "Could not load products list",
+        variant: "destructive",
+      });
     }
   };
 
@@ -162,17 +190,43 @@ export function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLeadModalP
   };
 
   const handleClientCreated = (newClient: any) => {
+    console.log('Client created callback received:', newClient);
     setShowCreateClientModal(false);
-    loadClients(); // Refresh the clients list
+    
+    // Defensive check for client data
+    if (!newClient || !newClient.id) {
+      console.error('Invalid client data received:', newClient);
+      toast({
+        title: "Error",
+        description: "Invalid client data received",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Add the new client to the list immediately (optimistic update)
+    setClients(prev => {
+      const clientsArray = Array.isArray(prev) ? prev : [];
+      return [...clientsArray, newClient];
+    });
+    
     // Auto-select the newly created client
     setSelectedClient(newClient);
     setFormData(prev => ({
       ...prev,
-      name: newClient.full_name,
-      email: newClient.email,
+      name: newClient.full_name || '',
+      email: newClient.email || '',
       phone: newClient.phone || '',
       address: newClient.address || ''
     }));
+    
+    // Close the client search popover if it's open
+    setClientSearchOpen(false);
+    
+    toast({
+      title: "Success",
+      description: "Client created and selected",
+    });
   };
 
   const resetForm = () => {
@@ -256,8 +310,8 @@ export function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLeadModalP
       <DialogContent 
         className="max-w-2xl max-h-[90vh] overflow-y-auto"
         onInteractOutside={(e) => {
-          // Prevent closing when clicking on popovers
-          if (clientSearchOpen || productSearchOpen) {
+          // Prevent closing when interacting with popovers or nested modals
+          if (clientSearchOpen || productSearchOpen || showCreateClientModal) {
             e.preventDefault();
           }
         }}
@@ -295,7 +349,7 @@ export function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLeadModalP
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    <Popover open={clientSearchOpen} onOpenChange={setClientSearchOpen}>
+                    <Popover open={clientSearchOpen} onOpenChange={setClientSearchOpen} modal>
                       <PopoverTrigger asChild>
                         <Button
                           variant="outline"
@@ -309,13 +363,22 @@ export function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLeadModalP
                       </PopoverTrigger>
                        <PopoverContent 
                          className="w-full p-0"
-                         onInteractOutside={(e) => e.preventDefault()}
+                         side="bottom"
+                         align="start"
+                         onInteractOutside={(e) => {
+                           // Allow clicking outside to close, but prevent event from reaching parent modal
+                           e.stopPropagation();
+                         }}
                        >
                          <Command>
                            <CommandInput placeholder="Search clients..." />
-                           <CommandEmpty>No clients found.</CommandEmpty>
+                           <CommandEmpty>
+                             {Array.isArray(clients) && clients.length === 0 
+                               ? "No clients found. Create a new client below." 
+                               : "No clients match your search."}
+                           </CommandEmpty>
                            <CommandGroup className="max-h-48 overflow-y-auto">
-                             {clients.map((client) => (
+                             {Array.isArray(clients) && clients.map((client) => (
                                <CommandItem
                                  key={client.id}
                                  onSelect={() => handleClientSelect(client)}
@@ -466,7 +529,7 @@ export function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLeadModalP
                       </div>
                     </div>
                   ) : (
-                    <Popover open={productSearchOpen} onOpenChange={setProductSearchOpen}>
+                    <Popover open={productSearchOpen} onOpenChange={setProductSearchOpen} modal>
                       <PopoverTrigger asChild>
                         <Button
                           variant="outline"
@@ -480,13 +543,22 @@ export function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLeadModalP
                       </PopoverTrigger>
                        <PopoverContent 
                          className="w-full p-0"
-                         onInteractOutside={(e) => e.preventDefault()}
+                         side="bottom"
+                         align="start"
+                         onInteractOutside={(e) => {
+                           // Allow clicking outside to close, but prevent event from reaching parent modal
+                           e.stopPropagation();
+                         }}
                        >
                          <Command>
                            <CommandInput placeholder="Search products..." />
-                           <CommandEmpty>No products found.</CommandEmpty>
+                           <CommandEmpty>
+                             {Array.isArray(products) && products.length === 0 
+                               ? "No products available." 
+                               : "No products match your search."}
+                           </CommandEmpty>
                            <CommandGroup className="max-h-48 overflow-y-auto">
-                             {products.map((product) => (
+                             {Array.isArray(products) && products.map((product) => (
                                <CommandItem
                                  key={product.id}
                                  onSelect={() => handleProductSelect(product)}
@@ -500,7 +572,7 @@ export function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLeadModalP
                                  <div className="flex-1">
                                    <div className="font-medium">{product.name}</div>
                                   <div className="text-sm text-muted-foreground">
-                                    £{product.base_price.toLocaleString()} • {product.category || 'Uncategorized'}
+                                    £{product.base_price?.toLocaleString() || '0'} • {product.category || 'Uncategorized'}
                                   </div>
                                 </div>
                               </CommandItem>
