@@ -654,6 +654,7 @@ export type Database = {
       }
       messages: {
         Row: {
+          client_id: string | null
           content: string
           created_at: string
           id: string
@@ -665,6 +666,7 @@ export type Database = {
           status: Database["public"]["Enums"]["message_status"] | null
         }
         Insert: {
+          client_id?: string | null
           content: string
           created_at?: string
           id?: string
@@ -676,6 +678,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["message_status"] | null
         }
         Update: {
+          client_id?: string | null
           content?: string
           created_at?: string
           id?: string
@@ -687,6 +690,13 @@ export type Database = {
           status?: Database["public"]["Enums"]["message_status"] | null
         }
         Relationships: [
+          {
+            foreignKeyName: "messages_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "messages_project_id_fkey"
             columns: ["project_id"]

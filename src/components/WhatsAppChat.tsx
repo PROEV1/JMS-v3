@@ -1,196 +1,116 @@
-import { useState, useEffect, useRef } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import type { Database } from '@/integrations/supabase/types';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { MessageSquare, Users, Paperclip, Image as ImageIcon, Send as SendIcon, Smile } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/hooks/useAuth';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { motion, AnimatePresence } from 'framer-motion';
-import ChatBubble from './ChatBubble';
-import ChatInput from './ChatInput';
 
-type Message = Database['public']['Tables']['messages']['Row'] & {
-  status?: 'sending' | 'sent' | 'delivered' | 'failed';
+import React, { useState, useEffect, useRef } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { toast } from 'sonner';
+import { Send, MessageCircle } from 'lucide-react';
+import { Button } from './ui/button';
+import { Textarea } from './ui/textarea';
+import { Card } from './ui/card';
+import { ChatBubble } from './ChatBubble';
+
+interface Message {
+  id: string;
+  content: string;
+  sender_id: string;
+  sender_role: 'admin' | 'client' | 'engineer';
+  created_at: string;
+  status: 'sent' | 'delivered' | 'read';
   client_id?: string;
-};
+  quote_id?: string;
+  project_id?: string;
+}
 
 interface WhatsAppChatProps {
   clientId?: string;
   quoteId?: string;
   projectId?: string;
-  title?: string;
+  className?: string;
 }
 
-function WhatsAppChat({ 
-  clientId, 
-  quoteId, 
-  projectId, 
-  title = "Messages" 
-}: WhatsAppChatProps) {
-  const { user, session } = useAuth();
-  const { toast } = useToast();
-  
+export const WhatsAppChat: React.FC<WhatsAppChatProps> = ({
+  clientId,
+  quoteId,
+  projectId,
+  className = ''
+}) => {
+  const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
+  const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
-  const [userRole, setUserRole] = useState<'admin' | 'client' | 'engineer' | 'manager' | 'standard_office_user'>('client');
+  const [sending, setSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (user) {
-      // Get user role
-      supabase
-        .from('profiles')
-        .select('role')
-        .eq('user_id', user.id)
-        .single()
-        .then(({ data }) => {
-          if (data) setUserRole(data.role);
-        });
-    }
-    
-    loadMessages();
-    
-    // Set up real-time subscription
-    const channel = supabase
-      .channel('messages')
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'messages'
-      }, (payload) => {
-        const newMessage = payload.new as Message;
-        if (shouldShowMessage(newMessage)) {
-          // Check if this message is already in our list (from optimistic update)
-          setMessages(prev => {
-            const existingIndex = prev.findIndex(msg => 
-              msg.content === newMessage.content && 
-              msg.sender_id === newMessage.sender_id &&
-              msg.id.startsWith('temp-')
-            );
-            
-            if (existingIndex >= 0) {
-              // Replace the temporary message with the real one
-              const updated = [...prev];
-              updated[existingIndex] = { ...newMessage, status: 'delivered' };
-              return updated;
-            } else {
-              // New message from someone else
-              return [...prev, { ...newMessage, status: 'delivered' }];
-            }
-          });
-          scrollToBottom();
-        }
-      })
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'messages'
-      }, (payload) => {
-        const updatedMessage = payload.new as Message;
-        if (shouldShowMessage(updatedMessage)) {
-          setMessages(prev => prev.map(msg => 
-            msg.id === updatedMessage.id ? updatedMessage : msg
-          ));
-        }
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [clientId, quoteId, projectId]);
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  const shouldShowMessage = (message: Message) => {
-    // For client-specific view, show messages for this client
-    if (clientId && message.client_id === clientId) return true;
-    
-    // For quote-specific view, show messages for this quote
-    if (quoteId && message.quote_id === quoteId) return true;
-    
-    // For project-specific view, show messages for this project
-    if (projectId && message.project_id === projectId) return true;
-    
-    // If no specific context, show general messages
-    if (!clientId && !quoteId && !projectId && !message.client_id && !message.quote_id && !message.project_id) {
-      return true;
-    }
-    
-    return false;
-  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
   const loadMessages = async () => {
     try {
-      console.log('WhatsAppChat: Loading messages for:', { clientId, quoteId, projectId });
-      
-      // Use any typing to bypass TypeScript complexity
-      const supabaseQuery: any = supabase;
-      let result: any;
-      
+      setLoading(true);
+      console.log('Loading messages with:', { clientId, quoteId, projectId });
+
+      let query = supabase
+        .from('messages')
+        .select('*')
+        .order('created_at', { ascending: true });
+
+      // Apply filters based on available context
       if (clientId) {
-        result = await supabaseQuery.from('messages').select('*').eq('client_id', clientId).order('created_at', { ascending: true });
+        query = query.eq('client_id', clientId);
       } else if (quoteId) {
-        result = await supabaseQuery.from('messages').select('*').eq('quote_id', quoteId).order('created_at', { ascending: true });
+        query = query.eq('quote_id', quoteId);
       } else if (projectId) {
-        result = await supabaseQuery.from('messages').select('*').eq('project_id', projectId).order('created_at', { ascending: true });
+        query = query.eq('project_id', projectId);
       } else {
-        result = await supabaseQuery.from('messages').select('*').is('client_id', null).is('quote_id', null).is('project_id', null).order('created_at', { ascending: true });
+        // No context provided - this shouldn't happen but handle gracefully
+        console.warn('WhatsAppChat: No clientId, quoteId, or projectId provided');
+        setMessages([]);
+        setLoading(false);
+        return;
       }
 
-      if (result.error) throw result.error;
-      console.log('WhatsAppChat: Loaded messages:', result.data?.length || 0);
-      setMessages(result.data || []);
-    } catch (error) {
-      console.error('Error loading messages:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load messages",
-        variant: "destructive",
-      });
+      const { data, error } = await query;
+
+      if (error) {
+        console.error('Error loading messages:', error);
+        toast.error('Failed to load messages');
+        setMessages([]);
+      } else {
+        console.log('Messages loaded:', data);
+        setMessages(data || []);
+      }
+    } catch (err) {
+      console.error('Error in loadMessages:', err);
+      setMessages([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const sendMessage = async (content: string) => {
-    if (!session?.user?.id || !content.trim()) return;
+  useEffect(() => {
+    loadMessages();
+  }, [clientId, quoteId, projectId]);
 
-    // Generate temporary ID for optimistic update
-    const tempId = `temp-${Date.now()}`;
-    const tempMessage: Message = {
-      id: tempId,
-      content,
-      sender_role: userRole || 'client',
-      created_at: new Date().toISOString(),
-      is_read: false,
-      sender_id: session.user.id,
-      quote_id: quoteId,
-      project_id: projectId,
-      client_id: clientId,
-      status: 'sending',
-    };
-
-    // Optimistically add message to UI
-    setMessages(prev => [...prev, tempMessage]);
-    scrollToBottom();
+  const sendMessage = async () => {
+    if (!newMessage.trim() || sending) return;
 
     try {
-      const response = await fetch(`https://qvppvstgconmzzjsryna.supabase.co/functions/v1/send-message`, {
+      setSending(true);
+      console.log('Sending message with context:', { clientId, quoteId, projectId });
+
+      const response = await fetch('/api/v1/send-message', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
         },
         body: JSON.stringify({
-          content,
+          content: newMessage.trim(),
           clientId,
           quoteId,
           projectId,
@@ -198,163 +118,98 @@ function WhatsAppChat({
       });
 
       const result = await response.json();
-      
+
       if (!response.ok) {
         throw new Error(result.error || 'Failed to send message');
       }
 
-      // Update the temporary message with the real message data
-      setMessages(prev => prev.map(msg => 
-        msg.id === tempId 
-          ? { ...result.message, status: 'sent' }
-          : msg
-      ));
-
+      console.log('Message sent successfully:', result);
+      setNewMessage('');
+      toast.success('Message sent');
+      
+      // Reload messages to show the new one
+      await loadMessages();
     } catch (error) {
       console.error('Error sending message:', error);
-      
-      // Update message status to failed
-      setMessages(prev => prev.map(msg => 
-        msg.id === tempId 
-          ? { ...msg, status: 'failed' }
-          : msg
-      ));
-
-      toast({
-        title: "Failed to send message",
-        description: "Tap to retry",
-        variant: "destructive",
-      });
+      toast.error(error instanceof Error ? error.message : 'Failed to send message');
+    } finally {
+      setSending(false);
     }
   };
 
-  const markAsRead = async (messageId: string) => {
-    try {
-      const { error } = await supabase
-        .from('messages')
-        .update({ is_read: true })
-        .eq('id', messageId);
-
-      if (error) throw error;
-    } catch (error) {
-      console.error('Error marking message as read:', error);
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
     }
   };
-
-  // Mark unread messages as read when component mounts or messages change
-  useEffect(() => {
-    const unreadMessages = messages.filter(msg => 
-      !msg.is_read && 
-      msg.sender_role !== userRole
-    );
-    
-    unreadMessages.forEach(msg => markAsRead(msg.id));
-  }, [messages, userRole]);
-
-  const unreadCount = messages.filter(msg => !msg.is_read && msg.sender_role !== userRole).length;
 
   if (loading) {
     return (
-      <Card className="h-[calc(100vh-16rem)] md:h-[600px] shadow-lg border-muted/40 overflow-hidden rounded-xl">
-        <CardContent className="p-0 flex items-center justify-center h-full bg-gradient-to-br from-background to-muted/30">
-          <div className="flex flex-col items-center gap-4">
-            <div className="relative">
-              <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center animate-pulse">
-                <MessageSquare className="h-6 w-6 text-muted-foreground opacity-70" />
-              </div>
-              <div className="absolute -right-1 -bottom-1 w-4 h-4 bg-primary rounded-full animate-ping" />
-            </div>
-            <div className="text-muted-foreground animate-pulse">Loading conversations...</div>
-          </div>
-        </CardContent>
+      <Card className={`p-4 ${className}`}>
+        <div className="flex items-center justify-center h-32">
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+          <span className="ml-2 text-sm text-muted-foreground">Loading messages...</span>
+        </div>
       </Card>
     );
   }
 
   return (
-    <Card className="h-[calc(100vh-16rem)] md:h-[600px] shadow-lg border-muted/40 overflow-hidden rounded-xl flex flex-col bg-gradient-to-br from-background to-muted/10">
-      <CardHeader className="bg-card shadow-sm border-b border-border/50 p-4 flex-shrink-0 z-10">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <div className="bg-primary/10 rounded-full p-2">
-                <MessageSquare className="h-5 w-5 text-primary" />
-              </div>
-              {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-destructive w-4 h-4 rounded-full flex items-center justify-center text-[10px] text-destructive-foreground font-semibold">
-                  {unreadCount}
-                </span>
-              )}
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold leading-none tracking-tight">{title}</h3>
-              <p className="text-sm text-muted-foreground flex items-center gap-2 mt-1">
-                <Users className="h-3 w-3" />
-                <span>{messages.length} messages</span>
-              </p>
-            </div>
+    <Card className={`flex flex-col h-[500px] ${className}`}>
+      {/* Header */}
+      <div className="flex items-center gap-2 p-4 border-b">
+        <MessageCircle className="h-5 w-5 text-primary" />
+        <h3 className="font-semibold">Messages</h3>
+      </div>
+
+      {/* Messages Area */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {messages.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full text-center">
+            <MessageCircle className="h-12 w-12 text-muted-foreground/50 mb-4" />
+            <p className="text-muted-foreground mb-2">No messages yet</p>
+            <p className="text-sm text-muted-foreground/80">
+              Start a conversation by sending a message below
+            </p>
           </div>
-        </div>
-      </CardHeader>
-      
-      <CardContent className="flex-1 flex flex-col p-0 overflow-hidden">
-        <ScrollArea className="flex-1 p-4">
-          <AnimatePresence initial={false}>
-            {messages.length > 0 ? (
-              <div className="space-y-3">
-                {messages.map((message, index) => {
-                  const isOwn = userRole === 'admin' ? message.sender_role === 'admin' : message.sender_role === 'client';
-                  const prevMessage = index > 0 ? messages[index - 1] : null;
-                  const showAvatar = !prevMessage || prevMessage.sender_role !== message.sender_role;
-                  
-                  return (
-                    <motion.div 
-                      key={message.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 0.2 }}
-                    >
-                      <ChatBubble
-                        message={message}
-                        isOwn={!!isOwn}
-                        showAvatar={showAvatar}
-                        senderName={message.sender_role === 'admin' ? 'Pro EV Team' : 'Client'}
-                      />
-                    </motion.div>
-                  );
-                })}
-              </div>
-            ) : (
-              <motion.div 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="flex flex-col items-center justify-center h-full min-h-[320px] text-center p-8"
-              >
-                <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
-                  <MessageSquare className="h-8 w-8 text-muted-foreground/50" />
-                </div>
-                <p className="text-lg font-medium mb-2 text-foreground">No messages yet</p>
-                <p className="text-sm text-muted-foreground max-w-xs">
-                  Start a conversation by sending a message below!
-                </p>
-              </motion.div>
-            )}
-            <div ref={messagesEndRef} className="h-4" />
-          </AnimatePresence>
-        </ScrollArea>
-        
-        <div className="mt-auto">
-          <ChatInput
-            onSendMessage={sendMessage}
+        ) : (
+          messages.map((message) => (
+            <ChatBubble
+              key={message.id}
+              message={message}
+              isCurrentUser={message.sender_id === user?.id}
+            />
+          ))
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Input Area */}
+      <div className="p-4 border-t">
+        <div className="flex gap-2">
+          <Textarea
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            onKeyPress={handleKeyPress}
             placeholder="Type your message..."
-            disabled={!session}
+            className="flex-1 min-h-[40px] max-h-[120px] resize-none"
+            disabled={sending}
           />
+          <Button
+            onClick={sendMessage}
+            disabled={!newMessage.trim() || sending}
+            size="sm"
+            className="px-3"
+          >
+            {sending ? (
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
+          </Button>
         </div>
-      </CardContent>
+      </div>
     </Card>
   );
-}
-
-export default WhatsAppChat;
-export { WhatsAppChat };
+};
