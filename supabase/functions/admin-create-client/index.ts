@@ -24,20 +24,26 @@ serve(async (req) => {
       }
     );
 
-    // Verify the requesting user is an admin
+    // Create client with the authorization header to get the user
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       console.error("No authorization header provided");
       throw new Error("No authorization header");
     }
 
-    const token = authHeader.replace("Bearer ", "");
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? ""
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      {
+        global: {
+          headers: {
+            Authorization: authHeader,
+          },
+        },
+      }
     );
 
-    const { data: userData, error: userError } = await supabaseClient.auth.getUser(token);
+    const { data: userData, error: userError } = await supabaseClient.auth.getUser();
     if (userError) {
       console.error("User token validation failed:", userError);
       throw new Error(`Invalid user token: ${userError.message}`);
