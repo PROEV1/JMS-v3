@@ -148,9 +148,9 @@ export const getSmartEngineerRecommendations = async (order: Order, postcode?: s
         
         // Try to extract postcode from client address
         if (clientData?.address) {
-          const postcodeMatch = clientData.address.match(/([A-Z]{1,2}[0-9][A-Z0-9]?\s?[0-9][A-Z]{2})/i);
+          const postcodeMatch = clientData.address.match(/([A-Z]{1,2}[0-9O][A-Z0-9O]?\s?[0-9O][A-Z]{2})/i);
           if (postcodeMatch) {
-            finalPostcode = postcodeMatch[1].replace(/\s/g, ' ').toUpperCase();
+            finalPostcode = postcodeMatch[1].replace(/\s/g, ' ').replace(/O/g, '0').toUpperCase();
           }
         }
       } catch (error) {
@@ -160,9 +160,9 @@ export const getSmartEngineerRecommendations = async (order: Order, postcode?: s
     
     if (!finalPostcode && order.job_address) {
       // Try to extract postcode from job address
-      const postcodeMatch = order.job_address.match(/([A-Z]{1,2}[0-9][A-Z0-9]?\s?[0-9][A-Z]{2})/i);
+      const postcodeMatch = order.job_address.match(/([A-Z]{1,2}[0-9O][A-Z0-9O]?\s?[0-9O][A-Z]{2})/i);
       if (postcodeMatch) {
-        finalPostcode = postcodeMatch[1].replace(/\s/g, ' ').toUpperCase();
+        finalPostcode = postcodeMatch[1].replace(/\s/g, ' ').replace(/O/g, '0').toUpperCase();
       }
     }
     
@@ -186,6 +186,9 @@ export const getSmartEngineerRecommendations = async (order: Order, postcode?: s
     }
 
     console.log(`Found ${allEngineers.length} engineers to evaluate`);
+    
+    // Track exclusion reasons for diagnostics
+    const exclusionReasons: Record<string, string[]> = {};
 
     // Calculate minimum booking date based on advance notice requirements
     const now = new Date();
@@ -194,9 +197,14 @@ export const getSmartEngineerRecommendations = async (order: Order, postcode?: s
     const recommendations = await Promise.all(
       allEngineers.map(async (engineer) => {
         try {
+          // Initialize exclusion tracking for this engineer
+          exclusionReasons[engineer.name] = [];
+          
           // Validate engineer setup
           const setupValidation = validateEngineerSetup(engineer);
           if (!setupValidation.isComplete) {
+            const reasons = setupValidation.missingItems.map(item => `Missing: ${item}`);
+            exclusionReasons[engineer.name] = reasons;
             console.log(`Engineer ${engineer.name} setup incomplete:`, setupValidation.missingItems);
             return null;
           }
@@ -204,6 +212,7 @@ export const getSmartEngineerRecommendations = async (order: Order, postcode?: s
           // Check if engineer can serve this postcode
           const serviceCheck = canEngineerServePostcode(engineer, finalPostcode);
           if (!serviceCheck.canServe) {
+            exclusionReasons[engineer.name].push(`Cannot serve postcode ${finalPostcode}`);
             console.log(`Engineer ${engineer.name} cannot serve postcode ${finalPostcode}`);
             return null;
           }
@@ -227,6 +236,7 @@ export const getSmartEngineerRecommendations = async (order: Order, postcode?: s
 
           // Check distance limits
           if (distance > settings.max_distance_miles) {
+            exclusionReasons[engineer.name].push(`Too far: ${distance} miles > ${settings.max_distance_miles} limit`);
             console.log(`Engineer ${engineer.name} too far: ${distance} miles > ${settings.max_distance_miles} limit`);
             return null;
           }
@@ -264,6 +274,7 @@ export const getSmartEngineerRecommendations = async (order: Order, postcode?: s
           }
 
           if (!availableDate) {
+            exclusionReasons[engineer.name].push(`No availability within ${maxCheckDays} days`);
             console.log(`Engineer ${engineer.name} has no availability within ${maxCheckDays} days`);
             return null;
           }
@@ -283,6 +294,7 @@ export const getSmartEngineerRecommendations = async (order: Order, postcode?: s
             availableDate: availableDate.toISOString().split('T')[0]
           };
         } catch (error) {
+          exclusionReasons[engineer.name].push(`Evaluation error: ${error}`);
           console.error(`Error evaluating engineer ${engineer.name}:`, error);
           return null;
         }
@@ -295,10 +307,26 @@ export const getSmartEngineerRecommendations = async (order: Order, postcode?: s
       .sort((a, b) => b!.score - a!.score);
 
     console.log(`Generated ${validRecommendations.length} valid recommendations`);
+    
+    // Log exclusion summary for diagnostics
+    const excludedEngineers = Object.entries(exclusionReasons)
+      .filter(([name, reasons]) => reasons.length > 0);
+    
+    if (excludedEngineers.length > 0) {
+      console.log('Engineer exclusion summary:');
+      excludedEngineers.forEach(([name, reasons]) => {
+        console.log(`  ${name}: ${reasons.join(', ')}`);
+      });
+    }
 
     return {
       recommendations: validRecommendations,
-      settings
+      settings,
+      diagnostics: {
+        totalEngineers: allEngineers.length,
+        excludedEngineers: excludedEngineers.length,
+        exclusionReasons: Object.fromEntries(excludedEngineers)
+      }
     };
   } catch (error) {
     console.error('Error getting engineer recommendations:', error);
@@ -682,6 +710,26 @@ export async function getEngineersForPostcode(postcode: string): Promise<Array<{
 /**
  * Validate engineer setup completeness
  */
+/**
+ * Get default working hours (Monday-Friday, 9AM-5PM)
+ */
+function getDefaultWorkingHours() {
+  const defaultHours = [];
+  // Monday (1) to Friday (5)
+  for (let day = 1; day <= 5; day++) {
+    defaultHours.push({
+      day_of_week: day,
+      start_time: '09:00',
+      end_time: '17:00',
+      is_available: true
+    });
+  }
+  return defaultHours;
+}
+
+/**
+ * Validate engineer setup completeness
+ */
 export function validateEngineerSetup(engineer: EngineerSettings): {
   isComplete: boolean;
   missingItems: string[];
@@ -696,8 +744,12 @@ export function validateEngineerSetup(engineer: EngineerSettings): {
     missingItems.push('Service areas');
   }
 
+  // For working hours, we'll default to Mon-Fri 9-5 if none configured
+  // This allows engineers to show up in recommendations even if they haven't
+  // explicitly configured their working hours yet
   if (!engineer.working_hours || engineer.working_hours.length === 0) {
-    missingItems.push('Working hours');
+    console.log(`Engineer ${engineer.name} has no working hours configured - using default Mon-Fri 9-5`);
+    engineer.working_hours = getDefaultWorkingHours();
   }
 
   return {

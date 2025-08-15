@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Order, Engineer, getStatusColor } from '@/utils/schedulingUtils';
+import { getLocationDisplayText } from '@/utils/postcodeUtils';
 import { MapPin, User, Calendar, Clock, Eye, Package, CalendarDays, Users } from 'lucide-react';
 
 interface JobCardProps {
@@ -84,7 +85,7 @@ export function JobCard({
                 <p><strong>Email:</strong> {order.client?.email}</p>
                 <p><strong>Phone:</strong> {order.client?.phone}</p>
                 <p><strong>Address:</strong> {order.job_address || order.client?.address}</p>
-                <p><strong>Postcode:</strong> {order.postcode}</p>
+                <p><strong>Postcode:</strong> {getLocationDisplayText(order)}</p>
               </div>
             </div>
             <div>
@@ -203,20 +204,20 @@ export function JobCard({
             {/* Enhanced Details */}
             <div className="space-y-1 text-xs text-muted-foreground">
               {/* Postcode/Address - always show postcode, full address on hover */}
-              {(order.postcode || order.job_address) && (
+              {(order.postcode || order.job_address || order.client?.address) && (
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <div className="flex items-center gap-1 cursor-help">
                         <MapPin className="h-3 w-3" />
                         <span className="truncate">
-                          {order.postcode || order.job_address?.split(',').pop()?.trim()}
+                          {getLocationDisplayText(order)}
                         </span>
                       </div>
                     </TooltipTrigger>
                     <TooltipContent>
                       <p>{order.job_address || order.client?.address}</p>
-                      {order.postcode && <p>Postcode: {order.postcode}</p>}
+                      <p>Postcode: {getLocationDisplayText(order)}</p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>

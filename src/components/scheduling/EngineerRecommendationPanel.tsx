@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { Order, Engineer, getSmartEngineerRecommendations, clearDistanceCache } from '@/utils/schedulingUtils';
+import { getLocationDisplayText } from '@/utils/postcodeUtils';
 import { MapPin, Clock, User, Star, Zap, CheckCircle, X, RefreshCw } from 'lucide-react';
 
 interface EngineerSuggestion {
@@ -41,6 +42,7 @@ export function EngineerRecommendationPanel({
 
   const loadSmartRecommendations = async () => {
     setLoading(true);
+    const displayPostcode = getLocationDisplayText(order);
     setDebugInfo(`Job: ${order.order_number} | Checking postcode sources...`);
     
     try {
@@ -51,7 +53,9 @@ export function EngineerRecommendationPanel({
       if (result.error) {
         setDebugInfo(`Job: ${order.order_number} | Error: ${result.error}`);
       } else {
-        setDebugInfo(`Job: ${order.order_number} | Postcode: Available | Found ${result.recommendations.length} recommendations`);
+        const diagnostics = result.diagnostics ? 
+          ` | Excluded: ${result.diagnostics.excludedEngineers}/${result.diagnostics.totalEngineers}` : '';
+        setDebugInfo(`Job: ${order.order_number} | Postcode: ${displayPostcode} | Found ${result.recommendations.length} recommendations${diagnostics}`);
       }
     } catch (error) {
       console.error('Error loading smart recommendations:', error);
@@ -115,9 +119,12 @@ export function EngineerRecommendationPanel({
             </Button>
           </div>
         </CardTitle>
-        <p className="text-sm text-muted-foreground">
-          For {order.order_number} - {order.postcode}
-        </p>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <MapPin className="h-4 w-4" />
+              <span>Order: {order.order_number}</span>
+              <span>•</span>
+              <span>Postcode: {getLocationDisplayText(order)}</span>
+            </div>
         {settings && (
           <div className="bg-primary/10 border border-primary/20 rounded-md p-2 mt-2">
             <p className="text-xs text-primary-foreground">
