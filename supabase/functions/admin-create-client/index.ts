@@ -106,6 +106,8 @@ serve(async (req) => {
       if (existingClient) {
         throw new Error("This email already has a client account");
       }
+      
+      console.log("Will create client record for existing user");
     } else {
       // User doesn't exist, create new auth user
       console.log("Creating new auth user");
@@ -121,6 +123,7 @@ serve(async (req) => {
       });
 
       if (authError) {
+        console.error("Auth user creation error:", authError);
         throw new Error(`Auth creation failed: ${authError.message}`);
       }
 

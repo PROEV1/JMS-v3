@@ -310,8 +310,17 @@ export function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLeadModalP
       <DialogContent 
         className="max-w-2xl max-h-[90vh] overflow-y-auto"
         onInteractOutside={(e) => {
-          // Prevent closing when interacting with popovers or nested modals
-          if (clientSearchOpen || productSearchOpen || showCreateClientModal) {
+          // Prevent closing when interacting with popovers, dropdowns, or nested modals
+          const target = e.target as Element;
+          const isInteractingWithDropdown = target.closest('[role="listbox"]') || 
+                                           target.closest('[data-radix-popper-content-wrapper]') ||
+                                           target.closest('[data-radix-select-content]') ||
+                                           target.closest('[cmdk-root]') ||
+                                           clientSearchOpen || 
+                                           productSearchOpen || 
+                                           showCreateClientModal;
+          
+          if (isInteractingWithDropdown) {
             e.preventDefault();
           }
         }}
@@ -361,15 +370,15 @@ export function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLeadModalP
                           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                         </Button>
                       </PopoverTrigger>
-                       <PopoverContent 
-                         className="w-full p-0"
-                         side="bottom"
-                         align="start"
-                         onInteractOutside={(e) => {
-                           // Allow clicking outside to close, but prevent event from reaching parent modal
-                           e.stopPropagation();
-                         }}
-                       >
+                        <PopoverContent 
+                          className="w-full p-0 z-50"
+                          side="bottom"
+                          align="start"
+                          onInteractOutside={(e) => {
+                            // Allow clicking outside to close, but prevent event from reaching parent modal
+                            e.stopPropagation();
+                          }}
+                        >
                          <Command>
                            <CommandInput placeholder="Search clients..." />
                            <CommandEmpty>
@@ -541,15 +550,15 @@ export function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLeadModalP
                           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                         </Button>
                       </PopoverTrigger>
-                       <PopoverContent 
-                         className="w-full p-0"
-                         side="bottom"
-                         align="start"
-                         onInteractOutside={(e) => {
-                           // Allow clicking outside to close, but prevent event from reaching parent modal
-                           e.stopPropagation();
-                         }}
-                       >
+                        <PopoverContent 
+                          className="w-full p-0 z-50"
+                          side="bottom"
+                          align="start"
+                          onInteractOutside={(e) => {
+                            // Allow clicking outside to close, but prevent event from reaching parent modal
+                            e.stopPropagation();
+                          }}
+                        >
                          <Command>
                            <CommandInput placeholder="Search products..." />
                            <CommandEmpty>
