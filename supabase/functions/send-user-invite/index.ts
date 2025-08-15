@@ -176,7 +176,7 @@ const handler = async (req: Request): Promise<Response> => {
     console.log('Using Resend API key (first 8 chars):', resendKey.substring(0, 8) + '...');
     
     const emailPayload = {
-      from: 'ProSpaces Portal <info@portal.prospaces.co.uk>',
+      from: 'ProSpaces Portal <onboarding@resend.dev>',
       to: [email],
       subject: 'Welcome to ProSpaces Portal - Your Account is Ready!',
       html: `
