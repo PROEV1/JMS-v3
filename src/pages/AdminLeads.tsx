@@ -9,7 +9,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { LeadStatusKPIs } from '@/components/LeadStatusKPIs';
 import { CreateLeadModal } from '@/components/CreateLeadModal';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 const AdminLeads = () => {
   console.log('AdminLeads component rendering...');
@@ -17,10 +28,11 @@ const AdminLeads = () => {
   const [statusFilter, setStatusFilter] = useState<Lead['status'] | 'all'>('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [clients, setClients] = useState<Array<{ id: string; full_name: string; email: string; phone?: string; address?: string }>>([]);
+  const [deletingLeadId, setDeletingLeadId] = useState<string | null>(null);
   
   console.log('Current statusFilter:', statusFilter);
   
-  const { leads, loading, error, convertToClient, convertToQuote, updateLead, createLead } = useLeads({
+  const { leads, loading, error, convertToClient, convertToQuote, updateLead, createLead, deleteLead } = useLeads({
     status: statusFilter === 'all' ? undefined : statusFilter
   });
   
@@ -61,6 +73,25 @@ const AdminLeads = () => {
         description: "Failed to create lead",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleDeleteLead = async (leadId: string) => {
+    try {
+      setDeletingLeadId(leadId);
+      await deleteLead(leadId);
+      toast({
+        title: "Success",
+        description: "Lead deleted successfully",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete lead",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingLeadId(null);
     }
   };
   
@@ -192,6 +223,35 @@ const AdminLeads = () => {
                       Client: {lead.client_id.slice(0, 8)}
                     </Badge>
                   )}
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        disabled={deletingLeadId === lead.id}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Lead</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Are you sure you want to delete this lead for "{lead.name}"? This action cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => handleDeleteLead(lead.id)}
+                          className="bg-red-600 hover:bg-red-700"
+                        >
+                          {deletingLeadId === lead.id ? 'Deleting...' : 'Delete'}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               </div>
             </CardHeader>

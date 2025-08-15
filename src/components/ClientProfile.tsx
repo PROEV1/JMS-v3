@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -9,7 +9,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { Mail, Phone, MapPin, User, Calendar, FileText, Wrench } from 'lucide-react';
+import { Mail, Phone, MapPin, User, Calendar, FileText, Wrench, Plus, Eye, MessageSquare } from 'lucide-react';
+import MessagesSection from './MessagesSection';
 
 interface Client {
   id: string;
@@ -51,6 +52,16 @@ interface Project {
   client_id: string;
 }
 
+interface Lead {
+  id: string;
+  name: string;
+  email: string;
+  status: string;
+  total_price: number | null;
+  product_name: string | null;
+  created_at: string;
+}
+
 interface ClientProfileProps {
   client: {
     id: string;
@@ -65,6 +76,7 @@ interface ClientProfileProps {
 }
 
 export const ClientProfile: React.FC<ClientProfileProps> = ({ client: initialClient, onBack }) => {
+  const navigate = useNavigate();
   const [client, setClient] = useState<Client | null>({
     ...initialClient,
     updated_at: initialClient.updated_at || new Date().toISOString()
@@ -72,6 +84,7 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ client: initialCli
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -157,6 +170,16 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ client: initialCli
       
       setProjects(transformedProjects);
 
+      // Fetch leads for this client
+      const { data: leadsData, error: leadsError } = await supabase
+        .from('leads')
+        .select('id, name, email, status, total_price, product_name, created_at')
+        .eq('client_id', initialClient.id)
+        .order('created_at', { ascending: false });
+
+      if (leadsError) throw leadsError;
+      setLeads(leadsData || []);
+
     } catch (error) {
       console.error('Error fetching client data:', error);
       toast({
@@ -220,6 +243,18 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ client: initialCli
     }
   };
 
+  const handleNewQuote = () => {
+    navigate(`/admin/quotes/new?clientId=${initialClient.id}`);
+  };
+
+  const handleViewQuote = (quoteId: string) => {
+    navigate(`/admin/quotes/${quoteId}`);
+  };
+
+  const handleViewOrder = (orderId: string) => {
+    navigate(`/admin/order/${orderId}`);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -245,12 +280,21 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ client: initialCli
             <User className="h-5 w-5" />
             Client Details
           </CardTitle>
-          <Button
-            variant="outline"
-            onClick={() => editMode ? handleUpdateClient() : setEditMode(true)}
-          >
-            {editMode ? 'Save Changes' : 'Edit Client'}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              onClick={handleNewQuote}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              New Quote
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => editMode ? handleUpdateClient() : setEditMode(true)}
+            >
+              {editMode ? 'Save Changes' : 'Edit Client'}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {editMode ? (
@@ -329,6 +373,45 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ client: initialCli
         </CardContent>
       </Card>
 
+      {/* Leads */}
+      {leads.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Leads ({leads.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {leads.map((lead) => (
+                <div key={lead.id} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <span className="font-medium">{lead.name}</span>
+                    <Badge className={getStatusColor(lead.status)}>
+                      {lead.status}
+                    </Badge>
+                    {lead.product_name && (
+                      <span className="text-sm text-muted-foreground">
+                        • {lead.product_name}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-right">
+                    {lead.total_price && (
+                      <div className="font-medium">£{lead.total_price.toLocaleString()}</div>
+                    )}
+                    <div className="text-sm text-muted-foreground">
+                      {new Date(lead.created_at).toLocaleDateString()}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Quotes */}
       <Card>
         <CardHeader>
@@ -349,6 +432,15 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ client: initialCli
                     <Badge className={getStatusColor(quote.status)}>
                       {quote.status}
                     </Badge>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleViewQuote(quote.id)}
+                      className="h-6 px-2 text-xs"
+                    >
+                      <Eye className="h-3 w-3 mr-1" />
+                      View Details
+                    </Button>
                   </div>
                   <div className="text-right">
                     <div className="font-medium">£{quote.total_cost.toLocaleString()}</div>
@@ -383,6 +475,15 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ client: initialCli
                     <Badge className={getStatusColor(order.status)}>
                       {order.status}
                     </Badge>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleViewOrder(order.id)}
+                      className="h-6 px-2 text-xs"
+                    >
+                      <Eye className="h-3 w-3 mr-1" />
+                      View Details
+                    </Button>
                   </div>
                   <div className="text-right">
                     <div className="font-medium">£{order.total_amount.toLocaleString()}</div>
@@ -429,6 +530,22 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ client: initialCli
           </CardContent>
         </Card>
       )}
+
+      {/* Messages Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <MessageSquare className="h-5 w-5" />
+            Messages
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <MessagesSection 
+            clientId={initialClient.id}
+            title={`Chat with ${client.full_name}`}
+          />
+        </CardContent>
+      </Card>
     </div>
   );
 };

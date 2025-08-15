@@ -1,175 +1,120 @@
+
 import React, { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { useToast } from '@/hooks/use-toast';
-import { Lead } from '@/hooks/useLeads';
+import { Separator } from '@/components/ui/separator';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Search, User, Mail, Phone, MapPin, Plus } from 'lucide-react';
 import { validateLeadData } from '@/utils/leadUtils';
-import { Plus } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+
+interface Client {
+  id: string;
+  full_name: string;
+  email: string;
+  phone?: string;
+  address?: string;
+}
 
 interface CreateLeadModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: (lead: Lead) => void;
-  clients?: Array<{ id: string; full_name: string; email: string; phone?: string; address?: string }>;
+  onSuccess: (leadData: any) => void;
+  clients: Client[];
 }
 
-export const CreateLeadModal = ({ isOpen, onClose, onSuccess, clients = [] }: CreateLeadModalProps) => {
+export const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
+  isOpen,
+  onClose,
+  onSuccess,
+  clients
+}) => {
   const { toast } = useToast();
-  const [loading, setLoading] = useState(false);
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [clientSearch, setClientSearch] = useState('');
-  const [filteredClients, setFilteredClients] = useState(clients);
-  const [isClientModalOpen, setIsClientModalOpen] = useState(false);
-  const [products, setProducts] = useState<Array<{ id: string; name: string; base_price: number }>>([]);
-  const [newClientData, setNewClientData] = useState({
-    full_name: '',
-    email: '',
-    phone: '',
-    address: ''
-  });
-  
+  const [showNewClientForm, setShowNewClientForm] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     phone: '',
     address: '',
     message: '',
-    source: '',
     notes: '',
-    client_id: '',
+    source: '',
     product_name: '',
     product_price: '',
     total_price: '',
     width_cm: '',
     finish: '',
-    luxe_upgrade: false
+    luxe_upgrade: false,
+    accessories_data: [] as any[],
+    configuration: {} as any,
+    product_details: '',
   });
 
-  // Auto-fill form when client is selected
-  useEffect(() => {
-    if (formData.client_id) {
-      const selectedClient = clients.find(c => c.id === formData.client_id);
-      if (selectedClient) {
-        setFormData(prev => ({
-          ...prev,
-          name: selectedClient.full_name,
-          email: selectedClient.email,
-          phone: selectedClient.phone || '',
-          address: selectedClient.address || ''
-        }));
-      }
-    }
-  }, [formData.client_id, clients]);
+  // Filter clients based on search
+  const filteredClients = clients.filter(client =>
+    client.full_name.toLowerCase().includes(clientSearch.toLowerCase()) ||
+    client.email.toLowerCase().includes(clientSearch.toLowerCase())
+  );
 
-  // Update filtered clients when clients prop or search changes
+  // Reset form when modal closes
   useEffect(() => {
-    if (!clientSearch.trim()) {
-      setFilteredClients(clients);
-    } else {
-      const filtered = clients.filter(client => 
-        client.full_name.toLowerCase().includes(clientSearch.toLowerCase()) ||
-        client.email.toLowerCase().includes(clientSearch.toLowerCase())
-      );
-      setFilteredClients(filtered);
-    }
-  }, [clients, clientSearch]);
-
-  // Fetch products when modal opens
-  useEffect(() => {
-    if (isOpen) {
-      fetchProducts();
+    if (!isOpen) {
+      setSelectedClient(null);
+      setClientSearch('');
+      setShowNewClientForm(false);
+      setFormData({
+        name: '',
+        email: '',
+        phone: '',
+        address: '',
+        message: '',
+        notes: '',
+        source: '',
+        product_name: '',
+        product_price: '',
+        total_price: '',
+        width_cm: '',
+        finish: '',
+        luxe_upgrade: false,
+        accessories_data: [],
+        configuration: {},
+        product_details: '',
+      });
     }
   }, [isOpen]);
 
-  const fetchProducts = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('products')
-        .select('id, name, base_price')
-        .eq('is_active', true)
-        .order('name');
-
-      if (error) throw error;
-      setProducts(data || []);
-    } catch (error) {
-      console.error('Error fetching products:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load products",
-        variant: "destructive",
-      });
+  // Auto-fill form when client is selected
+  useEffect(() => {
+    if (selectedClient) {
+      setFormData(prev => ({
+        ...prev,
+        name: selectedClient.full_name,
+        email: selectedClient.email,
+        phone: selectedClient.phone || '',
+        address: selectedClient.address || '',
+      }));
+      setShowNewClientForm(false);
     }
-  };
+  }, [selectedClient]);
 
-  const handleClientSearch = (searchValue: string) => {
-    setClientSearch(searchValue);
-  };
-
-  const createClient = async () => {
-    if (!newClientData.full_name || !newClientData.email) {
-      toast({
-        title: "Validation Error",
-        description: "Name and email are required",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      const { data, error } = await supabase.functions.invoke('admin-create-client', {
-        body: newClientData
-      });
-
-      if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: "Client created successfully",
-      });
-
-      // Select the new client
-      const newClient = data.client;
-      setFormData(prev => ({ ...prev, client_id: newClient.id }));
-      
-      // Clear search and close modal
-      setClientSearch('');
-      setIsClientModalOpen(false);
-      setNewClientData({ full_name: '', email: '', phone: '', address: '' });
-      
-    } catch (error) {
-      console.error('Error creating client:', error);
-      toast({
-        title: "Error",
-        description: "Failed to create client",
-        variant: "destructive",
-      });
-    }
+  const handleClientSelect = (client: Client) => {
+    setSelectedClient(client);
+    setClientSearch('');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!formData.client_id) {
-      toast({
-        title: "Validation Error",
-        description: "Please select a client",
-        variant: "destructive",
-      });
-      return;
-    }
 
-    const errors = validateLeadData({
-      name: formData.name,
-      email: formData.email,
-      phone: formData.phone,
-      product_price: formData.product_price ? parseFloat(formData.product_price) : undefined,
-      total_price: formData.total_price ? parseFloat(formData.total_price) : undefined,
-      width_cm: formData.width_cm ? parseFloat(formData.width_cm) : undefined,
-    } as any, !!formData.client_id);
+    const hasSelectedClient = !!selectedClient;
+    const errors = validateLeadData(formData, hasSelectedClient);
+
     if (errors.length > 0) {
       toast({
         title: "Validation Error",
@@ -180,54 +125,16 @@ export const CreateLeadModal = ({ isOpen, onClose, onSuccess, clients = [] }: Cr
     }
 
     try {
-      setLoading(true);
-
-      // Create lead data object
       const leadData = {
-        name: formData.name.trim(),
-        email: formData.email.trim(),
-        phone: formData.phone.trim() || undefined,
-        address: formData.address.trim() || undefined,
-        message: formData.message.trim() || undefined,
-        source: formData.source.trim() || undefined,
-        notes: formData.notes.trim() || undefined,
-        client_id: formData.client_id || undefined,
-        product_name: formData.product_name.trim() || undefined,
-        product_price: formData.product_price ? parseFloat(formData.product_price) : undefined,
-        total_price: formData.total_price ? parseFloat(formData.total_price) : undefined,
-        width_cm: formData.width_cm ? parseFloat(formData.width_cm) : undefined,
-        finish: formData.finish.trim() || undefined,
-        luxe_upgrade: formData.luxe_upgrade,
-        status: 'new' as const
+        ...formData,
+        client_id: selectedClient?.id || null,
+        status: 'new',
+        product_price: formData.product_price ? parseFloat(formData.product_price) : null,
+        total_price: formData.total_price ? parseFloat(formData.total_price) : null,
+        width_cm: formData.width_cm ? parseFloat(formData.width_cm) : null,
       };
 
-      // Call the success handler with the lead data
-      await onSuccess(leadData as Lead);
-      
-      // Reset form
-      setFormData({
-        name: '',
-        email: '',
-        phone: '',
-        address: '',
-        message: '',
-        source: '',
-        notes: '',
-        client_id: '',
-        product_name: '',
-        product_price: '',
-        total_price: '',
-        width_cm: '',
-        finish: '',
-        luxe_upgrade: false
-      });
-      setClientSearch('');
-      
-      toast({
-        title: "Success",
-        description: "Lead created successfully",
-      });
-      
+      await onSuccess(leadData);
       onClose();
     } catch (error) {
       console.error('Error creating lead:', error);
@@ -236,8 +143,6 @@ export const CreateLeadModal = ({ isOpen, onClose, onSuccess, clients = [] }: Cr
         description: "Failed to create lead",
         variant: "destructive",
       });
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -247,215 +152,182 @@ export const CreateLeadModal = ({ isOpen, onClose, onSuccess, clients = [] }: Cr
         <DialogHeader>
           <DialogTitle>Create New Lead</DialogTitle>
         </DialogHeader>
-        
+
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Name *</Label>
-              <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                disabled={!!formData.client_id}
-                placeholder={formData.client_id ? "Auto-filled from selected client" : "Enter name"}
-                required={!formData.client_id}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="email">Email *</Label>
-              <Input
-                id="email"
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                disabled={!!formData.client_id}
-                placeholder={formData.client_id ? "Auto-filled from selected client" : "Enter email"}
-                required={!formData.client_id}
-              />
-            </div>
-          </div>
+          {/* Client Selection Section */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label className="text-base font-semibold">Client Selection *</Label>
+                  {selectedClient && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSelectedClient(null)}
+                    >
+                      Change Client
+                    </Button>
+                  )}
+                </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="phone">Phone</Label>
-              <Input
-                id="phone"
-                value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                disabled={!!formData.client_id}
-                placeholder={formData.client_id ? "Auto-filled from selected client" : "Enter phone"}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="source">Source</Label>
-              <Input
-                id="source"
-                value={formData.source}
-                onChange={(e) => setFormData({ ...formData, source: e.target.value })}
-                placeholder="e.g., Website, Referral, etc."
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="address">Address (Optional)</Label>
-            <Textarea
-              id="address"
-              value={formData.address}
-              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-              disabled={!!formData.client_id}
-              placeholder={formData.client_id ? "Auto-filled from selected client" : "Enter address"}
-              rows={2}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="client_id">Client *</Label>
-            <div className="space-y-2">
-              <Input
-                placeholder="Search clients..."
-                value={clientSearch}
-                onChange={(e) => handleClientSearch(e.target.value)}
-              />
-              <div className="flex gap-2">
-                <Select 
-                  value={formData.client_id} 
-                  onValueChange={(value) => setFormData({ ...formData, client_id: value })}
-                  required
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a client..." />
-                  </SelectTrigger>
-                  <SelectContent className="bg-background z-50">
-                    {filteredClients.map((client) => (
-                      <SelectItem key={client.id} value={client.id}>
-                        {client.full_name} ({client.email})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Dialog open={isClientModalOpen} onOpenChange={setIsClientModalOpen}>
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    size="icon"
-                    onClick={() => setIsClientModalOpen(true)}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Create New Client</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <div>
-                        <Label htmlFor="new_client_name">Full Name *</Label>
-                        <Input
-                          id="new_client_name"
-                          value={newClientData.full_name}
-                          onChange={(e) => setNewClientData(prev => ({ ...prev, full_name: e.target.value }))}
-                          placeholder="Enter client name"
-                        />
+                {selectedClient ? (
+                  <Card className="bg-muted/50">
+                    <CardContent className="pt-4">
+                      <div className="flex items-start justify-between">
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <User className="h-4 w-4 text-muted-foreground" />
+                            <span className="font-medium">{selectedClient.full_name}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Mail className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm">{selectedClient.email}</span>
+                          </div>
+                          {selectedClient.phone && (
+                            <div className="flex items-center gap-2">
+                              <Phone className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-sm">{selectedClient.phone}</span>
+                            </div>
+                          )}
+                          {selectedClient.address && (
+                            <div className="flex items-center gap-2">
+                              <MapPin className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-sm">{selectedClient.address}</span>
+                            </div>
+                          )}
+                        </div>
+                        <Badge variant="secondary">Selected</Badge>
                       </div>
-                      <div>
-                        <Label htmlFor="new_client_email">Email *</Label>
-                        <Input
-                          id="new_client_email"
-                          type="email"
-                          value={newClientData.email}
-                          onChange={(e) => setNewClientData(prev => ({ ...prev, email: e.target.value }))}
-                          placeholder="Enter email address"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="new_client_phone">Phone</Label>
-                        <Input
-                          id="new_client_phone"
-                          value={newClientData.phone}
-                          onChange={(e) => setNewClientData(prev => ({ ...prev, phone: e.target.value }))}
-                          placeholder="Enter phone number"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="new_client_address">Address</Label>
-                        <Textarea
-                          id="new_client_address"
-                          value={newClientData.address}
-                          onChange={(e) => setNewClientData(prev => ({ ...prev, address: e.target.value }))}
-                          placeholder="Enter client address"
-                          rows={3}
-                        />
-                      </div>
-                      <div className="flex justify-end space-x-2">
-                        <Button type="button" variant="outline" onClick={() => setIsClientModalOpen(false)}>
-                          Cancel
-                        </Button>
-                        <Button type="button" onClick={createClient}>
-                          Create Client
-                        </Button>
-                      </div>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search existing clients by name or email..."
+                        value={clientSearch}
+                        onChange={(e) => setClientSearch(e.target.value)}
+                        className="pl-10"
+                      />
                     </div>
-                  </DialogContent>
-                </Dialog>
+
+                    {clientSearch && filteredClients.length > 0 && (
+                      <div className="border rounded-md max-h-48 overflow-y-auto">
+                        {filteredClients.map((client) => (
+                          <div
+                            key={client.id}
+                            className="p-3 hover:bg-muted cursor-pointer border-b last:border-0"
+                            onClick={() => handleClientSelect(client)}
+                          >
+                            <div className="font-medium">{client.full_name}</div>
+                            <div className="text-sm text-muted-foreground">{client.email}</div>
+                            {client.phone && (
+                              <div className="text-sm text-muted-foreground">{client.phone}</div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="text-center">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setShowNewClientForm(!showNewClientForm)}
+                        className="gap-2"
+                      >
+                        <Plus className="h-4 w-4" />
+                        {showNewClientForm ? 'Hide New Client Form' : 'Create New Client'}
+                      </Button>
+                    </div>
+
+                    {showNewClientForm && (
+                      <Card>
+                        <CardContent className="pt-6">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <Label htmlFor="name">Full Name *</Label>
+                              <Input
+                                id="name"
+                                value={formData.name}
+                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                required={!selectedClient}
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="email">Email *</Label>
+                              <Input
+                                id="email"
+                                type="email"
+                                value={formData.email}
+                                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                required={!selectedClient}
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="phone">Phone</Label>
+                              <Input
+                                id="phone"
+                                value={formData.phone}
+                                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                              />
+                            </div>
+                            <div className="md:col-span-2">
+                              <Label htmlFor="address">Address</Label>
+                              <Input
+                                id="address"
+                                value={formData.address}
+                                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                              />
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
+                )}
               </div>
-            </div>
+            </CardContent>
+          </Card>
+
+          <Separator />
+
+          {/* Source Section */}
+          <div>
+            <Label htmlFor="source">Lead Source</Label>
+            <Select value={formData.source} onValueChange={(value) => setFormData({ ...formData, source: value })}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select lead source" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="website">Website</SelectItem>
+                <SelectItem value="referral">Referral</SelectItem>
+                <SelectItem value="social_media">Social Media</SelectItem>
+                <SelectItem value="google_ads">Google Ads</SelectItem>
+                <SelectItem value="phone_call">Phone Call</SelectItem>
+                <SelectItem value="email">Email</SelectItem>
+                <SelectItem value="trade_show">Trade Show</SelectItem>
+                <SelectItem value="other">Other</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="message">Message</Label>
-            <Textarea
-              id="message"
-              value={formData.message}
-              onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-              rows={3}
-            />
-          </div>
-
+          {/* Product Information */}
           <div className="space-y-4">
-            <h4 className="font-medium">Product Details (Optional)</h4>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
+            <Label className="text-base font-semibold">Product Information</Label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
                 <Label htmlFor="product_name">Product Name</Label>
-                <Select
-                  value={formData.product_name}
-                  onValueChange={(value) => {
-                    const selectedProduct = products.find(p => p.name === value);
-                    setFormData({ 
-                      ...formData, 
-                      product_name: value,
-                      product_price: selectedProduct ? selectedProduct.base_price.toString() : ''
-                    });
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a product..." />
-                  </SelectTrigger>
-                  <SelectContent className="bg-background z-50">
-                    {products.map((product) => (
-                      <SelectItem key={product.id} value={product.name}>
-                        {product.name} - £{product.base_price.toFixed(2)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="finish">Finish</Label>
                 <Input
-                  id="finish"
-                  value={formData.finish}
-                  onChange={(e) => setFormData({ ...formData, finish: e.target.value })}
-                  placeholder="e.g., Standard White Matt"
+                  id="product_name"
+                  value={formData.product_name}
+                  onChange={(e) => setFormData({ ...formData, product_name: e.target.value })}
                 />
               </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-2">
+              <div>
                 <Label htmlFor="product_price">Product Price (£)</Label>
                 <Input
                   id="product_price"
@@ -465,8 +337,7 @@ export const CreateLeadModal = ({ isOpen, onClose, onSuccess, clients = [] }: Cr
                   onChange={(e) => setFormData({ ...formData, product_price: e.target.value })}
                 />
               </div>
-              
-              <div className="space-y-2">
+              <div>
                 <Label htmlFor="total_price">Total Price (£)</Label>
                 <Input
                   id="total_price"
@@ -476,39 +347,59 @@ export const CreateLeadModal = ({ isOpen, onClose, onSuccess, clients = [] }: Cr
                   onChange={(e) => setFormData({ ...formData, total_price: e.target.value })}
                 />
               </div>
-              
-              <div className="space-y-2">
+              <div>
                 <Label htmlFor="width_cm">Width (cm)</Label>
                 <Input
                   id="width_cm"
                   type="number"
-                  step="0.1"
                   value={formData.width_cm}
                   onChange={(e) => setFormData({ ...formData, width_cm: e.target.value })}
                 />
               </div>
             </div>
+            <div>
+              <Label htmlFor="product_details">Product Details</Label>
+              <Textarea
+                id="product_details"
+                value={formData.product_details}
+                onChange={(e) => setFormData({ ...formData, product_details: e.target.value })}
+                rows={3}
+              />
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="notes">Notes</Label>
-            <Textarea
-              id="notes"
-              value={formData.notes}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              rows={2}
-              placeholder="Internal notes about this lead..."
-            />
+          {/* Additional Information */}
+          <div className="space-y-4">
+            <Label className="text-base font-semibold">Additional Information</Label>
+            <div>
+              <Label htmlFor="message">Customer Message</Label>
+              <Textarea
+                id="message"
+                value={formData.message}
+                onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+                rows={3}
+              />
+            </div>
+            <div>
+              <Label htmlFor="notes">Internal Notes</Label>
+              <Textarea
+                id="notes"
+                value={formData.notes}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                rows={3}
+              />
+            </div>
           </div>
 
-          <DialogFooter>
+          {/* Form Actions */}
+          <div className="flex justify-end gap-2 pt-4">
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? 'Creating...' : 'Create Lead'}
+            <Button type="submit" className="bg-green-600 hover:bg-green-700">
+              Create Lead
             </Button>
-          </DialogFooter>
+          </div>
         </form>
       </DialogContent>
     </Dialog>

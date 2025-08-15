@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { createOrFindClient, saveLeadHistory } from '@/utils/leadConversionUtils';
@@ -161,6 +160,32 @@ export const useLeads = (options: UseLeadsOptions = {}) => {
     }
   }, []);
 
+  const deleteLead = useCallback(async (id: string) => {
+    try {
+      console.log('Deleting lead:', id);
+      
+      const { error: deleteError } = await supabase
+        .from('leads')
+        .delete()
+        .eq('id', id);
+
+      if (deleteError) {
+        console.error('Error deleting lead:', deleteError);
+        throw new Error(`Failed to delete lead: ${deleteError.message}`);
+      }
+
+      console.log('Lead deleted successfully:', id);
+      
+      // Update local state immediately
+      setLeads(prev => prev.filter(lead => lead.id !== id));
+
+      return true;
+    } catch (err) {
+      console.error('Error deleting lead:', err);
+      throw err;
+    }
+  }, []);
+
   const convertToClient = useCallback(async (lead: Lead) => {
     try {
       const clientData = await createOrFindClient(lead);
@@ -260,6 +285,7 @@ export const useLeads = (options: UseLeadsOptions = {}) => {
     fetchLeads,
     createLead,
     updateLead,
+    deleteLead,
     convertToClient,
     convertToQuote,
   };

@@ -1,3 +1,4 @@
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.52.0'
 import { Resend } from 'npm:resend@4.0.0'
 
@@ -67,32 +68,29 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Get client information
-    let clientInfo = null
+    // Determine client_id and recipient email based on sender role
+    let messageClientId = null
     let recipientEmail = null
     let senderName = profile.full_name || user.email
 
     if (profile.role === 'admin') {
-      // Admin is sending message to client
-      if (!clientId) {
-        return new Response(
-          JSON.stringify({ error: 'Client ID is required for admin messages' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-      }
+      // Admin is sending message - use provided clientId
+      messageClientId = clientId || null
+      
+      if (clientId) {
+        // Get client email for notification
+        const { data: client } = await supabaseAdmin
+          .from('clients')
+          .select('full_name, email')
+          .eq('id', clientId)
+          .single()
 
-      const { data: client } = await supabaseAdmin
-        .from('clients')
-        .select('full_name, email')
-        .eq('id', clientId)
-        .single()
-
-      if (client) {
-        clientInfo = client
-        recipientEmail = client.email
+        if (client) {
+          recipientEmail = client.email
+        }
       }
     } else {
-      // Client is sending message to admin
+      // Client is sending message - look up their client record
       const { data: client } = await supabaseAdmin
         .from('clients')
         .select('id, full_name, email')
@@ -100,20 +98,21 @@ Deno.serve(async (req) => {
         .single()
 
       if (client) {
-        clientInfo = client
+        messageClientId = client.id
         senderName = client.full_name || client.email
-        // Send to admin email - you can change this to your admin email
+        // Send to admin email
         recipientEmail = 'paul@proev.co.uk'
       }
     }
 
-    // Insert message into database
+    // Insert message into database with client_id
     const { data: message, error: messageError } = await supabaseAdmin
       .from('messages')
       .insert({
         sender_id: user.id,
         sender_role: profile.role,
         content: content,
+        client_id: messageClientId,
         quote_id: quoteId || null,
         project_id: projectId || null,
         status: 'sent'

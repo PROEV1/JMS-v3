@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -19,6 +18,7 @@ interface Message {
   sender_id: string;
   quote_id?: string;
   project_id?: string;
+  client_id?: string;
   status?: 'sending' | 'sent' | 'delivered' | 'failed';
 }
 
@@ -113,15 +113,21 @@ export default function WhatsAppChat({
   }, [messages]);
 
   const shouldShowMessage = (message: Message) => {
+    // For client-specific view, show messages for this client
+    if (clientId && message.client_id === clientId) return true;
+    
+    // For quote-specific view, show messages for this quote
     if (quoteId && message.quote_id === quoteId) return true;
+    
+    // For project-specific view, show messages for this project
     if (projectId && message.project_id === projectId) return true;
-    if (clientId) {
-      // For client-specific view, show messages that are either:
-      // 1. Associated with their quotes/projects, OR
-      // 2. General messages in their conversation (no specific quote/project)
-      return !message.quote_id && !message.project_id;
+    
+    // If no specific context, show general messages
+    if (!clientId && !quoteId && !projectId && !message.client_id && !message.quote_id && !message.project_id) {
+      return true;
     }
-    return true;
+    
+    return false;
   };
 
   const scrollToBottom = () => {
@@ -137,37 +143,26 @@ export default function WhatsAppChat({
         .select('*')
         .order('created_at', { ascending: true });
 
+      // Filter by the appropriate context
       if (clientId) {
-        // Get client's user_id
-        const { data: clientData } = await supabase
-          .from('clients')
-          .select('user_id')
-          .eq('id', clientId)
-          .single();
-
-        console.log('WhatsAppChat: Client data:', clientData);
-
-        if (clientData?.user_id) {
-          // For client-specific messages, filter by sender_id matching the client's user_id
-          query = query.eq('sender_id', clientData.user_id);
-        } else {
-          // If no valid client data, return empty results
-          setMessages([]);
-          setLoading(false);
-          return;
-        }
+        query = query.eq('client_id', clientId);
       } else if (quoteId) {
         query = query.eq('quote_id', quoteId);
       } else if (projectId) {
         query = query.eq('project_id', projectId);
+      } else {
+        // For general messages, show only messages without specific context
+        query = query
+          .is('client_id', null)
+          .is('quote_id', null)
+          .is('project_id', null);
       }
 
       const { data, error } = await query;
 
       if (error) throw error;
 
-      console.log('WhatsAppChat: Raw loaded messages:', data);
-      console.log('WhatsAppChat: Messages after shouldShowMessage filter:', data?.filter(msg => shouldShowMessage(msg)));
+      console.log('WhatsAppChat: Loaded messages:', data?.length || 0);
       setMessages(data || []);
     } catch (error) {
       console.error('Error loading messages:', error);
@@ -195,6 +190,7 @@ export default function WhatsAppChat({
       sender_id: session.user.id,
       quote_id: quoteId,
       project_id: projectId,
+      client_id: clientId,
       status: 'sending',
     };
 
@@ -203,7 +199,7 @@ export default function WhatsAppChat({
     scrollToBottom();
 
     try {
-      const response = await fetch(`https://jttogvpjfeegbkpturey.supabase.co/functions/v1/send-message`, {
+      const response = await fetch(`https://qvppvstgconmzzjsryna.supabase.co/functions/v1/send-message`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
