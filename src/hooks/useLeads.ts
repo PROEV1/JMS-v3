@@ -124,13 +124,12 @@ export const useLeads = (options: UseLeadsOptions = {}) => {
         const { data: overrideData, error: overrideError } = await supabase
           .from('lead_status_overrides')
           .upsert({
-            external_lead_id: id,
+            lead_id: id, // Fixed: using lead_id instead of external_lead_id
             status: updates.status,
-            client_id: updates.client_id || null,
-            updated_by: currentUser.user.id,
+            created_by: currentUser.user.id,
             notes: updates.notes || null
           }, {
-            onConflict: 'external_lead_id'
+            onConflict: 'lead_id'
           })
           .select();
 
