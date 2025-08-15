@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -18,6 +19,9 @@ export default {
 			}
 		},
 		extend: {
+			fontFamily: {
+				'montserrat': ['Montserrat', 'sans-serif'],
+			},
 			colors: {
 				border: 'hsl(var(--border))',
 				input: 'hsl(var(--input))',
@@ -43,6 +47,35 @@ export default {
 				accent: {
 					DEFAULT: 'hsl(var(--accent))',
 					foreground: 'hsl(var(--accent-foreground))'
+				},
+				'accent-pink': 'hsl(var(--accent-pink))',
+				'accent-green': 'hsl(var(--accent-green))',
+				'accent-cream': 'hsl(var(--accent-cream))',
+				// Brand colors
+				'brand-teal': {
+					DEFAULT: 'hsl(var(--brand-teal))',
+					light: 'hsl(var(--brand-teal-light))',
+					dark: 'hsl(var(--brand-teal-dark))'
+				},
+				'brand-pink': {
+					DEFAULT: 'hsl(var(--brand-pink))',
+					light: 'hsl(var(--brand-pink-light))',
+					dark: 'hsl(var(--brand-pink-dark))'
+				},
+				'brand-green': {
+					DEFAULT: 'hsl(var(--brand-green))',
+					light: 'hsl(var(--brand-green-light))',
+					dark: 'hsl(var(--brand-green-dark))'
+				},
+				'brand-cream': {
+					DEFAULT: 'hsl(var(--brand-cream))',
+					light: 'hsl(var(--brand-cream-light))',
+					dark: 'hsl(var(--brand-cream-dark))'
+				},
+				'brand-blue': {
+					DEFAULT: 'hsl(var(--brand-blue))',
+					light: 'hsl(var(--brand-blue-light))',
+					dark: 'hsl(var(--brand-blue-dark))'
 				},
 				popover: {
 					DEFAULT: 'hsl(var(--popover))',

@@ -1,3 +1,5 @@
+
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -8,78 +10,93 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
+    /* ProSpaces Brand Color Palette */
     --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --foreground: 221 37% 19%; /* #2b2e3d */
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 221 37% 19%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 221 37% 19%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    /* Primary: #2b2e3d (dark blue-gray) */
+    --primary: 221 37% 19%;
+    --primary-foreground: 0 0% 98%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    /* Secondary: #8ac4c2 (teal) */
+    --secondary: 177 29% 66%;
+    --secondary-foreground: 221 37% 19%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 44 44% 91%; /* #f5efe8 */
+    --muted-foreground: 221 20% 50%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    /* Accent colors from palette */
+    --accent: 104 47% 75%; /* #d1d9b0 */
+    --accent-foreground: 221 37% 19%;
+
+    /* Brand-specific colors */
+    --brand-teal: 177 29% 66%; /* #8ac4c2 */
+    --brand-teal-light: 177 29% 80%;
+    --brand-teal-dark: 177 29% 50%;
+    
+    --brand-pink: 347 58% 88%; /* #f7ccd6 */
+    --brand-pink-light: 347 58% 92%;
+    --brand-pink-dark: 347 58% 75%;
+    
+    --brand-green: 104 47% 75%; /* #d1d9b0 */
+    --brand-green-light: 104 47% 85%;
+    --brand-green-dark: 104 47% 65%;
+    
+    --brand-cream: 44 44% 91%; /* #f5efe8 */
+    --brand-cream-light: 44 44% 95%;
+    --brand-cream-dark: 44 44% 85%;
+
+    --brand-blue: 221 37% 19%; /* Primary blue */
+    --brand-blue-light: 221 37% 30%;
+    --brand-blue-dark: 221 37% 15%;
+
+    /* Additional ProSpaces colors */
+    --accent-pink: 347 58% 88%; /* #f7ccd6 */
+    --accent-green: 100 33% 89%; /* #e5f2e3 */
+    --accent-cream: 44 44% 91%; /* #f5efe8 */
 
     --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive-foreground: 0 0% 98%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 177 29% 90%;
+    --input: 177 29% 90%;
+    --ring: 177 29% 66%;
 
-    --radius: 0.5rem;
+    --radius: 0.75rem;
 
     --sidebar-background: 0 0% 98%;
-
     --sidebar-foreground: 240 5.3% 26.1%;
-
     --sidebar-primary: 240 5.9% 10%;
-
     --sidebar-primary-foreground: 0 0% 98%;
-
     --sidebar-accent: 240 4.8% 95.9%;
-
     --sidebar-accent-foreground: 240 5.9% 10%;
-
     --sidebar-border: 220 13% 91%;
-
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
   .dark {
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
-
     --card: 222.2 84% 4.9%;
     --card-foreground: 210 40% 98%;
-
     --popover: 222.2 84% 4.9%;
     --popover-foreground: 210 40% 98%;
-
     --primary: 210 40% 98%;
     --primary-foreground: 222.2 47.4% 11.2%;
-
     --secondary: 217.2 32.6% 17.5%;
     --secondary-foreground: 210 40% 98%;
-
     --muted: 217.2 32.6% 17.5%;
     --muted-foreground: 215 20.2% 65.1%;
-
     --accent: 217.2 32.6% 17.5%;
     --accent-foreground: 210 40% 98%;
-
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
-
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
@@ -101,5 +118,171 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+    font-family: 'Montserrat', sans-serif;
+  }
+
+  /* ProSpaces Brand Typography */
+  .brand-heading-1, h1 {
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 500; /* Medium */
+  }
+
+  .brand-heading-2, h2 {
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 300; /* Light */
+  }
+
+  .brand-heading-3, h3 {
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 600; /* Semi-Bold */
+  }
+
+  .brand-body, .body-text {
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 400; /* Regular */
+  }
+
+  .brand-title {
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 700; /* Bold for brand elements */
+  }
+
+  /* Brand utility classes */
+  .brand-gradient-teal {
+    background: linear-gradient(135deg, hsl(var(--brand-teal-light)), hsl(var(--brand-teal)));
+  }
+
+  .brand-gradient-pink {
+    background: linear-gradient(135deg, hsl(var(--brand-pink-light)), hsl(var(--brand-pink)));
+  }
+
+  .brand-gradient-green {
+    background: linear-gradient(135deg, hsl(var(--brand-green-light)), hsl(var(--brand-green)));
+  }
+
+  .brand-gradient-subtle {
+    background: linear-gradient(135deg, hsl(var(--background)), hsl(var(--muted)));
+  }
+
+  /* Brand Status Colors */
+  .status-sent {
+    @apply bg-brand-teal text-white;
+  }
+  
+  .status-accepted {
+    @apply bg-brand-green text-white;
+  }
+  
+  .status-declined {
+    @apply bg-destructive text-destructive-foreground;
+  }
+  
+  .status-pending {
+    @apply bg-brand-pink text-white;
+  }
+
+  /* Brand Icon Backgrounds */
+  .icon-bg-teal {
+    @apply bg-brand-teal-light/20;
+  }
+  
+  .icon-bg-pink {
+    @apply bg-brand-pink-light/20;
+  }
+  
+  .icon-bg-green {
+    @apply bg-brand-green-light/20;
+  }
+  
+  .icon-bg-cream {
+    @apply bg-brand-cream/50;
+  }
+
+  /* Brand Card Styles */
+  .brand-card {
+    @apply bg-card border border-border rounded-lg shadow-sm hover:shadow-md transition-all duration-200;
+  }
+  
+  .brand-card-interactive {
+    @apply brand-card cursor-pointer hover:shadow-lg hover:border-brand-teal/30 hover:-translate-y-1;
+  }
+
+  /* Brand Button Variants */
+  .btn-brand-primary {
+    @apply bg-brand-teal hover:bg-brand-teal-dark text-white;
+  }
+  
+  .btn-brand-secondary {
+    @apply bg-brand-green hover:bg-brand-green-dark text-white;
+  }
+  
+  .btn-brand-accent {
+    @apply bg-brand-pink hover:bg-brand-pink-dark text-white;
+  }
+
+  /* Brand Badge Styles */
+  .badge-teal {
+    @apply bg-brand-teal text-white;
+  }
+  
+  .badge-green {
+    @apply bg-brand-green text-white;
+  }
+  
+  .badge-pink {
+    @apply bg-brand-pink text-white;
+  }
+  
+  .badge-cream {
+    @apply bg-brand-cream text-primary;
+  }
+
+  /* Brand Container Styles */
+  .brand-page {
+    @apply min-h-screen bg-background;
+  }
+  
+  .brand-container {
+    @apply container mx-auto px-6 py-8;
+  }
+
+  /* Brand Loading Spinner */
+  .brand-spinner {
+    @apply animate-spin rounded-full h-32 w-32 border-b-2 border-brand-teal;
+  }
+
+  /* Custom drag and drop styles */
+  .drop-zone-calendar .rbc-calendar {
+    transition: background-color 0.2s ease;
+  }
+
+  .drop-zone-calendar .rbc-calendar:hover {
+    background-color: hsl(var(--primary) / 0.05);
+  }
+
+  .drop-zone-calendar .rbc-time-view .rbc-time-content {
+    border: 2px dashed transparent;
+    transition: border-color 0.2s ease;
+  }
+
+  .drop-zone-calendar .rbc-time-view .rbc-time-content:hover {
+    border-color: hsl(var(--primary) / 0.3);
+  }
+
+  /* Drag feedback for job cards */
+  .react-flow__node-dragging {
+    transform: rotate(5deg);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+  }
+
+  /* Engineer recommendation panel styles */
+  .engineer-recommendation-panel {
+    max-height: 400px;
+    overflow-y: auto;
+    z-index: 1000;
+    background: hsl(var(--background));
+    border: 1px solid hsl(var(--border));
+    border-radius: 8px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
   }
 }
