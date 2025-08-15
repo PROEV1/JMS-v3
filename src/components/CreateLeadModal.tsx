@@ -15,6 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { validateLeadData } from '@/utils/leadUtils';
 import { cn } from '@/lib/utils';
+import { CreateClientModal } from './CreateClientModal';
 
 interface Client {
   id: string;
@@ -22,6 +23,14 @@ interface Client {
   email: string;
   phone: string | null;
   address: string | null;
+}
+
+interface Product {
+  id: string;
+  name: string;
+  base_price: number;
+  description: string | null;
+  category: string | null;
 }
 
 interface CreateLeadModalProps {
@@ -52,9 +61,13 @@ interface FormData {
 export function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLeadModalProps) {
   const { toast } = useToast();
   const [clients, setClients] = useState<Client[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [clientSearchOpen, setClientSearchOpen] = useState(false);
+  const [productSearchOpen, setProductSearchOpen] = useState(false);
   const [newClientMode, setNewClientMode] = useState(false);
+  const [showCreateClientModal, setShowCreateClientModal] = useState(false);
   const [formData, setFormData] = useState<FormData>({
     name: '',
     email: '',
@@ -87,6 +100,7 @@ export function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLeadModalP
   useEffect(() => {
     if (isOpen) {
       loadClients();
+      loadProducts();
     }
   }, [isOpen]);
 
@@ -104,6 +118,21 @@ export function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLeadModalP
     }
   };
 
+  const loadProducts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('id, name, base_price, description, category')
+        .eq('is_active', true)
+        .order('name');
+
+      if (error) throw error;
+      setProducts(data || []);
+    } catch (error) {
+      console.error('Error loading products:', error);
+    }
+  };
+
   const handleClientSelect = (client: Client) => {
     setSelectedClient(client);
     setFormData(prev => ({
@@ -117,8 +146,33 @@ export function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLeadModalP
     setNewClientMode(false);
   };
 
+  const handleProductSelect = (product: Product) => {
+    setSelectedProduct(product);
+    setFormData(prev => ({
+      ...prev,
+      product_name: product.name,
+      product_price: product.base_price.toString(),
+      product_details: product.description || ''
+    }));
+    setProductSearchOpen(false);
+  };
+
+  const handleCreateClient = async () => {
+    setShowCreateClientModal(true);
+  };
+
+  const handleClientCreated = () => {
+    setShowCreateClientModal(false);
+    loadClients(); // Refresh the clients list
+    toast({
+      title: "Success",
+      description: "Client created successfully",
+    });
+  };
+
   const resetForm = () => {
     setSelectedClient(null);
+    setSelectedProduct(null);
     setNewClientMode(false);
     setFormData({
       name: '',
@@ -274,7 +328,7 @@ export function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLeadModalP
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() => setNewClientMode(!newClientMode)}
+                      onClick={handleCreateClient}
                       className="w-full"
                     >
                       <Plus className="mr-2 h-4 w-4" />
@@ -372,16 +426,75 @@ export function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLeadModalP
               <div className="space-y-4">
                 <Label className="text-base font-semibold">Product Information</Label>
                 
+                {/* Product Selection */}
+                <div className="space-y-3">
+                  <Label htmlFor="product">Product *</Label>
+                  {selectedProduct ? (
+                    <div className="flex items-center justify-between p-3 border rounded-lg bg-muted/50">
+                      <div>
+                        <p className="font-medium">{selectedProduct.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          £{selectedProduct.base_price.toLocaleString()} • {selectedProduct.category}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary">Selected</Badge>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setSelectedProduct(null)}
+                        >
+                          Change
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <Popover open={productSearchOpen} onOpenChange={setProductSearchOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={productSearchOpen}
+                          className="w-full justify-between"
+                        >
+                          Select product...
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0">
+                        <Command>
+                          <CommandInput placeholder="Search products..." />
+                          <CommandEmpty>No products found.</CommandEmpty>
+                          <CommandGroup className="max-h-48 overflow-y-auto">
+                            {products.map((product) => (
+                              <CommandItem
+                                key={product.id}
+                                onSelect={() => handleProductSelect(product)}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    selectedProduct?.id === product.id ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                <div className="flex-1">
+                                  <div className="font-medium">{product.name}</div>
+                                  <div className="text-sm text-muted-foreground">
+                                    £{product.base_price.toLocaleString()} • {product.category || 'Uncategorized'}
+                                  </div>
+                                </div>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  )}
+                </div>
+
+                {/* Product Details Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="product_name">Product Name</Label>
-                    <Input
-                      id="product_name"
-                      value={formData.product_name}
-                      onChange={(e) => setFormData(prev => ({ ...prev, product_name: e.target.value }))}
-                      placeholder="e.g. EV Charger Installation"
-                    />
-                  </div>
                   <div>
                     <Label htmlFor="finish">Finish</Label>
                     <Select value={formData.finish} onValueChange={(value) => setFormData(prev => ({ ...prev, finish: value }))}>
@@ -397,9 +510,19 @@ export function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLeadModalP
                       </SelectContent>
                     </Select>
                   </div>
+                  <div>
+                    <Label htmlFor="width_cm">Width (cm)</Label>
+                    <Input
+                      id="width_cm"
+                      type="number"
+                      value={formData.width_cm}
+                      onChange={(e) => setFormData(prev => ({ ...prev, width_cm: e.target.value }))}
+                      placeholder="e.g. 150"
+                    />
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="product_price">Product Price (£)</Label>
                     <Input
@@ -409,7 +532,11 @@ export function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLeadModalP
                       value={formData.product_price}
                       onChange={(e) => setFormData(prev => ({ ...prev, product_price: e.target.value }))}
                       placeholder="0.00"
+                      disabled={!!selectedProduct}
                     />
+                    {selectedProduct && (
+                      <p className="text-xs text-muted-foreground mt-1">Auto-filled from selected product</p>
+                    )}
                   </div>
                   <div>
                     <Label htmlFor="total_price">Total Quote Price (£)</Label>
@@ -420,16 +547,6 @@ export function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLeadModalP
                       value={formData.total_price}
                       onChange={(e) => setFormData(prev => ({ ...prev, total_price: e.target.value }))}
                       placeholder="0.00"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="width_cm">Width (cm)</Label>
-                    <Input
-                      id="width_cm"
-                      type="number"
-                      value={formData.width_cm}
-                      onChange={(e) => setFormData(prev => ({ ...prev, width_cm: e.target.value }))}
-                      placeholder="e.g. 150"
                     />
                   </div>
                 </div>
@@ -453,7 +570,11 @@ export function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLeadModalP
                     onChange={(e) => setFormData(prev => ({ ...prev, product_details: e.target.value }))}
                     placeholder="Additional product specifications or details"
                     rows={3}
+                    disabled={!!selectedProduct && !!selectedProduct.description}
                   />
+                  {selectedProduct?.description && (
+                    <p className="text-xs text-muted-foreground mt-1">Auto-filled from selected product</p>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -496,6 +617,13 @@ export function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLeadModalP
             </Button>
           </div>
         </form>
+
+        {/* Create Client Modal */}
+        <CreateClientModal
+          isOpen={showCreateClientModal}
+          onClose={() => setShowCreateClientModal(false)}
+          onSuccess={handleClientCreated}
+        />
       </DialogContent>
     </Dialog>
   );
