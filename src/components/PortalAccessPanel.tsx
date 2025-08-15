@@ -63,26 +63,19 @@ export const PortalAccessPanel: React.FC<PortalAccessPanelProps> = ({ client }) 
       setSending(true);
       console.log('Sending user invite for client:', client.id);
 
-      const response = await fetch('/api/v1/send-user-invite', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
-        },
-        body: JSON.stringify({
+      const { data, error } = await supabase.functions.invoke('send-user-invite', {
+        body: {
           email: client.email,
           full_name: client.full_name,
           role: 'client',
-        }),
+        },
       });
 
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to send invite');
+      if (error) {
+        throw new Error(error.message || 'Failed to send invite');
       }
 
-      console.log('Invite sent successfully:', result);
+      console.log('Invite sent successfully:', data);
       toast.success(profile ? 'Password reset link sent' : 'Portal invite sent');
       
       // Reload profile data

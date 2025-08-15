@@ -81,6 +81,45 @@ export default function Auth() {
     }
   };
 
+  const handleForgotPassword = async () => {
+    if (!email) {
+      toast({
+        title: "Email required",
+        description: "Please enter your email address first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/setup-password`
+      });
+
+      if (error) {
+        toast({
+          title: "Error sending reset link",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Reset link sent!",
+          description: "Check your email for a password reset link",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     console.log('Sign In button clicked!');
@@ -195,6 +234,15 @@ export default function Auth() {
                         className="h-11 bg-gray-50 border-gray-200 focus:border-brand-teal focus:ring-brand-teal"
                         placeholder="Enter your password"
                       />
+                      <div className="flex justify-end">
+                        <button
+                          type="button"
+                          onClick={handleForgotPassword}
+                          className="text-xs text-muted-foreground hover:text-brand-teal transition-colors"
+                        >
+                          Forgot your password?
+                        </button>
+                      </div>
                     </div>
                     <BrandButton 
                       type="submit" 

@@ -143,11 +143,15 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Generate password reset link for the user with our custom redirect
     console.log('Generating password reset link for user:', userId);
+    const origin = req.headers.get('origin') || 'https://preview--pro-spaces-client-portal.lovable.app';
+    const redirectTo = `${origin}/auth/setup-password`;
+    console.log('Using redirectTo URL:', redirectTo);
+    
     const { data: resetData, error: resetError } = await supabase.auth.admin.generateLink({
       type: 'recovery',
       email: email,
       options: {
-        redirectTo: 'https://preview--pro-spaces-client-portal.lovable.app/auth/setup-password'
+        redirectTo: redirectTo
       }
     });
 
