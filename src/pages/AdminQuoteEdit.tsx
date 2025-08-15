@@ -306,13 +306,9 @@ export default function AdminQuoteEdit() {
           client_id: formData.client_id,
           product_details: productDetails,
           total_cost: totalCost,
-          room_info: formData.room_info || null,
-          range: formData.range || null,
-          finish: formData.finish || null,
           special_instructions: formData.special_instructions || null,
           warranty_period: formData.warranty_period,
           includes_installation: formData.includes_installation,
-          deposit_required: formData.deposit_required,
           notes: formData.notes || null,
           expires_at: expiresAt,
         })

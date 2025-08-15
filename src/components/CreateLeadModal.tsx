@@ -153,6 +153,15 @@ export const CreateLeadModal = ({ isOpen, onClose, onSuccess, clients = [] }: Cr
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!formData.client_id) {
+      toast({
+        title: "Validation Error",
+        description: "Please select a client",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const errors = validateLeadData({
       name: formData.name,
       email: formData.email,
@@ -303,7 +312,7 @@ export const CreateLeadModal = ({ isOpen, onClose, onSuccess, clients = [] }: Cr
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="client_id">Associate with Client (Optional)</Label>
+            <Label htmlFor="client_id">Client *</Label>
             <div className="space-y-2">
               <Input
                 placeholder="Search clients..."
@@ -314,6 +323,7 @@ export const CreateLeadModal = ({ isOpen, onClose, onSuccess, clients = [] }: Cr
                 <Select 
                   value={formData.client_id} 
                   onValueChange={(value) => setFormData({ ...formData, client_id: value })}
+                  required
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select a client..." />

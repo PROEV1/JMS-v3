@@ -20,7 +20,7 @@ const AdminLeads = () => {
   
   console.log('Current statusFilter:', statusFilter);
   
-  const { leads, loading, error, convertToClient, updateLead, createLead } = useLeads({
+  const { leads, loading, error, convertToClient, convertToQuote, updateLead, createLead } = useLeads({
     status: statusFilter === 'all' ? undefined : statusFilter
   });
   
@@ -86,18 +86,18 @@ const AdminLeads = () => {
     );
   }
 
-  const handleConvertToClient = async (lead: any) => {
+  const handleConvertToQuote = async (lead: any) => {
     try {
       setConverting(lead.id);
-      await convertToClient(lead);
+      const result = await convertToQuote(lead);
       toast({
         title: "Success",
-        description: `${lead.name} has been converted to a client`,
+        description: `Quote ${result.quote_number} created for ${lead.name}`,
       });
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to convert lead to client",
+        description: "Failed to convert lead to quote",
         variant: "destructive",
       });
     } finally {
@@ -378,19 +378,19 @@ const AdminLeads = () => {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => window.location.href = `/admin/clients/${lead.client_id}`}
+                      onClick={() => window.location.href = `/admin/quotes`}
                     >
-                      View Client Record
+                      View Quotes
                     </Button>
                   )}
                   <Button
                     size="sm"
-                    onClick={() => handleConvertToClient(lead)}
-                    disabled={converting === lead.id || lead.status === 'converted'}
+                    onClick={() => handleConvertToQuote(lead)}
+                    disabled={converting === lead.id || lead.status === 'converted' || !lead.client_id}
                     className="bg-green-600 hover:bg-green-700"
                   >
                     {converting === lead.id ? 'Converting...' : 
-                     lead.status === 'converted' ? 'Converted' : 'Convert to Client'}
+                     lead.status === 'converted' ? 'Converted' : 'Convert to Quote'}
                   </Button>
                 </div>
               </div>
