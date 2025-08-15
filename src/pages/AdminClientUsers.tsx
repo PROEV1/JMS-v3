@@ -8,10 +8,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { UserPlus, Search, Edit, Trash2, MoreHorizontal, User } from 'lucide-react';
+import { UserPlus, Search, Edit, Trash2, MoreHorizontal, User, Plus } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { CreateClientModal } from '@/components/CreateClientModal';
 
 // Component to show client link indicator
 function ClientLinkIndicator({ userId }: { userId: string }) {
@@ -66,6 +67,7 @@ export default function AdminClientUsers() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [regionFilter, setRegionFilter] = useState<string>('all');
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   useEffect(() => {
     if (!permissionsLoading && !canManageUsers) {
@@ -186,10 +188,16 @@ export default function AdminClientUsers() {
           <p className="text-muted-foreground">Manage client portal users and their access</p>
         </div>
         {canCreateUsers && (
-          <Button onClick={() => navigate('/admin/users/new')}>
-            <UserPlus className="h-4 w-4 mr-2" />
-            Invite Client User
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={() => setShowCreateModal(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Create Client
+            </Button>
+            <Button variant="outline" onClick={() => navigate('/admin/users/new')}>
+              <UserPlus className="h-4 w-4 mr-2" />
+              Invite Client User
+            </Button>
+          </div>
         )}
       </div>
 
@@ -321,6 +329,15 @@ export default function AdminClientUsers() {
           </Table>
         </CardContent>
       </Card>
+
+      <CreateClientModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSuccess={() => {
+          setShowCreateModal(false);
+          fetchUsers();
+        }}
+      />
     </div>
   );
 }
