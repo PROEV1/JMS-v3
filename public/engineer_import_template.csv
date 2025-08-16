@@ -1,0 +1,3 @@
+email,full_name,region,availability,starting_postcode,mon_available,mon_start,mon_end,tue_available,tue_start,tue_end,wed_available,wed_start,wed_end,thu_available,thu_start,thu_end,fri_available,fri_start,fri_end,sat_available,sat_start,sat_end,sun_available,sun_start,sun_end,service_areas,max_travel_minutes
+john.doe@example.com,John Doe,London,true,SW1A 1AA,true,09:00,17:00,true,09:00,17:00,true,09:00,17:00,true,09:00,17:00,true,09:00,17:00,false,,,false,,,SW1|SW2|SW3,60
+jane.smith@example.com,Jane Smith,Manchester,true,M1 1AA,true,08:00,16:00,true,08:00,16:00,true,08:00,16:00,true,08:00,16:00,true,08:00,16:00,true,10:00,14:00,false,,,M1|M2|M3,45

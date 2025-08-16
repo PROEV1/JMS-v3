@@ -22,9 +22,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Plus, Settings, User, MapPin, Calendar, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { Plus, Settings, User, MapPin, Calendar, CheckCircle, XCircle, Clock, Upload } from 'lucide-react';
 import { EngineerScheduleManager } from '@/components/admin/EngineerScheduleManager';
 import { EngineerUserSetup } from '@/components/admin/EngineerUserSetup';
+import { EngineerCsvImport } from '@/components/admin/EngineerCsvImport';
 import { useNavigate } from 'react-router-dom';
 
 interface Engineer {
@@ -49,6 +50,7 @@ export default function AdminEngineers() {
   const [showScheduleManager, setShowScheduleManager] = useState(false);
   const [selectedEngineer, setSelectedEngineer] = useState<Engineer | null>(null);
   const [showUserSetup, setShowUserSetup] = useState(false);
+  const [showCsvImport, setShowCsvImport] = useState(false);
   
   // Form states
   const [formData, setFormData] = useState({
@@ -266,13 +268,19 @@ export default function AdminEngineers() {
         <div className="flex items-center justify-between mb-8">
           <BrandHeading1>Engineer Management</BrandHeading1>
           
-          <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
-            <DialogTrigger asChild>
-              <Button onClick={() => setEditingEngineer(null)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Engineer
-              </Button>
-            </DialogTrigger>
+          <div className="flex space-x-2">
+            <Button variant="outline" onClick={() => setShowCsvImport(true)}>
+              <Upload className="h-4 w-4 mr-2" />
+              Import CSV
+            </Button>
+            
+            <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
+              <DialogTrigger asChild>
+                <Button onClick={() => setEditingEngineer(null)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Engineer
+                </Button>
+              </DialogTrigger>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>
@@ -353,6 +361,7 @@ export default function AdminEngineers() {
               </form>
             </DialogContent>
           </Dialog>
+          </div>
         </div>
 
         {/* Stats Cards */}
@@ -570,6 +579,16 @@ export default function AdminEngineers() {
             </DialogContent>
           </Dialog>
         )}
+
+        {/* CSV Import Modal */}
+        <EngineerCsvImport 
+          open={showCsvImport}
+          onOpenChange={setShowCsvImport}
+          onImportComplete={() => {
+            fetchEngineers();
+            setShowCsvImport(false);
+          }}
+        />
       </BrandContainer>
     </BrandPage>
   );
