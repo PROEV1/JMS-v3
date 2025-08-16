@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
@@ -8,8 +9,10 @@ import { Textarea } from './ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Separator } from './ui/separator';
-import { User, Mail, Phone, MapPin, Calendar, Save, Edit2, X } from 'lucide-react';
+import { Skeleton } from './ui/skeleton';
+import { User, Mail, Phone, MapPin, Calendar, Save, Edit2, X, FileText, Package } from 'lucide-react';
 import { PortalAccessPanel } from './PortalAccessPanel';
+import { WhatsAppChat } from './WhatsAppChat';
 
 interface Client {
   id: string;
@@ -21,6 +24,23 @@ interface Client {
   postcode: string | null;
   user_id: string | null;
   updated_at?: string;
+}
+
+interface Quote {
+  id: string;
+  quote_number: string;
+  status: string;
+  total_cost: number;
+  created_at: string;
+}
+
+interface Order {
+  id: string;
+  order_number: string;
+  status_enhanced: string;
+  total_amount: number;
+  amount_paid: number;
+  scheduled_install_date: string | null;
 }
 
 interface ClientProfileProps {
@@ -36,14 +56,21 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({
   showBackButton = false,
   onBack
 }) => {
+  const navigate = useNavigate();
   const [client, setClient] = useState<Client | null>(null);
+  const [quotes, setQuotes] = useState<Quote[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [quotesLoading, setQuotesLoading] = useState(true);
+  const [ordersLoading, setOrdersLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState<Partial<Client>>({});
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     loadClient();
+    loadQuotes();
+    loadOrders();
   }, [clientId]);
 
   const loadClient = async () => {
@@ -75,12 +102,67 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({
     }
   };
 
+  const loadQuotes = async () => {
+    setQuotesLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('quotes')
+        .select('id, quote_number, status, total_cost, created_at')
+        .eq('client_id', clientId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching quotes:', error);
+        toast.error('Failed to load quotes');
+      } else {
+        setQuotes(data || []);
+      }
+    } catch (error) {
+      console.error('Error loading quotes:', error);
+      toast.error('Failed to load quotes');
+    } finally {
+      setQuotesLoading(false);
+    }
+  };
+
+  const loadOrders = async () => {
+    setOrdersLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('id, order_number, status_enhanced, total_amount, amount_paid, scheduled_install_date')
+        .eq('client_id', clientId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching orders:', error);
+        toast.error('Failed to load orders');
+      } else {
+        setOrders(data || []);
+      }
+    } catch (error) {
+      console.error('Error loading orders:', error);
+      toast.error('Failed to load orders');
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
+
   const saveChanges = async () => {
     setSaving(true);
     try {
+      // Only send editable fields
+      const updatePayload = {
+        full_name: editData.full_name,
+        email: editData.email,
+        phone: editData.phone,
+        address: editData.address,
+        postcode: editData.postcode
+      };
+
       const { error } = await supabase
         .from('clients')
-        .update(editData)
+        .update(updatePayload)
         .eq('id', clientId);
 
       if (error) {
@@ -262,29 +344,108 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({
 
           <Card>
             <CardHeader>
-              <CardTitle>Quotes</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Quotes ({quotes.length})
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              {/* Implement quotes list here */}
-              <p className="text-muted-foreground">No quotes available</p>
+              {quotesLoading ? (
+                <div className="space-y-3">
+                  <Skeleton className="h-16 w-full" />
+                  <Skeleton className="h-16 w-full" />
+                </div>
+              ) : quotes.length > 0 ? (
+                <div className="space-y-3">
+                  {quotes.map((quote) => (
+                    <div key={quote.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{quote.quote_number}</span>
+                          <Badge variant="outline">{quote.status}</Badge>
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          Created {new Date(quote.created_at).toLocaleDateString()} • Total: £{quote.total_cost.toFixed(2)}
+                        </div>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigate(`/admin/quotes/${quote.id}`)}
+                      >
+                        View
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-muted-foreground">No quotes available</p>
+              )}
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle>Orders</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <Package className="h-5 w-5" />
+                Orders ({orders.length})
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              {/* Implement orders list here */}
-              <p className="text-muted-foreground">No orders available</p>
+              {ordersLoading ? (
+                <div className="space-y-3">
+                  <Skeleton className="h-16 w-full" />
+                  <Skeleton className="h-16 w-full" />
+                </div>
+              ) : orders.length > 0 ? (
+                <div className="space-y-3">
+                  {orders.map((order) => (
+                    <div key={order.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{order.order_number}</span>
+                          <Badge variant="outline">{order.status_enhanced.replace(/_/g, ' ')}</Badge>
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          {order.scheduled_install_date && (
+                            <>Scheduled: {new Date(order.scheduled_install_date).toLocaleDateString()} • </>
+                          )}
+                          Paid: £{order.amount_paid.toFixed(2)} / £{order.total_amount.toFixed(2)}
+                        </div>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigate(`/admin/order/${order.id}`)}
+                      >
+                        View
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-muted-foreground">No orders available</p>
+              )}
             </CardContent>
           </Card>
         </div>
 
-        {/* Right Column - Portal Access & Actions */}
+        {/* Right Column - Portal Access, Messages & Actions */}
         <div className="space-y-6">
           {/* Portal Access Panel */}
           <PortalAccessPanel client={client} />
+
+          {/* Messages */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Messages</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="h-[500px]">
+                <WhatsAppChat clientId={clientId} />
+              </div>
+            </CardContent>
+          </Card>
 
           <Card>
             <CardHeader>
