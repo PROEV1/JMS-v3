@@ -242,7 +242,7 @@ Deno.serve(async (req) => {
               user_id: newUser.user!.id,
               email: email,
               full_name: row.full_name || email.split('@')[0],
-              role: 'engineer',
+              role: 'engineer', // Ensure consistent role assignment
               status: 'active'
             };
 
