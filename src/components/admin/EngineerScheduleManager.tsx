@@ -65,6 +65,7 @@ export function EngineerScheduleManager({ engineerId, engineerName }: EngineerSc
   const [loading, setLoading] = useState(true);
   const [showTimeOffModal, setShowTimeOffModal] = useState(false);
   const [showServiceAreaModal, setShowServiceAreaModal] = useState(false);
+  const [showWorkingHoursModal, setShowWorkingHoursModal] = useState(false);
   const [startingPostcode, setStartingPostcode] = useState('');
   
   // Time off form
@@ -79,6 +80,14 @@ export function EngineerScheduleManager({ engineerId, engineerName }: EngineerSc
   const [serviceAreaForm, setServiceAreaForm] = useState({
     postcode_area: '',
     max_travel_minutes: 60
+  });
+
+  // Working hours form
+  const [workingHoursForm, setWorkingHoursForm] = useState({
+    day_of_week: 0,
+    start_time: '09:00',
+    end_time: '17:00',
+    is_available: true
   });
 
   const { toast } = useToast();
@@ -243,6 +252,63 @@ export function EngineerScheduleManager({ engineerId, engineerName }: EngineerSc
     }
   };
 
+  const addWorkingHours = async () => {
+    try {
+      const { error } = await supabase
+        .from('engineer_availability')
+        .insert({
+          engineer_id: engineerId,
+          day_of_week: workingHoursForm.day_of_week,
+          start_time: workingHoursForm.start_time,
+          end_time: workingHoursForm.end_time,
+          is_available: workingHoursForm.is_available
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Working Hours Updated",
+        description: "Working hours have been saved",
+      });
+
+      setWorkingHoursForm({ day_of_week: 0, start_time: '09:00', end_time: '17:00', is_available: true });
+      setShowWorkingHoursModal(false);
+      fetchEngineerData();
+    } catch (error) {
+      console.error('Error adding working hours:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save working hours",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const deleteWorkingHours = async (workingHoursId: string) => {
+    try {
+      const { error } = await supabase
+        .from('engineer_availability')
+        .delete()
+        .eq('id', workingHoursId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Working Hours Removed",
+        description: "Working hours have been deleted",
+      });
+
+      fetchEngineerData();
+    } catch (error) {
+      console.error('Error deleting working hours:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete working hours",
+        variant: "destructive",
+      });
+    }
+  };
+
   const deleteTimeOff = async (timeOffId: string) => {
     try {
       const { error } = await supabase
@@ -371,9 +437,78 @@ export function EngineerScheduleManager({ engineerId, engineerName }: EngineerSc
       {/* Working Hours */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Clock className="h-5 w-5" />
-            <span>Working Hours</span>
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Clock className="h-5 w-5" />
+              <span>Working Hours</span>
+            </div>
+            <Dialog open={showWorkingHoursModal} onOpenChange={setShowWorkingHoursModal}>
+              <DialogTrigger asChild>
+                <Button size="sm">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Set Hours
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Set Working Hours</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="dayOfWeek">Day of Week</Label>
+                    <Select 
+                      value={workingHoursForm.day_of_week.toString()} 
+                      onValueChange={(value) => setWorkingHoursForm(prev => ({ ...prev, day_of_week: parseInt(value) }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select day" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {DAYS.map((day, index) => (
+                          <SelectItem key={index} value={index.toString()}>{day}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="startTime">Start Time</Label>
+                      <Input
+                        id="startTime"
+                        type="time"
+                        value={workingHoursForm.start_time}
+                        onChange={(e) => setWorkingHoursForm(prev => ({ ...prev, start_time: e.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="endTime">End Time</Label>
+                      <Input
+                        id="endTime"
+                        type="time"
+                        value={workingHoursForm.end_time}
+                        onChange={(e) => setWorkingHoursForm(prev => ({ ...prev, end_time: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="isAvailable"
+                      checked={workingHoursForm.is_available}
+                      onChange={(e) => setWorkingHoursForm(prev => ({ ...prev, is_available: e.target.checked }))}
+                      className="rounded"
+                    />
+                    <Label htmlFor="isAvailable">Available on this day</Label>
+                  </div>
+                  <div className="flex justify-end space-x-2">
+                    <Button variant="outline" onClick={() => setShowWorkingHoursModal(false)}>
+                      Cancel
+                    </Button>
+                    <Button onClick={addWorkingHours}>Save Hours</Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -386,13 +521,24 @@ export function EngineerScheduleManager({ engineerId, engineerName }: EngineerSc
                 return (
                   <div key={index} className="flex items-center justify-between p-3 border rounded">
                     <div className="font-medium">{day}</div>
-                    <div className="text-sm">
-                      {dayHours && dayHours.is_available ? (
-                        <span className="text-green-600">
-                          {dayHours.start_time} - {dayHours.end_time}
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground">Not available</span>
+                    <div className="flex items-center space-x-2">
+                      <div className="text-sm">
+                        {dayHours && dayHours.is_available ? (
+                          <span className="text-green-600">
+                            {dayHours.start_time} - {dayHours.end_time}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">Not available</span>
+                        )}
+                      </div>
+                      {dayHours && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => deleteWorkingHours(dayHours.id)}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
                       )}
                     </div>
                   </div>
