@@ -96,7 +96,8 @@ export default function AdminQuoteEdit() {
     full_name: '',
     email: '',
     phone: '',
-    address: ''
+    address: '',
+    postcode: ''
   });
   
   const [formData, setFormData] = useState({
@@ -262,7 +263,7 @@ export default function AdminQuoteEdit() {
       // Clear search and close modal
       setClientSearch('');
       setIsClientModalOpen(false);
-      setNewClientData({ full_name: '', email: '', phone: '', address: '' });
+      setNewClientData({ full_name: '', email: '', phone: '', address: '', postcode: '' });
     } catch (error) {
       console.error('Error creating client:', error);
       toast({
@@ -489,6 +490,15 @@ export default function AdminQuoteEdit() {
                                 onChange={(e) => setNewClientData(prev => ({ ...prev, address: e.target.value }))}
                                 placeholder="Enter client address"
                                 rows={3}
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="new_client_postcode">Postcode</Label>
+                              <Input
+                                id="new_client_postcode"
+                                value={newClientData.postcode}
+                                onChange={(e) => setNewClientData(prev => ({ ...prev, postcode: e.target.value.toUpperCase() }))}
+                                placeholder="e.g. SW1A 1AA"
                               />
                             </div>
                             <div className="flex justify-end space-x-2">

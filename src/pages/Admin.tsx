@@ -55,7 +55,8 @@ export default function Admin() {
     full_name: '',
     email: '',
     phone: '',
-    address: ''
+    address: '',
+    postcode: ''
   });
 
   useEffect(() => {
@@ -159,7 +160,8 @@ export default function Admin() {
         full_name: '',
         email: '',
         phone: '',
-        address: ''
+        address: '',
+        postcode: ''
       });
       setShowCreateModal(false);
       loadDashboardData();
@@ -374,7 +376,16 @@ export default function Admin() {
                     placeholder="Client's address"
                   />
                 </div>
-                <Button 
+                <div className="space-y-2">
+                  <Label htmlFor="postcode">Postcode (Optional)</Label>
+                  <Input
+                    id="postcode"
+                    value={newClient.postcode}
+                    onChange={(e) => setNewClient({ ...newClient, postcode: e.target.value.toUpperCase() })}
+                    placeholder="e.g. SW1A 1AA"
+                  />
+                </div>
+                <Button
                   onClick={createClient} 
                   disabled={!newClient.full_name || !newClient.email}
                   className="w-full"
