@@ -161,7 +161,32 @@ export default function AdminQuoteCreate() {
         body: newClientData
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error creating client:', error);
+        if (error.name === 'FunctionsHttpError') {
+          try {
+            const errorDetail = await error.context.json();
+            toast({
+              title: "Error",
+              description: errorDetail.error || "Failed to create client",
+              variant: "destructive",
+            });
+          } catch (parseError) {
+            toast({
+              title: "Error",
+              description: "Failed to create client",
+              variant: "destructive",
+            });
+          }
+        } else {
+          toast({
+            title: "Error",
+            description: error.message || "Failed to create client",
+            variant: "destructive",
+          });
+        }
+        return;
+      }
 
       toast({
         title: "Success",
@@ -181,10 +206,10 @@ export default function AdminQuoteCreate() {
       
       console.log('New client created and selected:', newClient.id);
     } catch (error) {
-      console.error('Error creating client:', error);
+      console.error('Unexpected error creating client:', error);
       toast({
         title: "Error",
-        description: "Failed to create client",
+        description: "An unexpected error occurred",
         variant: "destructive",
       });
     }

@@ -80,91 +80,133 @@ serve(async (req) => {
 
     // Validate required fields
     if (!full_name || !email) {
-      throw new Error("Full name and email are required");
+      return new Response(JSON.stringify({ error: "Full name and email are required" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400,
+      });
     }
 
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      throw new Error("Invalid email format");
+      return new Response(JSON.stringify({ error: "Invalid email format" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400,
+      });
     }
 
-    console.log("Attempting to create/connect client with email:", email);
+    // Normalize email
+    const normalizedEmail = email.trim().toLowerCase();
+    console.log("Attempting to create/connect client with email:", normalizedEmail);
 
-    // First, check if a user with this email already exists
-    // We'll create the user first and handle the "user already exists" error
+    // Step 1: Try to find user_id via profiles (faster, assumes profiles sync with auth)
     let userId = null;
     let tempPassword = null;
-    let userExists = false;
+    let isNewUser = false;
+    
+    const { data: profileData, error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .select('user_id')
+      .eq('email', normalizedEmail)
+      .maybeSingle();
 
-    try {
-      // Try to create a new user first
-      console.log("Attempting to create new auth user");
-      tempPassword = Math.random().toString(36).slice(-12) + 'A1!';
-      
-      const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-        email: email,
-        password: tempPassword,
-        user_metadata: {
-          full_name: full_name,
-        },
-        email_confirm: true
+    if (profileData) {
+      userId = profileData.user_id;
+      console.log(`Found existing user via profiles: ${userId}`);
+    } else if (profileError && profileError.code !== 'PGRST116') { // Ignore 'no rows' error
+      console.error("Profile lookup failed:", profileError);
+      return new Response(JSON.stringify({ error: `Profile lookup failed: ${profileError.message}` }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400,
       });
-
-      if (authError) {
-        // Check if error is because user already exists
-        if (authError.message.includes('already registered') || authError.message.includes('already exists')) {
-          console.log("User already exists, will look up existing user");
-          userExists = true;
-          tempPassword = null; // Reset since we didn't create a new user
-        } else {
-          console.error("Auth user creation error:", authError);
-          throw new Error(`Auth creation failed: ${authError.message}`);
+    } else {
+      // Step 2: Fallback to paginated auth.admin.listUsers if no profile
+      console.log("No profile found, searching auth users...");
+      let page = 1;
+      const perPage = 1000; // Max per Supabase docs to minimize loops
+      let foundUser = null;
+      
+      while (true) {
+        const { data: listUsersResponse, error: listError } = await supabaseAdmin.auth.admin.listUsers({ 
+          page, 
+          perPage 
+        });
+        
+        if (listError) {
+          console.error("Error listing users:", listError);
+          return new Response(JSON.stringify({ error: `User lookup failed: ${listError.message}` }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 400,
+          });
         }
-      } else if (authData.user) {
+
+        foundUser = listUsersResponse.users?.find(u => u.email?.toLowerCase() === normalizedEmail);
+        if (foundUser || listUsersResponse.users.length < perPage) break; // Stop if found or no more pages
+        page++;
+      }
+
+      if (foundUser) {
+        userId = foundUser.id;
+        console.log(`Found existing user via auth list: ${userId}`);
+      } else {
+        // Step 3: Create new user if not found anywhere
+        console.log("Creating new auth user");
+        
+        // Generate stronger temporary password using crypto
+        const randomBytes = crypto.getRandomValues(new Uint8Array(16));
+        const randomString = Array.from(randomBytes, byte => byte.toString(36)).join('');
+        tempPassword = randomString.slice(0, 12) + 'A1!';
+        
+        const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+          email: normalizedEmail,
+          password: tempPassword,
+          user_metadata: {
+            full_name: full_name,
+          },
+          email_confirm: true
+        });
+
+        if (authError) {
+          console.error("Auth user creation error:", authError);
+          return new Response(JSON.stringify({ error: `Auth creation failed: ${authError.message}` }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 400,
+          });
+        }
+        
+        if (!authData.user) {
+          return new Response(JSON.stringify({ error: "Failed to create user - no user data returned" }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 400,
+          });
+        }
+        
         userId = authData.user.id;
+        isNewUser = true;
         console.log("Created new user with ID:", userId);
       }
-    } catch (error) {
-      console.error("Error during user creation attempt:", error);
-      throw error;
     }
 
-    // If user exists, we need to find their ID
-    if (userExists) {
-      const { data: listUsersResponse, error: userLookupError } = await supabaseAdmin.auth.admin.listUsers();
+    // Check for duplicate clients before creating
+    const { data: existingClient, error: clientCheckError } = await supabaseAdmin
+      .from('clients')
+      .select('id')
+      .or(`user_id.eq.${userId},email.eq.${normalizedEmail}`)
+      .maybeSingle();
       
-      if (userLookupError) {
-        console.error("Error looking up existing users:", userLookupError);
-        throw new Error(`User lookup failed: ${userLookupError.message}`);
-      }
-
-      // Find user by email
-      const existingUser = listUsersResponse.users?.find(user => user.email === email);
-      if (!existingUser) {
-        throw new Error("User exists but could not be found in user list");
-      }
-      
-      userId = existingUser.id;
-      console.log("Found existing user with ID:", userId);
-      
-      // Check if this user already has a client record
-      const { data: existingClient, error: clientCheckError } = await supabaseAdmin
-        .from('clients')
-        .select('id')
-        .eq('user_id', userId)
-        .maybeSingle();
-        
-      if (clientCheckError) {
-        console.error("Error checking existing client:", clientCheckError);
-        throw new Error(`Client check failed: ${clientCheckError.message}`);
-      }
-      
-      if (existingClient) {
-        throw new Error("This email already has a client account");
-      }
-      
-      console.log("Will create client record for existing user");
+    if (clientCheckError) {
+      console.error("Error checking existing client:", clientCheckError);
+      return new Response(JSON.stringify({ error: `Client check failed: ${clientCheckError.message}` }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400,
+      });
+    }
+    
+    if (existingClient) {
+      return new Response(JSON.stringify({ error: "This email already has a client account" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400,
+      });
     }
 
     // Create client record using service role (bypasses RLS)
@@ -173,7 +215,7 @@ serve(async (req) => {
       .insert({
         user_id: userId,
         full_name: full_name,
-        email: email,
+        email: normalizedEmail,
         phone: phone || null,
         address: address || null,
         postcode: postcode || null
@@ -184,22 +226,26 @@ serve(async (req) => {
     if (clientError) {
       console.error("Client creation failed:", clientError);
       // If client creation fails and we created a new user, clean up the auth user
-      if (tempPassword && userId) {
+      if (isNewUser && userId) {
+        console.log("Cleaning up auth user due to client creation failure");
         await supabaseAdmin.auth.admin.deleteUser(userId);
       }
-      throw new Error(`Client creation failed: ${clientError.message}`);
+      return new Response(JSON.stringify({ error: `Client creation failed: ${clientError.message}` }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400,
+      });
     }
 
     console.log("Client created successfully:", clientData.id);
 
     // Create profile for new users
-    if (tempPassword && userId) {
+    if (isNewUser && userId) {
       console.log("Creating profile for new user");
       const { error: profileError } = await supabaseAdmin
         .from('profiles')
         .insert({
           user_id: userId,
-          email: email,
+          email: normalizedEmail,
           full_name: full_name,
           role: 'client'
         });
@@ -218,7 +264,7 @@ serve(async (req) => {
         success: true, 
         client: clientData,
         temporaryPassword: tempPassword,
-        isNewUser: !!tempPassword
+        isNewUser: isNewUser
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -227,9 +273,12 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error("Error in admin-create-client:", error);
+    console.error("Error in admin-create-client:", error, {
+      message: error.message,
+      stack: error.stack
+    });
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error.message || "An unexpected error occurred" }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 400,
