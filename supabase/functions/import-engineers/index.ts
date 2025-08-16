@@ -217,14 +217,14 @@ Deno.serve(async (req) => {
             result.summary.created_users++;
             console.log(`Successfully created user for: ${email}`);
 
-            // Create profile
+            // Create profile with engineer role
             const { error: profileInsertError } = await supabaseAdmin
               .from('profiles')
               .insert({
                 user_id: newUser.user!.id,
                 email: email,
                 full_name: row.full_name || email.split('@')[0],
-                role: 'engineer',
+                role: 'engineer' as any, // Ensure it's treated as the correct enum type
                 status: 'active'
               });
 
