@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.import-engineers]
 verify_jwt = false
+
+[functions.admin-create-client-v2]
+verify_jwt = true
