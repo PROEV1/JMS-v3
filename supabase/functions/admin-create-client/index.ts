@@ -4,11 +4,17 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+  "Access-Control-Max-Age": "86400",
 };
 
 serve(async (req) => {
+  // Handle CORS preflight requests first
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { 
+      status: 200,
+      headers: corsHeaders 
+    });
   }
 
   try {
@@ -55,7 +61,7 @@ serve(async (req) => {
     }
 
     console.log("Validating admin role for user:", userData.user.id);
-    console.log("Function v1 - Force Deploy 20250116a - Enhanced Robustness");
+    console.log("Function v1 - Force Deploy 20250116b - CORS Fix");
 
     // Check if user is admin using service role to avoid RLS issues
     const { data: profile, error: profileError } = await supabaseAdmin
