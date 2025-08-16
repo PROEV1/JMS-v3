@@ -414,37 +414,13 @@ Deno.serve(async (req) => {
           }
         }
 
-        // Process service areas
-        if (row.service_areas?.trim()) {
-          const areas = row.service_areas.split('|')
-            .map(area => area.trim().toUpperCase())
-            .filter(area => area.length > 0);
-
-          for (const area of areas) {
-            const { error: serviceAreaError } = await supabaseAdmin
-              .from('engineer_service_areas')
-              .upsert({
-                engineer_id: engineer.id,
-                postcode_area: area,
-                max_travel_minutes: row.max_travel_minutes || 60
-              }, {
-                onConflict: 'engineer_id,postcode_area'
-              });
-
-            if (serviceAreaError) {
-              console.error(`Error upserting service area ${area}:`, serviceAreaError);
-              result.summary.errors.push({ 
-                row: rowNumber, 
-                error: `Failed to update service area: ${area}`,
-                email 
-              });
-            } else {
-              result.summary.service_area_upserts++;
-            }
-          }
-        } else if (row.max_travel_minutes && row.starting_postcode?.trim()) {
-          // Create a default service area based on starting postcode if max_travel_minutes is provided
-          const postcodeArea = row.starting_postcode.trim().toUpperCase().replace(/\d.*/, '');
+        // Always try to create service areas if max_travel_minutes is provided
+        if (row.max_travel_minutes && row.starting_postcode?.trim()) {
+          const startingPostcode = row.starting_postcode.trim().toUpperCase();
+          // Extract postcode area (e.g., "DA5 1BJ" -> "DA")  
+          const postcodeArea = startingPostcode.replace(/\d.*$/, '').replace(/\s.*$/, '');
+          
+          console.log(`Creating service area ${postcodeArea} for engineer ${email} with ${row.max_travel_minutes} min travel`);
           
           const { error: serviceAreaError } = await supabaseAdmin
             .from('engineer_service_areas')
@@ -457,15 +433,15 @@ Deno.serve(async (req) => {
             });
 
           if (serviceAreaError) {
-            console.error(`Error creating default service area ${postcodeArea}:`, serviceAreaError);
+            console.error(`Error creating service area ${postcodeArea}:`, serviceAreaError);
             result.summary.errors.push({ 
               row: rowNumber, 
-              error: `Failed to create default service area: ${postcodeArea}`,
+              error: `Failed to create service area: ${postcodeArea}`,
               email 
             });
           } else {
             result.summary.service_area_upserts++;
-            console.log(`Created default service area ${postcodeArea} for engineer ${email}`);
+            console.log(`Created service area ${postcodeArea} for engineer ${email}`);
           }
         }
 

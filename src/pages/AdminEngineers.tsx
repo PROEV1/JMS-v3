@@ -384,18 +384,13 @@ export default function AdminEngineers() {
         <div className="flex items-center justify-between mb-8">
           <BrandHeading1>Engineer Management</BrandHeading1>
           
-           <div className="flex space-x-2">
-             <Button variant="outline" onClick={() => setShowCsvImport(true)}>
-               <Upload className="h-4 w-4 mr-2" />
-               Import CSV
-             </Button>
-             
-             <Button variant="outline" onClick={syncServiceAreas} disabled={syncing}>
-               <MapPin className="h-4 w-4 mr-2" />
-               {syncing ? "Syncing..." : "Sync Service Areas"}
-             </Button>
-             
-             <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
+          <div className="flex space-x-2">
+            <Button variant="outline" onClick={() => setShowCsvImport(true)}>
+              <Upload className="h-4 w-4 mr-2" />
+              Import CSV
+            </Button>
+            
+            <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
               <DialogTrigger asChild>
                 <Button onClick={() => setEditingEngineer(null)}>
                   <Plus className="h-4 w-4 mr-2" />

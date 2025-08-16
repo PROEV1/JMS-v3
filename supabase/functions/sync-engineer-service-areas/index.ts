@@ -96,13 +96,7 @@ Deno.serve(async (req) => {
     // Find engineers with starting postcodes but no service areas
     const { data: engineers, error: engineersError } = await supabaseAdmin
       .from('engineers')
-      .select(`
-        id, 
-        name, 
-        email, 
-        starting_postcode,
-        engineer_service_areas!inner(id)
-      `)
+      .select('id, name, email, starting_postcode')
       .not('starting_postcode', 'is', null);
 
     if (engineersError) {
