@@ -7,7 +7,7 @@ serve(async (req) => {
   const origin = req.headers.get('origin');
   const corsHeaders = getCorsHeaders(origin);
   
-  console.log(`[admin-create-client-v2] ${req.method} request from origin:`, origin);
+  console.log(`[admin-create-client-v2] CORS ready - ${req.method} request from origin:`, origin);
   
   // Handle CORS preflight requests first - return 204 instead of 200
   if (req.method === 'OPTIONS') {
