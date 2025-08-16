@@ -22,7 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Plus, Settings, User, MapPin, Calendar, CheckCircle, XCircle, Clock, Upload } from 'lucide-react';
+import { Plus, Settings, User, MapPin, Calendar, CheckCircle, XCircle, Clock, Upload, Trash2 } from 'lucide-react';
 import { EngineerScheduleManager } from '@/components/admin/EngineerScheduleManager';
 import { EngineerUserSetup } from '@/components/admin/EngineerUserSetup';
 import { EngineerCsvImport } from '@/components/admin/EngineerCsvImport';
@@ -257,6 +257,80 @@ export default function AdminEngineers() {
         description: "Failed to update availability",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleDelete = async (engineer: Engineer) => {
+    // Check if engineer has active assignments
+    if (engineer.assigned_jobs > engineer.completed_jobs) {
+      toast({
+        title: "Cannot Delete Engineer",
+        description: `${engineer.name} has ${engineer.assigned_jobs - engineer.completed_jobs} active job assignments. Please reassign or complete these jobs first.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Confirmation dialog
+    const confirmed = window.confirm(
+      `Are you sure you want to delete ${engineer.name}?\n\n` +
+      `This will permanently remove:\n` +
+      `• Engineer profile\n` +
+      `• Availability settings\n` +
+      `• Service areas\n` +
+      `• Time off records\n\n` +
+      `This action cannot be undone.`
+    );
+
+    if (!confirmed) return;
+
+    setSaving(true);
+    try {
+      // Delete related data first, then engineer
+      const { error: availabilityError } = await supabase
+        .from('engineer_availability')
+        .delete()
+        .eq('engineer_id', engineer.id);
+
+      if (availabilityError) throw availabilityError;
+
+      const { error: serviceAreasError } = await supabase
+        .from('engineer_service_areas')
+        .delete()
+        .eq('engineer_id', engineer.id);
+
+      if (serviceAreasError) throw serviceAreasError;
+
+      const { error: timeOffError } = await supabase
+        .from('engineer_time_off')
+        .delete()
+        .eq('engineer_id', engineer.id);
+
+      if (timeOffError) throw timeOffError;
+
+      // Finally delete the engineer
+      const { error: engineerError } = await supabase
+        .from('engineers')
+        .delete()
+        .eq('id', engineer.id);
+
+      if (engineerError) throw engineerError;
+
+      toast({
+        title: "Engineer Deleted",
+        description: `${engineer.name} has been permanently removed from the system`,
+      });
+
+      fetchEngineers();
+    } catch (error: any) {
+      console.error('Error deleting engineer:', error);
+      toast({
+        title: "Delete Failed",
+        description: error.message || "Failed to delete engineer. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -525,18 +599,28 @@ export default function AdminEngineers() {
                           >
                             <User className="h-3 w-3" />
                           </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleToggleAvailability(engineer)}
-                            title={engineer.availability ? "Mark Unavailable" : "Mark Available"}
-                          >
-                            {engineer.availability ? (
-                              <XCircle className="h-3 w-3" />
-                            ) : (
-                              <CheckCircle className="h-3 w-3" />
-                            )}
-                          </Button>
+                           <Button
+                             variant="outline"
+                             size="sm"
+                             onClick={() => handleToggleAvailability(engineer)}
+                             title={engineer.availability ? "Mark Unavailable" : "Mark Available"}
+                           >
+                             {engineer.availability ? (
+                               <XCircle className="h-3 w-3" />
+                             ) : (
+                               <CheckCircle className="h-3 w-3" />
+                             )}
+                           </Button>
+                           <Button
+                             variant="outline"
+                             size="sm"
+                             onClick={() => handleDelete(engineer)}
+                             title="Delete Engineer"
+                             className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                             disabled={saving}
+                           >
+                             <Trash2 className="h-3 w-3" />
+                           </Button>
                         </div>
                       </TableCell>
                     </TableRow>
