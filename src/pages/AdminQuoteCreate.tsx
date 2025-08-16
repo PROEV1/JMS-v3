@@ -157,34 +157,28 @@ export default function AdminQuoteCreate() {
     }
 
     try {
-      const { data, error } = await supabase.functions.invoke('admin-create-client', {
+      const { data, error } = await supabase.functions.invoke('admin-create-client-v2', {
         body: newClientData
       });
 
       if (error) {
         console.error('Error creating client:', error);
+        let errorMessage = "Failed to create client";
+        
         if (error.name === 'FunctionsHttpError') {
           try {
             const errorDetail = await error.context.json();
-            toast({
-              title: "Error",
-              description: errorDetail.error || "Failed to create client",
-              variant: "destructive",
-            });
+            errorMessage = errorDetail.error || errorMessage;
           } catch (parseError) {
-            toast({
-              title: "Error",
-              description: "Failed to create client",
-              variant: "destructive",
-            });
+            console.error('Failed to parse error response:', parseError);
           }
-        } else {
-          toast({
-            title: "Error",
-            description: error.message || "Failed to create client",
-            variant: "destructive",
-          });
         }
+        
+        toast({
+          title: "Error",
+          description: errorMessage,
+          variant: "destructive",
+        });
         return;
       }
 

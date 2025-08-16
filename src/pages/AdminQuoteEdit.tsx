@@ -243,11 +243,30 @@ export default function AdminQuoteEdit() {
     }
 
     try {
-      const { data, error } = await supabase.functions.invoke('admin-create-client', {
+      const { data, error } = await supabase.functions.invoke('admin-create-client-v2', {
         body: newClientData
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error creating client:', error);
+        let errorMessage = "Failed to create client";
+        
+        if (error.name === 'FunctionsHttpError') {
+          try {
+            const errorDetail = await error.context.json();
+            errorMessage = errorDetail.error || errorMessage;
+          } catch (parseError) {
+            console.error('Failed to parse error response:', parseError);
+          }
+        }
+        
+        toast({
+          title: "Error",
+          description: errorMessage,
+          variant: "destructive",
+        });
+        return;
+      }
 
       toast({
         title: "Success",
