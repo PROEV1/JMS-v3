@@ -72,11 +72,30 @@ export default function ClientQuotes() {
 
   const handleAcceptQuote = async (quoteId: string) => {
     try {
+      console.log('Starting quote acceptance...', { quoteId });
+      
+      // Check if user is authenticated
+      const { data: { session } } = await supabase.auth.getSession();
+      console.log('Current session:', session);
+      
+      if (!session) {
+        console.log('No session found, redirecting to auth');
+        toast({
+          title: "Authentication Required",
+          description: "Please log in to accept quotes",
+          variant: "destructive",
+        });
+        navigate('/auth');
+        return;
+      }
+      
       setAcceptingQuoteId(quoteId);
       
       const { data, error } = await supabase.functions.invoke('client-accept-quote', {
         body: { quoteId }
       });
+
+      console.log('Function response:', { data, error });
 
       if (error) throw error;
 
@@ -91,7 +110,7 @@ export default function ClientQuotes() {
       console.error('Error accepting quote:', error);
       toast({
         title: "Error",
-        description: "Failed to accept quote",
+        description: "Failed to accept quote. Please try logging in again.",
         variant: "destructive",
       });
       setAcceptingQuoteId(null);

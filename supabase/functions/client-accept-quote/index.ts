@@ -6,42 +6,28 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL')!
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
 serve(async (req) => {
-  console.log('client-accept-quote function called')
+  console.log('client-accept-quote function called, method:', req.method)
+  console.log('Headers:', Object.fromEntries(req.headers.entries()))
   
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    console.log('Handling OPTIONS request')
+    return new Response('ok', { 
+      status: 200,
+      headers: corsHeaders 
+    })
   }
 
   try {
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
     
-    // Get the JWT from the request
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: 'Missing authorization header' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    // Verify the JWT and get user
-    const jwt = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(jwt)
-    
-    if (authError || !user) {
-      console.error('Auth error:', authError)
-      return new Response(
-        JSON.stringify({ error: 'Invalid authorization' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    console.log('User authenticated:', user.email)
-
-    const { quoteId } = await req.json()
+    // Get request body
+    const body = await req.json()
+    console.log('Request body:', body)
+    const { quoteId } = body
     
     if (!quoteId) {
+      console.log('Missing quote ID')
       return new Response(
         JSON.stringify({ error: 'Quote ID is required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -49,6 +35,35 @@ serve(async (req) => {
     }
 
     console.log('Processing quote acceptance for:', quoteId)
+
+    // Get the JWT from the request (if available)
+    const authHeader = req.headers.get('Authorization')
+    console.log('Auth header present:', !!authHeader)
+    
+    let user = null
+    if (authHeader) {
+      const jwt = authHeader.replace('Bearer ', '')
+      const { data: { user: authUser }, error: authError } = await supabaseAdmin.auth.getUser(jwt)
+      
+      if (authError) {
+        console.error('Auth error:', authError)
+        return new Response(
+          JSON.stringify({ error: 'Invalid authorization' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+      user = authUser
+    }
+
+    if (!user) {
+      console.log('No valid user found')
+      return new Response(
+        JSON.stringify({ error: 'Authentication required' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    console.log('User authenticated:', user.email)
 
     // Get client record for this user
     const { data: client, error: clientError } = await supabaseAdmin

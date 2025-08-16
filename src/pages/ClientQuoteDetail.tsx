@@ -103,11 +103,26 @@ export default function ClientQuoteDetail() {
     if (!quote) return;
 
     try {
+      console.log('Starting quote acceptance...', { quoteId: quote.id });
+      
+      // Check if user is authenticated
+      const { data: { session } } = await supabase.auth.getSession();
+      console.log('Current session:', session);
+      
+      if (!session) {
+        console.log('No session found, redirecting to auth');
+        toast.error('Please log in to accept quotes');
+        navigate('/auth');
+        return;
+      }
+      
       setAccepting(true);
       
       const { data, error } = await supabase.functions.invoke('client-accept-quote', {
         body: { quoteId: quote.id }
       });
+
+      console.log('Function response:', { data, error });
 
       if (error) throw error;
 
@@ -117,7 +132,7 @@ export default function ClientQuoteDetail() {
       navigate(`/client/orders/${data.orderId}`);
     } catch (error) {
       console.error('Error accepting quote:', error);
-      toast.error('Failed to accept quote');
+      toast.error('Failed to accept quote. Please try logging in again.');
       setAccepting(false);
     }
   };
