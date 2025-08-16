@@ -66,6 +66,7 @@ export default function AdminEngineers() {
     user_id: null as string | null
   });
   const [availableUsers, setAvailableUsers] = useState<any[]>([]);
+  const [syncing, setSyncing] = useState(false);
 
   const { toast } = useToast();
 
@@ -242,6 +243,40 @@ export default function AdminEngineers() {
     setShowCreateModal(true);
   };
 
+  const syncServiceAreas = async () => {
+    setSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('sync-engineer-service-areas');
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Service Areas Synced",
+        description: `Created ${data.created_areas} service areas for ${data.updated_engineers} engineers`,
+      });
+      
+      if (data.errors && data.errors.length > 0) {
+        console.warn('Sync warnings:', data.errors);
+        toast({
+          title: "Sync Completed with Warnings",
+          description: `${data.errors.length} engineers had issues. Check console for details.`,
+          variant: "destructive",
+        });
+      }
+      
+      fetchEngineers();
+    } catch (error: any) {
+      console.error('Error syncing service areas:', error);
+      toast({
+        title: "Sync Failed",
+        description: error.message || "Failed to sync service areas",
+        variant: "destructive",
+      });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const handleToggleAvailability = async (engineer: Engineer) => {
     try {
       const { error } = await supabase
@@ -349,13 +384,18 @@ export default function AdminEngineers() {
         <div className="flex items-center justify-between mb-8">
           <BrandHeading1>Engineer Management</BrandHeading1>
           
-          <div className="flex space-x-2">
-            <Button variant="outline" onClick={() => setShowCsvImport(true)}>
-              <Upload className="h-4 w-4 mr-2" />
-              Import CSV
-            </Button>
-            
-            <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
+           <div className="flex space-x-2">
+             <Button variant="outline" onClick={() => setShowCsvImport(true)}>
+               <Upload className="h-4 w-4 mr-2" />
+               Import CSV
+             </Button>
+             
+             <Button variant="outline" onClick={syncServiceAreas} disabled={syncing}>
+               <MapPin className="h-4 w-4 mr-2" />
+               {syncing ? "Syncing..." : "Sync Service Areas"}
+             </Button>
+             
+             <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
               <DialogTrigger asChild>
                 <Button onClick={() => setEditingEngineer(null)}>
                   <Plus className="h-4 w-4 mr-2" />
