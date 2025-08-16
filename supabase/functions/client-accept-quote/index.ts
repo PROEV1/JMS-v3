@@ -8,14 +8,35 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 serve(async (req) => {
   console.log('client-accept-quote function called, method:', req.method)
   console.log('Headers:', Object.fromEntries(req.headers.entries()))
+  console.log('URL:', req.url)
   
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     console.log('Handling OPTIONS request')
-    return new Response('ok', { 
+    return new Response(null, { 
       status: 200,
-      headers: corsHeaders 
+      headers: {
+        ...corsHeaders,
+        'Access-Control-Max-Age': '86400',
+      }
     })
+  }
+
+  // Handle GET requests for testing
+  if (req.method === 'GET') {
+    console.log('Handling GET request - function is alive')
+    return new Response(
+      JSON.stringify({ message: 'Function is working', timestamp: new Date().toISOString() }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
+  }
+
+  // Only handle POST requests for quote acceptance
+  if (req.method !== 'POST') {
+    return new Response(
+      JSON.stringify({ error: 'Method not allowed' }),
+      { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
   }
 
   try {
