@@ -1,3 +1,4 @@
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
@@ -414,13 +415,49 @@ Deno.serve(async (req) => {
           }
         }
 
-        // Always try to create service areas if max_travel_minutes is provided
-        if (row.max_travel_minutes && row.starting_postcode?.trim()) {
+        // Process service areas - handle both explicit areas and fallback
+        let serviceAreasProcessed = false;
+        
+        // First, try to process explicit service_areas column
+        if (row.service_areas?.trim()) {
+          const areas = row.service_areas.split('|')
+            .map(area => area.trim().toUpperCase())
+            .filter(area => area.length > 0);
+
+          console.log(`Processing explicit service areas for ${email}:`, areas);
+
+          for (const area of areas) {
+            const { error: serviceAreaError } = await supabaseAdmin
+              .from('engineer_service_areas')
+              .upsert({
+                engineer_id: engineer.id,
+                postcode_area: area,
+                max_travel_minutes: row.max_travel_minutes || 60
+              }, {
+                onConflict: 'engineer_id,postcode_area'
+              });
+
+            if (serviceAreaError) {
+              console.error(`Error upserting service area ${area}:`, serviceAreaError);
+              result.summary.errors.push({ 
+                row: rowNumber, 
+                error: `Failed to update service area: ${area}`,
+                email 
+              });
+            } else {
+              result.summary.service_area_upserts++;
+              serviceAreasProcessed = true;
+            }
+          }
+        }
+        
+        // If no explicit service areas were processed, create fallback from starting postcode
+        if (!serviceAreasProcessed && row.max_travel_minutes && row.starting_postcode?.trim()) {
           const startingPostcode = row.starting_postcode.trim().toUpperCase();
           // Extract postcode area (e.g., "DA5 1BJ" -> "DA")  
           const postcodeArea = startingPostcode.replace(/\d.*$/, '').replace(/\s.*$/, '');
           
-          console.log(`Creating service area ${postcodeArea} for engineer ${email} with ${row.max_travel_minutes} min travel`);
+          console.log(`Creating fallback service area ${postcodeArea} for engineer ${email} with ${row.max_travel_minutes} min travel`);
           
           const { error: serviceAreaError } = await supabaseAdmin
             .from('engineer_service_areas')
@@ -433,15 +470,15 @@ Deno.serve(async (req) => {
             });
 
           if (serviceAreaError) {
-            console.error(`Error creating service area ${postcodeArea}:`, serviceAreaError);
+            console.error(`Error creating fallback service area ${postcodeArea}:`, serviceAreaError);
             result.summary.errors.push({ 
               row: rowNumber, 
-              error: `Failed to create service area: ${postcodeArea}`,
+              error: `Failed to create fallback service area: ${postcodeArea}`,
               email 
             });
           } else {
             result.summary.service_area_upserts++;
-            console.log(`Created service area ${postcodeArea} for engineer ${email}`);
+            console.log(`Created fallback service area ${postcodeArea} for engineer ${email}`);
           }
         }
 
