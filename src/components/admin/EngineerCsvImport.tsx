@@ -10,7 +10,7 @@ import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import Papa from 'papaparse';
-import { Upload, Download, AlertCircle, CheckCircle, X } from 'lucide-react';
+import { Upload, Download, AlertCircle, CheckCircle, X, Info, AlertTriangle } from 'lucide-react';
 
 interface CsvRow {
   email: string;
@@ -407,6 +407,31 @@ jane.smith@example.com,Jane Smith,Manchester,true,M1 1AA,true,08:00,16:00,true,0
                   <div className="text-sm text-muted-foreground">Service Areas</div>
                 </div>
               </div>
+
+              {/* Explanation for user creation */}
+              {createMissingUsers && importResult.summary.created_users === 0 && (
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-start space-x-2">
+                    <Info className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                    <div className="text-sm text-blue-700">
+                      <p className="font-medium">No new users were created</p>
+                      <p>All imported engineers already have user accounts in the system. Users are only created for engineers without existing accounts.</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {!createMissingUsers && (
+                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <div className="flex items-start space-x-2">
+                    <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5 flex-shrink-0" />
+                    <div className="text-sm text-yellow-700">
+                      <p className="font-medium">User creation was disabled</p>
+                      <p>Engineers without existing user accounts will not be able to log in. Enable "Create user accounts" to automatically create accounts for new engineers.</p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {importResult.summary.errors.length > 0 && (
                 <Alert variant="destructive">

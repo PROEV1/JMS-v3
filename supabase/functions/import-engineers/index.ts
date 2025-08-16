@@ -188,8 +188,12 @@ Deno.serve(async (req) => {
 
         profile = existingProfiles?.[0] || null;
 
+        console.log(`Profile lookup for ${email}:`, profile ? 'Found existing profile' : 'No profile found');
+        console.log(`Create missing users flag:`, create_missing_users);
+
         // Create user if needed and requested
         if (!profile && create_missing_users) {
+          console.log(`Creating new user for ${email}...`);
           try {
             const { data: newUser, error: createUserError } = await supabaseAdmin.auth.admin.createUser({
               email: email,
@@ -249,6 +253,10 @@ Deno.serve(async (req) => {
             });
             continue;
           }
+        } else if (!profile) {
+          console.log(`Skipping user creation for ${email} - create_missing_users is false`);
+        } else {
+          console.log(`User already exists for ${email}, skipping creation`);
         }
 
         // Get or create engineer record
