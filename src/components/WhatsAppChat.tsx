@@ -104,27 +104,20 @@ export const WhatsAppChat: React.FC<WhatsAppChatProps> = ({
       setSending(true);
       console.log('Sending message with context:', { clientId, quoteId, projectId });
 
-      const response = await fetch('/api/v1/send-message', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
-        },
-        body: JSON.stringify({
+      const { data, error } = await supabase.functions.invoke('send-message', {
+        body: {
           content: newMessage.trim(),
           clientId,
           quoteId,
           projectId,
-        }),
+        },
       });
 
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to send message');
+      if (error) {
+        throw new Error(error.message || 'Failed to send message');
       }
 
-      console.log('Message sent successfully:', result);
+      console.log('Message sent successfully:', data);
       setNewMessage('');
       toast.success('Message sent');
       

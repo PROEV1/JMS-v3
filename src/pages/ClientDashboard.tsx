@@ -7,131 +7,103 @@ import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { FileText, Wrench, CreditCard, Calendar, Eye, Download, MessageCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 
-interface Quote {
-  id: string;
-  quote_number: string;
-  status: string;
-  total_cost: number;
-  created_at: string;
-  expires_at: string | null;
-  is_shareable: boolean;
-  share_token: string | null;
-  // Optional fields that might not exist in database
-  deposit_required?: number;
-}
-
-interface Order {
-  id: string;
-  order_number: string;
-  status: string;
-  status_enhanced: string;
-  total_amount: number;
-  amount_paid: number;
-  created_at: string;
-  scheduled_install_date: string | null;
-}
-
-interface Payment {
-  id: string;
-  amount: number;
-  status: string;
-  payment_type: string;
-  created_at: string;
-  quote_id: string | null;
-  stripe_session_id: string | null;
-  // Fields that don't exist in database but are expected by interface
-  method?: string;
-  amount_paid?: number;
-  paid_on?: string;
+interface DashboardStats {
+  quotes: number;
+  orders: number;
+  messages: number;
+  payments: number;
+  documents: number;
 }
 
 export default function ClientDashboard() {
-  const [quotes, setQuotes] = useState<Quote[]>([]);
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [payments, setPayments] = useState<Payment[]>([]);
+  const [stats, setStats] = useState<DashboardStats>({
+    quotes: 0,
+    orders: 0,
+    messages: 0,
+    payments: 0,
+    documents: 0,
+  });
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { toast } = useToast();
 
   useEffect(() => {
-    fetchDashboardData();
-  }, []);
+    if (user) {
+      fetchDashboardData();
+    }
+  }, [user]);
 
   const fetchDashboardData = async () => {
     try {
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        navigate('/auth');
-        return;
-      }
+      setLoading(true);
 
-      // Get client record
-      const { data: client, error: clientError } = await supabase
+      // Get client ID first
+      const { data: clientData, error: clientError } = await supabase
         .from('clients')
         .select('id')
-        .eq('user_id', user.id)
+        .eq('user_id', user!.id)
         .single();
 
-      if (clientError) {
-        console.error('Error fetching client:', clientError);
+      if (clientError || !clientData) {
+        console.error('Error fetching client data:', clientError);
         return;
       }
 
-      // Fetch quotes with default values for missing fields
-      const { data: quotesData, error: quotesError } = await supabase
+      // Fetch quotes count
+      const { count: quotesCount } = await supabase
         .from('quotes')
-        .select('*')
-        .eq('client_id', client.id)
-        .order('created_at', { ascending: false });
+        .select('*', { count: 'exact', head: true })
+        .eq('client_id', clientData.id);
 
-      if (quotesError) throw quotesError;
-      
-      // Transform quotes to include default deposit_required
-      const transformedQuotes: Quote[] = (quotesData || []).map(quote => ({
-        ...quote,
-        deposit_required: quote.total_cost * 0.25, // Default to 25% of total cost
-      }));
-      
-      setQuotes(transformedQuotes);
-
-      // Fetch orders
-      const { data: ordersData, error: ordersError } = await supabase
+      // Fetch orders count  
+      const { count: ordersCount } = await supabase
         .from('orders')
-        .select('*')
-        .eq('client_id', client.id)
-        .order('created_at', { ascending: false });
+        .select('*', { count: 'exact', head: true })
+        .eq('client_id', clientData.id);
 
-      if (ordersError) throw ordersError;
-      setOrders(ordersData || []);
+      // Fetch messages count
+      const { count: messagesCount } = await supabase
+        .from('messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('client_id', clientData.id);
 
-      // Fetch payments - convert to our Payment interface
-      const { data: paymentsData, error: paymentsError } = await supabase
-        .from('payments')
-        .select('*')
-        .eq('client_id', client.id)
-        .order('created_at', { ascending: false });
+      // Fetch payments sum from order_payments table - fix the query
+      const { data: ordersForPayments } = await supabase
+        .from('orders')
+        .select('id')
+        .eq('client_id', clientData.id);
 
-      if (paymentsError) throw paymentsError;
+      const orderIds = ordersForPayments?.map(order => order.id) || [];
       
-      // Transform payments to match interface (though type conversion may still show warnings)
-      const transformedPayments = (paymentsData || []).map(payment => ({
-        ...payment,
-        method: payment.payment_type, // Map payment_type to method
-        amount_paid: payment.amount,  // Map amount to amount_paid
-        paid_on: payment.created_at   // Map created_at to paid_on
-      })) as Payment[];
-      
-      setPayments(transformedPayments);
+      let totalPaid = 0;
+      if (orderIds.length > 0) {
+        const { data: paymentsData } = await supabase
+          .from('order_payments')
+          .select('amount')
+          .eq('status', 'paid')
+          .in('order_id', orderIds);
 
+        totalPaid = paymentsData?.reduce((sum, payment) => sum + Number(payment.amount), 0) || 0;
+      }
+
+      // Fetch documents count
+      const { count: documentsCount } = await supabase
+        .from('files')
+        .select('*', { count: 'exact', head: true })
+        .eq('client_id', clientData.id);
+
+      setStats({
+        quotes: quotesCount || 0,
+        orders: ordersCount || 0,
+        messages: messagesCount || 0,
+        payments: totalPaid,
+        documents: documentsCount || 0,
+      });
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load dashboard data",
-        variant: "destructive",
-      });
     } finally {
       setLoading(false);
     }
@@ -246,7 +218,7 @@ export default function ClientDashboard() {
       <BrandPage>
         <BrandContainer>
           <div className="flex justify-center items-center h-64">
-            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </div>
         </BrandContainer>
       </BrandPage>
@@ -270,9 +242,9 @@ export default function ClientDashboard() {
                 <FileText className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{quotes.length}</div>
+                <div className="text-2xl font-bold">{stats.quotes}</div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {quotes.filter(q => q.status === 'sent').length} pending
+                  Total quotes
                 </p>
               </CardContent>
             </Card>
@@ -286,9 +258,9 @@ export default function ClientDashboard() {
                 <Wrench className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{orders.length}</div>
+                <div className="text-2xl font-bold">{stats.orders}</div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {orders.filter(o => o.status !== 'completed').length} active
+                  Total orders
                 </p>
               </CardContent>
             </Card>
@@ -302,7 +274,7 @@ export default function ClientDashboard() {
                 <MessageCircle className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">0</div>
+                <div className="text-2xl font-bold">{stats.messages}</div>
                 <p className="text-xs text-muted-foreground mt-1">
                   Chat with support
                 </p>
@@ -319,7 +291,7 @@ export default function ClientDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  £{payments.reduce((sum, p) => sum + p.amount, 0).toLocaleString()}
+                  £{stats.payments.toLocaleString()}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   Total paid
@@ -336,7 +308,7 @@ export default function ClientDashboard() {
                 <FileText className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">0</div>
+                <div className="text-2xl font-bold">{stats.documents}</div>
                 <p className="text-xs text-muted-foreground mt-1">
                   Upload & view files
                 </p>

@@ -181,68 +181,70 @@ export default function ClientQuotes() {
             </Card>
           ) : (
             <div className="space-y-4">
-              {quotes.map((quote) => (
-                <Card key={quote.id} className="hover:shadow-md transition-shadow">
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-3">
-                          <h3 className="font-semibold text-lg">{quote.quote_number}</h3>
-                          <Badge className={getStatusColor(quote.status)}>
-                            {formatStatus(quote.status)}
-                          </Badge>
-                        </div>
-                        
-                        <div className="text-sm text-muted-foreground space-y-1">
-                          <p>Created: {new Date(quote.created_at).toLocaleDateString()}</p>
-                          {quote.expires_at && (
-                            <p>Expires: {new Date(quote.expires_at).toLocaleDateString()}</p>
-                          )}
-                          <p className="font-medium text-foreground">{quote.product_details}</p>
-                        </div>
-                      </div>
+        {quotes.map((quote) => (
+          <Card 
+            key={quote.id} 
+            className="cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => navigate(`/client/quotes/${quote.id}`)}
+          >
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <h3 className="font-semibold text-lg">{quote.quote_number}</h3>
+                    <Badge className={getStatusColor(quote.status)}>
+                      {formatStatus(quote.status)}
+                    </Badge>
+                  </div>
+                  
+                  <div className="text-sm text-muted-foreground space-y-1">
+                    <p>Created: {new Date(quote.created_at).toLocaleDateString()}</p>
+                    {quote.expires_at && (
+                      <p>Expires: {new Date(quote.expires_at).toLocaleDateString()}</p>
+                    )}
+                    <p className="font-medium text-foreground">{quote.product_details}</p>
+                  </div>
+                </div>
 
-                      <div className="flex items-center gap-4">
-                        <div className="text-right">
-                          <p className="text-2xl font-bold text-primary">£{quote.total_cost.toLocaleString()}</p>
-                        </div>
-                        
-                        <div className="flex flex-col gap-2">
-                          {quote.is_shareable && quote.share_token && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => navigate(`/quote/${quote.share_token}`)}
-                            >
-                              <Eye className="h-4 w-4 mr-2" />
-                              View Details
-                            </Button>
-                          )}
-                          
-                          {quote.status === 'sent' && (
-                            <div className="flex gap-2">
-                              <Button
-                                size="sm"
-                                onClick={() => handleAcceptQuote(quote.id)}
-                                className="bg-green-600 hover:bg-green-700"
-                              >
-                                Accept
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleRejectQuote(quote.id)}
-                              >
-                                Reject
-                              </Button>
-                            </div>
-                          )}
-                        </div>
+                <div className="flex items-center gap-4">
+                  <div className="text-right">
+                    <p className="text-2xl font-bold text-primary">£{quote.total_cost.toLocaleString()}</p>
+                  </div>
+                  
+                  <div className="flex flex-col gap-2" onClick={(e) => e.stopPropagation()}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => navigate(`/client/quotes/${quote.id}`)}
+                    >
+                      <Eye className="h-4 w-4 mr-2" />
+                      View Details
+                    </Button>
+                    
+                    {quote.status === 'sent' && (
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => handleAcceptQuote(quote.id)}
+                          className="bg-green-600 hover:bg-green-700"
+                        >
+                          Accept
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleRejectQuote(quote.id)}
+                        >
+                          Reject
+                        </Button>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    )}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
             </div>
           )}
         </div>

@@ -18,6 +18,7 @@ import ClientPayments from "@/pages/ClientPayments";
 import ClientDocuments from "@/pages/ClientDocuments";
 import ClientProfileSelf from "@/pages/ClientProfileSelf";
 import ClientDateBlocking from "@/pages/ClientDateBlocking";
+import ClientQuoteDetail from "@/pages/ClientQuoteDetail";
 import EnhancedClientOrderView from "@/pages/EnhancedClientOrderView";
 import EngineerDashboard from "@/pages/EngineerDashboard";
 import EngineerProfile from "@/pages/EngineerProfile";
@@ -67,7 +68,7 @@ const App = () => (
             <Route path="/client/payments" element={<Layout><ClientPayments /></Layout>} />
             <Route path="/client/documents" element={<Layout><ClientDocuments /></Layout>} />
             <Route path="/client/profile" element={<Layout><ClientProfileSelf /></Layout>} />
-            <Route path="/client/date-blocking" element={<Layout><ClientDateBlocking /></Layout>} />
+            <Route path="/client/quotes/:id" element={<Layout><ClientQuoteDetail /></Layout>} />
             <Route path="/client/orders/:orderId" element={<Layout><EnhancedClientOrderView /></Layout>} />
             <Route path="/engineer" element={<Layout><EngineerDashboard /></Layout>} />
             <Route path="/engineer/profile" element={<Layout><EngineerProfile /></Layout>} />
