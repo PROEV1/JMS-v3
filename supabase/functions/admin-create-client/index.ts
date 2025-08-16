@@ -78,6 +78,17 @@ serve(async (req) => {
     // Get client data from request
     const { full_name, email, phone, address, postcode } = await req.json();
 
+    // Validate required fields
+    if (!full_name || !email) {
+      throw new Error("Full name and email are required");
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      throw new Error("Invalid email format");
+    }
+
     console.log("Attempting to create/connect client with email:", email);
 
     // First, check if a user with this email already exists
@@ -180,6 +191,27 @@ serve(async (req) => {
     }
 
     console.log("Client created successfully:", clientData.id);
+
+    // Create profile for new users
+    if (tempPassword && userId) {
+      console.log("Creating profile for new user");
+      const { error: profileError } = await supabaseAdmin
+        .from('profiles')
+        .insert({
+          user_id: userId,
+          email: email,
+          full_name: full_name,
+          role: 'client'
+        });
+
+      if (profileError) {
+        console.error("Profile creation failed:", profileError);
+        // Don't fail the whole operation, but log it
+        console.log("Continuing despite profile creation failure");
+      } else {
+        console.log("Profile created successfully");
+      }
+    }
 
     return new Response(
       JSON.stringify({ 

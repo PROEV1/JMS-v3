@@ -106,7 +106,7 @@ export default function Admin() {
       }
 
       // Call admin-create-client function
-      const response = await fetch(`https://jttogvpjfeegbkpturey.supabase.co/functions/v1/admin-create-client`, {
+      const response = await fetch(`https://qvppvstgconmzzjsryna.supabase.co/functions/v1/admin-create-client`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -252,7 +252,7 @@ export default function Admin() {
       // Call admin-delete-client function
       console.log('Calling delete function with:', { clientId: client.id, userId: client.user_id });
       
-      const response = await fetch(`https://jttogvpjfeegbkpturey.supabase.co/functions/v1/admin-delete-client`, {
+      const response = await fetch(`https://qvppvstgconmzzjsryna.supabase.co/functions/v1/admin-delete-client`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
