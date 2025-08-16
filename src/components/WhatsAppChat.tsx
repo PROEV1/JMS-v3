@@ -95,6 +95,28 @@ export const WhatsAppChat: React.FC<WhatsAppChatProps> = ({
 
   useEffect(() => {
     loadMessages();
+    
+    // Set up real-time subscription for new messages
+    const channel = supabase
+      .channel('messages')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: clientId ? `client_id=eq.${clientId}` : quoteId ? `quote_id=eq.${quoteId}` : `project_id=eq.${projectId}`
+        },
+        (payload) => {
+          console.log('New message received:', payload);
+          setMessages(current => [...current, payload.new as Message]);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [clientId, quoteId, projectId]);
 
   const sendMessage = async () => {

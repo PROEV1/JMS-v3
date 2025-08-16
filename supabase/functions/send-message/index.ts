@@ -74,20 +74,25 @@ Deno.serve(async (req) => {
     let senderName = profile.full_name || user.email
 
     if (profile.role === 'admin') {
-      // Admin is sending message - use provided clientId
-      messageClientId = clientId || null
+      // Admin is sending message - clientId is required
+      if (!clientId) {
+        return new Response(
+          JSON.stringify({ error: 'Client ID is required for admin messages' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
       
-      if (clientId) {
-        // Get client email for notification
-        const { data: client } = await supabaseAdmin
-          .from('clients')
-          .select('full_name, email')
-          .eq('id', clientId)
-          .single()
+      messageClientId = clientId
+      
+      // Get client email for notification
+      const { data: client } = await supabaseAdmin
+        .from('clients')
+        .select('full_name, email')
+        .eq('id', clientId)
+        .single()
 
-        if (client) {
-          recipientEmail = client.email
-        }
+      if (client) {
+        recipientEmail = client.email
       }
     } else {
       // Client is sending message - look up their client record
@@ -97,12 +102,25 @@ Deno.serve(async (req) => {
         .eq('user_id', user.id)
         .single()
 
-      if (client) {
-        messageClientId = client.id
-        senderName = client.full_name || client.email
-        // Send to admin email
-        recipientEmail = 'paul@proev.co.uk'
+      if (!client) {
+        return new Response(
+          JSON.stringify({ error: 'Client record not found for user' }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
       }
+
+      messageClientId = client.id
+      senderName = client.full_name || client.email
+      // Send to admin email
+      recipientEmail = 'paul@proev.co.uk'
+    }
+
+    // Ensure we have a client_id at this point
+    if (!messageClientId) {
+      return new Response(
+        JSON.stringify({ error: 'Unable to determine client context for message' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
     // Insert message into database with client_id
