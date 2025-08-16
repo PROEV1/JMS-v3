@@ -81,20 +81,59 @@ serve(async (req) => {
     console.log("Attempting to create/connect client with email:", email);
 
     // First, check if a user with this email already exists
-    const { data: listUsersResponse, error: userLookupError } = await supabaseAdmin.auth.admin.listUsers();
-    
-    if (userLookupError) {
-      console.error("Error looking up existing users:", userLookupError);
-      throw new Error(`User lookup failed: ${userLookupError.message}`);
-    }
-
-    // Find user by email
-    const existingUser = listUsersResponse.users?.find(user => user.email === email);
+    // We'll create the user first and handle the "user already exists" error
     let userId = null;
     let tempPassword = null;
+    let userExists = false;
 
-    if (existingUser) {
-      // User already exists, use their ID
+    try {
+      // Try to create a new user first
+      console.log("Attempting to create new auth user");
+      tempPassword = Math.random().toString(36).slice(-12) + 'A1!';
+      
+      const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+        email: email,
+        password: tempPassword,
+        user_metadata: {
+          full_name: full_name,
+        },
+        email_confirm: true
+      });
+
+      if (authError) {
+        // Check if error is because user already exists
+        if (authError.message.includes('already registered') || authError.message.includes('already exists')) {
+          console.log("User already exists, will look up existing user");
+          userExists = true;
+          tempPassword = null; // Reset since we didn't create a new user
+        } else {
+          console.error("Auth user creation error:", authError);
+          throw new Error(`Auth creation failed: ${authError.message}`);
+        }
+      } else if (authData.user) {
+        userId = authData.user.id;
+        console.log("Created new user with ID:", userId);
+      }
+    } catch (error) {
+      console.error("Error during user creation attempt:", error);
+      throw error;
+    }
+
+    // If user exists, we need to find their ID
+    if (userExists) {
+      const { data: listUsersResponse, error: userLookupError } = await supabaseAdmin.auth.admin.listUsers();
+      
+      if (userLookupError) {
+        console.error("Error looking up existing users:", userLookupError);
+        throw new Error(`User lookup failed: ${userLookupError.message}`);
+      }
+
+      // Find user by email
+      const existingUser = listUsersResponse.users?.find(user => user.email === email);
+      if (!existingUser) {
+        throw new Error("User exists but could not be found in user list");
+      }
+      
       userId = existingUser.id;
       console.log("Found existing user with ID:", userId);
       
@@ -115,31 +154,6 @@ serve(async (req) => {
       }
       
       console.log("Will create client record for existing user");
-    } else {
-      // User doesn't exist, create new auth user
-      console.log("Creating new auth user");
-      tempPassword = Math.random().toString(36).slice(-12) + 'A1!';
-      
-      const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-        email: email,
-        password: tempPassword,
-        user_metadata: {
-          full_name: full_name,
-        },
-        email_confirm: true
-      });
-
-      if (authError) {
-        console.error("Auth user creation error:", authError);
-        throw new Error(`Auth creation failed: ${authError.message}`);
-      }
-
-      if (!authData.user) {
-        throw new Error("Failed to create user");
-      }
-      
-      userId = authData.user.id;
-      console.log("Created new user with ID:", userId);
     }
 
     // Create client record using service role (bypasses RLS)
