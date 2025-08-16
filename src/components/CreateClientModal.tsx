@@ -20,7 +20,8 @@ export const CreateClientModal = ({ isOpen, onClose, onSuccess }: CreateClientMo
     full_name: '',
     email: '',
     phone: '',
-    address: ''
+    address: '',
+    postcode: ''
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -44,7 +45,8 @@ export const CreateClientModal = ({ isOpen, onClose, onSuccess }: CreateClientMo
           full_name: formData.full_name.trim(),
           email: formData.email.trim(),
           phone: formData.phone.trim() || null,
-          address: formData.address.trim() || null
+          address: formData.address.trim() || null,
+          postcode: formData.postcode.trim() || null
         }
       });
 
@@ -60,7 +62,8 @@ export const CreateClientModal = ({ isOpen, onClose, onSuccess }: CreateClientMo
         full_name: '',
         email: '',
         phone: '',
-        address: ''
+        address: '',
+        postcode: ''
       });
       
       // Close the modal and return the created client data
@@ -91,7 +94,8 @@ export const CreateClientModal = ({ isOpen, onClose, onSuccess }: CreateClientMo
       full_name: '',
       email: '',
       phone: '',
-      address: ''
+      address: '',
+      postcode: ''
     });
     onClose();
   };
@@ -141,7 +145,18 @@ export const CreateClientModal = ({ isOpen, onClose, onSuccess }: CreateClientMo
               id="address"
               value={formData.address}
               onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-              rows={3}
+              rows={2}
+              placeholder="Street address, city, etc."
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="postcode">Postcode</Label>
+            <Input
+              id="postcode"
+              value={formData.postcode}
+              onChange={(e) => setFormData({ ...formData, postcode: e.target.value.toUpperCase() })}
+              placeholder="e.g. SW1A 1AA"
             />
           </div>
 

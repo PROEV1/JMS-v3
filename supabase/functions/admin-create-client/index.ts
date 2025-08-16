@@ -76,7 +76,7 @@ serve(async (req) => {
     console.log("Admin validation successful");
 
     // Get client data from request
-    const { full_name, email, phone, address } = await req.json();
+    const { full_name, email, phone, address, postcode } = await req.json();
 
     console.log("Attempting to create/connect client with email:", email);
 
@@ -149,7 +149,8 @@ serve(async (req) => {
         full_name: full_name,
         email: email,
         phone: phone || null,
-        address: address || null
+        address: address || null,
+        postcode: postcode || null
       })
       .select()
       .single();
