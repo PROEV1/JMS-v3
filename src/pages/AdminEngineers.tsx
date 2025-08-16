@@ -39,6 +39,10 @@ interface Engineer {
   assigned_jobs: number;
   completed_jobs: number;
   starting_postcode: string | null;
+  service_areas?: Array<{
+    postcode_area: string;
+    max_travel_minutes: number;
+  }>;
 }
 
 export default function AdminEngineers() {
@@ -95,30 +99,32 @@ export default function AdminEngineers() {
 
       if (engineersError) throw engineersError;
 
-      // Fetch job counts for each engineer
+      // Fetch job counts and service areas for each engineer
       const engineersWithCounts = await Promise.all(
         engineersData.map(async (engineer) => {
-          const { data: assignedJobs, error: assignedError } = await supabase
-            .from('orders')
-            .select('id, engineer_signed_off_at')
-            .eq('engineer_id', engineer.id);
+          const [jobsResult, serviceAreasResult] = await Promise.all([
+            supabase
+              .from('orders')
+              .select('id, engineer_signed_off_at')
+              .eq('engineer_id', engineer.id),
+            supabase
+              .from('engineer_service_areas')
+              .select('postcode_area, max_travel_minutes')
+              .eq('engineer_id', engineer.id)
+          ]);
 
-          if (assignedError) {
-            console.error('Error fetching assigned jobs:', assignedError);
-            return {
-              ...engineer,
-              assigned_jobs: 0,
-              completed_jobs: 0
-            };
+          if (jobsResult.error) {
+            console.error('Error fetching assigned jobs:', jobsResult.error);
           }
 
-          const assigned = assignedJobs?.length || 0;
-          const completed = assignedJobs?.filter(job => job.engineer_signed_off_at).length || 0;
+          const assigned = jobsResult.data?.length || 0;
+          const completed = jobsResult.data?.filter(job => job.engineer_signed_off_at).length || 0;
 
           return {
             ...engineer,
             assigned_jobs: assigned,
-            completed_jobs: completed
+            completed_jobs: completed,
+            service_areas: serviceAreasResult.data || []
           };
         })
       );
@@ -521,6 +527,7 @@ export default function AdminEngineers() {
                     <TableHead>Engineer</TableHead>
                     <TableHead>Region</TableHead>
                     <TableHead>Starting Postcode</TableHead>
+                    <TableHead>Service Areas</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Jobs Assigned</TableHead>
                     <TableHead>Jobs Completed</TableHead>
@@ -547,6 +554,20 @@ export default function AdminEngineers() {
                         <div className="flex items-center space-x-1">
                           <MapPin className="h-3 w-3 text-muted-foreground" />
                           <span className="text-sm font-mono">{engineer.starting_postcode || 'Not set'}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          {engineer.service_areas && engineer.service_areas.length > 0 ? (
+                            engineer.service_areas.map((area, index) => (
+                              <div key={index} className="text-xs">
+                                <span className="font-mono">{area.postcode_area}</span>
+                                <span className="text-muted-foreground ml-1">({area.max_travel_minutes}min)</span>
+                              </div>
+                            ))
+                          ) : (
+                            <span className="text-xs text-muted-foreground">No areas set</span>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell>

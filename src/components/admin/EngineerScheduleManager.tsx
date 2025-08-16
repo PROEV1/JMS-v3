@@ -334,6 +334,61 @@ export function EngineerScheduleManager({ engineerId, engineerName }: EngineerSc
     }
   };
 
+  const updateServiceAreaTravelTime = async (id: string, maxTravelMinutes: number) => {
+    if (maxTravelMinutes < 1 || maxTravelMinutes > 180) return;
+    
+    try {
+      const { error } = await supabase
+        .from('engineer_service_areas')
+        .update({ max_travel_minutes: maxTravelMinutes })
+        .eq('id', id);
+
+      if (error) throw error;
+      
+      // Update local state immediately for better UX
+      setServiceAreas(areas => areas.map(area => 
+        area.id === id ? { ...area, max_travel_minutes: maxTravelMinutes } : area
+      ));
+      
+      toast({
+        title: "Travel Time Updated",
+        description: `Max travel time updated to ${maxTravelMinutes} minutes`,
+      });
+    } catch (error) {
+      console.error('Error updating travel time:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update travel time",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const deleteServiceArea = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('engineer_service_areas')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      
+      toast({
+        title: "Service Area Removed",
+        description: "Service area has been deleted successfully",
+      });
+      
+      fetchEngineerData();
+    } catch (error) {
+      console.error('Error deleting service area:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete service area",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (loading) {
     return <div>Loading engineer schedule...</div>;
   }
@@ -421,11 +476,30 @@ export function EngineerScheduleManager({ engineerId, engineerName }: EngineerSc
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {serviceAreas.map((area) => (
                 <div key={area.id} className="flex items-center justify-between p-3 border rounded">
-                  <div>
+                  <div className="flex-1">
                     <div className="font-medium">{area.postcode_area}</div>
                     <div className="text-sm text-muted-foreground">
-                      Max {area.max_travel_minutes} min travel
+                      Max travel: {area.max_travel_minutes} minutes
                     </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Input
+                      type="number"
+                      min="1"
+                      max="180"
+                      value={area.max_travel_minutes}
+                      onChange={(e) => updateServiceAreaTravelTime(area.id, parseInt(e.target.value))}
+                      className="w-20 h-8 text-center"
+                      title="Max travel minutes"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => deleteServiceArea(area.id)}
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
                   </div>
                 </div>
               ))}

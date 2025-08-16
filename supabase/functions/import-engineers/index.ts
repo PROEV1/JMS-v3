@@ -442,6 +442,31 @@ Deno.serve(async (req) => {
               result.summary.service_area_upserts++;
             }
           }
+        } else if (row.max_travel_minutes && row.starting_postcode?.trim()) {
+          // Create a default service area based on starting postcode if max_travel_minutes is provided
+          const postcodeArea = row.starting_postcode.trim().toUpperCase().replace(/\d.*/, '');
+          
+          const { error: serviceAreaError } = await supabaseAdmin
+            .from('engineer_service_areas')
+            .upsert({
+              engineer_id: engineer.id,
+              postcode_area: postcodeArea,
+              max_travel_minutes: row.max_travel_minutes
+            }, {
+              onConflict: 'engineer_id,postcode_area'
+            });
+
+          if (serviceAreaError) {
+            console.error(`Error creating default service area ${postcodeArea}:`, serviceAreaError);
+            result.summary.errors.push({ 
+              row: rowNumber, 
+              error: `Failed to create default service area: ${postcodeArea}`,
+              email 
+            });
+          } else {
+            result.summary.service_area_upserts++;
+            console.log(`Created default service area ${postcodeArea} for engineer ${email}`);
+          }
         }
 
       } catch (rowError) {
