@@ -213,6 +213,10 @@ Deno.serve(async (req) => {
               continue;
             }
 
+            // Increment counter immediately after successful user creation
+            result.summary.created_users++;
+            console.log(`Successfully created user for: ${email}`);
+
             // Create profile
             const { error: profileInsertError } = await supabaseAdmin
               .from('profiles')
@@ -242,7 +246,6 @@ Deno.serve(async (req) => {
               status: 'active'
             };
 
-            result.summary.created_users++;
             console.log(`Created user and profile for: ${email}`);
           } catch (userCreationError) {
             console.error('User creation failed:', userCreationError);
