@@ -91,30 +91,83 @@ export default function ClientQuotes() {
       
       setAcceptingQuoteId(quoteId);
       
-      // Try direct fetch instead of supabase.functions.invoke
-      const functionUrl = `https://qvppvstgconmzzjsryna.supabase.co/functions/v1/client-accept-quote`;
-      console.log('Calling function URL:', functionUrl);
-      
-      const response = await fetch(functionUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ quoteId })
-      });
+      // Get current user's client record
+      const { data: client, error: clientError } = await supabase
+        .from('clients')
+        .select('id, address')
+        .eq('user_id', session.user.id)
+        .single();
 
-      console.log('Response status:', response.status);
-      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Response error:', errorText);
-        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      if (clientError || !client) {
+        console.error('Client error:', clientError);
+        throw new Error('Client record not found');
       }
 
-      const data = await response.json();
-      console.log('Function response:', data);
+      // Get quote details
+      const { data: quote, error: quoteError } = await supabase
+        .from('quotes')
+        .select('id, status, total_cost, client_id')
+        .eq('id', quoteId)
+        .eq('client_id', client.id)
+        .single();
+
+      if (quoteError || !quote) {
+        console.error('Quote error:', quoteError);
+        throw new Error('Quote not found or access denied');
+      }
+
+      // Check if order already exists
+      const { data: existingOrder } = await supabase
+        .from('orders')
+        .select('id')
+        .eq('quote_id', quoteId)
+        .maybeSingle();
+
+      let orderId: string;
+
+      if (existingOrder) {
+        orderId = existingOrder.id;
+      } else {
+        // Create new order
+        const depositAmount = Math.round(quote.total_cost * 0.25 * 100) / 100;
+        
+        const { data: newOrder, error: orderError } = await supabase
+          .from('orders')
+          .insert({
+            client_id: client.id,
+            quote_id: quoteId,
+            total_amount: quote.total_cost,
+            deposit_amount: depositAmount,
+            job_address: client.address || null,
+            status: 'awaiting_payment',
+            order_number: 'TEMP' // Will be overridden by database trigger
+          })
+          .select('id')
+          .single();
+
+        if (orderError || !newOrder) {
+          console.error('Order creation error:', orderError);
+          throw new Error('Failed to create order');
+        }
+
+        orderId = newOrder.id;
+      }
+
+      // Accept the quote
+      if (quote.status !== 'accepted') {
+        const { error: updateError } = await supabase
+          .from('quotes')
+          .update({ 
+            status: 'accepted', 
+            accepted_at: new Date().toISOString() 
+          })
+          .eq('id', quoteId);
+
+        if (updateError) {
+          console.error('Quote update error:', updateError);
+          throw new Error('Failed to accept quote');
+        }
+      }
 
       toast({
         title: "Quote Accepted",
@@ -122,7 +175,7 @@ export default function ClientQuotes() {
       });
 
       // Redirect to the order page
-      navigate(`/client/orders/${data.orderId}`);
+      navigate(`/client/orders/${orderId}`);
     } catch (error) {
       console.error('Error accepting quote:', error);
       toast({
