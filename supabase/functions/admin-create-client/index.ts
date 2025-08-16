@@ -187,11 +187,11 @@ serve(async (req) => {
       }
     }
 
-    // Check for duplicate clients before creating
+    // Check for duplicate clients before creating (case-insensitive email check)
     const { data: existingClient, error: clientCheckError } = await supabaseAdmin
       .from('clients')
       .select('id')
-      .or(`user_id.eq.${userId},email.eq.${normalizedEmail}`)
+      .or(`user_id.eq.${userId},email.ilike.${normalizedEmail}`)
       .maybeSingle();
       
     if (clientCheckError) {

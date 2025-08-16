@@ -52,7 +52,22 @@ export const CreateClientModal = ({ isOpen, onClose, onSuccess }: CreateClientMo
 
       if (error) {
         console.error('Error creating client:', error);
-        throw new Error(error.message || 'Failed to create client');
+        
+        // Parse specific error message from FunctionsHttpError
+        let errorMessage = 'Failed to create client';
+        if (error.name === 'FunctionsHttpError') {
+          try {
+            const errorDetail = await error.context.json();
+            errorMessage = errorDetail.error || errorMessage;
+          } catch (parseError) {
+            console.warn('Could not parse error detail:', parseError);
+            errorMessage = error.message || errorMessage;
+          }
+        } else {
+          errorMessage = error.message || errorMessage;
+        }
+        
+        throw new Error(errorMessage);
       }
 
       console.log('Client created successfully:', data);
