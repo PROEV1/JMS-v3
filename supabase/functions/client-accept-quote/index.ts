@@ -89,7 +89,7 @@ serve(async (req) => {
     // Get client record for this user
     const { data: client, error: clientError } = await supabaseAdmin
       .from('clients')
-      .select('id, address')
+      .select('id, address, postcode')
       .eq('user_id', user.id)
       .single()
 
@@ -157,6 +157,7 @@ serve(async (req) => {
           total_amount: quote.total_cost,
           deposit_amount: depositAmount,
           job_address: client.address || null,
+          postcode: client.postcode || null,
           status: 'awaiting_payment'
         })
         .select('id')

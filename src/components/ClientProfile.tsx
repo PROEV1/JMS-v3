@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+import { normalizePostcode } from '@/utils/postcodeUtils';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
@@ -157,7 +158,7 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({
         email: editData.email,
         phone: editData.phone,
         address: editData.address,
-        postcode: editData.postcode
+        postcode: normalizePostcode(editData.postcode || '') || null
       };
 
       const { error } = await supabase
@@ -284,7 +285,7 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({
                       <label className="text-sm font-medium">Postcode</label>
                       <Input
                         value={editData.postcode || ''}
-                        onChange={(e) => setEditData({ ...editData, postcode: e.target.value })}
+                        onChange={(e) => setEditData({ ...editData, postcode: e.target.value.toUpperCase() })}
                         placeholder="Postcode"
                       />
                     </div>

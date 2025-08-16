@@ -414,7 +414,7 @@ export function EngineerScheduleManager({ engineerId, engineerName }: EngineerSc
               <Input
                 id="startingPostcode"
                 value={startingPostcode}
-                onChange={(e) => setStartingPostcode(e.target.value)}
+                onChange={(e) => setStartingPostcode(e.target.value.toUpperCase())}
                 placeholder="e.g., SW1A 1AA"
               />
             </div>
@@ -445,7 +445,7 @@ export function EngineerScheduleManager({ engineerId, engineerName }: EngineerSc
                     <Input
                       id="postcodeArea"
                       value={serviceAreaForm.postcode_area}
-                      onChange={(e) => setServiceAreaForm(prev => ({ ...prev, postcode_area: e.target.value }))}
+                      onChange={(e) => setServiceAreaForm(prev => ({ ...prev, postcode_area: e.target.value.toUpperCase() }))}
                       placeholder="e.g., SW1, E1, N1"
                     />
                   </div>

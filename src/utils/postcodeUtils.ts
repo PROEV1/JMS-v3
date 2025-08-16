@@ -34,13 +34,14 @@ export function extractPostcodeFromAddress(address: string): string | null {
 
 /**
  * Gets the best available postcode from multiple sources
- * Priority: order.postcode → client.address → order.job_address
+ * Priority: order.postcode → client.postcode → client.address → order.job_address
  */
 export function getBestPostcode(order: {
   postcode?: string;
   job_address?: string;
   client?: {
     address?: string;
+    postcode?: string;
   };
 }): string | null {
   // 1. Try order.postcode first
@@ -48,7 +49,12 @@ export function getBestPostcode(order: {
     return normalizePostcode(order.postcode);
   }
   
-  // 2. Try extracting from client.address
+  // 2. Try client.postcode directly
+  if (order.client?.postcode) {
+    return normalizePostcode(order.client.postcode);
+  }
+  
+  // 3. Try extracting from client.address
   if (order.client?.address) {
     const extracted = extractPostcodeFromAddress(order.client.address);
     if (extracted) {
@@ -56,7 +62,7 @@ export function getBestPostcode(order: {
     }
   }
   
-  // 3. Try extracting from order.job_address
+  // 4. Try extracting from order.job_address
   if (order.job_address) {
     const extracted = extractPostcodeFromAddress(order.job_address);
     if (extracted) {
@@ -75,6 +81,7 @@ export function getLocationDisplayText(order: {
   job_address?: string;
   client?: {
     address?: string;
+    postcode?: string;
   };
 }): string {
   const postcode = getBestPostcode(order);

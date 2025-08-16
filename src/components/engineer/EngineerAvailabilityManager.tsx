@@ -238,7 +238,7 @@ export function EngineerAvailabilityManager() {
               <Input
                 id="startingPostcode"
                 value={startingPostcode}
-                onChange={(e) => setStartingPostcode(e.target.value)}
+                onChange={(e) => setStartingPostcode(e.target.value.toUpperCase())}
                 placeholder="e.g., SW1A 1AA"
               />
             </div>

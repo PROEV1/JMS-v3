@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { normalizePostcode } from "@/utils/postcodeUtils";
 import { 
   User, 
   Mail, 
@@ -26,6 +27,7 @@ interface ClientDetailsProps {
       email: string;
       phone?: string | null;
       address: string | null;
+      postcode?: string | null;
     };
   };
   onUpdate: () => void;
@@ -35,51 +37,26 @@ export function ClientDetailsSection({ order, onUpdate }: ClientDetailsProps) {
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  // Parse address into components for better editing
-  const parseAddress = (address: string | null) => {
-    if (!address) return { street: '', city: '', postcode: '' };
-    
-    // Simple parsing - you might want to make this more sophisticated
-    const parts = address.split(',').map(p => p.trim());
-    if (parts.length >= 3) {
-      return {
-        street: parts.slice(0, -2).join(', '),
-        city: parts[parts.length - 2],
-        postcode: parts[parts.length - 1]
-      };
-    }
-    return { street: address, city: '', postcode: '' };
-  };
 
   const [editData, setEditData] = useState({
     full_name: order.client.full_name,
     email: order.client.email,
     phone: order.client.phone || '',
-    address: order.client.address || ''
+    address: order.client.address || '',
+    postcode: order.client.postcode || ''
   });
-
-  // Separate state for address components during editing
-  const [addressComponents, setAddressComponents] = useState(() => 
-    parseAddress(order.client.address)
-  );
 
   const handleSave = async () => {
     setIsLoading(true);
     try {
-      // Reconstruct address from components
-      const reconstructedAddress = [
-        addressComponents.street, 
-        addressComponents.city, 
-        addressComponents.postcode
-      ].filter(p => p && p.trim()).join(', ');
-
       const { error } = await supabase
         .from('clients')
         .update({
           full_name: editData.full_name,
           email: editData.email,
           phone: editData.phone || null,
-          address: reconstructedAddress || null
+          address: editData.address || null,
+          postcode: normalizePostcode(editData.postcode) || null
         })
         .eq('id', order.client.id);
 
@@ -109,14 +86,10 @@ export function ClientDetailsSection({ order, onUpdate }: ClientDetailsProps) {
       full_name: order.client.full_name,
       email: order.client.email,
       phone: order.client.phone || '',
-      address: order.client.address || ''
+      address: order.client.address || '',
+      postcode: order.client.postcode || ''
     });
-    setAddressComponents(parseAddress(order.client.address));
     setIsEditing(false);
-  };
-
-  const updateAddressComponent = (field: string, value: string) => {
-    setAddressComponents(prev => ({ ...prev, [field]: value }));
   };
 
   return (
@@ -185,26 +158,25 @@ export function ClientDetailsSection({ order, onUpdate }: ClientDetailsProps) {
               />
             </div>
 
-            {/* Address Fields */}
-            <div className="space-y-3">
+            {/* Address */}
+            <div>
               <label className="text-sm font-medium">Address</label>
-              <Input
-                value={addressComponents.street}
-                onChange={(e) => updateAddressComponent('street', e.target.value)}
-                placeholder="Street address"
+              <Textarea
+                value={editData.address}
+                onChange={(e) => setEditData(prev => ({ ...prev, address: e.target.value }))}
+                placeholder="Street address, town, city"
+                rows={2}
               />
-              <div className="grid grid-cols-2 gap-3">
-                <Input
-                  value={addressComponents.city}
-                  onChange={(e) => updateAddressComponent('city', e.target.value)}
-                  placeholder="City"
-                />
-                <Input
-                  value={addressComponents.postcode}
-                  onChange={(e) => updateAddressComponent('postcode', e.target.value)}
-                  placeholder="Postcode"
-                />
-              </div>
+            </div>
+
+            {/* Postcode */}
+            <div>
+              <label className="text-sm font-medium">Postcode</label>
+              <Input
+                value={editData.postcode}
+                onChange={(e) => setEditData(prev => ({ ...prev, postcode: e.target.value.toUpperCase() }))}
+                placeholder="e.g. SW1A 1AA"
+              />
             </div>
           </div>
         ) : (
@@ -241,6 +213,12 @@ export function ClientDetailsSection({ order, onUpdate }: ClientDetailsProps) {
               <div className="flex items-start gap-2">
                 <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
                 <span className="text-sm">{order.client.address}</span>
+              </div>
+            )}
+
+            {order.client.postcode && (
+              <div className="flex items-center gap-2">
+                <Badge variant="outline">{order.client.postcode}</Badge>
               </div>
             )}
 
