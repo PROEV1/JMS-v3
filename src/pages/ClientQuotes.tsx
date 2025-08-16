@@ -91,13 +91,30 @@ export default function ClientQuotes() {
       
       setAcceptingQuoteId(quoteId);
       
-      const { data, error } = await supabase.functions.invoke('client-accept-quote', {
-        body: { quoteId }
+      // Try direct fetch instead of supabase.functions.invoke
+      const functionUrl = `https://qvppvstgconmzzjsryna.supabase.co/functions/v1/client-accept-quote`;
+      console.log('Calling function URL:', functionUrl);
+      
+      const response = await fetch(functionUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ quoteId })
       });
 
-      console.log('Function response:', { data, error });
+      console.log('Response status:', response.status);
+      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Response error:', errorText);
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
 
-      if (error) throw error;
+      const data = await response.json();
+      console.log('Function response:', data);
 
       toast({
         title: "Quote Accepted",
@@ -110,7 +127,7 @@ export default function ClientQuotes() {
       console.error('Error accepting quote:', error);
       toast({
         title: "Error",
-        description: "Failed to accept quote. Please try logging in again.",
+        description: `Failed to accept quote: ${error.message}`,
         variant: "destructive",
       });
       setAcceptingQuoteId(null);
