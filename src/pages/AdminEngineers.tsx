@@ -38,6 +38,7 @@ interface Engineer {
   user_id: string | null;
   assigned_jobs: number;
   completed_jobs: number;
+  starting_postcode: string | null;
 }
 
 export default function AdminEngineers() {
@@ -519,6 +520,7 @@ export default function AdminEngineers() {
                   <TableRow>
                     <TableHead>Engineer</TableHead>
                     <TableHead>Region</TableHead>
+                    <TableHead>Starting Postcode</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Jobs Assigned</TableHead>
                     <TableHead>Jobs Completed</TableHead>
@@ -539,6 +541,12 @@ export default function AdminEngineers() {
                         <div className="flex items-center space-x-1">
                           <MapPin className="h-3 w-3 text-muted-foreground" />
                           <span>{engineer.region || 'Not set'}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-1">
+                          <MapPin className="h-3 w-3 text-muted-foreground" />
+                          <span className="text-sm font-mono">{engineer.starting_postcode || 'Not set'}</span>
                         </div>
                       </TableCell>
                       <TableCell>

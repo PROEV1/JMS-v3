@@ -368,6 +368,41 @@ export function EngineerScheduleManager({ engineerId, engineerName }: EngineerSc
         </CardContent>
       </Card>
 
+      {/* Working Hours */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Clock className="h-5 w-5" />
+            <span>Working Hours</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {workingHours.length === 0 ? (
+            <p className="text-muted-foreground">Default working hours: 9:00 AM - 5:00 PM, Monday to Friday</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {DAYS.map((day, index) => {
+                const dayHours = workingHours.find(wh => wh.day_of_week === index);
+                return (
+                  <div key={index} className="flex items-center justify-between p-3 border rounded">
+                    <div className="font-medium">{day}</div>
+                    <div className="text-sm">
+                      {dayHours && dayHours.is_available ? (
+                        <span className="text-green-600">
+                          {dayHours.start_time} - {dayHours.end_time}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">Not available</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Time Off Requests */}
       <Card>
         <CardHeader>
