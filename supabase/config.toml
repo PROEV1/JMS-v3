@@ -2,6 +2,3 @@ project_id = "qvppvstgconmzzjsryna"
 
 [functions.client-accept-quote]
 verify_jwt = false
-
-[functions.import-engineers]
-verify_jwt = false

@@ -70,16 +70,68 @@ Deno.serve(async (req) => {
     });
   }
 
-  const supabase = createClient(
+  // Create supabase client for service operations
+  const supabaseAdmin = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   );
 
-  try {
-    console.log('Processing engineer import request - verify_jwt disabled');
+  // Create client for user auth validation
+  const supabaseAuth = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+  );
 
-    // Skip auth check for now to test CORS
-    // TODO: Implement proper auth validation
+  try {
+    console.log('Processing engineer import request with JWT validation');
+
+    // Get the authorization header
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader) {
+      console.log('No authorization header provided');
+      return new Response(JSON.stringify({ 
+        error: 'Authorization required',
+        message: 'Please log in to import engineers' 
+      }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Extract and validate the JWT token
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token);
+    
+    if (authError || !user) {
+      console.log('Invalid token or user not found:', authError);
+      return new Response(JSON.stringify({ 
+        error: 'Invalid authentication',
+        message: 'Please log in again' 
+      }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Check if user has admin role
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .select('role')
+      .eq('user_id', user.id)
+      .single();
+
+    if (profileError || !profile || profile.role !== 'admin') {
+      console.log('User is not admin:', user.email, profile?.role);
+      return new Response(JSON.stringify({ 
+        error: 'Access denied',
+        message: 'Admin access required for engineer import' 
+      }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    console.log('Admin user validated:', user.email);
 
     const body: ImportRequest = await req.json();
     const { rows, create_missing_users = false } = body;
@@ -123,7 +175,7 @@ Deno.serve(async (req) => {
 
         // Look up existing profile by email
         let profile = null;
-        const { data: existingProfiles, error: profileLookupError } = await supabase
+        const { data: existingProfiles, error: profileLookupError } = await supabaseAdmin
           .from('profiles')
           .select('user_id, full_name, email, role, status')
           .eq('email', email)
@@ -144,7 +196,7 @@ Deno.serve(async (req) => {
         // Create user if needed and requested
         if (!profile && create_missing_users) {
           try {
-            const { data: newUser, error: createUserError } = await supabase.auth.admin.createUser({
+            const { data: newUser, error: createUserError } = await supabaseAdmin.auth.admin.createUser({
               email: email,
               email_confirm: true,
               user_metadata: {
@@ -163,7 +215,7 @@ Deno.serve(async (req) => {
             }
 
             // Create profile
-            const { error: profileInsertError } = await supabase
+            const { error: profileInsertError } = await supabaseAdmin
               .from('profiles')
               .insert({
                 user_id: newUser.user!.id,
@@ -205,7 +257,7 @@ Deno.serve(async (req) => {
         }
 
         // Get or create engineer record
-        const { data: existingEngineers, error: engineerLookupError } = await supabase
+        const { data: existingEngineers, error: engineerLookupError } = await supabaseAdmin
           .from('engineers')
           .select('id, user_id')
           .eq('email', email)
@@ -225,7 +277,7 @@ Deno.serve(async (req) => {
 
         if (engineer) {
           // Update existing engineer
-          const { error: updateError } = await supabase
+          const { error: updateError } = await supabaseAdmin
             .from('engineers')
             .update({
               name: row.full_name || email.split('@')[0],
@@ -251,7 +303,7 @@ Deno.serve(async (req) => {
           console.log(`Updated engineer: ${email}`);
         } else {
           // Create new engineer
-          const { data: newEngineer, error: createError } = await supabase
+          const { data: newEngineer, error: createError } = await supabaseAdmin
             .from('engineers')
             .insert({
               name: row.full_name || email.split('@')[0],
@@ -312,7 +364,7 @@ Deno.serve(async (req) => {
             }
 
             // Upsert availability
-            const { error: availabilityError } = await supabase
+            const { error: availabilityError } = await supabaseAdmin
               .from('engineer_availability')
               .upsert({
                 engineer_id: engineer.id,
@@ -336,7 +388,7 @@ Deno.serve(async (req) => {
             }
           } else if (!isAvailable) {
             // Mark as unavailable
-            const { error: availabilityError } = await supabase
+            const { error: availabilityError } = await supabaseAdmin
               .from('engineer_availability')
               .upsert({
                 engineer_id: engineer.id,
@@ -363,7 +415,7 @@ Deno.serve(async (req) => {
             .filter(area => area.length > 0);
 
           for (const area of areas) {
-            const { error: serviceAreaError } = await supabase
+            const { error: serviceAreaError } = await supabaseAdmin
               .from('engineer_service_areas')
               .upsert({
                 engineer_id: engineer.id,
