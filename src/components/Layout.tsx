@@ -31,17 +31,26 @@ export default function Layout({ children }: LayoutProps) {
   const fetchUserRole = async () => {
     try {
       console.log('Layout: Fetching role for user:', user?.id);
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('profiles')
-        .select('role')
+        .select('role, status')
         .eq('user_id', user?.id)
-        .single();
+        .maybeSingle();
+      
+      if (error) {
+        console.error('Layout: Database error fetching user role:', error);
+        setUserRole('client'); // Default to client on error
+        return;
+      }
       
       console.log('Layout: User profile data:', data);
       
-      if (data) {
+      if (data && data.status === 'active') {
         setUserRole(data.role);
         console.log('Layout: Set user role to:', data.role);
+      } else {
+        console.log('Layout: No active profile found, defaulting to client');
+        setUserRole('client');
       }
     } catch (error) {
       console.error('Layout: Error fetching user role:', error);
