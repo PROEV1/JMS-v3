@@ -69,34 +69,33 @@ Deno.serve(async (req) => {
   try {
     console.log('Processing engineer import request');
 
-    // Since verify_jwt = false, we'll do a simpler auth check
-    // First try to get user from authorization header if present
-    let isAdmin = false;
+    // Get the user from the JWT (handled by Supabase with verify_jwt = true)
     const authHeader = req.headers.get('Authorization');
-    
-    if (authHeader) {
-      try {
-        const token = authHeader.replace('Bearer ', '');
-        const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-        
-        if (!authError && user) {
-          const { data: profile, error: profileError } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('user_id', user.id)
-            .single();
-
-          isAdmin = !profileError && profile?.role === 'admin';
-        }
-      } catch (error) {
-        console.error('Auth validation error:', error);
-        // Continue with isAdmin = false
-      }
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'No authorization header' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
-    // Since this is a public function (verify_jwt = false), we need some form of validation
-    // For now, we'll require admin access but handle auth more gracefully
-    if (!isAdmin) {
+    // Verify user is admin
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: 'Invalid token' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('user_id', user.id)
+      .single();
+
+    if (profileError || profile?.role !== 'admin') {
       return new Response(JSON.stringify({ error: 'Admin access required' }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
