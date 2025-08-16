@@ -140,7 +140,7 @@ export default function ClientQuotes() {
             deposit_amount: depositAmount,
             job_address: client.address || null,
             status: 'awaiting_payment',
-            order_number: 'TEMP' // Will be overridden by database trigger
+            order_number: '' // Will be set by database trigger
           })
           .select('id')
           .single();
