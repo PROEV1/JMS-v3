@@ -132,38 +132,13 @@ export const getSmartEngineerRecommendations = async (order: Order, postcode?: s
     // Get scheduling settings
     const settings = await getSchedulingSettings();
     
-    // Try to find postcode from multiple sources
-    let finalPostcode = postcode || order.postcode;
+    // Use the passed postcode or fallback to getBestPostcode
+    let finalPostcode = postcode;
     
     if (!finalPostcode) {
-      // Try to get postcode from client data
-      try {
-        const { data: clientData, error: clientError } = await supabase
-          .from('clients')
-          .select('address')
-          .eq('id', order.client_id)
-          .single();
-        
-        if (clientError) throw clientError;
-        
-        // Try to extract postcode from client address
-        if (clientData?.address) {
-          const postcodeMatch = clientData.address.match(/([A-Z]{1,2}[0-9O][A-Z0-9O]?\s?[0-9O][A-Z]{2})/i);
-          if (postcodeMatch) {
-            finalPostcode = postcodeMatch[1].replace(/\s/g, ' ').replace(/O/g, '0').toUpperCase();
-          }
-        }
-      } catch (error) {
-        console.warn('Could not fetch client data for postcode:', error);
-      }
-    }
-    
-    if (!finalPostcode && order.job_address) {
-      // Try to extract postcode from job address
-      const postcodeMatch = order.job_address.match(/([A-Z]{1,2}[0-9O][A-Z0-9O]?\s?[0-9O][A-Z]{2})/i);
-      if (postcodeMatch) {
-        finalPostcode = postcodeMatch[1].replace(/\s/g, ' ').replace(/O/g, '0').toUpperCase();
-      }
+      // Import getBestPostcode dynamically to avoid circular imports
+      const { getBestPostcode } = await import('@/utils/postcodeUtils');
+      finalPostcode = getBestPostcode(order);
     }
     
     if (!finalPostcode) {

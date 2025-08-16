@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Calendar } from '@/components/ui/calendar';
 import { Order, Engineer, getSmartEngineerRecommendations } from '@/utils/schedulingUtils';
+import { getBestPostcode } from '@/utils/postcodeUtils';
 import { MapPin, Clock, User, AlertTriangle, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -53,7 +54,7 @@ export function SmartAssignmentModal({
     const loadSuggestions = async () => {
       setLoading(true);
       try {
-        const result = await getSmartEngineerRecommendations(order, order.postcode);
+        const result = await getSmartEngineerRecommendations(order, getBestPostcode(order));
         setSuggestions(result.recommendations);
         
         // Auto-select the first available date if no date is selected

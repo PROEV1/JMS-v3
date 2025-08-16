@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { Order, Engineer, getSmartEngineerRecommendations, clearDistanceCache } from '@/utils/schedulingUtils';
-import { getLocationDisplayText } from '@/utils/postcodeUtils';
+import { getLocationDisplayText, getBestPostcode } from '@/utils/postcodeUtils';
 import { MapPin, Clock, User, Star, Zap, CheckCircle, X, RefreshCw } from 'lucide-react';
 
 interface EngineerSuggestion {
@@ -46,7 +46,7 @@ export function EngineerRecommendationPanel({
     setDebugInfo(`Job: ${order.order_number} | Checking postcode sources...`);
     
     try {
-      const result = await getSmartEngineerRecommendations(order, order.postcode);
+      const result = await getSmartEngineerRecommendations(order, getBestPostcode(order));
       setSuggestions(result.recommendations);
       setSettings(result.settings);
       
