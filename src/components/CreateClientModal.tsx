@@ -39,16 +39,40 @@ export const CreateClientModal = ({ isOpen, onClose, onSuccess }: CreateClientMo
         return;
       }
 
-      // Create client using the admin function v2
-      const { data, error } = await supabase.functions.invoke('admin-create-client-v2', {
-        body: {
-          full_name: formData.full_name.trim(),
-          email: formData.email.trim(),
-          phone: formData.phone.trim() || null,
-          address: formData.address.trim() || null,
-          postcode: formData.postcode.trim() || null
-        }
-      });
+      // Try v2 first, fallback to v1 if needed
+      let data, error;
+      
+      try {
+        console.log('Attempting to create client with admin-create-client-v2');
+        const response = await supabase.functions.invoke('admin-create-client-v2', {
+          body: {
+            full_name: formData.full_name.trim(),
+            email: formData.email.trim(),
+            phone: formData.phone.trim() || null,
+            address: formData.address.trim() || null,
+            postcode: formData.postcode.trim() || null
+          }
+        });
+        
+        data = response.data;
+        error = response.error;
+      } catch (v2Error) {
+        console.log('V2 failed, trying v1 fallback:', v2Error);
+        
+        // Fallback to v1 if v2 is not deployed
+        const response = await supabase.functions.invoke('admin-create-client', {
+          body: {
+            full_name: formData.full_name.trim(),
+            email: formData.email.trim(),
+            phone: formData.phone.trim() || null,
+            address: formData.address.trim() || null,
+            postcode: formData.postcode.trim() || null
+          }
+        });
+        
+        data = response.data;
+        error = response.error;
+      }
 
       if (error) {
         console.error('Error creating client:', error);

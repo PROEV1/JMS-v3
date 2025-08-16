@@ -55,7 +55,7 @@ serve(async (req) => {
     }
 
     console.log("Validating admin role for user:", userData.user.id);
-    console.log("Function v2 - Fixed getUsersByEmail deployment issue");
+    console.log("Function v1 - Force Deploy 20250116a - Enhanced Robustness");
 
     // Check if user is admin using service role to avoid RLS issues
     const { data: profile, error: profileError } = await supabaseAdmin
