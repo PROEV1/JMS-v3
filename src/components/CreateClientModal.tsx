@@ -102,7 +102,7 @@ export const CreateClientModal = ({ isOpen, onClose, onSuccess }: CreateClientMo
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create New Client</DialogTitle>
         </DialogHeader>
