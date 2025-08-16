@@ -4,4 +4,4 @@ project_id = "qvppvstgconmzzjsryna"
 verify_jwt = false
 
 [functions.import-engineers]
-verify_jwt = false
+verify_jwt = true
