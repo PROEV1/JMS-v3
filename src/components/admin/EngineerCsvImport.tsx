@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
@@ -250,6 +250,9 @@ jane.smith@example.com,Jane Smith,Manchester,true,M1 1AA,true,08:00,16:00,true,0
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Import Engineers from CSV</DialogTitle>
+          <DialogDescription>
+            Upload a CSV file to import engineer data, schedules, and service areas into the system.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6">
