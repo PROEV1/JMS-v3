@@ -190,11 +190,16 @@ jane.smith@example.com,Jane Smith,Manchester,true,M1 1AA,true,08:00,16:00,true,0
         setImportProgress(prev => Math.min(prev + 10, 90));
       }, 500);
 
+      // Get session token for authentication fallback
+      const session = (await supabase.auth.getSession()).data.session;
+      const token = session?.access_token ?? '';
+
       const { data, error } = await supabase.functions.invoke('import-engineers', {
         body: {
           rows: csvData,
           create_missing_users: createMissingUsers
-        }
+        },
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
 
       clearInterval(progressInterval);
