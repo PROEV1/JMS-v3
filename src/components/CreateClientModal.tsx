@@ -39,8 +39,8 @@ export const CreateClientModal = ({ isOpen, onClose, onSuccess }: CreateClientMo
         return;
       }
 
-      // Create client using the admin function
-      const { data, error } = await supabase.functions.invoke('admin-create-client', {
+      // Create client using the admin function v2
+      const { data, error } = await supabase.functions.invoke('admin-create-client-v2', {
         body: {
           full_name: formData.full_name.trim(),
           email: formData.email.trim(),
