@@ -104,19 +104,20 @@ export default function ClientQuoteDetail() {
 
     try {
       setAccepting(true);
-      const { error } = await supabase
-        .from('quotes')
-        .update({ status: 'accepted', accepted_at: new Date().toISOString() })
-        .eq('id', quote.id);
+      
+      const { data, error } = await supabase.functions.invoke('client-accept-quote', {
+        body: { quoteId: quote.id }
+      });
 
       if (error) throw error;
 
-      toast.success('Quote accepted successfully!');
-      setQuote({ ...quote, status: 'accepted' });
+      toast.success('Quote accepted! Redirecting to your order...');
+      
+      // Redirect to the order page
+      navigate(`/client/orders/${data.orderId}`);
     } catch (error) {
       console.error('Error accepting quote:', error);
       toast.error('Failed to accept quote');
-    } finally {
       setAccepting(false);
     }
   };

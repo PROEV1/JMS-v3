@@ -23,6 +23,7 @@ interface Quote {
 export default function ClientQuotes() {
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
+  const [acceptingQuoteId, setAcceptingQuoteId] = useState<string | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -71,19 +72,21 @@ export default function ClientQuotes() {
 
   const handleAcceptQuote = async (quoteId: string) => {
     try {
-      const { error } = await supabase
-        .from('quotes')
-        .update({ status: 'accepted', accepted_at: new Date().toISOString() })
-        .eq('id', quoteId);
+      setAcceptingQuoteId(quoteId);
+      
+      const { data, error } = await supabase.functions.invoke('client-accept-quote', {
+        body: { quoteId }
+      });
 
       if (error) throw error;
 
       toast({
         title: "Quote Accepted",
-        description: "Your quote has been accepted and an order will be created.",
+        description: "Redirecting to your order...",
       });
 
-      fetchQuotes();
+      // Redirect to the order page
+      navigate(`/client/orders/${data.orderId}`);
     } catch (error) {
       console.error('Error accepting quote:', error);
       toast({
@@ -91,6 +94,7 @@ export default function ClientQuotes() {
         description: "Failed to accept quote",
         variant: "destructive",
       });
+      setAcceptingQuoteId(null);
     }
   };
 
@@ -226,9 +230,17 @@ export default function ClientQuotes() {
                         <Button
                           size="sm"
                           onClick={() => handleAcceptQuote(quote.id)}
+                          disabled={acceptingQuoteId === quote.id}
                           className="bg-green-600 hover:bg-green-700"
                         >
-                          Accept
+                          {acceptingQuoteId === quote.id ? (
+                            <div className="flex items-center">
+                              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-2"></div>
+                              Accepting...
+                            </div>
+                          ) : (
+                            'Accept'
+                          )}
                         </Button>
                         <Button
                           variant="outline"
