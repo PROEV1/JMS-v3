@@ -124,11 +124,15 @@ jane.smith@example.com,Jane Smith,Manchester,true,M1 1AA,true,08:00,16:00,true,0
         const data = results.data as CsvRow[];
         setCsvData(data);
         
-        // Validate data
+        // Validate data and filter valid rows
         const errors: string[] = [];
+        const validRows: CsvRow[] = [];
+        
         data.forEach((row, index) => {
+          const rowErrors: string[] = [];
+          
           if (!row.email) {
-            errors.push(`Row ${index + 1}: Email is required`);
+            rowErrors.push(`Row ${index + 1}: Email is required`);
           }
           
           // Validate time formats
@@ -141,15 +145,23 @@ jane.smith@example.com,Jane Smith,Manchester,true,M1 1AA,true,08:00,16:00,true,0
             if (row[availableKey] && row[startKey] && row[endKey]) {
               const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
               if (!timeRegex.test(row[startKey] as string)) {
-                errors.push(`Row ${index + 1}: Invalid ${day}_start time format (use HH:MM)`);
+                rowErrors.push(`Row ${index + 1}: Invalid ${day}_start time format (use HH:MM)`);
               }
               if (!timeRegex.test(row[endKey] as string)) {
-                errors.push(`Row ${index + 1}: Invalid ${day}_end time format (use HH:MM)`);
+                rowErrors.push(`Row ${index + 1}: Invalid ${day}_end time format (use HH:MM)`);
               }
             }
           });
+          
+          if (rowErrors.length === 0) {
+            validRows.push(row);
+          } else {
+            errors.push(...rowErrors);
+          }
         });
         
+        // Set the filtered valid data for import
+        setCsvData(validRows);
         setValidationErrors(errors);
       },
       error: (error) => {
@@ -172,13 +184,13 @@ jane.smith@example.com,Jane Smith,Manchester,true,M1 1AA,true,08:00,16:00,true,0
       return;
     }
 
+    // Show warning about skipped rows but proceed with valid rows
     if (validationErrors.length > 0) {
       toast({
-        title: "Validation Errors",
-        description: "Please fix validation errors before importing",
-        variant: "destructive",
+        title: "Validation Warnings",
+        description: `${validationErrors.length} rows will be skipped due to validation errors. Importing ${csvData.length} valid rows.`,
+        variant: "default",
       });
-      return;
     }
 
     setIsImporting(true);
@@ -427,7 +439,7 @@ jane.smith@example.com,Jane Smith,Manchester,true,M1 1AA,true,08:00,16:00,true,0
             </Button>
             <Button 
               onClick={handleImport}
-              disabled={!csvData.length || validationErrors.length > 0 || isImporting}
+              disabled={!csvData.length || isImporting}
             >
               <Upload className="h-4 w-4 mr-2" />
               {isImporting ? 'Importing...' : 'Import Engineers'}
