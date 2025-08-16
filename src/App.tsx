@@ -1,45 +1,50 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { AuthProvider } from "@/hooks/useAuth";
 import Layout from "@/components/Layout";
 
-import Dashboard from "./pages/Dashboard";
-import ClientDashboard from "./pages/ClientDashboard";
-import Admin from "./pages/Admin";
-import AdminProducts from "./pages/AdminProducts";
-import AdminClients from "./pages/AdminClients";
-import AdminQuotes from "./pages/AdminQuotes";
-import AdminOrders from "./pages/AdminOrders";
-import AdminEngineers from "./pages/AdminEngineers";
-import AdminQuoteDetail from "./pages/AdminQuoteDetail";
-import AdminQuoteCreate from "./pages/AdminQuoteCreate";
-import AdminQuoteEdit from "./pages/AdminQuoteEdit";
-import AdminLeads from "./pages/AdminLeads";
-import ClientProfilePage from "./pages/ClientProfilePage";
-import EngineerDashboard from "./pages/EngineerDashboard";
-import EngineerJobDetail from "./pages/EngineerJobDetail";
-import EngineerProfile from "./pages/EngineerProfile";
-import Auth from "./pages/Auth";
-import SetupPassword from "./pages/SetupPassword";
-import AdminMessages from "./pages/AdminMessages";
-import AdminSettings from "./pages/AdminSettings";
-import AdminUsers from "./pages/AdminUsers";
-import AdminClientUsers from "./pages/AdminClientUsers";
-import AdminUserDetail from "./pages/AdminUserDetail";
-import AdminUserInvite from "./pages/AdminUserInvite";
-import OrderDetail from "./pages/OrderDetail";
-import PublicQuoteView from "./pages/PublicQuoteView";
-import EnhancedClientOrderView from "./pages/EnhancedClientOrderView";
-import AdminSchedule from "./pages/AdminSchedule";
-import ClientDateBlocking from "./pages/ClientDateBlocking";
-import EngineerAvailability from "./pages/EngineerAvailability";
-import NotFound from "./pages/NotFound";
+import Dashboard from "@/pages/Dashboard";
+import Admin from "@/pages/Admin";
+import ClientDashboard from "@/pages/ClientDashboard";
+import ClientQuotes from "@/pages/ClientQuotes";
+import ClientOrders from "@/pages/ClientOrders";
+import ClientMessages from "@/pages/ClientMessages";
+import ClientPayments from "@/pages/ClientPayments";
+import ClientDocuments from "@/pages/ClientDocuments";
+import ClientProfileSelf from "@/pages/ClientProfileSelf";
+import ClientDateBlocking from "@/pages/ClientDateBlocking";
+import EnhancedClientOrderView from "@/pages/EnhancedClientOrderView";
+import EngineerDashboard from "@/pages/EngineerDashboard";
+import EngineerProfile from "@/pages/EngineerProfile";
+import EngineerAvailability from "@/pages/EngineerAvailability";
+import EngineerJobDetail from "@/pages/EngineerJobDetail";
+import ClientProfilePage from "@/pages/ClientProfilePage";
+import AdminOrders from "@/pages/AdminOrders";
+import AdminSchedule from "@/pages/AdminSchedule";
+import AdminEngineers from "@/pages/AdminEngineers";
+import AdminProducts from "@/pages/AdminProducts";
+import AdminClients from "@/pages/AdminClients";
+import AdminLeads from "@/pages/AdminLeads";
+import AdminQuotes from "@/pages/AdminQuotes";
+import AdminQuoteCreate from "@/pages/AdminQuoteCreate";
+import AdminQuoteEdit from "@/pages/AdminQuoteEdit";
+import AdminQuoteDetail from "@/pages/AdminQuoteDetail";
+import AdminMessages from "@/pages/AdminMessages";
+import AdminUsers from "@/pages/AdminUsers";
+import AdminClientUsers from "@/pages/AdminClientUsers";
+import AdminUserInvite from "@/pages/AdminUserInvite";
+import AdminUserDetail from "@/pages/AdminUserDetail";
+import AdminSettings from "@/pages/AdminSettings";
+import OrderDetail from "@/pages/OrderDetail";
+import PublicQuoteView from "@/pages/PublicQuoteView";
+import Auth from "@/pages/Auth";
+import SetupPassword from "@/pages/SetupPassword";
+import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
 
@@ -56,6 +61,12 @@ const App = () => (
             <Route path="/auth/setup-password" element={<SetupPassword />} />
             <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
             <Route path="/client" element={<Layout><ClientDashboard /></Layout>} />
+            <Route path="/client/quotes" element={<Layout><ClientQuotes /></Layout>} />
+            <Route path="/client/orders" element={<Layout><ClientOrders /></Layout>} />
+            <Route path="/client/messages" element={<Layout><ClientMessages /></Layout>} />
+            <Route path="/client/payments" element={<Layout><ClientPayments /></Layout>} />
+            <Route path="/client/documents" element={<Layout><ClientDocuments /></Layout>} />
+            <Route path="/client/profile" element={<Layout><ClientProfileSelf /></Layout>} />
             <Route path="/client/date-blocking" element={<Layout><ClientDateBlocking /></Layout>} />
             <Route path="/client/orders/:orderId" element={<Layout><EnhancedClientOrderView /></Layout>} />
             <Route path="/engineer" element={<Layout><EngineerDashboard /></Layout>} />

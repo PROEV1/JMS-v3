@@ -16,7 +16,8 @@ import {
   Clock,
   MessageCircle,
   FolderOpen,
-  UserCog
+  UserCog,
+  CreditCard
 } from 'lucide-react';
 import {
   Sidebar,
@@ -58,12 +59,14 @@ export function AppSidebar({ userRole }: AppSidebarProps) {
   ];
 
   const clientMenuItems = [
-    { icon: FileText, label: 'Dashboard', href: '/client', action: () => { navigate('/client'); window.history.replaceState(null, '', '/client'); window.dispatchEvent(new HashChangeEvent('hashchange')); } },
-    { icon: FileText, label: 'Quotes', href: '/client#quotes', action: () => { navigate('/client'); setTimeout(() => window.location.hash = 'quotes', 0); } },
+    { icon: Home, label: 'Dashboard', href: '/client', action: () => navigate('/client') },
+    { icon: FileText, label: 'Quotes', href: '/client/quotes', action: () => navigate('/client/quotes') },
+    { icon: ShoppingCart, label: 'Orders', href: '/client/orders', action: () => navigate('/client/orders') },
+    { icon: MessageCircle, label: 'Messages', href: '/client/messages', action: () => navigate('/client/messages') },
+    { icon: FolderOpen, label: 'Documents', href: '/client/documents', action: () => navigate('/client/documents') },
+    { icon: CreditCard, label: 'Payments', href: '/client/payments', action: () => navigate('/client/payments') },
     { icon: Calendar, label: 'Availability', href: '/client/date-blocking', action: () => navigate('/client/date-blocking') },
-    { icon: MessageCircle, label: 'Messages', href: '/client#messages', action: () => { navigate('/client'); setTimeout(() => window.location.hash = 'messages', 0); } },
-    { icon: FolderOpen, label: 'Documents', href: '/client#documents', action: () => { navigate('/client'); setTimeout(() => window.location.hash = 'documents', 0); } },
-    { icon: User, label: 'Profile', href: '/client#profile', action: () => { navigate('/client'); setTimeout(() => window.location.hash = 'profile', 0); } },
+    { icon: User, label: 'Profile', href: '/client/profile', action: () => navigate('/client/profile') },
   ];
 
   const engineerMenuItems = [

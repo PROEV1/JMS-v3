@@ -259,242 +259,149 @@ export default function ClientDashboard() {
         <div className="space-y-6">
           <h1 className="text-3xl font-bold">My Dashboard</h1>
 
-          {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card>
+          {/* Navigation Tiles */}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+            <Card 
+              className="cursor-pointer hover:shadow-md transition-shadow"
+              onClick={() => navigate('/client/quotes')}
+            >
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Active Quotes</CardTitle>
+                <CardTitle className="text-sm font-medium">Quotes</CardTitle>
                 <FileText className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{quotes.filter(q => q.status === 'sent').length}</div>
+                <div className="text-2xl font-bold">{quotes.length}</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {quotes.filter(q => q.status === 'sent').length} pending
+                </p>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card 
+              className="cursor-pointer hover:shadow-md transition-shadow"
+              onClick={() => navigate('/client/orders')}
+            >
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Active Orders</CardTitle>
+                <CardTitle className="text-sm font-medium">Orders</CardTitle>
                 <Wrench className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{orders.filter(o => o.status !== 'completed').length}</div>
+                <div className="text-2xl font-bold">{orders.length}</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {orders.filter(o => o.status !== 'completed').length} active
+                </p>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card 
+              className="cursor-pointer hover:shadow-md transition-shadow"
+              onClick={() => navigate('/client/messages')}
+            >
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Payments</CardTitle>
+                <CardTitle className="text-sm font-medium">Messages</CardTitle>
+                <MessageCircle className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">0</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Chat with support
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card 
+              className="cursor-pointer hover:shadow-md transition-shadow"
+              onClick={() => navigate('/client/payments')}
+            >
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Payments</CardTitle>
                 <CreditCard className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
                   £{payments.reduce((sum, p) => sum + p.amount, 0).toLocaleString()}
                 </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Total paid
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card 
+              className="cursor-pointer hover:shadow-md transition-shadow"
+              onClick={() => navigate('/client/documents')}
+            >
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Documents</CardTitle>
+                <FileText className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">0</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Upload & view files
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card 
+              className="cursor-pointer hover:shadow-md transition-shadow"
+              onClick={() => navigate('/client/profile')}
+            >
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Profile</CardTitle>
+                <Eye className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  <Eye className="h-6 w-6" />
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Manage account
+                </p>
               </CardContent>
             </Card>
           </div>
 
-          {/* Quotes Section */}
+          {/* Quick Actions */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Recent Quotes
-              </CardTitle>
+              <CardTitle>Quick Actions</CardTitle>
             </CardHeader>
             <CardContent>
-              {quotes.length === 0 ? (
-                <p className="text-muted-foreground text-center py-8">No quotes found</p>
-              ) : (
-                <div className="space-y-4">
-                  {quotes.slice(0, 5).map((quote) => (
-                    <div key={quote.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="flex items-center gap-4">
-                        <div>
-                          <p className="font-medium">{quote.quote_number}</p>
-                          <p className="text-sm text-muted-foreground">
-                            Created: {new Date(quote.created_at).toLocaleDateString()}
-                          </p>
-                          {quote.expires_at && (
-                            <p className="text-sm text-muted-foreground">
-                              Expires: {new Date(quote.expires_at).toLocaleDateString()}
-                            </p>
-                          )}
-                        </div>
-                        <Badge className={getStatusColor(quote.status)}>
-                          {formatStatus(quote.status)}
-                        </Badge>
-                      </div>
-                      
-                      <div className="flex items-center gap-4">
-                        <div className="text-right">
-                          <p className="font-medium">£{quote.total_cost.toLocaleString()}</p>
-                          {quote.deposit_required && (
-                            <p className="text-sm text-muted-foreground">
-                              Deposit: £{quote.deposit_required.toLocaleString()}
-                            </p>
-                          )}
-                        </div>
-                        
-                        <div className="flex gap-2">
-                          {quote.is_shareable && quote.share_token && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => navigate(`/quote/${quote.share_token}`)}
-                            >
-                              <Eye className="h-4 w-4 mr-1" />
-                              View
-                            </Button>
-                          )}
-                          
-                          {quote.status === 'sent' && quote.deposit_required && (
-                            <>
-                              <Button
-                                size="sm"
-                                onClick={() => handlePayDeposit(quote.id, quote.deposit_required!)}
-                              >
-                                <CreditCard className="h-4 w-4 mr-1" />
-                                Pay Deposit
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handlePayBalance(quote.id, quote.total_cost)}
-                              >
-                                Pay Full Amount
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Orders Section */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Wrench className="h-5 w-5" />
-                Recent Orders
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {orders.length === 0 ? (
-                <p className="text-muted-foreground text-center py-8">No orders found</p>
-              ) : (
-                <div className="space-y-4">
-                  {orders.slice(0, 5).map((order) => (
-                    <div key={order.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="flex items-center gap-4">
-                        <div>
-                          <p className="font-medium">{order.order_number}</p>
-                          <p className="text-sm text-muted-foreground">
-                            Created: {new Date(order.created_at).toLocaleDateString()}
-                          </p>
-                          {order.scheduled_install_date && (
-                            <p className="text-sm text-muted-foreground">
-                              <Calendar className="h-3 w-3 inline mr-1" />
-                              Scheduled: {new Date(order.scheduled_install_date).toLocaleDateString()}
-                            </p>
-                          )}
-                        </div>
-                        <Badge className={getStatusColor(order.status_enhanced)}>
-                          {formatStatus(order.status_enhanced)}
-                        </Badge>
-                      </div>
-                      
-                      <div className="flex items-center gap-4">
-                        <div className="text-right">
-                          <p className="font-medium">£{order.total_amount.toLocaleString()}</p>
-                          <p className="text-sm text-muted-foreground">
-                            Paid: £{order.amount_paid.toLocaleString()}
-                          </p>
-                        </div>
-                        
-                        <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => navigate(`/order/${order.id}`)}
-                          >
-                            <Eye className="h-4 w-4 mr-1" />
-                            View
-                          </Button>
-                          
-                          {order.amount_paid < order.total_amount && (
-                            <Button
-                              size="sm"
-                              onClick={() => handlePayOrder(order.id, order.total_amount - order.amount_paid)}
-                            >
-                              <CreditCard className="h-4 w-4 mr-1" />
-                              Pay Balance
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Messages Section */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <MessageCircle className="h-5 w-5" />
-                Messages
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-8">
-                <MessageCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <p className="text-muted-foreground mb-4">Chat with our support team</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Button 
-                  onClick={() => navigate('/client/messages')}
-                  className="flex items-center gap-2"
+                  variant="outline" 
+                  className="h-16 flex flex-col gap-2"
+                  onClick={() => navigate('/client/quotes')}
                 >
-                  <MessageCircle className="h-4 w-4" />
-                  Open Messages
+                  <FileText className="h-5 w-5" />
+                  <span>View All Quotes</span>
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="h-16 flex flex-col gap-2"
+                  onClick={() => navigate('/client/orders')}
+                >
+                  <Wrench className="h-5 w-5" />
+                  <span>View All Orders</span>
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="h-16 flex flex-col gap-2"
+                  onClick={() => navigate('/client/messages')}
+                >
+                  <MessageCircle className="h-5 w-5" />
+                  <span>Contact Support</span>
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="h-16 flex flex-col gap-2"
+                  onClick={() => navigate('/client/date-blocking')}
+                >
+                  <Calendar className="h-5 w-5" />
+                  <span>Manage Availability</span>
                 </Button>
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Recent Payments */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CreditCard className="h-5 w-5" />
-                Recent Payments
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {payments.length === 0 ? (
-                <p className="text-muted-foreground text-center py-8">No payments found</p>
-              ) : (
-                <div className="space-y-4">
-                  {payments.slice(0, 5).map((payment) => (
-                    <div key={payment.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div>
-                        <p className="font-medium">£{payment.amount.toLocaleString()}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {payment.payment_type} • {new Date(payment.created_at).toLocaleDateString()}
-                        </p>
-                      </div>
-                      <Badge className={getStatusColor(payment.status)}>
-                        {formatStatus(payment.status)}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              )}
             </CardContent>
           </Card>
         </div>
