@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { normalizePostcode, getBestPostcode, getOutwardCode } from './postcodeUtils';
 
 // Legacy interfaces for backward compatibility
 export interface Order {
@@ -198,11 +199,11 @@ export const getSmartEngineerRecommendations = async (order: Order, postcode?: s
             return null;
           }
 
-          // Check if engineer can serve this postcode
+          // Initial service area check - now more permissive, final check via Mapbox
           const serviceCheck = canEngineerServePostcode(engineer, finalPostcode);
           if (!serviceCheck.canServe) {
-            exclusionReasons[engineer.name].push(`Cannot serve postcode ${finalPostcode}`);
-            console.log(`Engineer ${engineer.name} cannot serve postcode ${finalPostcode}`);
+            exclusionReasons[engineer.name].push(`No service area coverage for ${finalPostcode}`);
+            console.log(`Engineer ${engineer.name} has no service area for ${finalPostcode}`);
             return null;
           }
 
@@ -210,18 +211,26 @@ export const getSmartEngineerRecommendations = async (order: Order, postcode?: s
           let distance = 0;
           let travelTime = serviceCheck.travelTime || 60;
           
-          if (engineer.starting_postcode) {
-            try {
-              const distanceResult = await getLiveDistance(engineer.starting_postcode, finalPostcode);
-              distance = distanceResult.distance;
-              travelTime = distanceResult.duration;
-            } catch (error) {
-              console.warn(`Failed to get live distance for ${engineer.name}:`, error);
-              // Fallback to estimated travel time from service area
-              distance = serviceCheck.travelTime ? Math.round(serviceCheck.travelTime / 2) : 25; // Rough estimate
-              travelTime = serviceCheck.travelTime || 60;
-            }
-          }
+           if (engineer.starting_postcode) {
+             try {
+               const distanceResult = await getLiveDistance(engineer.starting_postcode, finalPostcode);
+               distance = distanceResult.distance;
+               travelTime = distanceResult.duration;
+               
+               // Final check: respect engineer's travel time limits based on actual Mapbox data
+               const maxTravelMinutes = serviceCheck.travelTime || 80;
+               if (travelTime > maxTravelMinutes) {
+                 exclusionReasons[engineer.name].push(`Travel time ${travelTime}min exceeds limit ${maxTravelMinutes}min`);
+                 console.log(`Engineer ${engineer.name} travel time ${travelTime} exceeds limit ${maxTravelMinutes}`);
+                 return null;
+               }
+             } catch (error) {
+               console.warn(`Failed to get live distance for ${engineer.name}:`, error);
+               // Fallback to estimated travel time from service area
+               distance = serviceCheck.travelTime ? Math.round(serviceCheck.travelTime / 2) : 25; // Rough estimate
+               travelTime = serviceCheck.travelTime || 60;
+             }
+           }
 
           // Check distance limits
           if (distance > settings.max_distance_miles) {
@@ -641,6 +650,7 @@ export function isEngineerAvailableOnDate(
 
 /**
  * Check if engineer can serve a postcode based on service areas
+ * Now uses proper outward code matching and allows Mapbox to determine final eligibility
  */
 export function canEngineerServePostcode(
   engineer: EngineerSettings,
@@ -650,13 +660,30 @@ export function canEngineerServePostcode(
     return { canServe: false };
   }
 
-  // Extract postcode area (e.g., "SW1A" from "SW1A 1AA")
-  const postcodeArea = postcode.replace(/\s+/g, '').toUpperCase().substring(0, 3);
+  // Extract proper outward code (e.g., "DA5" from "DA5 1BJ", "SW1A" from "SW1A 1AA")
+  const jobOutwardCode = getOutwardCode(postcode);
+  
+  if (!jobOutwardCode) {
+    return { canServe: false };
+  }
 
-  // Check if engineer serves this postcode area
+  // Check if engineer serves this postcode area with more flexible matching
   for (const area of engineer.service_areas) {
-    if (area.postcode_area.replace(/\s+/g, '').toUpperCase().includes(postcodeArea) ||
-        postcodeArea.includes(area.postcode_area.replace(/\s+/g, '').toUpperCase())) {
+    const areaOutwardCode = getOutwardCode(area.postcode_area);
+    
+    // Exact match first
+    if (areaOutwardCode === jobOutwardCode) {
+      return { 
+        canServe: true, 
+        travelTime: area.max_travel_minutes 
+      };
+    }
+    
+    // Partial match for same area (e.g., "DA" area covers "DA1", "DA5", etc.)
+    const jobAreaPrefix = jobOutwardCode.replace(/\d+[A-Z]?$/, ''); // Remove digits and optional letter
+    const areaPrefix = areaOutwardCode.replace(/\d+[A-Z]?$/, '');
+    
+    if (jobAreaPrefix === areaPrefix && jobAreaPrefix.length >= 1) {
       return { 
         canServe: true, 
         travelTime: area.max_travel_minutes 

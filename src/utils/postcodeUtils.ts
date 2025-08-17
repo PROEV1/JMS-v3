@@ -74,6 +74,20 @@ export function getBestPostcode(order: {
 }
 
 /**
+ * Extracts the outward code from a UK postcode (the part before the space)
+ * Examples: "DA5 1BJ" -> "DA5", "SW1A 1AA" -> "SW1A", "M1 1AA" -> "M1"
+ */
+export function getOutwardCode(postcode: string): string {
+  if (!postcode) return '';
+  
+  const normalized = normalizePostcode(postcode);
+  
+  // Split by space and take the first part (outward code)
+  const parts = normalized.split(' ');
+  return parts[0] || '';
+}
+
+/**
  * Gets display text for postcode/location with fallback to address
  */
 export function getLocationDisplayText(order: {

@@ -110,11 +110,11 @@ Deno.serve(async (req) => {
     for (const engineer of engineers || []) {
       try {
 
-        // Extract postcode area from starting postcode (e.g., "DA5 1BJ" -> "DA5")
+        // Extract proper outward code from starting postcode (e.g., "DA5 1BJ" -> "DA5")
         const postcodeArea = engineer.starting_postcode
           .trim()
           .toUpperCase()
-          .split(' ')[0]; // Take the first part before space
+          .split(' ')[0]; // Take the outward code (first part before space)
 
         if (!postcodeArea || postcodeArea.length < 2) {
           result.errors.push(`Invalid postcode format for ${engineer.email}: ${engineer.starting_postcode}`);

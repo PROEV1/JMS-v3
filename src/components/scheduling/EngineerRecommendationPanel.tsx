@@ -53,8 +53,19 @@ export function EngineerRecommendationPanel({
       if (result.error) {
         setDebugInfo(`Job: ${order.order_number} | Error: ${result.error}`);
       } else {
-        const diagnostics = result.diagnostics ? 
+        let diagnostics = result.diagnostics ? 
           ` | Excluded: ${result.diagnostics.excludedEngineers}/${result.diagnostics.totalEngineers}` : '';
+        
+        // Add detailed exclusion reasons for debugging
+        if (result.diagnostics?.exclusionReasons) {
+          const exclusionSummary = Object.entries(result.diagnostics.exclusionReasons)
+            .map(([name, reasons]) => `${name}: ${(reasons as string[]).join(', ')}`)
+            .join(' | ');
+          if (exclusionSummary) {
+            diagnostics += ` | Exclusions: ${exclusionSummary}`;
+          }
+        }
+        
         setDebugInfo(`Job: ${order.order_number} | Postcode: ${displayPostcode} | Found ${result.recommendations.length} recommendations${diagnostics}`);
       }
     } catch (error) {
