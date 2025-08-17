@@ -37,7 +37,7 @@ const getCorsHeaders = (origin?: string | null) => {
 };
 
 serve(async (req) => {
-  console.log('[seed-scheduling-data-v2] GitHub Actions Deploy Test - Auto deployment triggered');
+  console.log('[seed-scheduling-data-v2] Enhanced diagnostics v3 - Auto deployment with error handling');
   
   const origin = req.headers.get('Origin');
   const corsHeaders = getCorsHeaders(origin);
@@ -53,39 +53,119 @@ serve(async (req) => {
   }
 
   try {
-    // Create admin client with service role key
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-
-    // Check if user is admin
-    const authHeader = req.headers.get('Authorization')!;
-    const token = authHeader.replace('Bearer ', '');
+    // Validate environment variables first
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+    if (!supabaseUrl || !serviceRoleKey) {
+      console.error('Missing environment variables:', { hasUrl: !!supabaseUrl, hasServiceKey: !!serviceRoleKey });
+      return new Response(JSON.stringify({ 
+        success: false,
+        error: 'Server configuration error - missing environment variables',
+        details: { hasUrl: !!supabaseUrl, hasServiceKey: !!serviceRoleKey }
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Create admin client with service role key
+    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
+
+    // Parse request body
+    const requestBody = await req.json();
+    const { clients = 100, orders_per_client_min = 1, orders_per_client_max = 3, tag = 'SEED', diagnose = false } = requestBody;
+
+    // Authentication and role checking
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ 
+        success: false,
+        error: 'Missing Authorization header' 
+      }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Verify admin role
-    const { data: profile } = await supabaseAdmin
+    const token = authHeader.replace('Bearer ', '');
+    
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) {
+      console.error('Auth error:', authError);
+      return new Response(JSON.stringify({ 
+        success: false,
+        error: 'Invalid authentication token',
+        details: authError?.message 
+      }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Verify admin or manager role
+    const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
-      .select('role')
+      .select('role, status')
       .eq('user_id', user.id)
       .single();
 
-    if (profile?.role !== 'admin') {
-      return new Response(JSON.stringify({ error: 'Admin access required' }), {
+    if (profileError) {
+      console.error('Profile fetch error:', profileError);
+      return new Response(JSON.stringify({ 
+        success: false,
+        error: 'Failed to verify user permissions',
+        details: profileError.message 
+      }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const { clients = 100, orders_per_client_min = 1, orders_per_client_max = 3, tag = 'SEED' } = await req.json();
+    if (!profile || !['admin', 'manager'].includes(profile.role) || profile.status !== 'active') {
+      return new Response(JSON.stringify({ 
+        success: false,
+        error: 'Admin or Manager access required',
+        details: { role: profile?.role, status: profile?.status }
+      }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Diagnostic mode - return environment and user info without creating data
+    if (diagnose) {
+      const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
+      const seedUsers = existingUsers?.users?.filter(u => u.email?.includes('@seed.local')) || [];
+      
+      const { data: existingClients } = await supabaseAdmin
+        .from('clients')
+        .select('id')
+        .ilike('email', '%@seed.local%');
+
+      return new Response(JSON.stringify({
+        success: true,
+        diagnose: true,
+        environment: {
+          hasUrl: !!supabaseUrl,
+          hasServiceKey: !!serviceRoleKey,
+          urlLength: supabaseUrl?.length || 0
+        },
+        authentication: {
+          hasAuthHeader: !!authHeader,
+          userId: user.id,
+          userEmail: user.email,
+          role: profile.role,
+          status: profile.status
+        },
+        existingData: {
+          seedUsers: seedUsers.length,
+          seedClients: existingClients?.length || 0
+        }
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     console.log(`Starting seed with ${clients} clients, ${orders_per_client_min}-${orders_per_client_max} orders per client`);
 
@@ -139,9 +219,13 @@ serve(async (req) => {
       urgent: 0
     };
 
+    let errors: string[] = [];
+
     // Generate next sequence numbers for quote and order numbers
     let quoteSeq = 1000;
     let orderSeq = 2000;
+
+    console.log(`Starting seed with ${clients} clients, ${orders_per_client_min}-${orders_per_client_max} orders per client`);
 
     // Create clients and orders in batches
     const batchSize = 20;
@@ -168,13 +252,15 @@ serve(async (req) => {
 
         if (userError) {
           console.error(`Failed to create user ${i + 1}:`, userError);
+          errors.push(`User ${i + 1}: ${userError.message}`);
+          if (errors.length >= 5) break; // Stop after 5 consecutive errors
           continue;
         }
 
         createdCounts.users++;
 
         // Create profile
-        await supabaseAdmin
+        const { error: profileError } = await supabaseAdmin
           .from('profiles')
           .insert({
             user_id: authUser.user.id,
@@ -183,6 +269,13 @@ serve(async (req) => {
             role: 'client',
             status: 'active'
           });
+
+        if (profileError) {
+          console.error(`Failed to create profile ${i + 1}:`, profileError);
+          errors.push(`Profile ${i + 1}: ${profileError.message}`);
+          if (errors.length >= 5) break;
+          continue;
+        }
 
         // Create client
         const { data: client, error: clientError } = await supabaseAdmin
@@ -200,6 +293,8 @@ serve(async (req) => {
 
         if (clientError) {
           console.error(`Failed to create client ${i + 1}:`, clientError);
+          errors.push(`Client ${i + 1}: ${clientError.message}`);
+          if (errors.length >= 5) break;
           continue;
         }
 
@@ -342,10 +437,25 @@ serve(async (req) => {
 
     console.log('Seed data creation completed:', createdCounts);
 
+    // Check if we actually created data
+    if (createdCounts.clients === 0) {
+      return new Response(JSON.stringify({
+        success: false,
+        message: 'No data was created - check errors for details',
+        counts: createdCounts,
+        errors: errors.slice(0, 10), // First 10 errors
+        details: 'No clients were successfully created. This may indicate permission issues or database constraints.'
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     return new Response(JSON.stringify({
       success: true,
       message: `Successfully created ${createdCounts.clients} clients with ${createdCounts.orders} orders (${createdCounts.urgent} urgent)`,
       counts: createdCounts,
+      errors: errors.length > 0 ? errors.slice(0, 5) : undefined,
       reminder: `Use the Clear Seed Data function to remove this test data when no longer needed.`
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -354,8 +464,10 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in seed-scheduling-data-v2 function:', error);
     return new Response(JSON.stringify({ 
-      error: error.message,
-      details: 'Check function logs for more information'
+      success: false,
+      error: error.message || 'Unknown error occurred',
+      details: 'Check function logs for more information',
+      stack: error.stack
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

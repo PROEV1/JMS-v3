@@ -42,6 +42,9 @@ export function SchedulingSettingsPanel() {
   const [seedTag, setSeedTag] = useState('SEED');
   const [seeding, setSeeding] = useState(false);
   const [clearing, setClearing] = useState(false);
+  const [seedErrors, setSeedErrors] = useState<string[]>([]);
+  const [diagnosticInfo, setDiagnosticInfo] = useState<any>(null);
+  const [showDiagnostic, setShowDiagnostic] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -132,8 +135,27 @@ export function SchedulingSettingsPanel() {
     }
   };
 
+  const runDiagnostic = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('seed-scheduling-data-v2', {
+        body: { diagnose: true }
+      });
+
+      if (error) throw error;
+
+      setDiagnosticInfo(data);
+      setShowDiagnostic(true);
+      toast.success('Diagnostic completed - check results below');
+    } catch (error: any) {
+      console.error('Diagnostic failed:', error);
+      toast.error(`Diagnostic failed: ${error?.message || 'Unknown error'}`);
+    }
+  };
+
   const seedSchedulingData = async () => {
     setSeeding(true);
+    setSeedErrors([]);
+    
     try {
       // Try v2 function first, fallback to v1 if 404
       let data, error;
@@ -149,14 +171,11 @@ export function SchedulingSettingsPanel() {
       } catch (v2Error: any) {
         console.log('V2 function failed, trying v1:', v2Error);
         if (v2Error?.message?.includes('404') || v2Error?.status === 404) {
-          ({ data, error } = await supabase.functions.invoke('seed-scheduling-data', {
-            body: {
-              clients: seedClients,
-              orders_per_client_min: seedOrdersMin,
-              orders_per_client_max: seedOrdersMax,
-              tag: seedTag
-            }
-          }));
+          toast.error('Edge function not found - check deployment status');
+          return;
+        } else if (v2Error?.status === 401 || v2Error?.status === 403) {
+          toast.error('Permission denied - admin access required');
+          return;
         } else {
           throw v2Error;
         }
@@ -164,12 +183,35 @@ export function SchedulingSettingsPanel() {
 
       if (error) throw error;
 
-      toast.success(data.message);
-      console.log('Seed data created:', data);
+      // Check for successful data creation
+      if (data?.success === true && data?.counts?.clients > 0) {
+        toast.success(`Created ${data.counts.clients} clients and ${data.counts.orders} orders`);
+        console.log('Seed data created:', data);
+        
+        // Show any warnings if there were non-critical errors
+        if (data.errors && data.errors.length > 0) {
+          setSeedErrors(data.errors);
+        }
+      } else {
+        // Failed to create data
+        const errorMessage = data?.message || data?.error || 'No data was created';
+        toast.error(`Seed failed: ${errorMessage}`);
+        
+        if (data?.errors) {
+          setSeedErrors(data.errors);
+        }
+      }
     } catch (error: any) {
       console.error('Error seeding data:', error);
       const errorMessage = error?.message || 'Unknown error occurred';
       toast.error(`Failed to seed test data: ${errorMessage}`);
+      
+      // Show actionable message for common errors
+      if (error?.status === 404) {
+        setSeedErrors(['Edge function not deployed - check GitHub Actions']);
+      } else if (error?.status === 401 || error?.status === 403) {
+        setSeedErrors(['Permission denied - admin access required']);
+      }
     } finally {
       setSeeding(false);
     }
@@ -495,6 +537,91 @@ export function SchedulingSettingsPanel() {
               <Trash2 className="h-4 w-4 mr-2" />
               {clearing ? 'Clearing Data...' : 'Clear Seed Data'}
             </Button>
+          </div>
+
+          {/* Error Messages */}
+          {seedErrors.length > 0 && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <div className="flex items-start space-x-3">
+                <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="text-red-800 font-medium text-sm">Seed Data Errors</p>
+                  <div className="text-red-700 text-xs space-y-1">
+                    {seedErrors.slice(0, 5).map((error, index) => (
+                      <div key={index}>• {error}</div>
+                    ))}
+                    {seedErrors.length > 5 && (
+                      <div>• ... and {seedErrors.length - 5} more errors</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Diagnostic Tool */}
+          <div className="border-t pt-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">Troubleshooting</p>
+                <p className="text-xs text-muted-foreground">
+                  Run diagnostics to check environment and permissions
+                </p>
+              </div>
+              <Button
+                onClick={runDiagnostic}
+                variant="outline"
+                size="sm"
+                disabled={seeding || clearing}
+              >
+                Run Diagnose
+              </Button>
+            </div>
+
+            {/* Diagnostic Results */}
+            {showDiagnostic && diagnosticInfo && (
+              <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="space-y-3">
+                  <div className="text-sm font-medium text-blue-800">Diagnostic Results</div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                    <div>
+                      <div className="font-medium text-blue-700 mb-1">Environment</div>
+                      <div className="space-y-1 text-blue-600">
+                        <div>• Supabase URL: {diagnosticInfo.environment?.hasUrl ? '✓' : '✗'}</div>
+                        <div>• Service Key: {diagnosticInfo.environment?.hasServiceKey ? '✓' : '✗'}</div>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <div className="font-medium text-blue-700 mb-1">Authentication</div>
+                      <div className="space-y-1 text-blue-600">
+                        <div>• User: {diagnosticInfo.authentication?.userEmail}</div>
+                        <div>• Role: {diagnosticInfo.authentication?.role}</div>
+                        <div>• Status: {diagnosticInfo.authentication?.status}</div>
+                      </div>
+                    </div>
+                    
+                    <div className="md:col-span-2">
+                      <div className="font-medium text-blue-700 mb-1">Existing Data</div>
+                      <div className="space-y-1 text-blue-600">
+                        <div>• Seed Users: {diagnosticInfo.existingData?.seedUsers || 0}</div>
+                        <div>• Seed Clients: {diagnosticInfo.existingData?.seedClients || 0}</div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <Button
+                    onClick={() => setShowDiagnostic(false)}
+                    variant="ghost"
+                    size="sm"
+                    className="w-full"
+                  >
+                    Close Diagnostic
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="text-xs text-muted-foreground space-y-1">

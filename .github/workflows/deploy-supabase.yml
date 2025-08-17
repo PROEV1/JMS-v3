@@ -26,3 +26,10 @@ jobs:
           supabase functions deploy --project-ref "${{ secrets.SUPABASE_PROJECT_REF || 'qvppvstgconmzzjsryna' }}" --all
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: List deployed functions
+        run: |
+          echo "📋 Deployed functions:"
+          supabase functions list --project-ref "${{ secrets.SUPABASE_PROJECT_REF || 'qvppvstgconmzzjsryna' }}"
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
