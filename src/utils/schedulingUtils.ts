@@ -71,12 +71,26 @@ export const getStatusColor = (status: string): string => {
       return 'bg-yellow-500 text-white';
     case 'awaiting_agreement':
       return 'bg-orange-500 text-white';
-    case 'scheduled':
+    case 'needs_scheduling':
+    case 'awaiting_install_booking':
+      return 'bg-orange-400 text-white';
+    case 'date_offered':
       return 'bg-blue-500 text-white';
-    case 'in_progress':
-      return 'bg-purple-500 text-white';
-    case 'completed':
+    case 'date_accepted':
+    case 'scheduled':
       return 'bg-green-500 text-white';
+    case 'date_rejected':
+      return 'bg-red-500 text-white';
+    case 'offer_expired':
+      return 'bg-yellow-600 text-white';
+    case 'on_hold_parts_docs':
+      return 'bg-purple-500 text-white';
+    case 'cancelled':
+      return 'bg-gray-500 text-white';
+    case 'in_progress':
+      return 'bg-purple-600 text-white';
+    case 'completed':
+      return 'bg-green-600 text-white';
     default:
       return 'bg-gray-500 text-white';
   }

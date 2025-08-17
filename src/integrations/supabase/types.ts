@@ -1611,6 +1611,12 @@ export type Database = {
         | "completed"
         | "revisit_required"
         | "cancelled"
+        | "needs_scheduling"
+        | "date_offered"
+        | "date_accepted"
+        | "date_rejected"
+        | "offer_expired"
+        | "on_hold_parts_docs"
       user_role:
         | "admin"
         | "client"
@@ -1758,6 +1764,12 @@ export const Constants = {
         "completed",
         "revisit_required",
         "cancelled",
+        "needs_scheduling",
+        "date_offered",
+        "date_accepted",
+        "date_rejected",
+        "offer_expired",
+        "on_hold_parts_docs",
       ],
       user_role: [
         "admin",

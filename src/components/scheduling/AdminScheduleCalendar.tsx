@@ -12,6 +12,7 @@ import { SmartAssignmentModal } from './SmartAssignmentModal';
 // import { JobDetailsModal } from './JobDetailsModal';
 import { WeekViewCalendar } from './WeekViewCalendar';
 import { EngineerRecommendationPanel } from './EngineerRecommendationPanel';
+import { ScheduleKanban } from './ScheduleKanban';
 import { 
   Order, 
   Engineer, 
@@ -56,7 +57,7 @@ export function AdminScheduleCalendar() {
   const [showRecommendations, setShowRecommendations] = useState(false);
   const [draggedOrder, setDraggedOrder] = useState<Order | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<any>(null);
-  const [calendarView, setCalendarView] = useState<'calendar' | 'week'>('calendar');
+  const [calendarView, setCalendarView] = useState<'calendar' | 'week' | 'kanban'>('calendar');
   const [draggedJob, setDraggedJob] = useState<Order | null>(null);
 
   // Load data
@@ -151,7 +152,13 @@ export function AdminScheduleCalendar() {
   // Handle slot selection (for new assignments)
   const handleSelectSlot = useCallback((slotInfo: any) => {
     const currentUnassignedOrders = orders.filter(order => 
-      !order.engineer_id && (order.status_enhanced === 'awaiting_install_booking' || order.status_enhanced === 'scheduled')
+      !order.engineer_id && (
+        order.status_enhanced === 'awaiting_install_booking' || 
+        order.status_enhanced === 'scheduled' ||
+        order.status_enhanced === 'needs_scheduling' ||
+        order.status_enhanced === 'date_rejected' ||
+        order.status_enhanced === 'offer_expired'
+      )
     );
     if (currentUnassignedOrders.length > 0) {
       setSelectedSlot(slotInfo);
@@ -276,7 +283,13 @@ export function AdminScheduleCalendar() {
   };
 
   const unassignedOrders = orders.filter(order => 
-    !order.engineer_id && (order.status_enhanced === 'awaiting_install_booking' || order.status_enhanced === 'scheduled')
+    !order.engineer_id && (
+      order.status_enhanced === 'awaiting_install_booking' || 
+      order.status_enhanced === 'scheduled' ||
+      order.status_enhanced === 'needs_scheduling' ||
+      order.status_enhanced === 'date_rejected' ||
+      order.status_enhanced === 'offer_expired'
+    )
   );
 
   // Get stats for the dashboard
@@ -328,10 +341,16 @@ export function AdminScheduleCalendar() {
           </div>
           <div className="flex gap-2">
             <Button 
-              onClick={() => setCalendarView(calendarView === 'calendar' ? 'week' : 'calendar')} 
+              onClick={() => {
+                const views: ('calendar' | 'week' | 'kanban')[] = ['calendar', 'week', 'kanban'];
+                const currentIndex = views.indexOf(calendarView);
+                const nextIndex = (currentIndex + 1) % views.length;
+                setCalendarView(views[nextIndex]);
+              }} 
               variant="outline"
             >
-              {calendarView === 'calendar' ? 'Week View' : 'Calendar View'}
+              {calendarView === 'calendar' ? 'Week View' : 
+               calendarView === 'week' ? 'Kanban View' : 'Calendar View'}
             </Button>
             <Button onClick={loadData} variant="outline">
               Refresh
@@ -346,7 +365,23 @@ export function AdminScheduleCalendar() {
         />
 
         <div className="relative">
-          {calendarView === 'week' ? (
+          {calendarView === 'kanban' ? (
+            <ScheduleKanban
+              orders={orders}
+              engineers={engineers}
+              onOrderUpdate={loadData}
+              onShowRecommendations={(order) => {
+                setDraggedOrder(order);
+                setSelectedSlot({
+                  start: new Date(),
+                  end: new Date(Date.now() + 60 * 60 * 1000),
+                  resourceId: null,
+                  action: 'select'
+                });
+                setShowRecommendations(true);
+              }}
+            />
+          ) : calendarView === 'week' ? (
             <WeekViewCalendar
               orders={orders}
               engineers={engineers}
