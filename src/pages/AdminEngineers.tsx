@@ -52,6 +52,7 @@ export default function AdminEngineers() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingEngineer, setEditingEngineer] = useState<Engineer | null>(null);
   const [saving, setSaving] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [showScheduleManager, setShowScheduleManager] = useState(false);
   const [selectedEngineer, setSelectedEngineer] = useState<Engineer | null>(null);
   const [showUserSetup, setShowUserSetup] = useState(false);
@@ -66,7 +67,6 @@ export default function AdminEngineers() {
     user_id: null as string | null
   });
   const [availableUsers, setAvailableUsers] = useState<any[]>([]);
-  const [syncing, setSyncing] = useState(false);
 
   const { toast } = useToast();
 
@@ -385,6 +385,11 @@ export default function AdminEngineers() {
           <BrandHeading1>Engineer Management</BrandHeading1>
           
           <div className="flex space-x-2">
+            <Button variant="outline" onClick={syncServiceAreas} disabled={syncing}>
+              <MapPin className="h-4 w-4 mr-2" />
+              {syncing ? 'Syncing...' : 'Sync Service Areas'}
+            </Button>
+            
             <Button variant="outline" onClick={() => setShowCsvImport(true)}>
               <Upload className="h-4 w-4 mr-2" />
               Import CSV
