@@ -29,12 +29,6 @@ jobs:
         with:
           version: latest
 
-      - name: Link to Supabase project
-        run: |
-          echo "🔗 Linking to Supabase project..."
-          supabase link --project-ref "${{ secrets.SUPABASE_PROJECT_REF || 'qvppvstgconmzzjsryna' }}"
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
       - name: Deploy specific function (if specified)
         if: ${{ github.event.inputs.function_name != '' }}
