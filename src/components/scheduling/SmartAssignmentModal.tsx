@@ -29,6 +29,7 @@ interface EngineerSuggestion {
   travelTime: number;
   score: number;
   reasons: string[];
+  dailyWorkloadThatDay?: number;
 }
 
 export function SmartAssignmentModal({ 

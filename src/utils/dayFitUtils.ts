@@ -184,16 +184,13 @@ async function calculateTotalDayTime(engineer: EngineerSettings, orders: any[]):
       }
     }
 
-  // Add travel time back to starting location at end of day
-  if (remainingOrders.length === 0 && orders.length > 0) {
-    const lastOrder = orders[orders.length - 1];
-    if (lastOrder.postcode) {
-      try {
-        const { duration } = await getLiveDistance(lastOrder.postcode, engineer.starting_postcode);
-        totalMinutes += duration;
-      } catch {
-        totalMinutes += 30; // Default return travel time
-      }
+  // Add travel time back to starting location at end of day from the actual last visited location
+  if (orders.length > 0 && currentLocation !== engineer.starting_postcode) {
+    try {
+      const { duration } = await getLiveDistance(currentLocation, engineer.starting_postcode);
+      totalMinutes += duration;
+    } catch {
+      totalMinutes += 30; // Default return travel time
     }
   }
 

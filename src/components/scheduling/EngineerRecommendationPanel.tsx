@@ -15,6 +15,7 @@ interface EngineerSuggestion {
   travelTime: number;
   score: number;
   reasons: string[];
+  dailyWorkloadThatDay?: number;
 }
 
 interface EngineerRecommendationPanelProps {
@@ -166,86 +167,138 @@ export function EngineerRecommendationPanel({
             <p className="text-xs mt-1">Try adjusting the max distance in admin settings</p>
           </div>
         ) : (
-          suggestions.map((suggestion, index) => (
-            <div key={suggestion.engineer.id}>
-              <div 
-                className={`
-                  p-3 rounded-lg border cursor-pointer transition-all duration-200
-                  hover:border-primary hover:shadow-md
-                  ${index === 0 ? 'border-primary/50 bg-primary/5' : 'border-border'}
-                `}
-                onClick={() => onSelectEngineer(suggestion.engineer.id, suggestion.availableDate)}
-              >
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <Avatar className="h-8 w-8">
-                      <AvatarFallback className="text-xs">
-                        {suggestion.engineer.name.split(' ').map(n => n[0]).join('')}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="font-medium text-sm">{suggestion.engineer.name}</p>
-                      <p className="text-xs text-muted-foreground">{suggestion.engineer.region}</p>
-                      {suggestion.availableDate && (
-                        <p className="text-xs text-primary font-medium">
-                          Available: {new Date(suggestion.availableDate).toLocaleDateString()}
-                        </p>
-                      )}
+          <div className="space-y-4">
+            {/* Featured Recommendations */}
+            {suggestions.slice(0, 3).length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Star className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-medium text-primary">Featured ({Math.min(3, suggestions.length)})</span>
+                </div>
+                <div className="space-y-2">
+                  {suggestions.slice(0, 3).map((suggestion, index) => (
+                    <div key={suggestion.engineer.id}>
+                      <div 
+                        className={`
+                          p-3 rounded-lg border cursor-pointer transition-all duration-200
+                          hover:border-primary hover:shadow-md
+                          ${index === 0 ? 'border-primary/50 bg-primary/5' : 'border-border'}
+                        `}
+                        onClick={() => onSelectEngineer(suggestion.engineer.id, suggestion.availableDate)}
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <Avatar className="h-8 w-8">
+                              <AvatarFallback className="text-xs">
+                                {suggestion.engineer.name.split(' ').map(n => n[0]).join('')}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <p className="font-medium text-sm">{suggestion.engineer.name}</p>
+                              <p className="text-xs text-muted-foreground">{suggestion.engineer.region}</p>
+                              {suggestion.availableDate && (
+                                <p className="text-xs text-primary font-medium">
+                                  Available: {new Date(suggestion.availableDate).toLocaleDateString()}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            {getScoreIcon(suggestion.score)}
+                            <span className={`text-sm font-medium ${getScoreColor(suggestion.score)}`}>
+                              {suggestion.score}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-1 text-xs text-muted-foreground mb-2">
+                          <div className="flex items-center gap-1">
+                            <MapPin className="h-3 w-3" />
+                            <span>{suggestion.distance.toFixed(1)}mi from {suggestion.engineer.starting_postcode || 'N/A'}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            <span>{suggestion.travelTime}min travel time</span>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap gap-1 mb-2">
+                          {index === 0 && (
+                            <Badge className="text-xs bg-primary/10 text-primary border-primary">
+                              Best Match
+                            </Badge>
+                          )}
+                          <Badge variant="outline" className="text-xs text-green-600 border-green-200">
+                            Featured
+                          </Badge>
+                        </div>
+
+                        <div className="space-y-1">
+                          {suggestion.reasons.slice(0, 2).map((reason, idx) => (
+                            <p key={idx} className="text-xs text-muted-foreground">
+                              • {reason}
+                            </p>
+                          ))}
+                        </div>
+
+                        <Button 
+                          size="sm" 
+                          className="w-full mt-2" 
+                          variant={index === 0 ? "default" : "outline"}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onSelectEngineer(suggestion.engineer.id, suggestion.availableDate);
+                          }}
+                        >
+                          {index === 0 ? 'Assign (Recommended)' : 'Assign Engineer'}
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    {getScoreIcon(suggestion.score)}
-                    <span className={`text-sm font-medium ${getScoreColor(suggestion.score)}`}>
-                      {suggestion.score}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-1 text-xs text-muted-foreground mb-2">
-                  <div className="flex items-center gap-1">
-                    <MapPin className="h-3 w-3" />
-                    <span>{suggestion.distance.toFixed(1)}mi from {suggestion.engineer.starting_postcode || 'N/A'}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    <span>{suggestion.travelTime}min travel time</span>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-1 mb-2">
-                  {index === 0 && (
-                    <Badge className="text-xs bg-primary/10 text-primary border-primary">
-                      Best Match
-                    </Badge>
-                  )}
-                  <Badge variant="outline" className="text-xs text-green-600 border-green-200">
-                    Next Available
-                  </Badge>
-                </div>
-
-                <div className="space-y-1">
-                  {suggestion.reasons.slice(0, 2).map((reason, idx) => (
-                    <p key={idx} className="text-xs text-muted-foreground">
-                      • {reason}
-                    </p>
                   ))}
                 </div>
-
-                <Button 
-                  size="sm" 
-                  className="w-full mt-2" 
-                  variant={index === 0 ? "default" : "outline"}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onSelectEngineer(suggestion.engineer.id, suggestion.availableDate);
-                  }}
-                >
-                  {index === 0 ? 'Assign (Recommended)' : 'Assign Engineer'}
-                </Button>
               </div>
-              {index < suggestions.length - 1 && <Separator className="my-2" />}
-            </div>
-          ))
+            )}
+
+            {/* All Engineers */}
+            {suggestions.length > 3 && (
+              <div>
+                <Separator className="my-3" />
+                <div className="flex items-center gap-2 mb-2">
+                  <User className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium text-muted-foreground">All Qualifying Engineers ({suggestions.length})</span>
+                </div>
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {suggestions.map((suggestion, index) => (
+                    <div 
+                      key={suggestion.engineer.id}
+                      className="p-2 rounded border border-border hover:border-primary cursor-pointer transition-all duration-200"
+                      onClick={() => onSelectEngineer(suggestion.engineer.id, suggestion.availableDate)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Avatar className="h-6 w-6">
+                            <AvatarFallback className="text-xs">
+                              {suggestion.engineer.name.split(' ').map(n => n[0]).join('')}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="text-sm font-medium">{suggestion.engineer.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {suggestion.availableDate ? new Date(suggestion.availableDate).toLocaleDateString() : 'Date TBD'}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right text-xs text-muted-foreground">
+                          <div>{suggestion.distance.toFixed(1)}mi</div>
+                          <div>{suggestion.travelTime}min</div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </CardContent>
     </Card>

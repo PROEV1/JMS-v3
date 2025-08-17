@@ -141,7 +141,7 @@ export const updateOrderAssignment = async (orderId: string, engineerId: string 
   }
 };
 
-export const getSmartEngineerRecommendations = async (order: Order, postcode?: string) => {
+export const getSmartEngineerRecommendations = async (order: Order, postcode?: string, options: { startDate?: Date } = {}) => {
   try {
     console.log('Getting smart engineer recommendations for order:', order.order_number);
     
@@ -161,6 +161,8 @@ export const getSmartEngineerRecommendations = async (order: Order, postcode?: s
       console.log('No postcode found for order - checked order.postcode, client.address, and order.job_address');
       return { 
         recommendations: [], 
+        featured: [],
+        all: [],
         settings,
         error: 'No postcode available - cannot calculate engineer recommendations without location data'
       };
@@ -173,7 +175,7 @@ export const getSmartEngineerRecommendations = async (order: Order, postcode?: s
     
     if (allEngineers.length === 0) {
       console.log('No available engineers found');
-      return { recommendations: [], settings };
+      return { recommendations: [], featured: [], all: [], settings };
     }
 
     console.log(`Found ${allEngineers.length} engineers to evaluate`);
@@ -181,9 +183,9 @@ export const getSmartEngineerRecommendations = async (order: Order, postcode?: s
     // Track exclusion reasons for diagnostics
     const exclusionReasons: Record<string, string[]> = {};
 
-    // Calculate minimum booking date based on advance notice requirements
+    // Calculate minimum booking date based on advance notice requirements or provided start date
     const now = new Date();
-    const minimumDate = new Date(now.getTime() + (settings.minimum_advance_hours * 60 * 60 * 1000));
+    const minimumDate = options.startDate || new Date(now.getTime() + (settings.minimum_advance_hours * 60 * 60 * 1000));
     
     const recommendations = await Promise.all(
       allEngineers.map(async (engineer) => {
@@ -240,10 +242,11 @@ export const getSmartEngineerRecommendations = async (order: Order, postcode?: s
             return null;
           }
 
-          // Find next available date
+          // Find next available date - use configurable search horizon
           let availableDate: Date | null = null;
+          let dailyWorkloadThatDay = 0;
           let checkDate = new Date(minimumDate);
-          const maxCheckDays = 30; // Don't check beyond 30 days
+          const maxCheckDays = settings.recommendation_search_horizon_days || 120;
           let daysChecked = 0;
 
            while (!availableDate && daysChecked < maxCheckDays) {
@@ -270,6 +273,7 @@ export const getSmartEngineerRecommendations = async (order: Order, postcode?: s
                
                if (dayFit.canFit) {
                  availableDate = new Date(checkDate);
+                 dailyWorkloadThatDay = dailyWorkload;
                  console.log(`  ${engineer.name}: Available on ${availableDate.toLocaleDateString()}, current workload: ${dailyWorkload}/${settings.max_jobs_per_day}, day fit: ${dayFit.reasons.join(', ')}`);
                } else {
                  console.log(`  ${engineer.name}: ${checkDate.toLocaleDateString()} - would exceed capacity: ${dayFit.reasons.join(', ')}`);
@@ -283,17 +287,48 @@ export const getSmartEngineerRecommendations = async (order: Order, postcode?: s
              }
            }
 
+          // If no date found within horizon, try extended search up to 365 days
+          if (!availableDate && maxCheckDays < 365) {
+            const extendedMaxDays = 365;
+            while (!availableDate && daysChecked < extendedMaxDays) {
+              if (isEngineerAvailableOnDate(engineer, checkDate)) {
+                const isWeekend = checkDate.getDay() === 0 || checkDate.getDay() === 6;
+                if (isWeekend && !settings.allow_weekend_bookings) {
+                  checkDate.setDate(checkDate.getDate() + 1);
+                  daysChecked++;
+                  continue;
+                }
+
+                const dailyWorkload = await getEngineerDailyWorkload(engineer.id, checkDate.toISOString().split('T')[0]);
+                if (dailyWorkload >= settings.max_jobs_per_day) {
+                  checkDate.setDate(checkDate.getDate() + 1);
+                  daysChecked++;
+                  continue;
+                }
+
+                const dayFit = await calculateDayFit(engineer, checkDate, order, settings.day_lenience_minutes);
+                if (dayFit.canFit) {
+                  availableDate = new Date(checkDate);
+                  dailyWorkloadThatDay = dailyWorkload;
+                  break;
+                }
+              }
+              checkDate.setDate(checkDate.getDate() + 1);
+              daysChecked++;
+            }
+          }
+
           if (!availableDate) {
-            exclusionReasons[engineer.name].push(`No availability within ${maxCheckDays} days`);
-            console.log(`Engineer ${engineer.name} has no availability within ${maxCheckDays} days`);
+            exclusionReasons[engineer.name].push(`No availability within ${maxCheckDays} days (checked ${daysChecked} days)`);
+            console.log(`Engineer ${engineer.name} has no availability within ${daysChecked} days`);
             return null;
           }
 
-          // Calculate recommendation score
-          const score = calculateEngineerScore(engineer, distance, travelTime, availableDate);
+          // Calculate recommendation score (kept for display purposes)
+          const score = calculateEngineerScore(engineer, distance, travelTime, availableDate, dailyWorkloadThatDay);
           
-          // Generate recommendation reasons
-          const reasons = generateRecommendationReasons(engineer, distance, travelTime, availableDate, minimumDate);
+          // Generate recommendation reasons including workload info
+          const reasons = generateRecommendationReasons(engineer, distance, travelTime, availableDate, minimumDate, dailyWorkloadThatDay);
 
           return {
             engineer: engineer as Engineer,
@@ -301,7 +336,8 @@ export const getSmartEngineerRecommendations = async (order: Order, postcode?: s
             travelTime,
             score,
             reasons,
-            availableDate: availableDate.toISOString().split('T')[0]
+            availableDate: availableDate.toISOString().split('T')[0],
+            dailyWorkloadThatDay
           };
         } catch (error) {
           exclusionReasons[engineer.name].push(`Evaluation error: ${error}`);
@@ -311,12 +347,41 @@ export const getSmartEngineerRecommendations = async (order: Order, postcode?: s
       })
     );
 
-    // Filter out null recommendations and sort by score
+    // Filter out null recommendations and sort by new priority system
     const validRecommendations = recommendations
       .filter(rec => rec !== null)
-      .sort((a, b) => b!.score - a!.score);
+      .sort((a, b) => {
+        // 1. Sort by available date (earlier first)
+        const dateA = new Date(a!.availableDate).getTime();
+        const dateB = new Date(b!.availableDate).getTime();
+        if (dateA !== dateB) {
+          return dateA - dateB;
+        }
+        
+        // 2. Sort by travel time (shorter first)
+        if (a!.travelTime !== b!.travelTime) {
+          return a!.travelTime - b!.travelTime;
+        }
+        
+        // 3. Sort by daily workload (0 jobs preferred)
+        if (a!.dailyWorkloadThatDay !== b!.dailyWorkloadThatDay) {
+          return a!.dailyWorkloadThatDay - b!.dailyWorkloadThatDay;
+        }
+        
+        // 4. Sort by distance (shorter first)
+        if (a!.distance !== b!.distance) {
+          return a!.distance - b!.distance;
+        }
+        
+        // 5. Final tie-breaker by score
+        return b!.score - a!.score;
+      });
 
     console.log(`Generated ${validRecommendations.length} valid recommendations`);
+    
+    // Split into featured and all
+    const topCount = settings.top_recommendations_count || 3;
+    const featured = validRecommendations.slice(0, topCount);
     
     // Log exclusion summary for diagnostics
     const excludedEngineers = Object.entries(exclusionReasons)
@@ -330,7 +395,9 @@ export const getSmartEngineerRecommendations = async (order: Order, postcode?: s
     }
 
     return {
-      recommendations: validRecommendations,
+      recommendations: validRecommendations, // Keep for backward compatibility
+      featured,
+      all: validRecommendations,
       settings,
       diagnostics: {
         totalEngineers: allEngineers.length,
@@ -342,6 +409,8 @@ export const getSmartEngineerRecommendations = async (order: Order, postcode?: s
     console.error('Error getting engineer recommendations:', error);
     return {
       recommendations: [],
+      featured: [],
+      all: [],
       settings: await getSchedulingSettings()
     };
   }
@@ -424,7 +493,19 @@ export async function getEngineerDailyWorkload(engineerId: string, date: string)
 /**
  * Get scheduling settings from admin_settings
  */
-export async function getSchedulingSettings() {
+export async function getSchedulingSettings(): Promise<{
+  minimum_advance_hours: number;
+  max_distance_miles: number;
+  max_jobs_per_day: number;
+  working_hours_start: string;
+  working_hours_end: string;
+  day_lenience_minutes: number;
+  allow_weekend_bookings: boolean;
+  allow_holiday_bookings: boolean;
+  require_client_confirmation: boolean;
+  recommendation_search_horizon_days: number;
+  top_recommendations_count: number;
+}> {
   try {
     const { data: schedulingRules, error: schedulingError } = await supabase
       .from('admin_settings')
@@ -447,7 +528,9 @@ export async function getSchedulingSettings() {
       day_lenience_minutes: 15,
       allow_weekend_bookings: false,
       allow_holiday_bookings: false,
-      require_client_confirmation: true
+      require_client_confirmation: true,
+      recommendation_search_horizon_days: 120,
+      top_recommendations_count: 3
     };
 
     // Safely merge settings, ensuring they're objects
@@ -474,7 +557,9 @@ export async function getSchedulingSettings() {
       day_lenience_minutes: 15,
       allow_weekend_bookings: false,
       allow_holiday_bookings: false,
-      require_client_confirmation: true
+      require_client_confirmation: true,
+      recommendation_search_horizon_days: 120,
+      top_recommendations_count: 3
     };
   }
 }
@@ -486,7 +571,8 @@ function calculateEngineerScore(
   engineer: EngineerSettings,
   distance: number,
   travelTime: number,
-  availableDate: Date
+  availableDate: Date,
+  dailyWorkload: number = 0
 ): number {
   let score = 100;
 
@@ -504,6 +590,11 @@ function calculateEngineerScore(
   const availabilityBonus = Math.max(20 - daysUntilAvailable, 0); // Up to 20 point bonus
   score += availabilityBonus;
 
+  // Workload bonus (0 jobs preferred)
+  if (dailyWorkload === 0) {
+    score += 8; // Small bonus for free day
+  }
+
   // Ensure score stays within 0-100 range
   return Math.max(0, Math.min(100, Math.round(score)));
 }
@@ -516,35 +607,28 @@ function generateRecommendationReasons(
   distance: number,
   travelTime: number,
   availableDate: Date,
-  minimumDate: Date
+  minimumDate: Date,
+  dailyWorkload: number = 0
 ): string[] {
   const reasons: string[] = [];
 
+  // First doable date (always first)
+  reasons.push(`First available: ${availableDate.toLocaleDateString()}`);
+
+  // Workload on that day
+  if (dailyWorkload === 0) {
+    reasons.push('0 jobs on that day');
+  } else {
+    reasons.push(`${dailyWorkload} job${dailyWorkload === 1 ? '' : 's'} on that day`);
+  }
+
   // Distance and travel time
-  if (distance <= 10) {
-    reasons.push(`Very close location (${distance} miles)`);
-  } else if (distance <= 25) {
-    reasons.push(`Reasonable distance (${distance} miles)`);
+  if (distance <= 10 && travelTime <= 30) {
+    reasons.push(`Very close (${distance.toFixed(1)}mi, ${travelTime}min)`);
+  } else if (distance <= 25 && travelTime <= 60) {
+    reasons.push(`Reasonable distance (${distance.toFixed(1)}mi, ${travelTime}min)`);
   } else {
-    reasons.push(`Within service area (${distance} miles)`);
-  }
-
-  if (travelTime <= 30) {
-    reasons.push(`Short travel time (${travelTime} minutes)`);
-  } else if (travelTime <= 60) {
-    reasons.push(`Moderate travel time (${travelTime} minutes)`);
-  }
-
-  // Availability timing
-  const daysUntilAvailable = Math.ceil((availableDate.getTime() - minimumDate.getTime()) / (1000 * 60 * 60 * 24));
-  if (daysUntilAvailable === 0) {
-    reasons.push('Available from earliest possible date');
-  } else if (daysUntilAvailable <= 3) {
-    reasons.push(`Available very soon (${daysUntilAvailable} days)`);
-  } else if (daysUntilAvailable <= 7) {
-    reasons.push(`Available within a week (${daysUntilAvailable} days)`);
-  } else {
-    reasons.push(`Next availability: ${availableDate.toLocaleDateString()}`);
+    reasons.push(`${distance.toFixed(1)}mi away, ${travelTime}min travel`);
   }
 
   // Engineer qualifications

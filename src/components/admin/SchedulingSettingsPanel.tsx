@@ -19,6 +19,8 @@ interface SchedulingSettings {
   allow_weekend_bookings: boolean;
   allow_holiday_bookings: boolean;
   require_client_confirmation: boolean;
+  recommendation_search_horizon_days?: number;
+  top_recommendations_count?: number;
 }
 
 export function SchedulingSettingsPanel() {
@@ -101,6 +103,8 @@ export function SchedulingSettingsPanel() {
         working_hours_start: settings.working_hours_start,
         working_hours_end: settings.working_hours_end,
         day_lenience_minutes: settings.day_lenience_minutes,
+        recommendation_search_horizon_days: settings.recommendation_search_horizon_days,
+        top_recommendations_count: settings.top_recommendations_count,
       };
 
       const bookingRules = {
@@ -388,6 +392,44 @@ export function SchedulingSettingsPanel() {
                 />
                 <p className="text-xs text-muted-foreground">
                   Allow engineers to get home this many minutes after their end time
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="recommendation_horizon">Recommendation Search (days)</Label>
+                <Input
+                  id="recommendation_horizon"
+                  type="number"
+                  min="30"
+                  max="365"
+                  value={settings.recommendation_search_horizon_days || 120}
+                  onChange={(e) => setSettings(prev => ({ 
+                    ...prev, 
+                    recommendation_search_horizon_days: parseInt(e.target.value) || 120 
+                  }))}
+                />
+                <p className="text-xs text-muted-foreground">
+                  How far to search for engineer availability
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="top_recommendations">Top Recommendations Count</Label>
+                <Input
+                  id="top_recommendations"
+                  type="number"
+                  min="1"
+                  max="10"
+                  value={settings.top_recommendations_count || 3}
+                  onChange={(e) => setSettings(prev => ({ 
+                    ...prev, 
+                    top_recommendations_count: parseInt(e.target.value) || 3 
+                  }))}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Number of featured recommendations to show
                 </p>
               </div>
             </div>
