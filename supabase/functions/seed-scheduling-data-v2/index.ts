@@ -37,7 +37,7 @@ const getCorsHeaders = (origin?: string | null) => {
 };
 
 serve(async (req) => {
-  console.log('[seed-scheduling-data-v2] Build 2025-01-17-v2-deploy - FRESH DEPLOY with 204 preflight');
+  console.log('[seed-scheduling-data-v2] GitHub Actions Deploy Test - Auto deployment triggered');
   
   const origin = req.headers.get('Origin');
   const corsHeaders = getCorsHeaders(origin);
