@@ -169,13 +169,7 @@ serve(async (req) => {
 
     console.log(`Starting seed with ${clients} clients, ${orders_per_client_min}-${orders_per_client_max} orders per client`);
 
-    // Get existing engineers for assignment
-    const { data: engineers } = await supabaseAdmin
-      .from('engineers')
-      .select('id, name, starting_postcode')
-      .eq('availability', true);
-
-    console.log(`Found ${engineers?.length || 0} available engineers`);
+    console.log('About to start creating clients and orders in batches');
 
     // Postcode areas and cities for realistic data
     const postcodeAreas = [
@@ -227,6 +221,19 @@ serve(async (req) => {
 
     console.log(`Starting seed with ${clients} clients, ${orders_per_client_min}-${orders_per_client_max} orders per client`);
 
+    // Get existing engineers for assignment
+    const { data: engineers, error: engineersError } = await supabaseAdmin
+      .from('engineers')
+      .select('id, name, starting_postcode')
+      .eq('availability', true);
+
+    if (engineersError) {
+      console.error('Failed to fetch engineers:', engineersError);
+      errors.push(`Engineers fetch error: ${engineersError.message}`);
+    }
+
+    console.log(`Found ${engineers?.length || 0} available engineers`);
+
     // Create clients and orders in batches
     const batchSize = 20;
     for (let batch = 0; batch < Math.ceil(clients / batchSize); batch++) {
@@ -236,6 +243,7 @@ serve(async (req) => {
       console.log(`Processing batch ${batch + 1}: clients ${batchStart + 1}-${batchEnd}`);
       
       for (let i = batchStart; i < batchEnd; i++) {
+        console.log(`Creating client ${i + 1} of ${clients}`);
         const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
         const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
         const location = postcodeAreas[Math.floor(Math.random() * postcodeAreas.length)];
@@ -253,10 +261,14 @@ serve(async (req) => {
         if (userError) {
           console.error(`Failed to create user ${i + 1}:`, userError);
           errors.push(`User ${i + 1}: ${userError.message}`);
-          if (errors.length >= 5) break; // Stop after 5 consecutive errors
+          if (errors.length >= 5) {
+            console.log('Stopping after 5 consecutive user creation errors');
+            break; // Stop after 5 consecutive errors
+          }
           continue;
         }
 
+        console.log(`Successfully created user ${i + 1}: ${authUser.user.email}`);
         createdCounts.users++;
 
         // Create profile
@@ -294,10 +306,14 @@ serve(async (req) => {
         if (clientError) {
           console.error(`Failed to create client ${i + 1}:`, clientError);
           errors.push(`Client ${i + 1}: ${clientError.message}`);
-          if (errors.length >= 5) break;
+          if (errors.length >= 5) {
+            console.log('Stopping after 5 consecutive client creation errors');
+            break;
+          }
           continue;
         }
 
+        console.log(`Successfully created client ${i + 1}: ${client.full_name}`);
         createdCounts.clients++;
 
         // Create 1-2 quotes per client
