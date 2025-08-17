@@ -10,7 +10,7 @@ import { Upload, AlertTriangle, CheckCircle, Info } from 'lucide-react';
 
 interface EngineerCsvImportProps {
   open: boolean;
-  onOpenChange: (open: boolean) => void;
+  onOpenChange: React.Dispatch<React.SetStateAction<boolean>>;
   onImportComplete: () => void;
 }
 
