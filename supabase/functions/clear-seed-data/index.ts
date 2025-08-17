@@ -37,16 +37,18 @@ const getCorsHeaders = (origin?: string | null) => {
 };
 
 serve(async (req) => {
+  console.log('[clear-seed-data] Build 2025-01-17-v2 - CORS preflight 204 + verify_jwt=false');
+  
   const origin = req.headers.get('Origin');
   const corsHeaders = getCorsHeaders(origin);
   
   console.log(`${req.method} request from origin: ${origin || 'none'}`);
   
   if (req.method === 'OPTIONS') {
-    console.log('Handling CORS preflight request');
+    console.log('Handling CORS preflight request with 204');
     return new Response(null, { 
       headers: corsHeaders,
-      status: 200
+      status: 204
     });
   }
 
