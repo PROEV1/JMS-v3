@@ -74,17 +74,22 @@ export function getBestPostcode(order: {
 }
 
 /**
- * Extracts the outward code from a UK postcode (the part before the space)
- * Examples: "DA5 1BJ" -> "DA5", "SW1A 1AA" -> "SW1A", "M1 1AA" -> "M1"
+ * Extracts the outward code from a UK postcode using robust regex parsing
+ * Handles both spaced and unspaced postcodes correctly
+ * Examples: "DA5 1BJ" -> "DA5", "SW1A1AA" -> "SW1A", "M11AA" -> "M1", "NE65DY" -> "NE65"
  */
 export function getOutwardCode(postcode: string): string {
   if (!postcode) return '';
   
-  const normalized = normalizePostcode(postcode);
+  // Normalize first: uppercase, replace O with 0, remove all spaces
+  const normalized = postcode.replace(/O/g, '0').replace(/\s+/g, '').toUpperCase().trim();
   
-  // Split by space and take the first part (outward code)
-  const parts = normalized.split(' ');
-  return parts[0] || '';
+  // UK postcode outward code regex patterns:
+  // 1-2 letters, followed by 1-2 digits, optionally followed by a letter
+  const outwardCodePattern = /^([A-Z]{1,2}[0-9]{1,2}[A-Z]?)/;
+  const match = normalized.match(outwardCodePattern);
+  
+  return match ? match[1] : '';
 }
 
 /**
