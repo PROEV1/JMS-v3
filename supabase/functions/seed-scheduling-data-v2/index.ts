@@ -279,6 +279,12 @@ serve(async (req) => {
 
     console.log(`Found ${engineers?.length || 0} available engineers`);
 
+    // Get all existing seed users once at the start to avoid repeated API calls
+    console.log('Fetching existing seed users...');
+    const { data: allExistingUsers } = await supabaseAdmin.auth.admin.listUsers();
+    const existingSeedUsers = allExistingUsers?.users?.filter(u => u.email?.includes('@seed.local')) || [];
+    console.log(`Found ${existingSeedUsers.length} existing seed users`);
+
     // Create clients and orders in batches
     const batchSize = 20;
     for (let batch = 0; batch < Math.ceil(clients / batchSize); batch++) {
@@ -293,46 +299,44 @@ serve(async (req) => {
         const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
         const location = postcodeAreas[Math.floor(Math.random() * postcodeAreas.length)];
         
-        // Create auth user with explicit admin privileges - handle existing users
-        console.log(`Attempting to create auth user ${i + 1}...`);
+        // Check if user already exists first to avoid creation errors
+        console.log(`Checking for existing user ${i + 1}...`);
         let authUser;
-        const { data: createUserData, error: userError } = await supabaseAdmin.auth.admin.createUser({
-          email: `seed+${i + 1}@seed.local`,
-          password: 'SeedPassword123!',
-          email_confirm: true,
-          user_metadata: {
-            full_name: `${firstName} ${lastName}`,
-            created_by: 'seed-function'
-          }
-        });
+        
+        // Check if user already exists in our pre-fetched list
+        const existingUser = existingSeedUsers.find(u => u.email === `seed+${i + 1}@seed.local`);
+        
+        if (existingUser) {
+          console.log(`Found existing user ${i + 1}: ${existingUser.email}`);
+          authUser = { user: existingUser };
+        } else {
+          // User doesn't exist, create new one
+          console.log(`Creating new auth user ${i + 1}...`);
+          const { data: createUserData, error: userError } = await supabaseAdmin.auth.admin.createUser({
+            email: `seed+${i + 1}@seed.local`,
+            password: 'SeedPassword123!',
+            email_confirm: true,
+            user_metadata: {
+              full_name: `${firstName} ${lastName}`,
+              created_by: 'seed-function'
+            }
+          });
 
-        if (userError && userError.message?.includes('already been registered')) {
-          // User already exists, find them
-          console.log(`User ${i + 1} already exists, looking up existing user...`);
-          const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
-          const existingUser = existingUsers?.users?.find(u => u.email === `seed+${i + 1}@seed.local`);
-          if (existingUser) {
-            authUser = { user: existingUser };
-            console.log(`Found existing user ${i + 1}: ${existingUser.email}`);
-          } else {
-            console.error(`Could not find existing user ${i + 1}`);
-            errors.push(`User ${i + 1}: Could not create or find existing user`);
+          if (userError) {
+            console.error(`Failed to create user ${i + 1}:`, userError);
+            errors.push(`User ${i + 1}: ${userError.message}`);
+            if (errors.filter(e => e.includes('User')).length >= 5) {
+              console.log('Stopping after 5 consecutive user creation errors');
+              break;
+            }
             continue;
           }
-        } else if (userError) {
-          console.error(`Failed to create user ${i + 1}:`, userError);
-          errors.push(`User ${i + 1}: ${userError.message}`);
-          if (errors.length >= 5) {
-            console.log('Stopping after 5 consecutive user creation errors');
-            break;
-          }
-          continue;
-        } else {
+          
           authUser = createUserData;
+          createdCounts.users++;
         }
 
-        console.log(`Successfully created user ${i + 1}: ${authUser.user.email}`);
-        createdCounts.users++;
+        console.log(`Successfully processed user ${i + 1}: ${authUser.user.email}`);
 
         // Create profile with explicit RLS bypass - handle existing profiles
         console.log(`Creating profile for user ${i + 1}...`);
