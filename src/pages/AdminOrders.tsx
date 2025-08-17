@@ -76,7 +76,6 @@ export default function AdminOrders() {
       // Transform data to match our interface, providing defaults for missing fields
       const transformedOrders: Order[] = (data || []).map(order => ({
         ...order,
-        engineer_status: undefined, // This field doesn't exist in the database schema
       }));
 
       setOrders(transformedOrders);

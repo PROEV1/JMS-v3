@@ -32,7 +32,6 @@ interface EngineerJob {
   job_address: string;
   scheduled_install_date: string | null;
   status_enhanced: OrderStatusEnhanced;
-  engineer_status: string | null;
   product_details: string;
   client_phone: string;
   total_amount: number;
@@ -139,7 +138,6 @@ export default function EngineerDashboard() {
         job_address: job.job_address || 'Address not specified',
         scheduled_install_date: job.scheduled_install_date,
         status_enhanced: job.status_enhanced as OrderStatusEnhanced,
-        engineer_status: 'pending', // Default value since column doesn't exist
         product_details: job.quotes?.product_details || 'No product details',
         total_amount: job.total_amount,
         engineer_signed_off_at: job.engineer_signed_off_at,

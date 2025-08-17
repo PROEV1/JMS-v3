@@ -8,7 +8,7 @@ import { Clock, Navigation, Play, CheckCircle, MapPin } from 'lucide-react';
 
 interface JobStatusUpdaterProps {
   jobId: string;
-  currentStatus: string;
+  currentStatus: string | null;
   jobAddress: string;
   onStatusUpdate: () => void;
 }
@@ -46,11 +46,10 @@ export default function JobStatusUpdater({
     console.log('Updating job status to:', newStatus, 'for job ID:', jobId);
     
     try {
-      // Update the engineer_status field specifically for engineer progress
+      // Update just the manual status fields for order tracking
       const { error } = await supabase
         .from('orders')
         .update({ 
-          engineer_status: newStatus,
           manual_status_override: true,
           manual_status_notes: `Engineer status: ${JOB_STATUSES.find(s => s.key === newStatus)?.label}`
         })
@@ -75,7 +74,7 @@ export default function JobStatusUpdater({
         p_activity_type: 'engineer_status_update',
         p_description: `Engineer updated status to ${JOB_STATUSES.find(s => s.key === newStatus)?.label}`,
         p_details: {
-          engineer_status: newStatus,
+          status_update: newStatus,
           updated_by_engineer: true
         }
       });

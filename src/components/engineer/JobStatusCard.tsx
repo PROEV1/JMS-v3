@@ -14,7 +14,6 @@ interface JobStatusCardProps {
     job_address: string;
     scheduled_install_date: string | null;
     status_enhanced: OrderStatusEnhanced;
-    engineer_status: string | null;
     product_details: string;
     engineer_signed_off_at: string | null;
     upload_count?: number;
@@ -22,7 +21,7 @@ interface JobStatusCardProps {
   onActionClick: (jobId: string, action: 'start' | 'continue' | 'upload' | 'view') => void;
 }
 
-const getStatusConfig = (status: OrderStatusEnhanced, engineerStatus: string | null, signedOff: boolean, hasUploads: boolean) => {
+const getStatusConfig = (status: OrderStatusEnhanced, signedOff: boolean, hasUploads: boolean) => {
   // Priority: Check if completed but missing uploads
   if (signedOff && !hasUploads) {
     return {
@@ -35,52 +34,32 @@ const getStatusConfig = (status: OrderStatusEnhanced, engineerStatus: string | n
     };
   }
 
-  // Then check engineer status progression
-  switch (engineerStatus) {
-    case 'completed':
-      return {
-        color: 'bg-green-100 text-green-800 border-green-200',
-        icon: CheckCircle,
-        label: 'Completed',
-        action: 'view' as const,
-        actionLabel: 'View Details',
-        actionVariant: 'outline' as const
-      };
-    case 'in_progress':
-      return {
-        color: 'bg-orange-100 text-orange-800 border-orange-200',
-        icon: Play,
-        label: 'In Progress',
-        action: 'continue' as const,
-        actionLabel: 'Continue Job',
-        actionVariant: 'default' as const
-      };
-    case 'on_way':
-      return {
-        color: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-        icon: Navigation,
-        label: 'On Way',
-        action: 'continue' as const,
-        actionLabel: 'Continue Job',
-        actionVariant: 'default' as const
-      };
-    case 'scheduled':
-    default:
-      return {
-        color: 'bg-blue-100 text-blue-800 border-blue-200',
-        icon: Clock,
-        label: 'Scheduled',
-        action: 'start' as const,
-        actionLabel: 'Start Job',
-        actionVariant: 'default' as const
-      };
+  // Check if signed off (completed)
+  if (signedOff) {
+    return {
+      color: 'bg-green-100 text-green-800 border-green-200',
+      icon: CheckCircle,
+      label: 'Completed',
+      action: 'view' as const,
+      actionLabel: 'View Details',
+      actionVariant: 'outline' as const
+    };
   }
+
+  // Default to scheduled status
+  return {
+    color: 'bg-blue-100 text-blue-800 border-blue-200',
+    icon: Clock,
+    label: 'Scheduled',
+    action: 'start' as const,
+    actionLabel: 'Start Job',
+    actionVariant: 'default' as const
+  };
 };
 
 export function JobStatusCard({ job, onActionClick }: JobStatusCardProps) {
   const statusConfig = getStatusConfig(
     job.status_enhanced,
-    job.engineer_status,
     !!job.engineer_signed_off_at,
     (job.upload_count || 0) > 0
   );

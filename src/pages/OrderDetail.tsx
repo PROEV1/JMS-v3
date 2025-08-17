@@ -26,7 +26,6 @@ interface Order {
   status_enhanced: OrderStatusEnhanced;
   manual_status_override: boolean;
   manual_status_notes: string | null;
-  engineer_status: string | null;
   total_amount: number;
   deposit_amount: number;
   amount_paid: number;

@@ -44,7 +44,6 @@ interface JobDetails {
   scheduled_install_date: string | null;
   status: string;
   status_enhanced: string;
-  engineer_status: string;
   product_details: string;
   total_amount: number;
   quote: {
@@ -162,7 +161,6 @@ export default function EngineerJobDetail() {
         scheduled_install_date: data.scheduled_install_date,
         status: data.status,
         status_enhanced: data.status_enhanced,
-        engineer_status: 'scheduled', // Default value since column doesn't exist
         product_details: data.quote.product_details,
         total_amount: data.total_amount,
         quote: {
@@ -388,8 +386,7 @@ export default function EngineerJobDetail() {
         .update({
           engineer_signed_off_at: null,
           engineer_signature_data: null,
-          status: 'in_progress',
-          engineer_status: null
+          status: 'in_progress'
         })
         .eq('id', jobId);
 
@@ -472,7 +469,7 @@ export default function EngineerJobDetail() {
           {!job.engineer_signed_off_at && (
             <JobStatusUpdater
               jobId={job.id}
-              currentStatus={job.engineer_status}
+              currentStatus={null}
               jobAddress={job.job_address}
               onStatusUpdate={fetchJobDetails}
             />

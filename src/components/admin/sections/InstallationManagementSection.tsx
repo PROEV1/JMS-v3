@@ -6,7 +6,6 @@ import { Wrench } from "lucide-react";
 interface Order {
   id: string;
   engineer_id: string | null;
-  engineer_status: string | null;
   scheduled_install_date: string | null;
   time_window: string | null;
   estimated_duration_hours: number | null;
@@ -41,15 +40,6 @@ export function InstallationManagementSection({ order, onUpdate }: InstallationM
       defaultOpen={!isScheduled}
     >
       <div className="space-y-4">
-        {order.engineer_status && order.engineer_id && (
-          <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
-            <span className="text-sm font-medium text-muted-foreground">Engineer Progress:</span>
-            <EngineerStatusBadge status={order.engineer_status} />
-            {order.engineer && (
-              <span className="text-sm text-muted-foreground">by {order.engineer.name}</span>
-            )}
-          </div>
-        )}
         
         <UnifiedInstallationForm
           orderId={order.id}
