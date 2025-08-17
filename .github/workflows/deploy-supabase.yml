@@ -4,11 +4,17 @@ on:
   push:
     branches:
       - main
-      - '**'
+      - 'feature/**'
+      - 'dev/**'
     paths:
       - 'supabase/functions/**'
       - 'supabase/config.toml'
   workflow_dispatch:
+    inputs:
+      function_name:
+        description: 'Specific function to deploy (leave empty for all)'
+        required: false
+        default: ''
 
 jobs:
   deploy:
@@ -25,18 +31,29 @@ jobs:
 
       - name: Link to Supabase project
         run: |
+          echo "🔗 Linking to Supabase project..."
           supabase link --project-ref "${{ secrets.SUPABASE_PROJECT_REF || 'qvppvstgconmzzjsryna' }}"
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
+      - name: Deploy specific function (if specified)
+        if: ${{ github.event.inputs.function_name != '' }}
+        run: |
+          echo "🚀 Deploying function: ${{ github.event.inputs.function_name }}"
+          supabase functions deploy ${{ github.event.inputs.function_name }} --project-ref "${{ secrets.SUPABASE_PROJECT_REF || 'qvppvstgconmzzjsryna' }}"
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
       - name: Deploy seed-scheduling-data-v2 function first
+        if: ${{ github.event.inputs.function_name == '' }}
         run: |
           echo "🚀 Deploying seed-scheduling-data-v2 function..."
           supabase functions deploy seed-scheduling-data-v2 --project-ref "${{ secrets.SUPABASE_PROJECT_REF || 'qvppvstgconmzzjsryna' }}"
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
-      - name: Deploy all other functions
+      - name: Deploy all functions
+        if: ${{ github.event.inputs.function_name == '' }}
         run: |
           echo "🚀 Deploying all functions..."
           supabase functions deploy --project-ref "${{ secrets.SUPABASE_PROJECT_REF || 'qvppvstgconmzzjsryna' }}" --all
@@ -53,6 +70,12 @@ jobs:
       - name: Test seed-scheduling-data-v2 deployment
         run: |
           echo "🧪 Testing seed-scheduling-data-v2 function..."
-          curl -X GET "https://qvppvstgconmzzjsryna.supabase.co/functions/v1/seed-scheduling-data-v2" \
-            -H "apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF2cHB2c3RnY29ubXp6anNyeW5hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUyNTYxNjEsImV4cCI6MjA3MDgzMjE2MX0.3hJXqRe_xTpIhdIIEDBgG-8qc23UCRMwpLaf2zV0Se8" \
-            --fail-with-body
+          response=$(curl -s -X GET "https://qvppvstgconmzzjsryna.supabase.co/functions/v1/seed-scheduling-data-v2" \
+            -H "apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF2cHB2c3RnY29ubXp6anNyeW5hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUyNTYxNjEsImV4cCI6MjA3MDgzMjE2MX0.3hJXqRe_xTpIhdIIEDBgG-8qc23UCRMwpLaf2zV0Se8") 
+          echo "Response: $response"
+          if echo "$response" | grep -q '"ok":true'; then
+            echo "✅ Function deployment verified!"
+          else
+            echo "❌ Function test failed"
+            exit 1
+          fi

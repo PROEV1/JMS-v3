@@ -318,20 +318,22 @@ serve(async (req) => {
         console.log(`Successfully created user ${i + 1}: ${authUser.user.email}`);
         createdCounts.users++;
 
-        // Create profile with explicit RLS bypass
+        // Create profile with explicit RLS bypass - handle existing profiles
         console.log(`Creating profile for user ${i + 1}...`);
         const { error: profileError } = await supabaseAdmin
           .from('profiles')
-          .insert({
+          .upsert({
             user_id: authUser.user.id,
             email: `seed+${i + 1}@seed.local`,
             full_name: `${firstName} ${lastName}`,
             role: 'client',
             status: 'active'
+          }, {
+            onConflict: 'user_id'
           });
 
         if (profileError) {
-          console.error(`Failed to create profile ${i + 1}:`, profileError);
+          console.error(`Failed to create/update profile ${i + 1}:`, profileError);
           errors.push(`Profile ${i + 1}: ${profileError.message}`);
           if (errors.length >= 5) {
             console.log('Stopping after 5 consecutive profile creation errors');
@@ -340,25 +342,27 @@ serve(async (req) => {
           continue;
         }
 
-        console.log(`Successfully created profile for user ${i + 1}`);
+        console.log(`Successfully created/updated profile for user ${i + 1}`);
 
-        // Create client with explicit RLS bypass
+        // Create client with explicit RLS bypass - handle existing clients
         console.log(`Creating client record for user ${i + 1}...`);
         const { data: client, error: clientError } = await supabaseAdmin
           .from('clients')
-          .insert({
+          .upsert({
             user_id: authUser.user.id,
             full_name: `${firstName} ${lastName}`,
             email: `seed+${i + 1}@seed.local`,
             phone: `07${Math.floor(Math.random() * 900000000) + 100000000}`,
             address: `${Math.floor(Math.random() * 200) + 1} ${['High Street', 'Main Road', 'Church Lane', 'Mill Street', 'Victoria Road'][Math.floor(Math.random() * 5)]}, ${location.city}`,
             postcode: location.postcode
+          }, {
+            onConflict: 'user_id'
           })
           .select()
           .single();
 
         if (clientError) {
-          console.error(`Failed to create client ${i + 1}:`, clientError);
+          console.error(`Failed to create/update client ${i + 1}:`, clientError);
           errors.push(`Client ${i + 1}: ${clientError.message}`);
           if (errors.length >= 5) {
             console.log('Stopping after 5 consecutive client creation errors');
@@ -367,7 +371,7 @@ serve(async (req) => {
           continue;
         }
 
-        console.log(`Successfully created client ${i + 1}: ${client.full_name}`);
+        console.log(`Successfully created/updated client ${i + 1}: ${client.full_name}`);
         createdCounts.clients++;
 
         // Create 1-2 quotes per client
