@@ -3,7 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Order, Engineer, getStatusColor } from '@/utils/schedulingUtils';
-import { ChevronLeft, ChevronRight, User, AlertTriangle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, User, AlertTriangle, Clock, MapPin } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 interface WeekViewCalendarProps {
   orders: Order[];
@@ -21,6 +22,7 @@ export function WeekViewCalendar({
   onDateChange
 }: WeekViewCalendarProps) {
   const [weekStart, setWeekStart] = useState<Date>(getWeekStart(currentDate));
+  const navigate = useNavigate();
 
   useEffect(() => {
     setWeekStart(getWeekStart(currentDate));
@@ -104,11 +106,11 @@ export function WeekViewCalendar({
                 {weekDays.map((day, index) => (
                   <th 
                     key={index} 
-                    className={`
-                      p-2 text-center font-medium border-b min-w-[120px]
-                      ${isWeekend(day) ? 'bg-muted/50 text-muted-foreground' : ''}
-                      ${isToday(day) ? 'bg-primary/10 text-primary font-bold' : ''}
-                    `}
+                     className={`
+                       p-2 text-center font-medium border-b min-w-[140px]
+                       ${isWeekend(day) ? 'bg-muted/50 text-muted-foreground' : ''}
+                       ${isToday(day) ? 'bg-primary/10 text-primary font-bold' : ''}
+                     `}
                   >
                     <div className="flex flex-col">
                       <span className="text-xs">{day.toLocaleDateString('en-GB', { weekday: 'short' })}</span>
@@ -142,23 +144,23 @@ export function WeekViewCalendar({
                       <td 
                         key={dayIndex} 
                         className={`
-                          p-1 border-r text-center align-top
+                          p-2 border-r text-center align-top
                           ${isWeekend(day) ? 'bg-muted/30' : ''}
                           ${isToday(day) ? 'bg-primary/5' : ''}
-                          ${isOverloaded ? 'bg-red-50 border-red-200' : ''}
-                          ${isBusy && !isOverloaded ? 'bg-yellow-50 border-yellow-200' : ''}
+                          ${isOverloaded ? 'bg-red-50/50 border-red-200' : ''}
+                          ${isBusy && !isOverloaded ? 'bg-yellow-50/50 border-yellow-200' : ''}
                         `}
                       >
-                        <div className="space-y-1 min-h-[60px]">
+                        <div className="space-y-2 min-h-[80px] p-1">
                           {workload > 0 && (
-                            <div className="flex items-center justify-center mb-1">
+                            <div className="flex items-center justify-center mb-2">
                               <Badge 
                                 variant="outline" 
                                 className={`
-                                  text-xs px-1 py-0
-                                  ${isOverloaded ? 'text-red-600 border-red-300' : ''}
-                                  ${isBusy && !isOverloaded ? 'text-yellow-600 border-yellow-300' : ''}
-                                  ${workload === 1 ? 'text-green-600 border-green-300' : ''}
+                                  text-xs px-2 py-1
+                                  ${isOverloaded ? 'text-red-600 border-red-300 bg-red-50' : ''}
+                                  ${isBusy && !isOverloaded ? 'text-yellow-600 border-yellow-300 bg-yellow-50' : ''}
+                                  ${workload === 1 ? 'text-green-600 border-green-300 bg-green-50' : ''}
                                 `}
                               >
                                 {workload} {workload === 1 ? 'job' : 'jobs'}
@@ -166,29 +168,50 @@ export function WeekViewCalendar({
                             </div>
                           )}
                           
-                          {dayOrders.slice(0, 2).map((order) => (
+                          {dayOrders.slice(0, 3).map((order) => (
                             <div
                               key={order.id}
-                              className="text-xs p-1 rounded cursor-pointer hover:shadow-sm transition-shadow"
+                              className="bg-white border border-border rounded-md p-2 cursor-pointer hover:shadow-md transition-all duration-200 hover:border-primary/40 min-h-[60px] flex flex-col justify-between"
                               style={{ 
-                                backgroundColor: getStatusColor(order.status_enhanced) + '20',
-                                borderLeft: `3px solid ${getStatusColor(order.status_enhanced)}`
+                                borderLeftColor: getStatusColor(order.status_enhanced),
+                                borderLeftWidth: '3px'
                               }}
-                              onClick={() => onOrderClick(order)}
+                              onClick={() => navigate(`/admin/order/${order.id}`)}
                             >
-                              <div className="font-medium truncate">{order.order_number}</div>
-                              <div className="text-xs opacity-75 truncate">
-                                {order.client?.full_name}
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-1 text-xs font-medium text-primary">
+                                  <span>Install</span>
+                                </div>
+                                
+                                {order.postcode && (
+                                  <div className="flex items-center gap-1 text-xs font-semibold">
+                                    <MapPin className="h-3 w-3" />
+                                    <span>{order.postcode}</span>
+                                  </div>
+                                )}
+                                
+                                <div className="text-xs text-muted-foreground truncate">
+                                  {order.client?.full_name}
+                                </div>
                               </div>
-                              {order.time_window && (
-                                <div className="text-xs opacity-60">{order.time_window}</div>
-                              )}
+                              
+                              <div className="flex items-center justify-between mt-1">
+                                {order.time_window && (
+                                  <div className="text-xs text-muted-foreground">{order.time_window}</div>
+                                )}
+                                {order.estimated_duration_hours && (
+                                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                    <Clock className="h-3 w-3" />
+                                    <span>{order.estimated_duration_hours}h</span>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           ))}
                           
-                          {dayOrders.length > 2 && (
-                            <div className="text-xs text-muted-foreground">
-                              +{dayOrders.length - 2} more
+                          {dayOrders.length > 3 && (
+                            <div className="text-xs text-muted-foreground text-center py-1">
+                              +{dayOrders.length - 3} more
                             </div>
                           )}
 
@@ -224,6 +247,10 @@ export function WeekViewCalendar({
           <div className="flex items-center gap-1">
             <div className="w-3 h-3 rounded bg-muted"></div>
             <span>Weekend</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-3 rounded border-l-4" style={{ borderLeftColor: '#007ACC' }}></div>
+            <span>Install Jobs</span>
           </div>
         </div>
       </CardContent>
