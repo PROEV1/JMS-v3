@@ -15,6 +15,7 @@ interface SchedulingSettings {
   max_jobs_per_day: number;
   working_hours_start: string;
   working_hours_end: string;
+  day_lenience_minutes: number;
   allow_weekend_bookings: boolean;
   allow_holiday_bookings: boolean;
   require_client_confirmation: boolean;
@@ -27,6 +28,7 @@ export function SchedulingSettingsPanel() {
     max_jobs_per_day: 3,
     working_hours_start: '09:00',
     working_hours_end: '17:00',
+    day_lenience_minutes: 15,
     allow_weekend_bookings: false,
     allow_holiday_bookings: false,
     require_client_confirmation: true,
@@ -98,6 +100,7 @@ export function SchedulingSettingsPanel() {
         max_jobs_per_day: settings.max_jobs_per_day,
         working_hours_start: settings.working_hours_start,
         working_hours_end: settings.working_hours_end,
+        day_lenience_minutes: settings.day_lenience_minutes,
       };
 
       const bookingRules = {
@@ -351,23 +354,43 @@ export function SchedulingSettingsPanel() {
             Workload Management
           </div>
           
-          <div className="space-y-2">
-            <Label htmlFor="max_jobs">Maximum Jobs Per Day</Label>
-            <Input
-              id="max_jobs"
-              type="number"
-              min="1"
-              max="10"
-              value={settings.max_jobs_per_day}
-              onChange={(e) => setSettings(prev => ({ 
-                ...prev, 
-                max_jobs_per_day: parseInt(e.target.value) || 3 
-              }))}
-            />
-            <p className="text-xs text-muted-foreground">
-              Limit daily job assignments per engineer
-            </p>
-          </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="max_jobs">Maximum Jobs Per Day</Label>
+                <Input
+                  id="max_jobs"
+                  type="number"
+                  min="1"
+                  max="10"
+                  value={settings.max_jobs_per_day}
+                  onChange={(e) => setSettings(prev => ({ 
+                    ...prev, 
+                    max_jobs_per_day: parseInt(e.target.value) || 3 
+                  }))}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Limit daily job assignments per engineer
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="day_lenience">Day Lenience (minutes)</Label>
+                <Input
+                  id="day_lenience"
+                  type="number"
+                  min="0"
+                  max="60"
+                  value={settings.day_lenience_minutes}
+                  onChange={(e) => setSettings(prev => ({ 
+                    ...prev, 
+                    day_lenience_minutes: parseInt(e.target.value) || 15 
+                  }))}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Allow engineers to get home this many minutes after their end time
+                </p>
+              </div>
+            </div>
         </div>
 
         <Separator />

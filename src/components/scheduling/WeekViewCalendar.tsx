@@ -66,6 +66,23 @@ export function WeekViewCalendar({
     return getOrdersForEngineerAndDate(engineerId, date).length;
   };
 
+  const getEngineerCapacityStatus = (engineerId: string, date: Date): {
+    isOverCapacity: boolean;
+    totalHours: number;
+    workingHours: number;
+  } => {
+    const dayOrders = getOrdersForEngineerAndDate(engineerId, date);
+    const totalHours = dayOrders.reduce((total, order) => 
+      total + (order.estimated_duration_hours || 2), 0
+    );
+    
+    // Assume 8-hour working day for visual indicator
+    const workingHours = 8;
+    const isOverCapacity = totalHours > workingHours;
+    
+    return { isOverCapacity, totalHours, workingHours };
+  };
+
   const isWeekend = (date: Date): boolean => {
     const day = date.getDay();
     return day === 0 || day === 6; // Sunday or Saturday
@@ -137,8 +154,10 @@ export function WeekViewCalendar({
                   {weekDays.map((day, dayIndex) => {
                     const dayOrders = getOrdersForEngineerAndDate(engineer.id, day);
                     const workload = getEngineerWorkload(engineer.id, day);
+                    const capacityStatus = getEngineerCapacityStatus(engineer.id, day);
                     const isOverloaded = workload > 2;
                     const isBusy = workload > 1;
+                    const isOverCapacity = capacityStatus.isOverCapacity;
                     
                     return (
                       <td 
@@ -147,24 +166,31 @@ export function WeekViewCalendar({
                           p-2 border-r text-center align-top
                           ${isWeekend(day) ? 'bg-muted/30' : ''}
                           ${isToday(day) ? 'bg-primary/5' : ''}
-                          ${isOverloaded ? 'bg-red-50/50 border-red-200' : ''}
-                          ${isBusy && !isOverloaded ? 'bg-yellow-50/50 border-yellow-200' : ''}
+                          ${isOverCapacity ? 'bg-red-100/70 border-red-300' : ''}
+                          ${isOverloaded && !isOverCapacity ? 'bg-red-50/50 border-red-200' : ''}
+                          ${isBusy && !isOverloaded && !isOverCapacity ? 'bg-yellow-50/50 border-yellow-200' : ''}
                         `}
                       >
                         <div className="space-y-2 min-h-[80px] p-1">
                           {workload > 0 && (
-                            <div className="flex items-center justify-center mb-2">
+                            <div className="flex flex-col items-center justify-center mb-2 gap-1">
                               <Badge 
                                 variant="outline" 
                                 className={`
                                   text-xs px-2 py-1
-                                  ${isOverloaded ? 'text-red-600 border-red-300 bg-red-50' : ''}
-                                  ${isBusy && !isOverloaded ? 'text-yellow-600 border-yellow-300 bg-yellow-50' : ''}
-                                  ${workload === 1 ? 'text-green-600 border-green-300 bg-green-50' : ''}
+                                  ${isOverCapacity ? 'text-red-700 border-red-400 bg-red-100' : ''}
+                                  ${isOverloaded && !isOverCapacity ? 'text-red-600 border-red-300 bg-red-50' : ''}
+                                  ${isBusy && !isOverloaded && !isOverCapacity ? 'text-yellow-600 border-yellow-300 bg-yellow-50' : ''}
+                                  ${workload === 1 && !isOverCapacity ? 'text-green-600 border-green-300 bg-green-50' : ''}
                                 `}
                               >
                                 {workload} {workload === 1 ? 'job' : 'jobs'}
                               </Badge>
+                              {isOverCapacity && (
+                                <Badge variant="outline" className="text-xs px-1 py-0.5 text-red-700 border-red-400 bg-red-100">
+                                  {capacityStatus.totalHours}h / {capacityStatus.workingHours}h
+                                </Badge>
+                              )}
                             </div>
                           )}
                           
@@ -215,9 +241,9 @@ export function WeekViewCalendar({
                             </div>
                           )}
 
-                          {isOverloaded && (
+                          {(isOverloaded || isOverCapacity) && (
                             <div className="flex items-center justify-center mt-1">
-                              <AlertTriangle className="h-3 w-3 text-red-500" />
+                              <AlertTriangle className={`h-3 w-3 ${isOverCapacity ? 'text-red-600' : 'text-red-500'}`} />
                             </div>
                           )}
                         </div>
@@ -243,6 +269,10 @@ export function WeekViewCalendar({
           <div className="flex items-center gap-1">
             <div className="w-3 h-3 rounded bg-red-100 border border-red-300"></div>
             <span>3+ Jobs (Overloaded)</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-3 rounded bg-red-200 border border-red-400"></div>
+            <span>Over Capacity (Hours)</span>
           </div>
           <div className="flex items-center gap-1">
             <div className="w-3 h-3 rounded bg-muted"></div>

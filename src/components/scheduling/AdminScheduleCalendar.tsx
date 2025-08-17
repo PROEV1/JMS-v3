@@ -18,7 +18,8 @@ import {
   Engineer, 
   formatOrderForCalendar, 
   updateOrderAssignment,
-  getStatusColor 
+  getStatusColor,
+  EngineerSettings
 } from '@/utils/schedulingUtils';
 import { toast } from 'sonner';
 import { Calendar as CalendarIcon, Users, AlertTriangle } from 'lucide-react';
@@ -134,6 +135,41 @@ export function AdminScheduleCalendar() {
     slotInfo: any
   ) => {
     try {
+      // Check if assignment would exceed engineer's capacity
+      const order = orders.find(o => o.id === orderId);
+      const engineer = engineers.find(e => e.id === engineerId);
+      
+      if (order && engineer) {
+        const { wouldExceedCapacity } = await import('@/utils/dayFitUtils');
+        const engineerSettings: EngineerSettings = {
+          id: engineer.id,
+          name: engineer.name,
+          email: engineer.email,
+          starting_postcode: engineer.starting_postcode || null,
+          availability: engineer.availability,
+          service_areas: [],
+          working_hours: [
+            { day_of_week: 1, start_time: '08:00', end_time: '17:00', is_available: true },
+            { day_of_week: 2, start_time: '08:00', end_time: '17:00', is_available: true },
+            { day_of_week: 3, start_time: '08:00', end_time: '17:00', is_available: true },
+            { day_of_week: 4, start_time: '08:00', end_time: '17:00', is_available: true },
+            { day_of_week: 5, start_time: '08:00', end_time: '17:00', is_available: true }
+          ],
+          time_off: []
+        };
+        
+        const { wouldExceed, reason } = await wouldExceedCapacity(
+          engineerSettings,
+          slotInfo.start,
+          order
+        );
+        
+        if (wouldExceed) {
+          toast.error(`Cannot assign job: ${reason}`);
+          return;
+        }
+      }
+
       await updateOrderAssignment(orderId, engineerId, slotInfo.start.toISOString());
       await loadData();
       toast.success('Job assigned successfully');
@@ -141,7 +177,7 @@ export function AdminScheduleCalendar() {
       console.error('Error assigning job:', error);
       toast.error('Failed to assign job');
     }
-  }, [loadData]);
+  }, [loadData, orders, engineers]);
 
   // Handle event selection
   const handleSelectEvent = useCallback((event: CalendarEvent) => {

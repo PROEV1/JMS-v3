@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { normalizePostcode, getBestPostcode, getOutwardCode } from './postcodeUtils';
+import { calculateDayFit } from './dayFitUtils';
 
 // Legacy interfaces for backward compatibility
 export interface Order {
@@ -245,31 +246,42 @@ export const getSmartEngineerRecommendations = async (order: Order, postcode?: s
           const maxCheckDays = 30; // Don't check beyond 30 days
           let daysChecked = 0;
 
-          while (!availableDate && daysChecked < maxCheckDays) {
-            // Check if engineer is available on this date
-            if (isEngineerAvailableOnDate(engineer, checkDate)) {
-              // Check weekend restrictions
-              const isWeekend = checkDate.getDay() === 0 || checkDate.getDay() === 6;
-              if (isWeekend && !settings.allow_weekend_bookings) {
-                checkDate.setDate(checkDate.getDate() + 1);
-                daysChecked++;
-                continue;
-              }
+           while (!availableDate && daysChecked < maxCheckDays) {
+             // Check if engineer is available on this date
+             if (isEngineerAvailableOnDate(engineer, checkDate)) {
+               // Check weekend restrictions
+               const isWeekend = checkDate.getDay() === 0 || checkDate.getDay() === 6;
+               if (isWeekend && !settings.allow_weekend_bookings) {
+                 checkDate.setDate(checkDate.getDate() + 1);
+                 daysChecked++;
+                 continue;
+               }
 
-              // Check daily workload
-              const dailyWorkload = await getEngineerDailyWorkload(engineer.id, checkDate.toISOString().split('T')[0]);
-              if (dailyWorkload >= settings.max_jobs_per_day) {
-                checkDate.setDate(checkDate.getDate() + 1);
-                daysChecked++;
-                continue;
-              }
+               // Check daily workload
+               const dailyWorkload = await getEngineerDailyWorkload(engineer.id, checkDate.toISOString().split('T')[0]);
+               if (dailyWorkload >= settings.max_jobs_per_day) {
+                 checkDate.setDate(checkDate.getDate() + 1);
+                 daysChecked++;
+                 continue;
+               }
 
-              availableDate = new Date(checkDate);
-            } else {
-              checkDate.setDate(checkDate.getDate() + 1);
-              daysChecked++;
-            }
-          }
+               // Check if engineer can fit all jobs in their working day
+               const dayFit = await calculateDayFit(engineer, checkDate, order, settings.day_lenience_minutes);
+               
+               if (dayFit.canFit) {
+                 availableDate = new Date(checkDate);
+                 console.log(`  ${engineer.name}: Available on ${availableDate.toLocaleDateString()}, current workload: ${dailyWorkload}/${settings.max_jobs_per_day}, day fit: ${dayFit.reasons.join(', ')}`);
+               } else {
+                 console.log(`  ${engineer.name}: ${checkDate.toLocaleDateString()} - would exceed capacity: ${dayFit.reasons.join(', ')}`);
+                 checkDate.setDate(checkDate.getDate() + 1);
+                 daysChecked++;
+                 continue;
+               }
+             } else {
+               checkDate.setDate(checkDate.getDate() + 1);
+               daysChecked++;
+             }
+           }
 
           if (!availableDate) {
             exclusionReasons[engineer.name].push(`No availability within ${maxCheckDays} days`);
@@ -432,6 +444,7 @@ export async function getSchedulingSettings() {
       max_jobs_per_day: 3,
       working_hours_start: "09:00",
       working_hours_end: "17:00",
+      day_lenience_minutes: 15,
       allow_weekend_bookings: false,
       allow_holiday_bookings: false,
       require_client_confirmation: true
@@ -458,6 +471,7 @@ export async function getSchedulingSettings() {
       max_jobs_per_day: 3,
       working_hours_start: "09:00",
       working_hours_end: "17:00",
+      day_lenience_minutes: 15,
       allow_weekend_bookings: false,
       allow_holiday_bookings: false,
       require_client_confirmation: true
