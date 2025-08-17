@@ -87,6 +87,30 @@ const statusConfig = {
 export function EnhancedJobStatusBadge({ status, manualOverride, className }: EnhancedJobStatusBadgeProps) {
   const config = statusConfig[status];
   
+  // Fallback for unknown statuses
+  if (!config) {
+    return (
+      <div className="flex items-center gap-2">
+        <Badge 
+          variant="outline" 
+          className={cn(
+            "px-3 py-1 font-medium",
+            "bg-gray-100 text-gray-800 border-gray-200",
+            className
+          )}
+        >
+          <span className="mr-1">❓</span>
+          {status || 'Unknown Status'}
+        </Badge>
+        {manualOverride && (
+          <Badge variant="secondary" className="text-xs">
+            Manual Override
+          </Badge>
+        )}
+      </div>
+    );
+  }
+  
   return (
     <div className="flex items-center gap-2">
       <Badge 
