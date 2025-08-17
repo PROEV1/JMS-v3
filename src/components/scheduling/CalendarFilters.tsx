@@ -21,7 +21,7 @@ export function CalendarFilters({ engineers, filters, onFiltersChange }: Calenda
   const statuses = [
     { value: 'awaiting_payment', label: 'Awaiting Payment' },
     { value: 'awaiting_agreement', label: 'Awaiting Agreement' },
-    { value: 'awaiting_install_booking', label: 'Awaiting Booking' },
+    { value: 'awaiting_install_booking', label: 'Needs Scheduling' },
     { value: 'scheduled', label: 'Scheduled' },
     { value: 'in_progress', label: 'In Progress' },
     { value: 'awaiting_final_payment', label: 'Awaiting Final Payment' },

@@ -48,7 +48,7 @@ const statusConfig = {
     icon: "✍️"
   },
   awaiting_install_booking: {
-    label: "Awaiting Install Booking",
+    label: "Needs Scheduling",
     color: "bg-purple-100 text-purple-800 border-purple-200",
     icon: "📅"
   },

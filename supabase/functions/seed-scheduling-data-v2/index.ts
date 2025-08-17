@@ -239,16 +239,14 @@ serve(async (req) => {
     const firstNames = ['James', 'Mary', 'John', 'Patricia', 'Robert', 'Jennifer', 'Michael', 'Linda', 'William', 'Elizabeth', 'David', 'Barbara', 'Richard', 'Susan', 'Joseph', 'Jessica', 'Thomas', 'Sarah', 'Christopher', 'Karen', 'Charles', 'Nancy', 'Daniel', 'Lisa', 'Matthew', 'Betty', 'Anthony', 'Helen', 'Mark', 'Sandra'];
     const lastNames = ['Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller', 'Davis', 'Rodriguez', 'Martinez', 'Hernandez', 'Lopez', 'Gonzalez', 'Wilson', 'Anderson', 'Thomas', 'Taylor', 'Moore', 'Jackson', 'Martin', 'Lee', 'Perez', 'Thompson', 'White', 'Harris', 'Sanchez', 'Clark', 'Ramirez', 'Lewis', 'Robinson'];
 
-    // Order statuses distribution
+    // Order statuses distribution - focused on scheduling pipeline
     const orderStatuses = [
-      { status: 'awaiting_payment', weight: 15 },
-      { status: 'awaiting_agreement', weight: 10 },
-      { status: 'awaiting_install_booking', weight: 20 },
-      { status: 'scheduled', weight: 25 },
-      { status: 'in_progress', weight: 10 },
-      { status: 'install_completed_pending_qa', weight: 8 },
-      { status: 'completed', weight: 10 },
-      { status: 'quote_accepted', weight: 2 }
+      { status: 'awaiting_install_booking', weight: 30 }, // Main unscheduled status
+      { status: 'scheduled', weight: 35 }, // Main scheduled status  
+      { status: 'in_progress', weight: 15 }, // Currently being worked on
+      { status: 'install_completed_pending_qa', weight: 10 }, // Pending QA
+      { status: 'completed', weight: 8 }, // Finished jobs
+      { status: 'awaiting_payment', weight: 2 } // Few payment issues
     ];
 
     let createdCounts = {
@@ -519,28 +517,51 @@ serve(async (req) => {
 
             // Generate realistic amounts
             const depositAmount = Math.floor(totalCost * 0.3);
-            let amountPaid = 0;
+            let amountPaid = totalCost; // Most orders are fully paid to reach scheduling stage
+            let agreementSignedAt = new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString(); // Signed in past 30 days
+            let manualStatusOverride = false;
 
-            // Set payment status based on order status
-            if (['awaiting_payment', 'quote_accepted'].includes(selectedStatus)) {
-              amountPaid = 0;
-            } else if (selectedStatus === 'awaiting_agreement') {
-              amountPaid = Math.random() < 0.5 ? depositAmount : totalCost;
-            } else {
-              amountPaid = totalCost; // Fully paid for scheduled/in-progress/completed
+            // Adjust payment and agreement based on status
+            if (selectedStatus === 'awaiting_payment') {
+              amountPaid = Math.random() < 0.3 ? depositAmount : 0; // Some partial payments
+              agreementSignedAt = null;
+              manualStatusOverride = true; // Override auto-calculation
             }
 
-            // Generate scheduled date based on status
+            // Generate scheduled date and engineer assignment based on status
             let scheduledDate = null;
-            if (['scheduled', 'in_progress', 'install_completed_pending_qa', 'completed'].includes(selectedStatus)) {
-              const daysOffset = selectedStatus === 'completed' ? -Math.floor(Math.random() * 30) : Math.floor(Math.random() * 60) + 1; // Future dates for others
-              scheduledDate = new Date(Date.now() + daysOffset * 24 * 60 * 60 * 1000).toISOString();
-            }
-
-            // Assign engineer (70% chance)
             let assignedEngineer = null;
-            if (engineers && engineers.length > 0 && Math.random() < 0.7) {
-              assignedEngineer = engineers[Math.floor(Math.random() * engineers.length)].id;
+            let engineerSignedOffAt = null;
+
+            if (selectedStatus === 'awaiting_install_booking') {
+              // No scheduled date yet, but some might have engineers pre-assigned
+              if (engineers && engineers.length > 0 && Math.random() < 0.4) {
+                assignedEngineer = engineers[Math.floor(Math.random() * engineers.length)].id;
+              }
+            } else if (selectedStatus === 'scheduled') {
+              // Future scheduled dates, always have engineers
+              const daysOffset = Math.floor(Math.random() * 60) + 1; // 1-60 days in future
+              scheduledDate = new Date(Date.now() + daysOffset * 24 * 60 * 60 * 1000).toISOString();
+              if (engineers && engineers.length > 0) {
+                assignedEngineer = engineers[Math.floor(Math.random() * engineers.length)].id;
+              }
+            } else if (selectedStatus === 'in_progress') {
+              // Today or recent past dates, always have engineers
+              const daysOffset = Math.floor(Math.random() * 7) - 3; // -3 to +3 days from today
+              scheduledDate = new Date(Date.now() + daysOffset * 24 * 60 * 60 * 1000).toISOString();
+              if (engineers && engineers.length > 0) {
+                assignedEngineer = engineers[Math.floor(Math.random() * engineers.length)].id;
+              }
+            } else if (['install_completed_pending_qa', 'completed'].includes(selectedStatus)) {
+              // Past dates, always have engineers
+              const daysOffset = -Math.floor(Math.random() * 30) - 1; // 1-30 days ago
+              scheduledDate = new Date(Date.now() + daysOffset * 24 * 60 * 60 * 1000).toISOString();
+              if (engineers && engineers.length > 0) {
+                assignedEngineer = engineers[Math.floor(Math.random() * engineers.length)].id;
+              }
+              if (selectedStatus === 'completed') {
+                engineerSignedOffAt = new Date(Date.now() + daysOffset * 24 * 60 * 60 * 1000 + 8 * 60 * 60 * 1000).toISOString(); // 8 hours after install
+              }
             }
 
             await supabaseAdmin
@@ -549,13 +570,17 @@ serve(async (req) => {
                 client_id: client.id,
                 quote_id: quote.id,
                 order_number: `ORD2024-${String(orderSeq).padStart(4, '0')}`,
-                status: selectedStatus === 'quote_accepted' ? 'awaiting_payment' : 'pending',
+                status: selectedStatus === 'completed' ? 'completed' : 'pending',
                 status_enhanced: selectedStatus,
+                manual_status_override: manualStatusOverride,
+                manual_status_notes: manualStatusOverride ? 'Status manually set by seeding function' : null,
                 total_amount: totalCost,
                 deposit_amount: depositAmount,
                 amount_paid: amountPaid,
+                agreement_signed_at: agreementSignedAt,
                 scheduled_install_date: scheduledDate,
                 engineer_id: assignedEngineer,
+                engineer_signed_off_at: engineerSignedOffAt,
                 postcode: location.postcode,
                 job_address: `${Math.floor(Math.random() * 200) + 1} ${['Oak Avenue', 'Elm Street', 'Pine Road', 'Birch Close', 'Cedar Drive'][Math.floor(Math.random() * 5)]}, ${location.city}, ${location.postcode}`,
                 estimated_duration_hours: Math.floor(Math.random() * 4) + 3,
