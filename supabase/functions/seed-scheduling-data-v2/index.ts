@@ -279,14 +279,25 @@ serve(async (req) => {
 
     console.log(`Found ${engineers?.length || 0} available engineers`);
 
-    // Get all existing seed users once at the start to avoid repeated API calls
-    console.log('Fetching existing seed users...');
-    const { data: allExistingUsers } = await supabaseAdmin.auth.admin.listUsers();
-    const existingSeedUsers = allExistingUsers?.users?.filter(u => u.email?.includes('@seed.local')) || [];
-    console.log(`Found ${existingSeedUsers.length} existing seed users`);
+    // Get all existing seed data upfront to avoid creation conflicts
+    console.log('Fetching existing seed data...');
+    const { data: existingProfiles } = await supabaseAdmin
+      .from('profiles')
+      .select('user_id, email, full_name')
+      .ilike('email', '%@seed.local%');
+    
+    const { data: existingClients } = await supabaseAdmin
+      .from('clients')
+      .select('id, user_id, email, full_name')
+      .ilike('email', '%@seed.local%');
+
+    console.log(`Found ${existingProfiles?.length || 0} existing seed profiles and ${existingClients?.length || 0} existing seed clients`);
 
     // Create clients and orders in batches
     const batchSize = 20;
+    let consecutiveErrors = 0; // Track consecutive errors properly
+    const MAX_CONSECUTIVE_ERRORS = 5;
+
     for (let batch = 0; batch < Math.ceil(clients / batchSize); batch++) {
       const batchStart = batch * batchSize;
       const batchEnd = Math.min(batchStart + batchSize, clients);
@@ -294,26 +305,37 @@ serve(async (req) => {
       console.log(`Processing batch ${batch + 1}: clients ${batchStart + 1}-${batchEnd}`);
       
       for (let i = batchStart; i < batchEnd; i++) {
-        console.log(`Creating client ${i + 1} of ${clients}`);
+        console.log(`Processing client ${i + 1} of ${clients}`);
         const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
         const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
         const location = postcodeAreas[Math.floor(Math.random() * postcodeAreas.length)];
-        
-        // Check if user already exists first to avoid creation errors
-        console.log(`Checking for existing user ${i + 1}...`);
+        const email = `seed+${i + 1}@seed.local`;
+
         let authUser;
+        let isNewUser = false;
         
-        // Check if user already exists in our pre-fetched list
-        const existingUser = existingSeedUsers.find(u => u.email === `seed+${i + 1}@seed.local`);
+        // Check if profile already exists
+        const existingProfile = existingProfiles?.find(p => p.email === email);
         
-        if (existingUser) {
-          console.log(`Found existing user ${i + 1}: ${existingUser.email}`);
-          authUser = { user: existingUser };
+        if (existingProfile) {
+          console.log(`Found existing profile for ${email}, reusing user_id: ${existingProfile.user_id}`);
+          // Get the auth user data
+          const { data: userData, error: getUserError } = await supabaseAdmin.auth.admin.getUserById(existingProfile.user_id);
+          if (getUserError) {
+            console.error(`Failed to get existing user ${existingProfile.user_id}:`, getUserError);
+            consecutiveErrors++;
+            if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+              console.log(`Stopping after ${MAX_CONSECUTIVE_ERRORS} consecutive errors`);
+              break;
+            }
+            continue;
+          }
+          authUser = { user: userData.user };
         } else {
-          // User doesn't exist, create new one
-          console.log(`Creating new auth user ${i + 1}...`);
+          // Create new auth user
+          console.log(`Creating new auth user for ${email}...`);
           const { data: createUserData, error: userError } = await supabaseAdmin.auth.admin.createUser({
-            email: `seed+${i + 1}@seed.local`,
+            email,
             password: 'SeedPassword123!',
             email_confirm: true,
             user_metadata: {
@@ -323,28 +345,51 @@ serve(async (req) => {
           });
 
           if (userError) {
-            console.error(`Failed to create user ${i + 1}:`, userError);
-            errors.push(`User ${i + 1}: ${userError.message}`);
-            if (errors.filter(e => e.includes('User')).length >= 5) {
-              console.log('Stopping after 5 consecutive user creation errors');
-              break;
+            if (userError.message?.includes('already been registered')) {
+              console.log(`User ${email} already exists in auth, fetching existing user...`);
+              // Try to find the existing user
+              const { data: allUsers } = await supabaseAdmin.auth.admin.listUsers();
+              const existingAuthUser = allUsers?.users?.find(u => u.email === email);
+              if (existingAuthUser) {
+                authUser = { user: existingAuthUser };
+                console.log(`Successfully found existing auth user: ${existingAuthUser.email}`);
+                // Reset consecutive error count since this isn't really an error
+                consecutiveErrors = 0;
+              } else {
+                console.error(`Could not find existing auth user for ${email}`);
+                consecutiveErrors++;
+                if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+                  console.log(`Stopping after ${MAX_CONSECUTIVE_ERRORS} consecutive errors`);
+                  break;
+                }
+                continue;
+              }
+            } else {
+              console.error(`Failed to create user ${email}:`, userError);
+              consecutiveErrors++;
+              if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+                console.log(`Stopping after ${MAX_CONSECUTIVE_ERRORS} consecutive errors`);
+                break;
+              }
+              continue;
             }
-            continue;
+          } else {
+            authUser = createUserData;
+            isNewUser = true;
+            createdCounts.users++;
+            consecutiveErrors = 0; // Reset on success
           }
-          
-          authUser = createUserData;
-          createdCounts.users++;
         }
 
-        console.log(`Successfully processed user ${i + 1}: ${authUser.user.email}`);
+        console.log(`Successfully processed user for ${email}: ${authUser.user.email}`);
 
-        // Create profile with explicit RLS bypass - handle existing profiles
-        console.log(`Creating profile for user ${i + 1}...`);
+        // Upsert profile
+        console.log(`Upserting profile for ${email}...`);
         const { error: profileError } = await supabaseAdmin
           .from('profiles')
           .upsert({
             user_id: authUser.user.id,
-            email: `seed+${i + 1}@seed.local`,
+            email,
             full_name: `${firstName} ${lastName}`,
             role: 'client',
             status: 'active'
@@ -353,25 +398,23 @@ serve(async (req) => {
           });
 
         if (profileError) {
-          console.error(`Failed to create/update profile ${i + 1}:`, profileError);
-          errors.push(`Profile ${i + 1}: ${profileError.message}`);
-          if (errors.length >= 5) {
-            console.log('Stopping after 5 consecutive profile creation errors');
+          console.error(`Failed to upsert profile for ${email}:`, profileError);
+          consecutiveErrors++;
+          if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+            console.log(`Stopping after ${MAX_CONSECUTIVE_ERRORS} consecutive errors`);
             break;
           }
           continue;
         }
 
-        console.log(`Successfully created/updated profile for user ${i + 1}`);
-
-        // Create client with explicit RLS bypass - handle existing clients
-        console.log(`Creating client record for user ${i + 1}...`);
+        // Upsert client
+        console.log(`Upserting client record for ${email}...`);
         const { data: client, error: clientError } = await supabaseAdmin
           .from('clients')
           .upsert({
             user_id: authUser.user.id,
             full_name: `${firstName} ${lastName}`,
-            email: `seed+${i + 1}@seed.local`,
+            email,
             phone: `07${Math.floor(Math.random() * 900000000) + 100000000}`,
             address: `${Math.floor(Math.random() * 200) + 1} ${['High Street', 'Main Road', 'Church Lane', 'Mill Street', 'Victoria Road'][Math.floor(Math.random() * 5)]}, ${location.city}`,
             postcode: location.postcode
@@ -382,17 +425,18 @@ serve(async (req) => {
           .single();
 
         if (clientError) {
-          console.error(`Failed to create/update client ${i + 1}:`, clientError);
-          errors.push(`Client ${i + 1}: ${clientError.message}`);
-          if (errors.length >= 5) {
-            console.log('Stopping after 5 consecutive client creation errors');
+          console.error(`Failed to upsert client for ${email}:`, clientError);
+          consecutiveErrors++;
+          if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+            console.log(`Stopping after ${MAX_CONSECUTIVE_ERRORS} consecutive errors`);
             break;
           }
           continue;
         }
 
-        console.log(`Successfully created/updated client ${i + 1}: ${client.full_name}`);
+        console.log(`Successfully processed client ${i + 1}: ${client.full_name}`);
         createdCounts.clients++;
+        consecutiveErrors = 0; // Reset on success
 
         // Create 1-2 quotes per client
         const numQuotes = Math.random() < 0.7 ? 1 : 2;
