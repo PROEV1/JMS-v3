@@ -1533,6 +1533,10 @@ export type Database = {
         Args: { p_date: string; p_engineer_id: string }
         Returns: number
       }
+      get_engineer_id_for_user: {
+        Args: { user_uuid: string }
+        Returns: string
+      }
       get_user_role: {
         Args: { user_id: string }
         Returns: Database["public"]["Enums"]["user_role"]
@@ -1557,6 +1561,10 @@ export type Database = {
       }
       user_has_permission: {
         Args: { permission_key: string; user_id: string }
+        Returns: boolean
+      }
+      user_is_engineer_for_order: {
+        Args: { order_uuid: string; user_uuid: string }
         Returns: boolean
       }
     }
