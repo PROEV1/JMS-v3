@@ -37,7 +37,7 @@ const getCorsHeaders = (origin?: string | null) => {
 };
 
 serve(async (req) => {
-  console.log('[seed-scheduling-data-v2] Enhanced diagnostics v4 - Force deployment with robust user handling');
+  console.log('[seed-scheduling-data-v2] Enhanced diagnostics v5 - Forced redeploy with robust user handling');
   
   const origin = req.headers.get('Origin');
   const corsHeaders = getCorsHeaders(origin);
