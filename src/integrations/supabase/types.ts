@@ -1559,8 +1559,16 @@ export type Database = {
         }
         Returns: string
       }
+      user_can_view_client: {
+        Args: { client_uuid: string }
+        Returns: boolean
+      }
       user_has_permission: {
         Args: { permission_key: string; user_id: string }
+        Returns: boolean
+      }
+      user_has_role: {
+        Args: { role_name: Database["public"]["Enums"]["user_role"] }
         Returns: boolean
       }
       user_is_engineer_for_order: {
