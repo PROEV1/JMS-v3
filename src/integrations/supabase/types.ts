@@ -1541,6 +1541,14 @@ export type Database = {
         Args: { user_id: string }
         Returns: Database["public"]["Enums"]["user_role"]
       }
+      is_admin: {
+        Args: { user_uuid?: string }
+        Returns: boolean
+      }
+      is_manager: {
+        Args: { user_uuid?: string }
+        Returns: boolean
+      }
       log_order_activity: {
         Args: {
           p_activity_type: string
