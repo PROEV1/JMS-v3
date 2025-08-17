@@ -262,34 +262,11 @@ export function UnifiedInstallationForm({
   };
 
   const handleClearSchedule = async () => {
-    // Allow clearing schedule regardless of agreement status (admins can clear scheduled installations)
     setIsLoading(true);
+    console.log('Starting clear schedule process...');
+    
     try {
-      // Archive engineer work if there was any completed work
-      if (currentEngineerId && currentInstallDate) {
-        const { error: archiveError } = await supabase.rpc('archive_engineer_work', {
-          p_order_id: orderId,
-          p_reset_reason: 'schedule_cleared'
-        });
-        
-        if (archiveError) {
-          console.error('Archive error:', archiveError);
-        }
-      }
-
-      // Reset completion checklist
-      const { error: checklistError } = await supabase
-        .from('order_completion_checklist')
-        .update({ 
-          is_completed: false, 
-          completed_at: null 
-        })
-        .eq('order_id', orderId);
-        
-      if (checklistError) {
-        console.error('Checklist reset error:', checklistError);
-      }
-
+      // First, try to clear the main order fields
       const { error } = await supabase
         .from('orders')
         .update({
@@ -303,27 +280,47 @@ export function UnifiedInstallationForm({
         })
         .eq('id', orderId);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Order update error:', error);
+        throw error;
+      }
 
-      // Enhanced activity logging
-      if (currentEngineerId && currentInstallDate) {
-        try {
-          await supabase.rpc('log_order_activity', {
-            p_order_id: orderId,
-            p_activity_type: 'engineer_status_reset',
-            p_description: 'Installation schedule cleared - Previous work archived and engineer workspace reset',
-            p_details: {
-              reason: 'schedule_cleared',
-              previous_engineer: currentEngineerId,
-              previous_date: currentInstallDate,
-              engineer_work_archived: true,
-              checklist_reset: true,
-              notes_cleared: true
-            }
-          });
-        } catch (logError) {
-          console.error('Failed to log engineer status reset:', logError);
+      console.log('Order fields cleared successfully');
+
+      // Try to reset completion checklist (non-blocking)
+      try {
+        const { error: checklistError } = await supabase
+          .from('order_completion_checklist')
+          .update({ 
+            is_completed: false, 
+            completed_at: null 
+          })
+          .eq('order_id', orderId);
+          
+        if (checklistError) {
+          console.error('Checklist reset error (non-critical):', checklistError);
+        } else {
+          console.log('Checklist reset successfully');
         }
+      } catch (checklistError) {
+        console.error('Checklist reset failed (non-critical):', checklistError);
+      }
+
+      // Try to log activity (non-blocking)
+      try {
+        await supabase.rpc('log_order_activity', {
+          p_order_id: orderId,
+          p_activity_type: 'schedule_cleared',
+          p_description: 'Installation schedule cleared by admin',
+          p_details: {
+            reason: 'schedule_cleared',
+            previous_engineer: currentEngineerId,
+            previous_date: currentInstallDate
+          }
+        });
+        console.log('Activity logged successfully');
+      } catch (logError) {
+        console.error('Activity logging failed (non-critical):', logError);
       }
 
       // Update local form state
@@ -339,12 +336,14 @@ export function UnifiedInstallationForm({
         description: "Installation schedule has been cleared successfully.",
       });
 
+      console.log('Clear schedule completed successfully');
       onUpdate();
+      
     } catch (error) {
-      console.error('Error clearing schedule:', error);
+      console.error('Critical error clearing schedule:', error);
       toast({
         title: "Error",
-        description: "Failed to clear installation schedule",
+        description: `Failed to clear installation schedule: ${error.message}`,
         variant: "destructive",
       });
     } finally {
