@@ -7,7 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Settings, Clock, MapPin, Users, Calendar } from 'lucide-react';
+import { Settings, Clock, MapPin, Users, Calendar, Database, Trash2, AlertTriangle } from 'lucide-react';
 
 interface SchedulingSettings {
   minimum_advance_hours: number;
@@ -34,6 +34,14 @@ export function SchedulingSettingsPanel() {
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  
+  // Seed data controls
+  const [seedClients, setSeedClients] = useState(100);
+  const [seedOrdersMin, setSeedOrdersMin] = useState(1);
+  const [seedOrdersMax, setSeedOrdersMax] = useState(3);
+  const [seedTag, setSeedTag] = useState('SEED');
+  const [seeding, setSeeding] = useState(false);
+  const [clearing, setClearing] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -124,6 +132,47 @@ export function SchedulingSettingsPanel() {
     }
   };
 
+  const seedSchedulingData = async () => {
+    setSeeding(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('seed-scheduling-data', {
+        body: {
+          clients: seedClients,
+          orders_per_client_min: seedOrdersMin,
+          orders_per_client_max: seedOrdersMax,
+          tag: seedTag
+        }
+      });
+
+      if (error) throw error;
+
+      toast.success(data.message);
+      console.log('Seed data created:', data);
+    } catch (error) {
+      console.error('Error seeding data:', error);
+      toast.error('Failed to seed test data. Check console for details.');
+    } finally {
+      setSeeding(false);
+    }
+  };
+
+  const clearSeedData = async () => {
+    setClearing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('clear-seed-data');
+
+      if (error) throw error;
+
+      toast.success(data.message);
+      console.log('Seed data cleared:', data);
+    } catch (error) {
+      console.error('Error clearing seed data:', error);
+      toast.error('Failed to clear seed data. Check console for details.');
+    } finally {
+      setClearing(false);
+    }
+  };
+
   if (loading) {
     return (
       <Card className="w-full">
@@ -137,13 +186,14 @@ export function SchedulingSettingsPanel() {
   }
 
   return (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Settings className="h-5 w-5" />
-          Scheduling & Booking Settings
-        </CardTitle>
-      </CardHeader>
+    <div className="space-y-6">
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Settings className="h-5 w-5" />
+            Scheduling & Booking Settings
+          </CardTitle>
+        </CardHeader>
       <CardContent className="space-y-6">
         {/* Time and Distance Rules */}
         <div className="space-y-4">
@@ -307,16 +357,127 @@ export function SchedulingSettingsPanel() {
           </div>
         </div>
 
-        <div className="pt-4">
-          <Button 
-            onClick={saveSettings} 
-            disabled={saving}
-            className="w-full"
-          >
-            {saving ? 'Saving Settings...' : 'Save Settings'}
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+          <div className="pt-4">
+            <Button 
+              onClick={saveSettings} 
+              disabled={saving}
+              className="w-full"
+            >
+              {saving ? 'Saving Settings...' : 'Save Settings'}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Scheduling Test Data */}
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Database className="h-5 w-5" />
+            Scheduling Test Data
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Generate realistic test data for testing the scheduling pipeline with volume
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-start space-x-3">
+            <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5" />
+            <div className="space-y-1">
+              <p className="text-yellow-800 font-medium text-sm">Test Data Only</p>
+              <p className="text-yellow-700 text-xs">
+                This creates fake clients and orders with @seed.local emails. Engineers are NOT created - only existing engineers are used for assignments.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="seed_clients">Number of Clients</Label>
+              <Input
+                id="seed_clients"
+                type="number"
+                min="10"
+                max="500"
+                value={seedClients}
+                onChange={(e) => setSeedClients(parseInt(e.target.value) || 100)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Total test clients to create
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="seed_orders_min">Min Orders/Client</Label>
+              <Input
+                id="seed_orders_min"
+                type="number"
+                min="1"
+                max="5"
+                value={seedOrdersMin}
+                onChange={(e) => setSeedOrdersMin(parseInt(e.target.value) || 1)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="seed_orders_max">Max Orders/Client</Label>
+              <Input
+                id="seed_orders_max"
+                type="number"
+                min="1"
+                max="10"
+                value={seedOrdersMax}
+                onChange={(e) => setSeedOrdersMax(parseInt(e.target.value) || 3)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="seed_tag">Data Tag</Label>
+              <Input
+                id="seed_tag"
+                maxLength={10}
+                value={seedTag}
+                onChange={(e) => setSeedTag(e.target.value || 'SEED')}
+              />
+              <p className="text-xs text-muted-foreground">
+                Tag for easy identification
+              </p>
+            </div>
+          </div>
+
+          <div className="flex gap-3">
+            <Button 
+              onClick={seedSchedulingData} 
+              disabled={seeding || clearing}
+              className="flex-1"
+            >
+              <Database className="h-4 w-4 mr-2" />
+              {seeding ? 'Creating Test Data...' : 'Create Test Data'}
+            </Button>
+            
+            <Button 
+              onClick={clearSeedData} 
+              disabled={seeding || clearing}
+              variant="destructive"
+              className="flex-1"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              {clearing ? 'Clearing Data...' : 'Clear Seed Data'}
+            </Button>
+          </div>
+
+          <div className="text-xs text-muted-foreground space-y-1">
+            <p><strong>What gets created:</strong></p>
+            <ul className="list-disc list-inside space-y-1 ml-2">
+              <li>Client users with @seed.local emails across UK postcodes</li>
+              <li>Quotes with realistic EV charger products and pricing</li>
+              <li>Orders across all scheduling statuses (15% marked as urgent)</li>
+              <li>70% of orders assigned to existing engineers based on regions</li>
+              <li>Realistic dates, addresses, and scheduling conflicts for testing</li>
+            </ul>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

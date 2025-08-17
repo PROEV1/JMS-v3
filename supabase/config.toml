@@ -11,3 +11,9 @@ verify_jwt = false
 
 [functions.admin-create-client-v2]
 verify_jwt = false
+
+[functions.seed-scheduling-data]
+verify_jwt = true
+
+[functions.clear-seed-data]
+verify_jwt = true
