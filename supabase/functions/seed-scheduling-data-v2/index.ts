@@ -37,7 +37,7 @@ const getCorsHeaders = (origin?: string | null) => {
 };
 
 serve(async (req) => {
-  console.log('[seed-scheduling-data-v2] Enhanced diagnostics v3 - Auto deployment with error handling');
+  console.log('[seed-scheduling-data-v2] Enhanced diagnostics v4 - Force deployment with robust user handling');
   
   const origin = req.headers.get('Origin');
   const corsHeaders = getCorsHeaders(origin);
@@ -57,8 +57,9 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       ok: true,
       name: 'seed-scheduling-data-v2',
-      version: '2.0.0',
-      message: 'Function is deployed and ready'
+      version: '3.0.0',
+      message: 'Function deployed with robust user handling',
+      timestamp: new Date().toISOString()
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200
@@ -504,7 +505,6 @@ serve(async (req) => {
             const totalWeight = orderStatuses.reduce((sum, s) => sum + s.weight, 0);
             let random = Math.random() * totalWeight;
             let selectedStatus = orderStatuses[0].status;
-            
             for (const statusOption of orderStatuses) {
               random -= statusOption.weight;
               if (random <= 0) {
@@ -520,7 +520,7 @@ serve(async (req) => {
             // Generate realistic amounts
             const depositAmount = Math.floor(totalCost * 0.3);
             let amountPaid = 0;
-            
+
             // Set payment status based on order status
             if (['awaiting_payment', 'quote_accepted'].includes(selectedStatus)) {
               amountPaid = 0;
@@ -533,9 +533,7 @@ serve(async (req) => {
             // Generate scheduled date based on status
             let scheduledDate = null;
             if (['scheduled', 'in_progress', 'install_completed_pending_qa', 'completed'].includes(selectedStatus)) {
-              const daysOffset = selectedStatus === 'completed' ? 
-                -Math.floor(Math.random() * 30) : // Past dates for completed
-                Math.floor(Math.random() * 60) + 1; // Future dates for others
+              const daysOffset = selectedStatus === 'completed' ? -Math.floor(Math.random() * 30) : Math.floor(Math.random() * 60) + 1; // Future dates for others
               scheduledDate = new Date(Date.now() + daysOffset * 24 * 60 * 60 * 1000).toISOString();
             }
 
@@ -581,7 +579,7 @@ serve(async (req) => {
         success: false,
         message: 'No data was created - check errors for details',
         counts: createdCounts,
-        errors: errors.slice(0, 10), // First 10 errors
+        errors: errors.slice(0, 10),
         details: 'No clients were successfully created. This may indicate permission issues or database constraints.'
       }), {
         status: 400,
@@ -601,7 +599,7 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Error in seed-scheduling-data-v2 function:', error);
-    return new Response(JSON.stringify({ 
+    return new Response(JSON.stringify({
       success: false,
       error: error.message || 'Unknown error occurred',
       details: 'Check function logs for more information',
