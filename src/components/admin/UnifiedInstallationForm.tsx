@@ -95,8 +95,17 @@ export function UnifiedInstallationForm({
   };
 
   const canEdit = paymentReceived && agreementSigned;
-  const isScheduled = currentInstallDate && engineer;
+  const isScheduled = currentInstallDate && (engineer || currentEngineerId); // Check if scheduled (has date and engineer ID)
   const canClearSchedule = isScheduled; // Admins can always clear scheduled installations
+  
+  // Debug logging
+  console.log('Installation Form Debug:', {
+    currentInstallDate,
+    engineer,
+    currentEngineerId,
+    isScheduled,
+    canClearSchedule
+  });
 
   const formatTimeWindow = (window: string) => {
     switch (window) {
