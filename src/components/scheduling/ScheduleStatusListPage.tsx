@@ -7,9 +7,11 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Order } from '@/utils/schedulingUtils';
+import { Order, Engineer } from '@/utils/schedulingUtils';
+import { getLocationDisplayText } from '@/utils/postcodeUtils';
+import { SmartAssignmentModal } from '@/components/scheduling/SmartAssignmentModal';
 import { toast } from 'sonner';
-import { ArrowLeft, Search, Filter, Calendar, User, MapPin, PoundSterling } from 'lucide-react';
+import { ArrowLeft, Search, Filter, Calendar, User, MapPin, PoundSterling, Users } from 'lucide-react';
 
 interface StatusPageConfig {
   title: string;
@@ -68,20 +70,24 @@ export function ScheduleStatusListPage() {
   const navigate = useNavigate();
   const [orders, setOrders] = useState<Order[]>([]);
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
+  const [engineers, setEngineers] = useState<Engineer[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'created_at' | 'total_amount' | 'client_name'>('created_at');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [showAssignmentModal, setShowAssignmentModal] = useState(false);
 
   const config = status ? statusConfigs[status] : null;
 
   useEffect(() => {
-    const loadOrders = async () => {
+    const loadData = async () => {
       if (!config) return;
       
       setLoading(true);
       try {
-        const { data, error } = await supabase
+        // Load orders
+        const { data: ordersData, error: ordersError } = await supabase
           .from('orders')
           .select(`
             *,
@@ -91,17 +97,26 @@ export function ScheduleStatusListPage() {
           .in('status_enhanced', config.statusValues as any)
           .order('created_at', { ascending: false });
 
-        if (error) throw error;
-        setOrders(data || []);
+        if (ordersError) throw ordersError;
+        setOrders(ordersData || []);
+
+        // Load engineers for recommendations
+        const { data: engineersData, error: engineersError } = await supabase
+          .from('engineers')
+          .select('*')
+          .eq('availability', true);
+
+        if (engineersError) throw engineersError;
+        setEngineers(engineersData || []);
       } catch (error) {
-        console.error('Error loading orders:', error);
-        toast.error('Failed to load orders');
+        console.error('Error loading data:', error);
+        toast.error('Failed to load data');
       } finally {
         setLoading(false);
       }
     };
 
-    loadOrders();
+    loadData();
   }, [config]);
 
   useEffect(() => {
@@ -162,6 +177,42 @@ export function ScheduleStatusListPage() {
     } catch (error) {
       console.error('Error updating status:', error);
       toast.error('Failed to update status');
+    }
+  };
+
+  const handleShowRecommendations = (order: Order) => {
+    setSelectedOrder(order);
+    setShowAssignmentModal(true);
+  };
+
+  const handleAssignEngineer = async (engineerId: string, date: string) => {
+    if (!selectedOrder) return;
+
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update({ 
+          engineer_id: engineerId,
+          scheduled_install_date: date,
+          status_enhanced: 'scheduled'
+        })
+        .eq('id', selectedOrder.id);
+
+      if (error) throw error;
+      
+      // Update the order in the list
+      setOrders(prev => prev.map(o => 
+        o.id === selectedOrder.id 
+          ? { ...o, engineer_id: engineerId, scheduled_install_date: date, status_enhanced: 'scheduled' as any }
+          : o
+      ));
+      
+      setShowAssignmentModal(false);
+      setSelectedOrder(null);
+      toast.success('Engineer assigned successfully');
+    } catch (error) {
+      console.error('Error assigning engineer:', error);
+      toast.error('Failed to assign engineer');
     }
   };
 
@@ -311,7 +362,7 @@ export function ScheduleStatusListPage() {
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <MapPin className="h-4 w-4 text-muted-foreground" />
-                        {order.postcode || 'N/A'}
+                        {getLocationDisplayText(order)}
                       </div>
                     </TableCell>
                     <TableCell>
@@ -335,13 +386,26 @@ export function ScheduleStatusListPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => navigate(`/admin/orders/${order.id}`)}
-                      >
-                        View Details
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => navigate(`/admin/order/${order.id}`)}
+                        >
+                          View Details
+                        </Button>
+                        {/* Show recommendations button for unassigned jobs in scheduling statuses */}
+                        {!order.engineer_id && (status === 'needs-scheduling' || status === 'date-rejected') && (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => handleShowRecommendations(order)}
+                          >
+                            <Users className="h-4 w-4 mr-1" />
+                            Show Recommendations
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -350,6 +414,20 @@ export function ScheduleStatusListPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Smart Assignment Modal */}
+      {selectedOrder && (
+        <SmartAssignmentModal
+          isOpen={showAssignmentModal}
+          onClose={() => {
+            setShowAssignmentModal(false);
+            setSelectedOrder(null);
+          }}
+          order={selectedOrder}
+          engineers={engineers}
+          onAssign={handleAssignEngineer}
+        />
+      )}
     </div>
   );
 }
