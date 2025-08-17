@@ -12,7 +12,7 @@ import { SmartAssignmentModal } from './SmartAssignmentModal';
 // import { JobDetailsModal } from './JobDetailsModal';
 import { WeekViewCalendar } from './WeekViewCalendar';
 import { EngineerRecommendationPanel } from './EngineerRecommendationPanel';
-import { ScheduleKanban } from './ScheduleKanban';
+import { SchedulePipelineDashboard } from './SchedulePipelineDashboard';
 import { 
   Order, 
   Engineer, 
@@ -350,7 +350,7 @@ export function AdminScheduleCalendar() {
               variant="outline"
             >
               {calendarView === 'calendar' ? 'Week View' : 
-               calendarView === 'week' ? 'Kanban View' : 'Calendar View'}
+               calendarView === 'week' ? 'Pipeline View' : 'Calendar View'}
             </Button>
             <Button onClick={loadData} variant="outline">
               Refresh
@@ -366,20 +366,8 @@ export function AdminScheduleCalendar() {
 
         <div className="relative">
           {calendarView === 'kanban' ? (
-            <ScheduleKanban
+            <SchedulePipelineDashboard
               orders={orders}
-              engineers={engineers}
-              onOrderUpdate={loadData}
-              onShowRecommendations={(order) => {
-                setDraggedOrder(order);
-                setSelectedSlot({
-                  start: new Date(),
-                  end: new Date(Date.now() + 60 * 60 * 1000),
-                  resourceId: null,
-                  action: 'select'
-                });
-                setShowRecommendations(true);
-              }}
             />
           ) : calendarView === 'week' ? (
             <WeekViewCalendar

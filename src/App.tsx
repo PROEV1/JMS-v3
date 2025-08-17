@@ -27,6 +27,7 @@ import EngineerJobDetail from "@/pages/EngineerJobDetail";
 import ClientProfilePage from "@/pages/ClientProfilePage";
 import AdminOrders from "@/pages/AdminOrders";
 import AdminSchedule from "@/pages/AdminSchedule";
+import { ScheduleStatusListPage } from "@/components/scheduling/ScheduleStatusListPage";
 import AdminEngineers from "@/pages/AdminEngineers";
 import AdminProducts from "@/pages/AdminProducts";
 import AdminClients from "@/pages/AdminClients";
@@ -77,6 +78,7 @@ const App = () => (
             <Route path="/admin" element={<Layout><Admin /></Layout>} />
             <Route path="/admin/orders" element={<Layout><AdminOrders /></Layout>} />
             <Route path="/admin/schedule" element={<Layout><AdminSchedule /></Layout>} />
+            <Route path="/admin/schedule/status/:status" element={<Layout><ScheduleStatusListPage /></Layout>} />
             <Route path="/admin/engineers" element={<Layout><AdminEngineers /></Layout>} />
             <Route path="/admin/products" element={<Layout><AdminProducts /></Layout>} />
             <Route path="/admin/clients" element={<Layout><AdminClients /></Layout>} />
