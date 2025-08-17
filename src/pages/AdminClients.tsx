@@ -186,7 +186,7 @@ export default function AdminClients() {
                           <User className="h-4 w-4 text-primary" />
                         </div>
                         <div>
-                          <p className="font-medium brand-heading-3">
+                          <p className="font-medium brand-body">
                             {client.full_name
                               .split(' ')
                               .map(name => name.charAt(0).toUpperCase() + name.slice(1).toLowerCase())
