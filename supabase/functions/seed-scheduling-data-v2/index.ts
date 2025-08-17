@@ -98,7 +98,7 @@ serve(async (req) => {
     console.log('Testing database connection...');
     const { data: testData, error: testError } = await supabaseAdmin
       .from('profiles')
-      .select('count')
+      .select('id')
       .limit(1);
     
     if (testError) {
@@ -293,9 +293,10 @@ serve(async (req) => {
         const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
         const location = postcodeAreas[Math.floor(Math.random() * postcodeAreas.length)];
         
-        // Create auth user with explicit admin privileges
+        // Create auth user with explicit admin privileges - handle existing users
         console.log(`Attempting to create auth user ${i + 1}...`);
-        const { data: authUser, error: userError } = await supabaseAdmin.auth.admin.createUser({
+        let authUser;
+        const { data: createUserData, error: userError } = await supabaseAdmin.auth.admin.createUser({
           email: `seed+${i + 1}@seed.local`,
           password: 'SeedPassword123!',
           email_confirm: true,
@@ -305,14 +306,29 @@ serve(async (req) => {
           }
         });
 
-        if (userError) {
+        if (userError && userError.message?.includes('already been registered')) {
+          // User already exists, find them
+          console.log(`User ${i + 1} already exists, looking up existing user...`);
+          const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
+          const existingUser = existingUsers?.users?.find(u => u.email === `seed+${i + 1}@seed.local`);
+          if (existingUser) {
+            authUser = { user: existingUser };
+            console.log(`Found existing user ${i + 1}: ${existingUser.email}`);
+          } else {
+            console.error(`Could not find existing user ${i + 1}`);
+            errors.push(`User ${i + 1}: Could not create or find existing user`);
+            continue;
+          }
+        } else if (userError) {
           console.error(`Failed to create user ${i + 1}:`, userError);
           errors.push(`User ${i + 1}: ${userError.message}`);
           if (errors.length >= 5) {
             console.log('Stopping after 5 consecutive user creation errors');
-            break; // Stop after 5 consecutive errors
+            break;
           }
           continue;
+        } else {
+          authUser = createUserData;
         }
 
         console.log(`Successfully created user ${i + 1}: ${authUser.user.email}`);
