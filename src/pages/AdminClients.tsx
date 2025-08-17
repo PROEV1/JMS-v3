@@ -186,7 +186,13 @@ export default function AdminClients() {
                           <User className="h-4 w-4 text-primary" />
                         </div>
                         <div>
-                          <p className="font-medium brand-heading-3">{client.full_name}</p>
+                          <p className="font-medium brand-heading-3">
+                            {client.full_name
+                              .split(' ')
+                              .map(name => name.charAt(0).toUpperCase() + name.slice(1).toLowerCase())
+                              .join(' ')
+                            }
+                          </p>
                         </div>
                       </div>
                     </TableCell>
