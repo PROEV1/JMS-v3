@@ -1571,6 +1571,14 @@ export type Database = {
         Args: { client_uuid: string }
         Returns: boolean
       }
+      user_can_view_order: {
+        Args: { order_uuid: string; user_uuid?: string }
+        Returns: boolean
+      }
+      user_can_view_quote: {
+        Args: { quote_uuid: string; user_uuid?: string }
+        Returns: boolean
+      }
       user_has_permission: {
         Args: { permission_key: string; user_id: string }
         Returns: boolean
@@ -1581,6 +1589,10 @@ export type Database = {
       }
       user_is_engineer_for_order: {
         Args: { order_uuid: string; user_uuid: string }
+        Returns: boolean
+      }
+      user_owns_client: {
+        Args: { client_uuid: string; user_uuid?: string }
         Returns: boolean
       }
     }
