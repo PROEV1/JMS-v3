@@ -69,12 +69,44 @@ serve(async (req) => {
       });
     }
 
-    // Create admin client with service role key
-    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
+    console.log('Environment check passed, creating admin client');
+
+    // Create admin client with service role key - this should bypass RLS
+    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    });
+
+    console.log('Admin client created, parsing request body');
+
+    // Test database connection first
+    console.log('Testing database connection...');
+    const { data: testData, error: testError } = await supabaseAdmin
+      .from('profiles')
+      .select('count')
+      .limit(1);
+    
+    if (testError) {
+      console.error('Database connection test failed:', testError);
+      return new Response(JSON.stringify({ 
+        success: false,
+        error: 'Database connection failed',
+        details: testError.message 
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    
+    console.log('Database connection successful');
 
     // Parse request body
     const requestBody = await req.json();
     const { clients = 100, orders_per_client_min = 1, orders_per_client_max = 3, tag = 'SEED', diagnose = false } = requestBody;
+
+    console.log('Request parsed:', { clients, orders_per_client_min, orders_per_client_max, tag, diagnose });
 
     // Authentication and role checking
     const authHeader = req.headers.get('Authorization');
@@ -248,13 +280,15 @@ serve(async (req) => {
         const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
         const location = postcodeAreas[Math.floor(Math.random() * postcodeAreas.length)];
         
-        // Create auth user
+        // Create auth user with explicit admin privileges
+        console.log(`Attempting to create auth user ${i + 1}...`);
         const { data: authUser, error: userError } = await supabaseAdmin.auth.admin.createUser({
           email: `seed+${i + 1}@seed.local`,
           password: 'SeedPassword123!',
           email_confirm: true,
           user_metadata: {
-            full_name: `${firstName} ${lastName}`
+            full_name: `${firstName} ${lastName}`,
+            created_by: 'seed-function'
           }
         });
 
@@ -271,7 +305,8 @@ serve(async (req) => {
         console.log(`Successfully created user ${i + 1}: ${authUser.user.email}`);
         createdCounts.users++;
 
-        // Create profile
+        // Create profile with explicit RLS bypass
+        console.log(`Creating profile for user ${i + 1}...`);
         const { error: profileError } = await supabaseAdmin
           .from('profiles')
           .insert({
@@ -285,11 +320,17 @@ serve(async (req) => {
         if (profileError) {
           console.error(`Failed to create profile ${i + 1}:`, profileError);
           errors.push(`Profile ${i + 1}: ${profileError.message}`);
-          if (errors.length >= 5) break;
+          if (errors.length >= 5) {
+            console.log('Stopping after 5 consecutive profile creation errors');
+            break;
+          }
           continue;
         }
 
-        // Create client
+        console.log(`Successfully created profile for user ${i + 1}`);
+
+        // Create client with explicit RLS bypass
+        console.log(`Creating client record for user ${i + 1}...`);
         const { data: client, error: clientError } = await supabaseAdmin
           .from('clients')
           .insert({
