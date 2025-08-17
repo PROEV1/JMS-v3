@@ -96,6 +96,7 @@ export function UnifiedInstallationForm({
 
   const canEdit = paymentReceived && agreementSigned;
   const isScheduled = currentInstallDate && engineer;
+  const canClearSchedule = isScheduled; // Admins can always clear scheduled installations
 
   const formatTimeWindow = (window: string) => {
     switch (window) {
@@ -252,8 +253,7 @@ export function UnifiedInstallationForm({
   };
 
   const handleClearSchedule = async () => {
-    if (!canEdit) return;
-    
+    // Allow clearing schedule regardless of agreement status (admins can clear scheduled installations)
     setIsLoading(true);
     try {
       // Archive engineer work if there was any completed work
@@ -392,7 +392,7 @@ export function UnifiedInstallationForm({
                 <Check className="h-4 w-4" />
                 <span className="font-medium">Installation Scheduled</span>
               </div>
-              {canEdit && (
+              {canClearSchedule && (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-800 hover:bg-red-50">
