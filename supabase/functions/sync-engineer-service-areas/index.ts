@@ -109,43 +109,44 @@ Deno.serve(async (req) => {
     // Process each engineer
     for (const engineer of engineers || []) {
       try {
-        // Check if engineer already has service areas
-        const { data: existingAreas, error: areasError } = await supabaseAdmin
-          .from('engineer_service_areas')
-          .select('id')
-          .eq('engineer_id', engineer.id);
-
-        if (areasError) {
-          console.error(`Error checking service areas for ${engineer.email}:`, areasError);
-          result.errors.push(`Failed to check service areas for ${engineer.email}`);
-          continue;
-        }
-
-        // Skip if engineer already has service areas
-        if (existingAreas && existingAreas.length > 0) {
-          console.log(`Engineer ${engineer.email} already has service areas, skipping`);
-          continue;
-        }
 
         // Extract postcode area from starting postcode (e.g., "DA5 1BJ" -> "DA5")
         const postcodeArea = engineer.starting_postcode
           .trim()
           .toUpperCase()
-          .replace(/\s.*$/, '') // Remove everything after first space
-          .replace(/\d+.*$/, ''); // Remove numbers and everything after
+          .split(' ')[0]; // Take the first part before space
 
         if (!postcodeArea || postcodeArea.length < 2) {
           result.errors.push(`Invalid postcode format for ${engineer.email}: ${engineer.starting_postcode}`);
           continue;
         }
 
-        // Create default service area
+        // Check if this specific postcode area already exists for this engineer
+        const { data: existingSpecificArea, error: specificAreaError } = await supabaseAdmin
+          .from('engineer_service_areas')
+          .select('id')
+          .eq('engineer_id', engineer.id)
+          .eq('postcode_area', postcodeArea);
+
+        if (specificAreaError) {
+          console.error(`Error checking specific postcode area for ${engineer.email}:`, specificAreaError);
+          result.errors.push(`Failed to check specific postcode area for ${engineer.email}`);
+          continue;
+        }
+
+        // Skip if this specific postcode area already exists
+        if (existingSpecificArea && existingSpecificArea.length > 0) {
+          console.log(`Engineer ${engineer.email} already has service area for ${postcodeArea}, skipping`);
+          continue;
+        }
+
+        // Create service area with 80 minutes travel time
         const { error: insertError } = await supabaseAdmin
           .from('engineer_service_areas')
           .insert({
             engineer_id: engineer.id,
             postcode_area: postcodeArea,
-            max_travel_minutes: 60 // Default 60 minutes
+            max_travel_minutes: 80 // Set to 80 minutes as requested
           });
 
         if (insertError) {
@@ -156,7 +157,7 @@ Deno.serve(async (req) => {
 
         result.created_areas++;
         result.updated_engineers++;
-        console.log(`Created service area ${postcodeArea} for engineer ${engineer.email}`);
+        console.log(`Created service area ${postcodeArea} (80 min) for engineer ${engineer.email}`);
 
       } catch (engineerError) {
         console.error(`Error processing engineer ${engineer.email}:`, engineerError);
