@@ -112,7 +112,7 @@ serve(async (req) => {
     let tempPassword = null;
     let isNewUser = false;
     
-    const { data: profileData, error: profileError } = await supabaseAdmin
+    const { data: profileData, error: profileLookupError } = await supabaseAdmin
       .from('profiles')
       .select('user_id')
       .eq('email', normalizedEmail)
@@ -121,9 +121,9 @@ serve(async (req) => {
     if (profileData) {
       userId = profileData.user_id;
       console.log(`Found existing user via profiles: ${userId}`);
-    } else if (profileError && profileError.code !== 'PGRST116') { // Ignore 'no rows' error
-      console.error("Profile lookup failed:", profileError);
-      return new Response(JSON.stringify({ error: `Profile lookup failed: ${profileError.message}` }), {
+    } else if (profileLookupError && profileLookupError.code !== 'PGRST116') { // Ignore 'no rows' error
+      console.error("Profile lookup failed:", profileLookupError);
+      return new Response(JSON.stringify({ error: `Profile lookup failed: ${profileLookupError.message}` }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 400,
       });
@@ -249,7 +249,7 @@ serve(async (req) => {
     // Create profile for new users
     if (isNewUser && userId) {
       console.log("Creating profile for new user");
-      const { error: profileError } = await supabaseAdmin
+      const { error: profileCreationError } = await supabaseAdmin
         .from('profiles')
         .insert({
           user_id: userId,
@@ -258,8 +258,8 @@ serve(async (req) => {
           role: 'client'
         });
 
-      if (profileError) {
-        console.error("Profile creation failed:", profileError);
+      if (profileCreationError) {
+        console.error("Profile creation failed:", profileCreationError);
         // Don't fail the whole operation, but log it
         console.log("Continuing despite profile creation failure");
       } else {
