@@ -94,7 +94,6 @@ export function AdminInstallManagement({
       if (engineerChanging || dateChanging) {
         updates.engineer_signed_off_at = null;
         updates.engineer_signature_data = null;
-        updates.engineer_status = null;
         updates.engineer_notes = null;
       }
 

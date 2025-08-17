@@ -169,7 +169,6 @@ export function UnifiedInstallationForm({
       if (engineerChanging || dateChanging) {
         updateData.engineer_signed_off_at = null;
         updateData.engineer_signature_data = null;
-        updateData.engineer_status = null;
         updateData.engineer_notes = null;
       }
 
@@ -275,7 +274,6 @@ export function UnifiedInstallationForm({
           time_window: null,
           engineer_signed_off_at: null,
           engineer_signature_data: null,
-          engineer_status: null,
           engineer_notes: null
         })
         .eq('id', orderId);

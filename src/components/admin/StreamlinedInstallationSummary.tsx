@@ -145,7 +145,6 @@ export function StreamlinedInstallationSummary({
           }
           updates.engineer_signed_off_at = null;
           updates.engineer_signature_data = null;
-          updates.engineer_status = null;
           updates.engineer_notes = null;
           break;
         case 'date':
@@ -157,7 +156,6 @@ export function StreamlinedInstallationSummary({
           }
           updates.engineer_signed_off_at = null;
           updates.engineer_signature_data = null;
-          updates.engineer_status = null;
           updates.engineer_notes = null;
           break;
         case 'timeWindow':
@@ -301,7 +299,6 @@ export function StreamlinedInstallationSummary({
           internal_install_notes: null,
           engineer_signed_off_at: null,
           engineer_signature_data: null,
-          engineer_status: null,
           engineer_notes: null
         })
         .eq('id', orderId);
@@ -378,7 +375,6 @@ export function StreamlinedInstallationSummary({
       if (engineerChanging || dateChanging) {
         updateData.engineer_signed_off_at = null;
         updateData.engineer_signature_data = null;
-        updateData.engineer_status = null;
         updateData.engineer_notes = null;
       }
       
