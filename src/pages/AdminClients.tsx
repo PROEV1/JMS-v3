@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { Search, User, Mail, Phone, MapPin, Calendar, Plus } from 'lucide-react';
 import { BrandPage, BrandContainer, BrandHeading1, BrandLoading } from '@/components/brand';
+import { CreateClientModal } from '@/components/CreateClientModal';
 
 interface Client {
   id: string;
@@ -24,11 +25,21 @@ export default function AdminClients() {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
 
   const handleAddClient = () => {
-    navigate('/admin/client-users');
+    setIsCreateModalOpen(true);
+  };
+
+  const handleCreateSuccess = (newClient: any) => {
+    setIsCreateModalOpen(false);
+    fetchClients(); // Refresh the list
+    toast({
+      title: "Success",
+      description: "Client created successfully",
+    });
   };
 
   useEffect(() => {
@@ -228,6 +239,12 @@ export default function AdminClients() {
             </Card>
           )}
         </div>
+
+        <CreateClientModal
+          isOpen={isCreateModalOpen}
+          onClose={() => setIsCreateModalOpen(false)}
+          onSuccess={handleCreateSuccess}
+        />
       </BrandContainer>
     </BrandPage>
   );
