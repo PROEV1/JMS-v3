@@ -52,6 +52,19 @@ serve(async (req) => {
     });
   }
 
+  // Handle GET requests for health check (no auth required)
+  if (req.method === 'GET') {
+    return new Response(JSON.stringify({
+      ok: true,
+      name: 'seed-scheduling-data-v2',
+      version: '2.0.0',
+      message: 'Function is deployed and ready'
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200
+    });
+  }
+
   try {
     // Validate environment variables first
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
