@@ -404,29 +404,17 @@ export default function Dashboard() {
                     }
 
                     try {
-                      const authToken = (await supabase.auth.getSession()).data.session?.access_token;
-                      if (!authToken) {
-                        throw new Error('No authentication token');
-                      }
-
-                      const response = await fetch(`https://jttogvpjfeegbkpturey.supabase.co/functions/v1/send-message`, {
-                        method: 'POST',
-                        headers: {
-                          'Content-Type': 'application/json',
-                          'Authorization': `Bearer ${authToken}`,
-                        },
-                        body: JSON.stringify({
+                      const { data, error } = await supabase.functions.invoke('send-message', {
+                        body: {
                           content: quickMessage,
                           clientId: client?.id,
                           quoteId: selectedQuoteForMessage?.id,
                           projectId: selectedProjectForMessage?.id
-                        }),
+                        }
                       });
 
-                      const data = await response.json();
-
-                      if (!response.ok) {
-                        throw new Error(data.error || 'Failed to send message');
+                      if (error) {
+                        throw new Error(error.message || 'Failed to send message');
                       }
 
                       toast({
