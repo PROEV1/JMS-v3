@@ -17,3 +17,9 @@ verify_jwt = false
 
 [functions.clear-seed-data]
 verify_jwt = false
+
+[functions.seed-scheduling-data-v2]
+verify_jwt = false
+
+[functions.clear-seed-data-v2]
+verify_jwt = false

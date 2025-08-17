@@ -135,22 +135,41 @@ export function SchedulingSettingsPanel() {
   const seedSchedulingData = async () => {
     setSeeding(true);
     try {
-      const { data, error } = await supabase.functions.invoke('seed-scheduling-data', {
-        body: {
-          clients: seedClients,
-          orders_per_client_min: seedOrdersMin,
-          orders_per_client_max: seedOrdersMax,
-          tag: seedTag
+      // Try v2 function first, fallback to v1 if 404
+      let data, error;
+      try {
+        ({ data, error } = await supabase.functions.invoke('seed-scheduling-data-v2', {
+          body: {
+            clients: seedClients,
+            orders_per_client_min: seedOrdersMin,
+            orders_per_client_max: seedOrdersMax,
+            tag: seedTag
+          }
+        }));
+      } catch (v2Error: any) {
+        console.log('V2 function failed, trying v1:', v2Error);
+        if (v2Error?.message?.includes('404') || v2Error?.status === 404) {
+          ({ data, error } = await supabase.functions.invoke('seed-scheduling-data', {
+            body: {
+              clients: seedClients,
+              orders_per_client_min: seedOrdersMin,
+              orders_per_client_max: seedOrdersMax,
+              tag: seedTag
+            }
+          }));
+        } else {
+          throw v2Error;
         }
-      });
+      }
 
       if (error) throw error;
 
       toast.success(data.message);
       console.log('Seed data created:', data);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error seeding data:', error);
-      toast.error('Failed to seed test data. Check console for details.');
+      const errorMessage = error?.message || 'Unknown error occurred';
+      toast.error(`Failed to seed test data: ${errorMessage}`);
     } finally {
       setSeeding(false);
     }
@@ -159,15 +178,27 @@ export function SchedulingSettingsPanel() {
   const clearSeedData = async () => {
     setClearing(true);
     try {
-      const { data, error } = await supabase.functions.invoke('clear-seed-data');
+      // Try v2 function first, fallback to v1 if 404
+      let data, error;
+      try {
+        ({ data, error } = await supabase.functions.invoke('clear-seed-data-v2'));
+      } catch (v2Error: any) {
+        console.log('V2 clear function failed, trying v1:', v2Error);
+        if (v2Error?.message?.includes('404') || v2Error?.status === 404) {
+          ({ data, error } = await supabase.functions.invoke('clear-seed-data'));
+        } else {
+          throw v2Error;
+        }
+      }
 
       if (error) throw error;
 
       toast.success(data.message);
       console.log('Seed data cleared:', data);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error clearing seed data:', error);
-      toast.error('Failed to clear seed data. Check console for details.');
+      const errorMessage = error?.message || 'Unknown error occurred';
+      toast.error(`Failed to clear seed data: ${errorMessage}`);
     } finally {
       setClearing(false);
     }
