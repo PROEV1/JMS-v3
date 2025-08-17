@@ -1,222 +1,107 @@
-import { useState } from 'react';
+
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Progress } from '@/components/ui/progress';
-import { supabase } from '@/integrations/supabase/client';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Upload, Download, FileText, AlertTriangle, CheckCircle, XCircle, Users, UserPlus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 import Papa from 'papaparse';
-import { Upload, Download, AlertCircle, CheckCircle, X, Info, AlertTriangle } from 'lucide-react';
 
-interface CsvRow {
-  email: string;
-  full_name?: string;
-  region?: string;
-  availability?: boolean;
-  starting_postcode?: string;
-  mon_available?: boolean;
-  mon_start?: string;
-  mon_end?: string;
-  tue_available?: boolean;
-  tue_start?: string;
-  tue_end?: string;
-  wed_available?: boolean;
-  wed_start?: string;
-  wed_end?: string;
-  thu_available?: boolean;
-  thu_start?: string;
-  thu_end?: string;
-  fri_available?: boolean;
-  fri_start?: string;
-  fri_end?: string;
-  sat_available?: boolean;
-  sat_start?: string;
-  sat_end?: string;
-  sun_available?: boolean;
-  sun_start?: string;
-  sun_end?: string;
-  service_areas?: string;
-  max_travel_minutes?: number;
-}
-
-interface ValidationResult {
-  isValid: boolean;
-  errors: string[];
-}
-
-interface ImportResult {
-  success: boolean;
-  summary: {
-    processed: number;
-    created_users: number;
-    created_engineers: number;
-    updated_engineers: number;
-    availability_upserts: number;
-    service_area_upserts: number;
-    errors: Array<{ row: number; error: string; email?: string }>;
-  };
-}
-
-export function EngineerCsvImport({ open, onOpenChange, onImportComplete }: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+interface EngineerCsvImportProps {
   onImportComplete: () => void;
-}) {
+}
+
+interface ImportSummary {
+  processed: number;
+  created_users: number;
+  created_engineers: number;
+  updated_engineers: number;
+  availability_upserts: number;
+  service_area_upserts: number;
+  errors: Array<{ row: number; error: string; email?: string }>;
+}
+
+export function EngineerCsvImport({ onImportComplete }: EngineerCsvImportProps) {
   const [file, setFile] = useState<File | null>(null);
-  const [csvData, setCsvData] = useState<CsvRow[]>([]);
+  const [importing, setImporting] = useState(false);
   const [createMissingUsers, setCreateMissingUsers] = useState(false);
-  const [isImporting, setIsImporting] = useState(false);
-  const [importProgress, setImportProgress] = useState(0);
-  const [importResult, setImportResult] = useState<ImportResult | null>(null);
-  const [validationErrors, setValidationErrors] = useState<string[]>([]);
-  
+  const [updateExistingRoles, setUpdateExistingRoles] = useState(false);
+  const [importResult, setImportResult] = useState<ImportSummary | null>(null);
   const { toast } = useToast();
 
-  const csvTemplate = `email,full_name,region,availability,starting_postcode,mon_available,mon_start,mon_end,tue_available,tue_start,tue_end,wed_available,wed_start,wed_end,thu_available,thu_start,thu_end,fri_available,fri_start,fri_end,sat_available,sat_start,sat_end,sun_available,sun_start,sun_end,service_areas,max_travel_minutes
-john.doe@example.com,John Doe,London,true,SW1A 1AA,true,09:00,17:00,true,09:00,17:00,true,09:00,17:00,true,09:00,17:00,true,09:00,17:00,false,,,false,,,SW1|SW2|SW3,60
-jane.smith@example.com,Jane Smith,Manchester,true,M1 1AA,true,08:00,16:00,true,08:00,16:00,true,08:00,16:00,true,08:00,16:00,true,08:00,16:00,true,10:00,14:00,false,,,M1|M2|M3,45`;
-
   const downloadTemplate = () => {
-    const blob = new Blob([csvTemplate], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'engineer_import_template.csv';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
+    const link = document.createElement('a');
+    link.href = '/engineer_import_template.csv';
+    link.download = 'engineer_import_template.csv';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
-    if (!selectedFile) return;
-
-    setFile(selectedFile);
-    
-    Papa.parse(selectedFile, {
-      header: true,
-      skipEmptyLines: true,
-      transformHeader: (header) => header.trim().toLowerCase(),
-      transform: (value, header) => {
-        if (!value || value.trim() === '') return undefined;
-        
-        const headerStr = String(header);
-        
-        // Convert boolean fields
-        if (headerStr.includes('available') || headerStr === 'availability') {
-          return value.toLowerCase() === 'true' || value === '1';
-        }
-        
-        // Convert number fields
-        if (headerStr === 'max_travel_minutes') {
-          const num = parseInt(value);
-          return isNaN(num) ? undefined : num;
-        }
-        
-        return value.trim();
-      },
-      complete: (results) => {
-        const data = results.data as CsvRow[];
-        setCsvData(data);
-        
-        // Validate data and filter valid rows
-        const errors: string[] = [];
-        const validRows: CsvRow[] = [];
-        
-        data.forEach((row, index) => {
-          const rowErrors: string[] = [];
-          
-          if (!row.email) {
-            rowErrors.push(`Row ${index + 1}: Email is required`);
-          }
-          
-          // Validate time formats
-          const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-          days.forEach(day => {
-            const availableKey = `${day}_available` as keyof CsvRow;
-            const startKey = `${day}_start` as keyof CsvRow;
-            const endKey = `${day}_end` as keyof CsvRow;
-            
-            if (row[availableKey] && row[startKey] && row[endKey]) {
-              const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
-              if (!timeRegex.test(row[startKey] as string)) {
-                rowErrors.push(`Row ${index + 1}: Invalid ${day}_start time format (use HH:MM)`);
-              }
-              if (!timeRegex.test(row[endKey] as string)) {
-                rowErrors.push(`Row ${index + 1}: Invalid ${day}_end time format (use HH:MM)`);
-              }
-            }
-          });
-          
-          if (rowErrors.length === 0) {
-            validRows.push(row);
-          } else {
-            errors.push(...rowErrors);
-          }
-        });
-        
-        // Set the filtered valid data for import
-        setCsvData(validRows);
-        setValidationErrors(errors);
-      },
-      error: (error) => {
+    if (selectedFile) {
+      if (!selectedFile.name.toLowerCase().endsWith('.csv')) {
         toast({
-          title: "CSV Parse Error",
-          description: error.message,
+          title: "Invalid File Type",
+          description: "Please select a CSV file.",
           variant: "destructive",
         });
+        return;
       }
-    });
+      setFile(selectedFile);
+      setImportResult(null);
+    }
   };
 
-  const handleImport = async () => {
-    if (!csvData.length) {
-      toast({
-        title: "No Data",
-        description: "Please select and parse a CSV file first",
-        variant: "destructive",
-      });
-      return;
-    }
+  const processImport = async () => {
+    if (!file) return;
 
-    // Show warning about skipped rows but proceed with valid rows
-    if (validationErrors.length > 0) {
-      toast({
-        title: "Validation Warnings",
-        description: `${validationErrors.length} rows will be skipped due to validation errors. Importing ${csvData.length} valid rows.`,
-        variant: "default",
-      });
-    }
-
-    setIsImporting(true);
-    setImportProgress(0);
+    setImporting(true);
     setImportResult(null);
 
     try {
-      const progressInterval = setInterval(() => {
-        setImportProgress(prev => Math.min(prev + 10, 90));
-      }, 500);
+      const fileText = await file.text();
+      const parseResult = Papa.parse(fileText, {
+        header: true,
+        skipEmptyLines: true,
+        transformHeader: (header) => header.trim().toLowerCase().replace(/\s+/g, '_')
+      });
+
+      if (parseResult.errors.length > 0) {
+        toast({
+          title: "CSV Parse Error",
+          description: `Error parsing CSV: ${parseResult.errors[0].message}`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log('Parsed CSV data:', parseResult.data);
 
       const { data, error } = await supabase.functions.invoke('import-engineers', {
         body: {
-          rows: csvData,
-          create_missing_users: createMissingUsers
+          rows: parseResult.data,
+          create_missing_users: createMissingUsers,
+          update_existing_roles: updateExistingRoles
         }
       });
 
-      clearInterval(progressInterval);
-      setImportProgress(100);
-
       if (error) {
-        throw new Error(error.message);
+        console.error('Import error:', error);
+        toast({
+          title: "Import Failed",
+          description: error.message || "Failed to import engineers",
+          variant: "destructive",
+        });
+        return;
       }
 
-      setImportResult(data);
+      setImportResult(data.summary);
       
       if (data.success) {
         toast({
@@ -226,252 +111,177 @@ jane.smith@example.com,Jane Smith,Manchester,true,M1 1AA,true,08:00,16:00,true,0
         onImportComplete();
       } else {
         toast({
-          title: "Import Failed",
-          description: "Check the results for details",
+          title: "Import Issues",
+          description: `Import completed with ${data.summary.errors.length} errors`,
           variant: "destructive",
         });
       }
+
     } catch (error: any) {
-      console.error('Import error:', error);
+      console.error('Import failed:', error);
       toast({
         title: "Import Failed",
         description: error.message || "An unexpected error occurred",
         variant: "destructive",
       });
     } finally {
-      setIsImporting(false);
+      setImporting(false);
     }
   };
 
-  const resetImport = () => {
-    setFile(null);
-    setCsvData([]);
-    setValidationErrors([]);
-    setImportResult(null);
-    setImportProgress(0);
-    setIsImporting(false);
-  };
-
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Import Engineers from CSV</DialogTitle>
-          <DialogDescription>
-            Upload a CSV file to import engineer data, schedules, and service areas into the system.
-          </DialogDescription>
-        </DialogHeader>
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center space-x-2">
+          <Upload className="h-5 w-5" />
+          <span>Import Engineers from CSV</span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex items-center space-x-2">
+          <Button variant="outline" onClick={downloadTemplate} size="sm">
+            <Download className="h-4 w-4 mr-2" />
+            Download Template
+          </Button>
+          <span className="text-sm text-muted-foreground">
+            Use this template to format your engineer data
+          </span>
+        </div>
 
-        <div className="space-y-6">
-          {/* Template Download */}
-          <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
-            <div>
-              <h3 className="font-medium">CSV Template</h3>
-              <p className="text-sm text-muted-foreground">
-                Download the template to see the required format and example data
-              </p>
-            </div>
-            <Button variant="outline" onClick={downloadTemplate}>
-              <Download className="h-4 w-4 mr-2" />
-              Download Template
-            </Button>
-          </div>
+        <div>
+          <Label htmlFor="csv-file">Select CSV File</Label>
+          <Input
+            id="csv-file"
+            type="file"
+            accept=".csv"
+            onChange={handleFileChange}
+            className="mt-1"
+          />
+        </div>
 
-          {/* File Upload */}
-          <div className="space-y-2">
-            <Label htmlFor="csv-file">Select CSV File</Label>
-            <Input
-              id="csv-file"
-              type="file"
-              accept=".csv"
-              onChange={handleFileChange}
-              disabled={isImporting}
-            />
-          </div>
-
-          {/* Options */}
+        <div className="space-y-3">
           <div className="flex items-center space-x-2">
-            <Checkbox 
+            <Checkbox
               id="create-users"
               checked={createMissingUsers}
-              onCheckedChange={(checked) => setCreateMissingUsers(!!checked)}
-              disabled={isImporting}
+              onCheckedChange={(checked) => setCreateMissingUsers(checked as boolean)}
             />
-            <Label htmlFor="create-users">
-              Create user accounts for engineers that don't have one
+            <Label htmlFor="create-users" className="text-sm">
+              Create user accounts for engineers who don't have them
             </Label>
           </div>
 
-          {/* Validation Errors */}
-          {validationErrors.length > 0 && (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                <div className="space-y-1">
-                  <p className="font-medium">Validation Errors:</p>
-                  {validationErrors.slice(0, 5).map((error, index) => (
-                    <p key={index} className="text-sm">{error}</p>
-                  ))}
-                  {validationErrors.length > 5 && (
-                    <p className="text-sm">...and {validationErrors.length - 5} more errors</p>
-                  )}
-                </div>
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {/* Data Preview */}
-          {csvData.length > 0 && validationErrors.length === 0 && (
-            <div className="space-y-2">
-              <h3 className="font-medium">Data Preview ({csvData.length} rows)</h3>
-              <div className="border rounded-lg max-h-60 overflow-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Region</TableHead>
-                      <TableHead>Postcode</TableHead>
-                      <TableHead>Service Areas</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {csvData.slice(0, 5).map((row, index) => (
-                      <TableRow key={index}>
-                        <TableCell className="font-mono text-sm">{row.email}</TableCell>
-                        <TableCell>{row.full_name || 'N/A'}</TableCell>
-                        <TableCell>{row.region || 'N/A'}</TableCell>
-                        <TableCell>{row.starting_postcode || 'N/A'}</TableCell>
-                        <TableCell>{row.service_areas || 'N/A'}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-                {csvData.length > 5 && (
-                  <div className="p-2 text-center text-sm text-muted-foreground border-t">
-                    ...and {csvData.length - 5} more rows
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Import Progress */}
-          {isImporting && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Importing engineers...</span>
-                <span className="text-sm">{importProgress}%</span>
-              </div>
-              <Progress value={importProgress} className="w-full" />
-            </div>
-          )}
-
-          {/* Import Results */}
-          {importResult && (
-            <div className="space-y-4">
-              <div className="flex items-center space-x-2">
-                {importResult.success ? (
-                  <CheckCircle className="h-5 w-5 text-green-600" />
-                ) : (
-                  <X className="h-5 w-5 text-red-600" />
-                )}
-                <h3 className="font-medium">
-                  Import {importResult.success ? 'Completed' : 'Failed'}
-                </h3>
-              </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-4 bg-muted rounded-lg">
-                <div className="text-center">
-                  <div className="text-2xl font-bold">{importResult.summary.processed}</div>
-                  <div className="text-sm text-muted-foreground">Processed</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-green-600">{importResult.summary.created_users}</div>
-                  <div className="text-sm text-muted-foreground">Users Created</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-blue-600">{importResult.summary.created_engineers}</div>
-                  <div className="text-sm text-muted-foreground">Engineers Created</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-orange-600">{importResult.summary.updated_engineers}</div>
-                  <div className="text-sm text-muted-foreground">Engineers Updated</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-purple-600">{importResult.summary.availability_upserts}</div>
-                  <div className="text-sm text-muted-foreground">Schedule Updates</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-cyan-600">{importResult.summary.service_area_upserts}</div>
-                  <div className="text-sm text-muted-foreground">Service Areas</div>
-                </div>
-              </div>
-
-              {/* Explanation for user creation */}
-              {createMissingUsers && importResult.summary.created_users === 0 && (
-                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <div className="flex items-start space-x-2">
-                    <Info className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                    <div className="text-sm text-blue-700">
-                      <p className="font-medium">No new users were created</p>
-                      <p>All imported engineers already have user accounts in the system. Users are only created for engineers without existing accounts.</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {!createMissingUsers && (
-                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <div className="flex items-start space-x-2">
-                    <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5 flex-shrink-0" />
-                    <div className="text-sm text-yellow-700">
-                      <p className="font-medium">User creation was disabled</p>
-                      <p>Engineers without existing user accounts will not be able to log in. Enable "Create user accounts" to automatically create accounts for new engineers.</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {importResult.summary.errors.length > 0 && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>
-                    <div className="space-y-1">
-                      <p className="font-medium">{importResult.summary.errors.length} Errors:</p>
-                      {importResult.summary.errors.slice(0, 5).map((error, index) => (
-                        <p key={index} className="text-sm">
-                          Row {error.row}: {error.error} {error.email && `(${error.email})`}
-                        </p>
-                      ))}
-                      {importResult.summary.errors.length > 5 && (
-                        <p className="text-sm">...and {importResult.summary.errors.length - 5} more errors</p>
-                      )}
-                    </div>
-                  </AlertDescription>
-                </Alert>
-              )}
-            </div>
-          )}
-
-          {/* Action Buttons */}
-          <div className="flex justify-end space-x-2 pt-4 border-t">
-            <Button variant="outline" onClick={resetImport} disabled={isImporting}>
-              Reset
-            </Button>
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Close
-            </Button>
-            <Button 
-              onClick={handleImport}
-              disabled={!csvData.length || isImporting}
-            >
-              <Upload className="h-4 w-4 mr-2" />
-              {isImporting ? 'Importing...' : 'Import Engineers'}
-            </Button>
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="update-roles"
+              checked={updateExistingRoles}
+              onCheckedChange={(checked) => setUpdateExistingRoles(checked as boolean)}
+            />
+            <Label htmlFor="update-roles" className="text-sm">
+              Update profile role to 'engineer' for existing users
+            </Label>
           </div>
+
+          {updateExistingRoles && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+              <div className="flex items-start space-x-2">
+                <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5 flex-shrink-0" />
+                <div className="text-sm text-yellow-800">
+                  <p className="font-medium">Role Update Warning</p>
+                  <p>This will change the profile role to 'engineer' for any existing users found in the CSV. They will be redirected to the engineer portal on their next login.</p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
-      </DialogContent>
-    </Dialog>
+
+        {file && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <div className="flex items-center space-x-2">
+              <FileText className="h-4 w-4 text-blue-600" />
+              <span className="text-sm text-blue-800">
+                Ready to import: <strong>{file.name}</strong>
+              </span>
+            </div>
+          </div>
+        )}
+
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button 
+              disabled={!file || importing} 
+              className="w-full"
+            >
+              {importing ? 'Importing...' : 'Import Engineers'}
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirm Engineer Import</AlertDialogTitle>
+              <AlertDialogDescription>
+                You are about to import engineers from <strong>{file?.name}</strong>.
+                
+                <div className="mt-3 space-y-2">
+                  <div className="flex items-center space-x-2">
+                    {createMissingUsers ? <CheckCircle className="h-4 w-4 text-green-600" /> : <XCircle className="h-4 w-4 text-gray-400" />}
+                    <span className="text-sm">Create user accounts for new engineers</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    {updateExistingRoles ? <CheckCircle className="h-4 w-4 text-green-600" /> : <XCircle className="h-4 w-4 text-gray-400" />}
+                    <span className="text-sm">Update existing user roles to engineer</span>
+                  </div>
+                </div>
+
+                <p className="mt-3 text-sm">This action cannot be undone. Please ensure your CSV data is correct.</p>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={processImport}>
+                Import Engineers
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {importResult && (
+          <div className="mt-4 space-y-3">
+            <h4 className="font-medium">Import Results</h4>
+            
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="flex items-center space-x-2">
+                <Users className="h-4 w-4 text-blue-600" />
+                <span>Processed: {importResult.processed}</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <UserPlus className="h-4 w-4 text-green-600" />
+                <span>Created Users: {importResult.created_users}</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                <span>Created Engineers: {importResult.created_engineers}</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <CheckCircle className="h-4 w-4 text-blue-600" />
+                <span>Updated Engineers: {importResult.updated_engineers}</span>
+              </div>
+            </div>
+
+            {importResult.errors.length > 0 && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                <h5 className="font-medium text-red-800 mb-2">Errors ({importResult.errors.length})</h5>
+                <div className="space-y-1 max-h-32 overflow-y-auto">
+                  {importResult.errors.map((error, index) => (
+                    <div key={index} className="text-sm text-red-700">
+                      Row {error.row}: {error.error} {error.email && `(${error.email})`}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

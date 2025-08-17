@@ -1,4 +1,3 @@
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
@@ -41,6 +40,7 @@ interface EngineerRow {
 interface ImportRequest {
   rows: EngineerRow[];
   create_missing_users?: boolean;
+  update_existing_roles?: boolean;
 }
 
 interface ImportResult {
@@ -50,6 +50,7 @@ interface ImportResult {
     created_users: number;
     created_engineers: number;
     updated_engineers: number;
+    role_updates: number;
     availability_upserts: number;
     service_area_upserts: number;
     errors: Array<{ row: number; error: string; email?: string }>;
@@ -130,7 +131,7 @@ Deno.serve(async (req) => {
     console.log('Admin user validated:', user.email);
 
     const body: ImportRequest = await req.json();
-    const { rows, create_missing_users = false } = body;
+    const { rows, create_missing_users = false, update_existing_roles = false } = body;
 
     if (!rows || !Array.isArray(rows)) {
       return new Response(JSON.stringify({ error: 'Invalid request: rows must be an array' }), {
@@ -146,13 +147,17 @@ Deno.serve(async (req) => {
         created_users: 0,
         created_engineers: 0,
         updated_engineers: 0,
+        role_updates: 0,
         availability_upserts: 0,
         service_area_upserts: 0,
         errors: []
       }
     };
 
-    console.log(`Processing ${rows.length} engineer rows`);
+    console.log(`Processing ${rows.length} engineer rows with options:`, { 
+      create_missing_users, 
+      update_existing_roles 
+    });
 
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
@@ -189,8 +194,7 @@ Deno.serve(async (req) => {
 
         profile = existingProfiles?.[0] || null;
 
-        console.log(`Profile lookup for ${email}:`, profile ? 'Found existing profile' : 'No profile found');
-        console.log(`Create missing users flag:`, create_missing_users);
+        console.log(`Profile lookup for ${email}:`, profile ? `Found existing profile with role: ${profile.role}` : 'No profile found');
 
         // Create user if needed and requested
         if (!profile && create_missing_users) {
@@ -214,7 +218,6 @@ Deno.serve(async (req) => {
               continue;
             }
 
-            // Increment counter immediately after successful user creation
             result.summary.created_users++;
             console.log(`Successfully created user for: ${email}`);
 
@@ -225,7 +228,7 @@ Deno.serve(async (req) => {
                 user_id: newUser.user!.id,
                 email: email,
                 full_name: row.full_name || email.split('@')[0],
-                role: 'engineer' as any, // Ensure it's treated as the correct enum type
+                role: 'engineer' as any,
                 status: 'active'
               });
 
@@ -243,7 +246,7 @@ Deno.serve(async (req) => {
               user_id: newUser.user!.id,
               email: email,
               full_name: row.full_name || email.split('@')[0],
-              role: 'engineer', // Ensure consistent role assignment
+              role: 'engineer',
               status: 'active'
             };
 
@@ -260,7 +263,30 @@ Deno.serve(async (req) => {
         } else if (!profile) {
           console.log(`Skipping user creation for ${email} - create_missing_users is false`);
         } else {
-          console.log(`User already exists for ${email}, skipping creation`);
+          console.log(`User already exists for ${email}, checking role update`);
+          
+          // Update existing profile role if requested and role is not already engineer
+          if (update_existing_roles && profile.role !== 'engineer') {
+            console.log(`Updating role for ${email} from ${profile.role} to engineer`);
+            const { error: roleUpdateError } = await supabaseAdmin
+              .from('profiles')
+              .update({ role: 'engineer' })
+              .eq('user_id', profile.user_id);
+
+            if (roleUpdateError) {
+              console.error('Error updating role:', roleUpdateError);
+              result.summary.errors.push({ 
+                row: rowNumber, 
+                error: 'Failed to update user role',
+                email 
+              });
+              continue;
+            }
+
+            result.summary.role_updates++;
+            profile.role = 'engineer'; // Update local copy
+            console.log(`Updated role for ${email} to engineer`);
+          }
         }
 
         // Get or create engineer record
