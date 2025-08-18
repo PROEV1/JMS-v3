@@ -96,7 +96,7 @@ export default function MappingConfiguration({
 
   const updateColumnMapping = (orderField: string, sourceColumn: string) => {
     const newMappings = { ...columnMappings };
-    if (sourceColumn) {
+    if (sourceColumn && sourceColumn !== 'none') {
       newMappings[orderField] = sourceColumn;
     } else {
       delete newMappings[orderField];
@@ -166,14 +166,14 @@ export default function MappingConfiguration({
                 </div>
                 <div className="w-2/3">
                   <Select
-                    value={columnMappings[field.key] || ''}
-                    onValueChange={(value) => updateColumnMapping(field.key, value)}
+                    value={columnMappings[field.key] || 'none'}
+                    onValueChange={(value) => updateColumnMapping(field.key, value === 'none' ? '' : value)}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select source column" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">-- None --</SelectItem>
+                      <SelectItem value="none">-- None --</SelectItem>
                       {availableColumns.map((column) => (
                         <SelectItem key={column} value={column}>
                           {column}
