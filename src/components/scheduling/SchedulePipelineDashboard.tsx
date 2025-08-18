@@ -170,35 +170,41 @@ export function SchedulePipelineDashboard({ orders }: SchedulePipelineDashboardP
     expired: 0 
   });
 
-  // Fetch job offers counts for all statuses
+  // Fetch job offers counts for all statuses using head queries for robust counting
   useEffect(() => {
     const fetchOfferCounts = async () => {
-      const [pendingResult, acceptedResult, rejectedResult, expiredResult] = await Promise.all([
-        supabase
-          .from('job_offers')
-          .select('id', { count: 'exact' })
-          .eq('status', 'pending')
-          .gt('expires_at', new Date().toISOString()),
-        supabase
-          .from('job_offers')
-          .select('id', { count: 'exact' })
-          .eq('status', 'accepted'),
-        supabase
-          .from('job_offers')
-          .select('id', { count: 'exact' })
-          .eq('status', 'rejected'),
-        supabase
-          .from('job_offers')
-          .select('id', { count: 'exact' })
-          .eq('status', 'expired')
-      ]);
+      try {
+        const [pendingResult, acceptedResult, rejectedResult, expiredResult] = await Promise.all([
+          supabase
+            .from('job_offers')
+            .select('*', { count: 'exact', head: true })
+            .eq('status', 'pending')
+            .gt('expires_at', new Date().toISOString()),
+          supabase
+            .from('job_offers')
+            .select('*', { count: 'exact', head: true })
+            .eq('status', 'accepted'),
+          supabase
+            .from('job_offers')
+            .select('*', { count: 'exact', head: true })
+            .eq('status', 'rejected'),
+          supabase
+            .from('job_offers')
+            .select('*', { count: 'exact', head: true })
+            .eq('status', 'expired')
+        ]);
 
-      setOfferCounts({
-        pending: pendingResult.data?.length || 0,
-        accepted: acceptedResult.data?.length || 0,
-        rejected: rejectedResult.data?.length || 0,
-        expired: expiredResult.data?.length || 0
-      });
+        setOfferCounts({
+          pending: pendingResult.count || 0,
+          accepted: acceptedResult.count || 0,
+          rejected: rejectedResult.count || 0,
+          expired: expiredResult.count || 0
+        });
+      } catch (error) {
+        console.error('Error fetching offer counts:', error);
+        // Set defaults on error
+        setOfferCounts({ pending: 0, accepted: 0, rejected: 0, expired: 0 });
+      }
     };
 
     fetchOfferCounts();

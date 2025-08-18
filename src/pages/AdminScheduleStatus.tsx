@@ -36,20 +36,12 @@ export default function AdminScheduleStatus() {
         })) || []);
       }
 
-      // Handle different status types
+      // Handle different status types with two-step fetches for offer-based statuses
       if (status === 'date-offered') {
-        // For date-offered, query job_offers and get corresponding orders
+        // Step 1: Get offer IDs
         const { data: offersData, error: offersError } = await supabase
           .from('job_offers')
-          .select(`
-            order_id,
-            orders!inner(
-              *,
-              client:clients(*),
-              quote:quotes(*),
-              engineer:engineers(*)
-            )
-          `)
+          .select('order_id, offered_date, engineer_id')
           .eq('status', 'pending')
           .gt('expires_at', new Date().toISOString())
           .order('created_at', { ascending: false });
@@ -57,82 +49,130 @@ export default function AdminScheduleStatus() {
         if (offersError) {
           console.error('Error fetching offers data:', offersError);
           setOrders([]);
-        } else {
-          // Extract orders from the offers data and flatten
-          const ordersWithOffers = offersData?.map(offer => offer.orders).filter(Boolean) || [];
-          setOrders(ordersWithOffers);
-        }
-      } else if (status === 'ready-to-book') {
-        // For ready-to-book, query accepted job_offers and get corresponding orders
-        const { data: offersData, error: offersError } = await supabase
-          .from('job_offers')
-          .select(`
-            order_id,
-            orders!inner(
+        } else if (offersData && offersData.length > 0) {
+          // Step 2: Get orders for those IDs
+          const orderIds = offersData.map(offer => offer.order_id);
+          const { data: ordersData, error: ordersError } = await supabase
+            .from('orders')
+            .select(`
               *,
               client:clients(*),
               quote:quotes(*),
               engineer:engineers(*)
-            )
-          `)
+            `)
+            .in('id', orderIds)
+            .order('created_at', { ascending: false });
+
+          if (ordersError) {
+            console.error('Error fetching orders data:', ordersError);
+            setOrders([]);
+          } else {
+            setOrders(ordersData || []);
+          }
+        } else {
+          setOrders([]);
+        }
+      } else if (status === 'ready-to-book') {
+        // Step 1: Get accepted offer order IDs
+        const { data: offersData, error: offersError } = await supabase
+          .from('job_offers')
+          .select('order_id, offered_date, engineer_id')
           .eq('status', 'accepted')
           .order('accepted_at', { ascending: false });
 
         if (offersError) {
           console.error('Error fetching accepted offers data:', offersError);
           setOrders([]);
-        } else {
-          // Extract orders from the offers data and flatten
-          const ordersWithOffers = offersData?.map(offer => offer.orders).filter(Boolean) || [];
-          setOrders(ordersWithOffers);
-        }
-      } else if (status === 'date-rejected') {
-        // For date-rejected, query rejected job_offers and get corresponding orders
-        const { data: offersData, error: offersError } = await supabase
-          .from('job_offers')
-          .select(`
-            order_id,
-            orders!inner(
+        } else if (offersData && offersData.length > 0) {
+          // Step 2: Get orders for those IDs
+          const orderIds = offersData.map(offer => offer.order_id);
+          const { data: ordersData, error: ordersError } = await supabase
+            .from('orders')
+            .select(`
               *,
               client:clients(*),
               quote:quotes(*),
               engineer:engineers(*)
-            )
-          `)
+            `)
+            .in('id', orderIds)
+            .order('created_at', { ascending: false });
+
+          if (ordersError) {
+            console.error('Error fetching orders data:', ordersError);
+            setOrders([]);
+          } else {
+            setOrders(ordersData || []);
+          }
+        } else {
+          setOrders([]);
+        }
+      } else if (status === 'date-rejected') {
+        // Step 1: Get rejected offer order IDs
+        const { data: offersData, error: offersError } = await supabase
+          .from('job_offers')
+          .select('order_id, offered_date, engineer_id')
           .eq('status', 'rejected')
           .order('rejected_at', { ascending: false });
 
         if (offersError) {
           console.error('Error fetching rejected offers data:', offersError);
           setOrders([]);
-        } else {
-          // Extract orders from the offers data and flatten
-          const ordersWithOffers = offersData?.map(offer => offer.orders).filter(Boolean) || [];
-          setOrders(ordersWithOffers);
-        }
-      } else if (status === 'offer-expired') {
-        // For offer-expired, query expired job_offers and get corresponding orders
-        const { data: offersData, error: offersError } = await supabase
-          .from('job_offers')
-          .select(`
-            order_id,
-            orders!inner(
+        } else if (offersData && offersData.length > 0) {
+          // Step 2: Get orders for those IDs
+          const orderIds = offersData.map(offer => offer.order_id);
+          const { data: ordersData, error: ordersError } = await supabase
+            .from('orders')
+            .select(`
               *,
               client:clients(*),
               quote:quotes(*),
               engineer:engineers(*)
-            )
-          `)
+            `)
+            .in('id', orderIds)
+            .order('created_at', { ascending: false });
+
+          if (ordersError) {
+            console.error('Error fetching orders data:', ordersError);
+            setOrders([]);
+          } else {
+            setOrders(ordersData || []);
+          }
+        } else {
+          setOrders([]);
+        }
+      } else if (status === 'offer-expired') {
+        // Step 1: Get expired offer order IDs
+        const { data: offersData, error: offersError } = await supabase
+          .from('job_offers')
+          .select('order_id, offered_date, engineer_id')
           .eq('status', 'expired')
           .order('expired_at', { ascending: false });
 
         if (offersError) {
           console.error('Error fetching expired offers data:', offersError);
           setOrders([]);
+        } else if (offersData && offersData.length > 0) {
+          // Step 2: Get orders for those IDs
+          const orderIds = offersData.map(offer => offer.order_id);
+          const { data: ordersData, error: ordersError } = await supabase
+            .from('orders')
+            .select(`
+              *,
+              client:clients(*),
+              quote:quotes(*),
+              engineer:engineers(*)
+            `)
+            .in('id', orderIds)
+            .order('created_at', { ascending: false });
+
+          if (ordersError) {
+            console.error('Error fetching orders data:', ordersError);
+            setOrders([]);
+          } else {
+            setOrders(ordersData || []);
+          }
         } else {
-          // Extract orders from the offers data and flatten
-          const ordersWithOffers = offersData?.map(offer => offer.orders).filter(Boolean) || [];
-          setOrders(ordersWithOffers);
+          setOrders([]);
         }
       } else {
         // For other statuses, query orders normally
