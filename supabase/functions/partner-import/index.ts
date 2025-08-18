@@ -129,7 +129,7 @@ Deno.serve(async (req) => {
       csvRows = lines.map(line => line.split(',').map(cell => cell.trim().replace(/^"|"$/g, '')));
     } else if (importProfile.source_type === 'gsheet' && importProfile.gsheet_id) {
       // Fetch Google Sheets data
-      const sheetsResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/google-sheets-preview`, {
+      const sheetsResponse = await fetch(`https://qvppvstgconmzzjsryna.supabase.co/functions/v1/google-sheets-preview`, {
         method: 'POST',
         headers: {
           'Authorization': authHeader,
@@ -143,6 +143,8 @@ Deno.serve(async (req) => {
       });
 
       const sheetsData = await sheetsResponse.json();
+      console.log('Google Sheets response:', sheetsData);
+      
       if (!sheetsData.success) {
         result.summary.errors.push({
           row: 0,
