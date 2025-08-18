@@ -128,15 +128,36 @@ Deno.serve(async (req) => {
       const lines = csv_data.trim().split('\n');
       csvRows = lines.map(line => line.split(',').map(cell => cell.trim().replace(/^"|"$/g, '')));
     } else if (importProfile.source_type === 'gsheet' && importProfile.gsheet_id) {
-      // For Google Sheets integration, you'd implement Google Sheets API call here
-      result.summary.errors.push({
-        row: 0,
-        error: 'Google Sheets integration not yet implemented'
+      // Fetch Google Sheets data
+      const sheetsResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/google-sheets-preview`, {
+        method: 'POST',
+        headers: {
+          'Authorization': authHeader,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          gsheet_id: importProfile.gsheet_id,
+          sheet_name: importProfile.gsheet_sheet_name || 'Sheet1',
+          preview_rows: 10000 // Get all data for import
+        })
       });
-      
-      return new Response(JSON.stringify(result), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+
+      const sheetsData = await sheetsResponse.json();
+      if (!sheetsData.success) {
+        result.summary.errors.push({
+          row: 0,
+          error: `Google Sheets fetch failed: ${sheetsData.error}`
+        });
+        
+        return new Response(JSON.stringify(result), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Convert Google Sheets data to CSV format
+      const headers = sheetsData.headers;
+      const rows = sheetsData.rows;
+      csvRows = [headers, ...rows];
     } else {
       return new Response(JSON.stringify({ error: 'No data source provided' }), {
         status: 400,

@@ -9,11 +9,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Edit, Trash2, Upload, FileSpreadsheet } from 'lucide-react';
+import { Plus, Edit, Upload, FileSpreadsheet } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
+import MappingConfiguration from '@/components/admin/MappingConfiguration';
+import ImportRunModal from '@/components/admin/ImportRunModal';
 
 interface ImportProfile {
   id: string;
@@ -43,10 +44,10 @@ export default function AdminPartnerProfiles() {
     source_type: 'csv' as 'csv' | 'gsheet',
     gsheet_id: '',
     gsheet_sheet_name: '',
-    column_mappings: '{}',
-    status_mappings: '{}',
-    engineer_mapping_rules: '[]',
-    status_override_rules: '{}',
+    column_mappings: {} as Record<string, string>,
+    status_mappings: {} as Record<string, string>,
+    engineer_mapping_rules: [] as Array<any>,
+    status_override_rules: {} as Record<string, boolean>,
     is_active: true
   });
 
@@ -88,10 +89,10 @@ export default function AdminPartnerProfiles() {
           source_type: data.source_type,
           gsheet_id: data.gsheet_id || null,
           gsheet_sheet_name: data.gsheet_sheet_name || null,
-          column_mappings: JSON.parse(data.column_mappings),
-          status_mappings: JSON.parse(data.status_mappings),
-          engineer_mapping_rules: JSON.parse(data.engineer_mapping_rules),
-          status_override_rules: JSON.parse(data.status_override_rules),
+          column_mappings: data.column_mappings,
+          status_mappings: data.status_mappings,
+          engineer_mapping_rules: data.engineer_mapping_rules,
+          status_override_rules: data.status_override_rules,
           is_active: data.is_active
         }]);
       
@@ -100,11 +101,45 @@ export default function AdminPartnerProfiles() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['partner-profiles', partnerId] });
       setShowCreateDialog(false);
+      setEditingProfile(null);
       resetForm();
-      toast({ title: 'Import profile created successfully' });
+      toast({ title: editingProfile ? 'Import profile updated successfully' : 'Import profile created successfully' });
     },
     onError: (error) => {
-      toast({ title: 'Error creating profile', description: error.message, variant: 'destructive' });
+      toast({ title: editingProfile ? 'Error updating profile' : 'Error creating profile', description: error.message, variant: 'destructive' });
+    }
+  });
+
+  const updateProfileMutation = useMutation({
+    mutationFn: async (data: typeof formData) => {
+      if (!editingProfile) throw new Error('No profile selected for update');
+      
+      const { error } = await supabase
+        .from('partner_import_profiles')
+        .update({
+          name: data.name,
+          source_type: data.source_type,
+          gsheet_id: data.gsheet_id || null,
+          gsheet_sheet_name: data.gsheet_sheet_name || null,
+          column_mappings: data.column_mappings,
+          status_mappings: data.status_mappings,
+          engineer_mapping_rules: data.engineer_mapping_rules,
+          status_override_rules: data.status_override_rules,
+          is_active: data.is_active
+        })
+        .eq('id', editingProfile.id);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['partner-profiles', partnerId] });
+      setShowCreateDialog(false);
+      setEditingProfile(null);
+      resetForm();
+      toast({ title: 'Import profile updated successfully' });
+    },
+    onError: (error) => {
+      toast({ title: 'Error updating profile', description: error.message, variant: 'destructive' });
     }
   });
 
@@ -114,12 +149,13 @@ export default function AdminPartnerProfiles() {
       source_type: 'csv',
       gsheet_id: '',
       gsheet_sheet_name: '',
-      column_mappings: '{}',
-      status_mappings: '{}',
-      engineer_mapping_rules: '[]',
-      status_override_rules: '{}',
+      column_mappings: {},
+      status_mappings: {},
+      engineer_mapping_rules: [],
+      status_override_rules: {},
       is_active: true
     });
+    setEditingProfile(null);
   };
 
   const handleEdit = (profile: ImportProfile) => {
@@ -129,43 +165,45 @@ export default function AdminPartnerProfiles() {
       source_type: profile.source_type,
       gsheet_id: profile.gsheet_id || '',
       gsheet_sheet_name: profile.gsheet_sheet_name || '',
-      column_mappings: JSON.stringify(profile.column_mappings, null, 2),
-      status_mappings: JSON.stringify(profile.status_mappings, null, 2),
-      engineer_mapping_rules: JSON.stringify(profile.engineer_mapping_rules, null, 2),
-      status_override_rules: JSON.stringify(profile.status_override_rules, null, 2),
+      column_mappings: profile.column_mappings,
+      status_mappings: profile.status_mappings,
+      engineer_mapping_rules: profile.engineer_mapping_rules,
+      status_override_rules: profile.status_override_rules,
       is_active: profile.is_active
     });
+    setShowCreateDialog(true);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    try {
-      JSON.parse(formData.column_mappings);
-      JSON.parse(formData.status_mappings);
-      JSON.parse(formData.engineer_mapping_rules);
-      JSON.parse(formData.status_override_rules);
-    } catch {
-      toast({ title: 'Invalid JSON in configuration', variant: 'destructive' });
-      return;
+    
+    if (editingProfile) {
+      updateProfileMutation.mutate(formData);
+    } else {
+      createProfileMutation.mutate(formData);
     }
-
-    createProfileMutation.mutate(formData);
   };
 
-  const triggerImport = async (profileId: string, dryRun: boolean = true) => {
+  const triggerImport = async (profileId: string, csvData?: string, dryRun: boolean = true) => {
     try {
+      const body: any = {
+        profile_id: profileId,
+        dry_run: dryRun
+      };
+      
+      if (csvData) {
+        body.csv_data = csvData;
+      }
+
       const { data, error } = await supabase.functions.invoke('partner-import', {
-        body: {
-          profile_id: profileId,
-          dry_run: dryRun
-        }
+        body
       });
 
       if (error) throw error;
 
       toast({ 
         title: dryRun ? 'Dry run completed' : 'Import completed',
-        description: `Processed ${data.summary.processed} rows. ${data.summary.inserted_count} inserted, ${data.summary.updated_count} updated.`
+        description: `Processed ${data.summary.processed} rows. ${data.summary.inserted_count} inserted, ${data.summary.updated_count} updated, ${data.summary.skipped_count} skipped. ${data.summary.errors.length} errors.`
       });
     } catch (error: any) {
       toast({ 
@@ -189,45 +227,54 @@ export default function AdminPartnerProfiles() {
         </div>
         <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
           <DialogTrigger asChild>
-            <Button onClick={() => { resetForm(); setEditingProfile(null); }}>
+            <Button onClick={() => { resetForm(); }}>
               <Plus className="h-4 w-4 mr-2" />
               Add Profile
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Create Import Profile</DialogTitle>
+              <DialogTitle>
+                {editingProfile ? 'Edit Import Profile' : 'Create Import Profile'}
+              </DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="name">Profile Name</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  required
-                />
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="name">Profile Name</Label>
+                  <Input
+                    id="name"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="source_type">Source Type</Label>
+                  <Select 
+                    value={formData.source_type} 
+                    onValueChange={(value: 'csv' | 'gsheet') => setFormData({ ...formData, source_type: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="csv">CSV Upload</SelectItem>
+                      <SelectItem value="gsheet">Google Sheets</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div>
-                <Label htmlFor="source_type">Source Type</Label>
-                <Select value={formData.source_type} onValueChange={(value: 'csv' | 'gsheet') => setFormData({ ...formData, source_type: value })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="csv">CSV Upload</SelectItem>
-                    <SelectItem value="gsheet">Google Sheets</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+
               {formData.source_type === 'gsheet' && (
-                <>
+                <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="gsheet_id">Google Sheet ID</Label>
                     <Input
                       id="gsheet_id"
                       value={formData.gsheet_id}
                       onChange={(e) => setFormData({ ...formData, gsheet_id: e.target.value })}
+                      placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms"
                     />
                   </div>
                   <div>
@@ -236,53 +283,40 @@ export default function AdminPartnerProfiles() {
                       id="gsheet_sheet_name"
                       value={formData.gsheet_sheet_name}
                       onChange={(e) => setFormData({ ...formData, gsheet_sheet_name: e.target.value })}
+                      placeholder="Sheet1"
                     />
                   </div>
-                </>
+                </div>
               )}
-              <div>
-                <Label htmlFor="column_mappings">Column Mappings (JSON)</Label>
-                <Textarea
-                  id="column_mappings"
-                  value={formData.column_mappings}
-                  onChange={(e) => setFormData({ ...formData, column_mappings: e.target.value })}
-                  placeholder='{"partner_status": "Status", "scheduled_date": "Install Date"}'
-                  rows={3}
-                />
-              </div>
-              <div>
-                <Label htmlFor="status_mappings">Status Mappings (JSON)</Label>
-                <Textarea
-                  id="status_mappings"
-                  value={formData.status_mappings}
-                  onChange={(e) => setFormData({ ...formData, status_mappings: e.target.value })}
-                  placeholder='{"AWAITING_INSTALL_DATE": "awaiting_install_booking"}'
-                  rows={3}
-                />
-              </div>
-              <div>
-                <Label htmlFor="status_override_rules">Status Override Rules (JSON)</Label>
-                <Textarea
-                  id="status_override_rules"
-                  value={formData.status_override_rules}
-                  onChange={(e) => setFormData({ ...formData, status_override_rules: e.target.value })}
-                  placeholder='{"ON_HOLD": true, "CANCELLATION_REQUESTED": true}'
-                  rows={2}
-                />
-              </div>
+
+              <MappingConfiguration
+                sourceType={formData.source_type}
+                gsheetId={formData.gsheet_id}
+                gsheetSheetName={formData.gsheet_sheet_name}
+                columnMappings={formData.column_mappings}
+                statusMappings={formData.status_mappings}
+                statusOverrideRules={formData.status_override_rules}
+                onColumnMappingsChange={(mappings) => setFormData({ ...formData, column_mappings: mappings })}
+                onStatusMappingsChange={(mappings) => setFormData({ ...formData, status_mappings: mappings })}
+                onStatusOverrideRulesChange={(rules) => setFormData({ ...formData, status_override_rules: rules })}
+              />
+
               <div className="flex items-center space-x-2">
                 <Switch
                   id="is_active"
                   checked={formData.is_active}
                   onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
                 />
-                <Label htmlFor="is_active">Active</Label>
+                <Label htmlFor="is_active">Active Profile</Label>
               </div>
-              <div className="flex justify-end space-x-2">
-                <Button type="button" variant="outline" onClick={() => setShowCreateDialog(false)}>
+
+              <div className="flex justify-end space-x-2 pt-4 border-t">
+                <Button type="button" variant="outline" onClick={() => { setShowCreateDialog(false); resetForm(); }}>
                   Cancel
                 </Button>
-                <Button type="submit">Create</Button>
+                <Button type="submit" disabled={createProfileMutation.isPending || updateProfileMutation.isPending}>
+                  {editingProfile ? 'Update Profile' : 'Create Profile'}
+                </Button>
               </div>
             </form>
           </DialogContent>
@@ -313,18 +347,10 @@ export default function AdminPartnerProfiles() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => triggerImport(profile.id, true)}
-                >
-                  <FileSpreadsheet className="h-4 w-4 mr-1" />
-                  Dry Run
-                </Button>
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={() => triggerImport(profile.id, false)}
+                  onClick={() => setShowImportDialog(profile.id)}
                 >
                   <Upload className="h-4 w-4 mr-1" />
-                  Import
+                  Run Import
                 </Button>
                 <Button
                   variant="outline"
@@ -332,6 +358,7 @@ export default function AdminPartnerProfiles() {
                   onClick={() => handleEdit(profile)}
                 >
                   <Edit className="h-4 w-4" />
+                  Edit
                 </Button>
               </div>
             </CardHeader>
@@ -345,6 +372,18 @@ export default function AdminPartnerProfiles() {
           </Card>
         ))}
       </div>
+
+      {/* Import Run Modal */}
+      {showImportDialog && (
+        <ImportRunModal
+          isOpen={!!showImportDialog}
+          onClose={() => setShowImportDialog(null)}
+          onImport={(csvData, dryRun) => triggerImport(showImportDialog, csvData, dryRun)}
+          sourceType={profiles?.find(p => p.id === showImportDialog)?.source_type || 'csv'}
+          gsheetId={profiles?.find(p => p.id === showImportDialog)?.gsheet_id || undefined}
+          gsheetSheetName={profiles?.find(p => p.id === showImportDialog)?.gsheet_sheet_name || undefined}
+        />
+      )}
     </div>
   );
 }
