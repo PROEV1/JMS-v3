@@ -15,6 +15,7 @@ interface Engineer {
   id: string;
   name: string;
   email: string;
+  availability?: boolean;
 }
 
 interface EnhancedJobCardProps {
@@ -232,6 +233,7 @@ export function EnhancedJobCard({
         isOpen={showSmartAssignment}
         onClose={() => setShowSmartAssignment(false)}
         order={order}
+        engineers={engineers.map(e => ({ ...e, availability: e.availability ?? true }))}
         onAssign={async (engineerId, date) => {
           // Handle smart assignment - could automatically send offer
           console.log('Smart assigned:', engineerId, date);
