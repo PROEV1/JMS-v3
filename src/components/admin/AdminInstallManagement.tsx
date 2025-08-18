@@ -61,6 +61,16 @@ export function AdminInstallManagement({
   };
 
   const handleSave = async () => {
+    // Validation: Don't allow engineer assignment without a date
+    if (selectedEngineerId && selectedEngineerId !== 'unassigned' && !installDate) {
+      toast({
+        title: "Validation Error",
+        description: "You must set an installation date when assigning an engineer.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       const updates: any = {};

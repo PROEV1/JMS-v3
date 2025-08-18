@@ -453,8 +453,13 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                     <div className="flex items-center gap-2">
                       {order.order_number}
                       <Badge variant={getStatusColor(order.status_enhanced)} className="text-xs">
-                        {order.status_enhanced === 'awaiting_install_booking' ? 'Unassigned' : 
-                         order.engineer_id ? engineers.find(e => e.id === order.engineer_id)?.name || 'Assigned' : 'Unassigned'}
+                        {order.status_enhanced === 'awaiting_install_booking' ? 
+                          (order.engineer_id ? 
+                            `Needs scheduling — ${engineers.find(e => e.id === order.engineer_id)?.name || 'Assigned'}` : 
+                            'Needs scheduling — Unassigned'
+                          ) : 
+                          (order.engineer_id ? engineers.find(e => e.id === order.engineer_id)?.name || 'Assigned' : 'Unassigned')
+                        }
                       </Badge>
                     </div>
                   </TableCell>

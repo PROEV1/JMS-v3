@@ -129,6 +129,16 @@ export function StreamlinedInstallationSummary({
   };
 
   const handleSave = async (field: string) => {
+    // Validation: Don't allow engineer assignment without a date
+    if (field === 'engineer' && editValues.engineerId && editValues.engineerId !== 'none' && !editValues.installDate) {
+      toast({
+        title: "Validation Error",
+        description: "You must set an installation date when assigning an engineer.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
     try {
       let updates: any = {};
@@ -343,6 +353,16 @@ export function StreamlinedInstallationSummary({
   };
 
   const handleSaveEdit = async () => {
+    // Validation: Don't allow engineer assignment without a date
+    if (editData.engineer_id && !editData.scheduled_install_date) {
+      toast({
+        title: "Validation Error",
+        description: "You must set an installation date when assigning an engineer.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
     try {
       const updateData: any = {};

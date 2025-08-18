@@ -208,7 +208,7 @@ export default function AdminScheduleStatus() {
         } else {
           let filteredOrders = ordersData || [];
 
-          // For needs-scheduling, filter out orders that have active offers
+          // For needs-scheduling, filter to only orders that need scheduling (no engineer assigned and no active offers)
           if (status === 'needs-scheduling') {
             const { data: activeOffers } = await supabase
               .from('job_offers')
@@ -217,7 +217,10 @@ export default function AdminScheduleStatus() {
               .gt('expires_at', new Date().toISOString());
 
             const ordersWithActiveOffers = new Set(activeOffers?.map(offer => offer.order_id) || []);
-            filteredOrders = filteredOrders.filter(order => !ordersWithActiveOffers.has(order.id));
+            filteredOrders = filteredOrders.filter(order => 
+              !ordersWithActiveOffers.has(order.id) && 
+              order.engineer_id === null
+            );
           }
 
           setOrders(filteredOrders);

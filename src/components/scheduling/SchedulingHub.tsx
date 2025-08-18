@@ -45,12 +45,30 @@ export function SchedulingHub({}: SchedulingHubProps) {
         scheduledTodayResult,
         unavailableEngineersResult
       ] = await Promise.all([
-        // Unassigned jobs (awaiting_install_booking)
-        supabase
-          .from('orders')
-          .select('*', { count: 'exact', head: true })
-          .eq('status_enhanced', 'awaiting_install_booking')
-          .is('engineer_id', null),
+        // Unassigned jobs that need scheduling (no engineer and no active offers)
+        (async () => {
+          const { data: ordersData, error: ordersError } = await supabase
+            .from('orders')
+            .select('id')
+            .eq('status_enhanced', 'awaiting_install_booking')
+            .is('engineer_id', null);
+
+          if (ordersError) throw ordersError;
+
+          // Filter out orders with active offers
+          const { data: activeOffers } = await supabase
+            .from('job_offers')
+            .select('order_id')
+            .eq('status', 'pending')
+            .gt('expires_at', now.toISOString());
+
+          const ordersWithActiveOffers = new Set(activeOffers?.map(offer => offer.order_id) || []);
+          const needsSchedulingOrders = (ordersData || []).filter(order => 
+            !ordersWithActiveOffers.has(order.id)
+          );
+
+          return { count: needsSchedulingOrders.length };
+        })(),
         
         // Pending offers
         supabase
@@ -154,7 +172,7 @@ export function SchedulingHub({}: SchedulingHubProps) {
       {/* KPI Strip */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <KpiCard
-          title="Unassigned Jobs"
+          title="Needs Scheduling"
           value={kpiData?.unassigned || 0}
           icon={Clock}
           variant="warning"
