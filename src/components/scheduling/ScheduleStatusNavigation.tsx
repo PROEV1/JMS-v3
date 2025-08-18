@@ -133,16 +133,30 @@ export function ScheduleStatusNavigation({ currentStatus }: ScheduleStatusNaviga
           dateOfferedCount = uniqueOrderIds.length;
         }
 
-        const [rejectedResult, expiredResult] = await Promise.all([
-          supabase
+        // For date-rejected, count unique orders with rejected offers but no active offers
+        let dateRejectedCount = 0;
+        const { data: rejectedOffers } = await supabase
+          .from('job_offers')
+          .select('order_id')
+          .eq('status', 'rejected');
+
+        if (rejectedOffers?.length) {
+          const { data: activeOffers } = await supabase
             .from('job_offers')
-            .select('*', { count: 'exact', head: true })
-            .eq('status', 'rejected'),
-          supabase
-            .from('job_offers')
-            .select('*', { count: 'exact', head: true })
-            .eq('status', 'expired')
-        ]);
+            .select('order_id')
+            .in('status', ['pending', 'accepted'])
+            .gt('expires_at', new Date().toISOString());
+
+          const ordersWithActiveOffers = new Set(activeOffers?.map(offer => offer.order_id) || []);
+          const uniqueRejectedOrderIds = [...new Set(rejectedOffers.map(offer => offer.order_id))]
+            .filter(orderId => !ordersWithActiveOffers.has(orderId));
+          dateRejectedCount = uniqueRejectedOrderIds.length;
+        }
+
+        const expiredResult = await supabase
+          .from('job_offers')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'expired');
 
         // Fetch order-based counts
         const [scheduledResult, onHoldResult] = await Promise.all([
@@ -210,7 +224,7 @@ export function ScheduleStatusNavigation({ currentStatus }: ScheduleStatusNaviga
           'needs-scheduling': needsSchedulingCount,
           'date-offered': dateOfferedCount,
           'ready-to-book': readyToBookCount,
-          'date-rejected': rejectedResult.count || 0,
+          'date-rejected': dateRejectedCount,
           'offer-expired': expiredResult.count || 0,
           'scheduled': scheduledResult.count || 0,
           'on-hold': onHoldResult.count || 0

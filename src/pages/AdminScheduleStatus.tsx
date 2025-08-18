@@ -117,24 +117,39 @@ export default function AdminScheduleStatus() {
           console.error('Error fetching rejected offers data:', offersError);
           setOrders([]);
         } else if (offersData && offersData.length > 0) {
-          // Step 2: Get orders for those IDs
-          const orderIds = offersData.map(offer => offer.order_id);
-          const { data: ordersData, error: ordersError } = await supabase
-            .from('orders')
-            .select(`
-              *,
-              client:clients(*),
-              quote:quotes(*),
-              engineer:engineers(*)
-            `)
-            .in('id', orderIds)
-            .order('created_at', { ascending: false });
+          // Step 2: Get active offers to exclude orders that also have pending/accepted offers
+          const { data: activeOffers } = await supabase
+            .from('job_offers')
+            .select('order_id')
+            .in('status', ['pending', 'accepted'])
+            .gt('expires_at', new Date().toISOString());
 
-          if (ordersError) {
-            console.error('Error fetching orders data:', ordersError);
-            setOrders([]);
+          const ordersWithActiveOffers = new Set(activeOffers?.map(offer => offer.order_id) || []);
+          
+          // Step 3: Filter to unique order IDs that don't have active offers
+          const uniqueRejectedOrderIds = [...new Set(offersData.map(offer => offer.order_id))]
+            .filter(orderId => !ordersWithActiveOffers.has(orderId));
+
+          if (uniqueRejectedOrderIds.length > 0) {
+            const { data: ordersData, error: ordersError } = await supabase
+              .from('orders')
+              .select(`
+                *,
+                client:clients(*),
+                quote:quotes(*),
+                engineer:engineers(*)
+              `)
+              .in('id', uniqueRejectedOrderIds)
+              .order('created_at', { ascending: false });
+
+            if (ordersError) {
+              console.error('Error fetching orders data:', ordersError);
+              setOrders([]);
+            } else {
+              setOrders(ordersData || []);
+            }
           } else {
-            setOrders(ordersData || []);
+            setOrders([]);
           }
         } else {
           setOrders([]);
