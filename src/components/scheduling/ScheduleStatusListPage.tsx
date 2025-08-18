@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { 
   Calendar, 
   MapPin, 
@@ -182,100 +183,114 @@ export function ScheduleStatusListPage({
         </div>
       </div>
 
-      {/* Orders List */}
-      <div className="space-y-4">
-        {filteredOrders.length === 0 ? (
-          <Card>
-            <CardContent className="flex items-center justify-center py-12">
-              <div className="text-center">
-                <Calendar className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-medium mb-2">No jobs found</h3>
-                <p className="text-muted-foreground">
-                  {searchTerm ? 'Try adjusting your search criteria.' : 'No jobs match the current status.'}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        ) : (
-          filteredOrders.map((order) => (
-            <Card key={order.id} className="hover:shadow-md transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between">
-                  <div className="space-y-3 flex-1">
-                    {/* Header */}
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <h3 className="font-semibold text-lg">{order.order_number}</h3>
-                        <p className="text-muted-foreground">{order.client?.full_name}</p>
-                      </div>
-                      <Badge variant={getStatusColor(order.status_enhanced)}>
-                        {order.status_enhanced.replace('_', ' ')}
+      {/* Orders Table */}
+      <Card>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Job ID</TableHead>
+              <TableHead>Client</TableHead>
+              <TableHead>Postcode</TableHead>
+              <TableHead>Value</TableHead>
+              <TableHead>Engineer</TableHead>
+              <TableHead>Created</TableHead>
+              <TableHead>Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredOrders.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center py-12">
+                  <div className="flex flex-col items-center">
+                    <Calendar className="w-12 h-12 text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-medium mb-2">No jobs found</h3>
+                    <p className="text-muted-foreground">
+                      {searchTerm ? 'Try adjusting your search criteria.' : 'No jobs match the current status.'}
+                    </p>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredOrders.map((order) => (
+                <TableRow key={order.id}>
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-2">
+                      {order.order_number}
+                      <Badge variant={getStatusColor(order.status_enhanced)} className="text-xs">
+                        {order.status_enhanced === 'awaiting_install_booking' ? 'Unassigned' : 
+                         order.engineer_id ? engineers.find(e => e.id === order.engineer_id)?.name || 'Assigned' : 'Unassigned'}
                       </Badge>
                     </div>
-
-                    {/* Details */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-                      <div className="flex items-center gap-2">
-                        <MapPin className="w-4 h-4 text-muted-foreground" />
-                        <span className="truncate">
-                          {order.job_address || order.client?.address || 'No address'}
-                        </span>
-                      </div>
-
-                      {order.scheduled_install_date && (
-                        <div className="flex items-center gap-2">
-                          <Calendar className="w-4 h-4 text-muted-foreground" />
-                          <span>
-                            {new Date(order.scheduled_install_date).toLocaleDateString()}
-                          </span>
-                        </div>
-                      )}
-
-                      {order.engineer_id && (
-                        <div className="flex items-center gap-2">
-                          <User className="w-4 h-4 text-muted-foreground" />
-                          <span>
-                            {engineers.find(e => e.id === order.engineer_id)?.name || 'Unknown Engineer'}
-                          </span>
-                        </div>
-                      )}
-
-                      <div className="flex items-center gap-2">
-                        <Clock className="w-4 h-4 text-muted-foreground" />
-                        <span>{order.estimated_duration_hours || 2}h duration</span>
-                      </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <User className="w-4 h-4 text-muted-foreground" />
+                      {order.client?.full_name || 'Unknown Client'}
                     </div>
-
-                    {/* Actions */}
-                    {order.status_enhanced === 'awaiting_install_booking' && (
-                      <div className="flex gap-2 pt-2">
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-4 h-4 text-muted-foreground" />
+                      {order.postcode || 'N/A'}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="font-medium">
+                      £{order.total_amount ? Number(order.total_amount).toLocaleString() : '0'}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    {order.engineer_id ? (
+                      engineers.find(e => e.id === order.engineer_id)?.name || 'Unknown Engineer'
+                    ) : (
+                      <Badge variant="destructive" className="text-xs">Unassigned</Badge>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-muted-foreground" />
+                      {(order as any).created_at ? 
+                        new Date((order as any).created_at).toLocaleDateString('en-GB', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric'
+                        }) : 'Recent'}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    {order.status_enhanced === 'awaiting_install_booking' ? (
+                      <div className="flex gap-2">
                         <Button
                           size="sm"
                           variant="outline"
                           onClick={() => handleSmartAssign(order)}
-                          className="flex items-center gap-2"
+                          className="text-xs"
                         >
-                          <Wrench className="w-4 h-4" />
+                          <Wrench className="w-4 h-4 mr-1" />
                           Smart Assign
                         </Button>
                         <Button
                           size="sm"
                           variant="outline"
                           onClick={() => handleSendOffer(order)}
-                          className="flex items-center gap-2"
+                          className="text-xs"
                         >
-                          <Send className="w-4 h-4" />
+                          <Send className="w-4 h-4 mr-1" />
                           Send Offer
                         </Button>
                       </div>
+                    ) : (
+                      <Button size="sm" variant="outline" className="text-xs">
+                        View Details
+                      </Button>
                     )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
-      </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </Card>
 
       {/* Modals */}
       {selectedOrder && (
