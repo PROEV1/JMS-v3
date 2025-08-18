@@ -171,6 +171,22 @@ export const getSmartEngineerRecommendations = async (order: Order, postcode?: s
 
     console.log('Using postcode for recommendations:', finalPostcode);
 
+    // Get client blocked dates to exclude from recommendations
+    const { data: blockedDates, error: blockedDatesError } = await supabase
+      .from('client_blocked_dates')
+      .select('blocked_date')
+      .eq('client_id', order.client_id);
+      
+    if (blockedDatesError) {
+      console.warn('Failed to fetch client blocked dates:', blockedDatesError);
+    }
+    
+    const blockedDateStrings = new Set(
+      (blockedDates || []).map(bd => bd.blocked_date)
+    );
+    
+    console.log(`Client has ${blockedDateStrings.size} blocked dates`);
+
     // Get all engineers with complete settings
     const allEngineers = await getAllEngineersForScheduling();
     
@@ -255,6 +271,15 @@ export const getSmartEngineerRecommendations = async (order: Order, postcode?: s
           let daysChecked = 0;
 
            while (!availableDate && daysChecked < maxCheckDays) {
+             // Skip if this date is blocked by the client
+             const checkDateString = checkDate.toISOString().split('T')[0];
+             if (blockedDateStrings.has(checkDateString)) {
+               console.log(`  ${engineer.name}: Skipping ${checkDateString} - blocked by client`);
+               checkDate.setDate(checkDate.getDate() + 1);
+               daysChecked++;
+               continue;
+             }
+             
              // Check if engineer is available on this date
              if (isEngineerAvailableOnDate(engineer, checkDate)) {
                // Check weekend restrictions
@@ -296,6 +321,14 @@ export const getSmartEngineerRecommendations = async (order: Order, postcode?: s
           if (!availableDate && maxCheckDays < 365) {
             const extendedMaxDays = 365;
             while (!availableDate && daysChecked < extendedMaxDays) {
+              // Skip if this date is blocked by the client
+              const checkDateString = checkDate.toISOString().split('T')[0];
+              if (blockedDateStrings.has(checkDateString)) {
+                checkDate.setDate(checkDate.getDate() + 1);
+                daysChecked++;
+                continue;
+              }
+              
               if (isEngineerAvailableOnDate(engineer, checkDate)) {
                 const isWeekend = checkDate.getDay() === 0 || checkDate.getDay() === 6;
                 if (isWeekend && !settings.allow_weekend_bookings) {

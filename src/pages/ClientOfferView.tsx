@@ -3,9 +3,12 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { CalendarDays, Clock, User, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { CalendarDays, Clock, User, CheckCircle, XCircle, AlertTriangle, Calendar } from 'lucide-react';
 import Layout from '@/components/Layout';
 import { BrandTypography } from '@/components/brand/BrandTypography';
 import { supabase } from '@/integrations/supabase/client';
@@ -40,6 +43,10 @@ export default function ClientOfferView() {
   const [responding, setResponding] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
   const [showRejectionForm, setShowRejectionForm] = useState(false);
+  const [blockThisDate, setBlockThisDate] = useState(true);
+  const [blockDateRange, setBlockDateRange] = useState(false);
+  const [blockStartDate, setBlockStartDate] = useState('');
+  const [blockEndDate, setBlockEndDate] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -110,15 +117,36 @@ export default function ClientOfferView() {
       toast.error('Please provide a reason for rejection');
       return;
     }
+
+    // Validate date range if blocking a range
+    if (blockDateRange && (!blockStartDate || !blockEndDate)) {
+      toast.error('Please provide both start and end dates for the date range');
+      return;
+    }
+
+    if (blockDateRange && blockStartDate && blockEndDate && new Date(blockStartDate) > new Date(blockEndDate)) {
+      toast.error('Start date cannot be after end date');
+      return;
+    }
     
     setResponding(true);
     try {
+      const requestBody: any = {
+        token,
+        response: 'reject',
+        rejection_reason: rejectionReason,
+        block_this_date: blockThisDate
+      };
+
+      if (blockDateRange && blockStartDate && blockEndDate) {
+        requestBody.block_date_range = {
+          start_date: blockStartDate,
+          end_date: blockEndDate
+        };
+      }
+
       const { data, error } = await supabase.functions.invoke('offer-respond', {
-        body: {
-          token,
-          response: 'reject',
-          rejection_reason: rejectionReason
-        }
+        body: requestBody
       });
 
       if (error || data?.error) {
@@ -345,6 +373,68 @@ export default function ClientOfferView() {
                         rows={3}
                       />
                     </div>
+
+                    {/* Date blocking options */}
+                    <div className="space-y-4 p-4 bg-muted/50 rounded-lg">
+                      <div className="flex items-start space-x-2">
+                        <Checkbox
+                          id="block-this-date"
+                          checked={blockThisDate}
+                          onCheckedChange={(checked) => setBlockThisDate(checked as boolean)}
+                        />
+                        <div className="grid gap-1.5 leading-none">
+                          <Label htmlFor="block-this-date" className="text-sm font-medium">
+                            Don't offer this date again
+                          </Label>
+                          <p className="text-xs text-muted-foreground">
+                            We won't suggest {offer ? new Date(offer.offered_date).toLocaleDateString('en-GB') : 'this date'} for future installations
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start space-x-2">
+                        <Checkbox
+                          id="block-date-range"
+                          checked={blockDateRange}
+                          onCheckedChange={(checked) => setBlockDateRange(checked as boolean)}
+                        />
+                        <div className="grid gap-1.5 leading-none">
+                          <Label htmlFor="block-date-range" className="text-sm font-medium">
+                            Block a date range
+                          </Label>
+                          <p className="text-xs text-muted-foreground">
+                            Block multiple dates when you're away or unavailable
+                          </p>
+                        </div>
+                      </div>
+
+                      {blockDateRange && (
+                        <div className="grid grid-cols-2 gap-3 ml-6">
+                          <div>
+                            <Label htmlFor="start-date" className="text-xs">From</Label>
+                            <Input
+                              id="start-date"
+                              type="date"
+                              value={blockStartDate}
+                              onChange={(e) => setBlockStartDate(e.target.value)}
+                              min={new Date().toISOString().split('T')[0]}
+                              className="mt-1"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="end-date" className="text-xs">To</Label>
+                            <Input
+                              id="end-date"
+                              type="date"
+                              value={blockEndDate}
+                              onChange={(e) => setBlockEndDate(e.target.value)}
+                              min={blockStartDate || new Date().toISOString().split('T')[0]}
+                              className="mt-1"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
                     <div className="flex gap-4">
                       <Button 
                         variant="destructive"
@@ -359,6 +449,10 @@ export default function ClientOfferView() {
                         onClick={() => {
                           setShowRejectionForm(false);
                           setRejectionReason('');
+                          setBlockThisDate(true);
+                          setBlockDateRange(false);
+                          setBlockStartDate('');
+                          setBlockEndDate('');
                         }}
                         disabled={responding}
                         className="flex-1"

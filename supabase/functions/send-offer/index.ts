@@ -69,6 +69,21 @@ serve(async (req: Request) => {
       throw new Error('Engineer not found');
     }
 
+    // Check if client has blocked this date
+    const offeredDateOnly = new Date(offered_date).toISOString().split('T')[0];
+    const { data: blockedDates, error: blockedDateError } = await supabase
+      .from('client_blocked_dates')
+      .select('blocked_date, reason')
+      .eq('client_id', order.client_id)
+      .eq('blocked_date', offeredDateOnly);
+
+    if (blockedDateError) {
+      console.error('Error checking blocked dates:', blockedDateError);
+    } else if (blockedDates && blockedDates.length > 0) {
+      console.log(`Date ${offeredDateOnly} is blocked for client ${order.client_id}: ${blockedDates[0].reason}`);
+      throw new Error(`This date is not available: ${blockedDates[0].reason || 'Client unavailable'}`);
+    }
+
     // Check engineer availability on offered date
     const offerDate = new Date(offered_date)
     const dayOfWeek = offerDate.getDay()
