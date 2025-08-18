@@ -46,6 +46,7 @@ import OrderDetail from "@/pages/OrderDetail";
 import PublicQuoteView from "@/pages/PublicQuoteView";
 import Auth from "@/pages/Auth";
 import SetupPassword from "@/pages/SetupPassword";
+import NotFound from "@/pages/NotFound";
 import ClientOfferView from "@/pages/ClientOfferView";
 
 const queryClient = new QueryClient();
