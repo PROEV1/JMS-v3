@@ -12,6 +12,16 @@ serve(async (req) => {
   }
 
   try {
+    // Require Authorization header
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader) {
+      console.log('No authorization header')
+      return new Response(
+        JSON.stringify({ error: 'Authorization header required' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
     const body = await req.json()
     console.log('Received request body:', body)
     
@@ -22,10 +32,15 @@ serve(async (req) => {
       throw new Error('Quote ID is required')
     }
 
-    // Initialize Supabase client with service role for storage operations
+    // Create Supabase client with user's JWT for RLS compliance
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      {
+        global: {
+          headers: { Authorization: authHeader }
+        }
+      }
     )
 
     // Fetch quote details with related data
