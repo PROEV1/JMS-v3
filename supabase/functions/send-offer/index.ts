@@ -241,8 +241,9 @@ serve(async (req: Request) => {
       throw new Error('Failed to create job offer: ' + offerError?.message);
     }
 
-    // Generate offer URL
-    const offerUrl = `${Deno.env.get('SUPABASE_URL')?.replace('/rest/v1', '')}/offer/${clientToken}`;
+    // Generate offer URL - use the app base URL from config or fallback to current domain
+    const appBaseUrl = offerConfig.app_base_url || 'https://proev-installers.lovable.app';
+    const offerUrl = `${appBaseUrl}/offer/${clientToken}`;
 
     // Prepare message content
     const templateData = {
@@ -269,8 +270,9 @@ serve(async (req: Request) => {
     // Send via email (primary channel)
     if (delivery_channel === 'email' || offerConfig.auto_fallback_email) {
       try {
+        console.log('Sending email offer to:', order.client.email, 'with URL:', offerUrl);
         await resend.emails.send({
-          from: 'ProEV Scheduling <no-reply@proev.co.uk>',
+          from: offerConfig.from_address || 'ProEV Scheduling <no-reply@proev.co.uk>',
           to: [order.client.email],
           subject: `Installation Date Offered - ${order.order_number}`,
           html: `
