@@ -12,3 +12,6 @@ verify_jwt = false
 
 [functions.expire-offers]
 verify_jwt = false
+
+[functions.debug-secrets]
+verify_jwt = false

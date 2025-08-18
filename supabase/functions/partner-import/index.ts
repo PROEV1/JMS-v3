@@ -129,6 +129,11 @@ Deno.serve(async (req) => {
       csvRows = lines.map(line => line.split(',').map(cell => cell.trim().replace(/^"|"$/g, '')));
     } else if (importProfile.source_type === 'gsheet' && importProfile.gsheet_id) {
       // Fetch Google Sheets data
+      console.log('=== CALLING GOOGLE SHEETS PREVIEW FROM PARTNER-IMPORT ===');
+      console.log('Auth header present:', !!authHeader);
+      console.log('Sheet ID:', importProfile.gsheet_id?.substring(0, 10) + '...');
+      console.log('Sheet name:', importProfile.gsheet_sheet_name);
+      
       const sheetsResponse = await fetch(`https://qvppvstgconmzzjsryna.supabase.co/functions/v1/google-sheets-preview`, {
         method: 'POST',
         headers: {
@@ -142,8 +147,11 @@ Deno.serve(async (req) => {
         })
       });
 
+      console.log('Sheets response status:', sheetsResponse.status);
+      console.log('Sheets response headers:', Object.fromEntries(sheetsResponse.headers.entries()));
+      
       const sheetsData = await sheetsResponse.json();
-      console.log('Google Sheets response:', sheetsData);
+      console.log('Google Sheets response:', JSON.stringify(sheetsData, null, 2));
       
       if (!sheetsData.success) {
         result.summary.errors.push({

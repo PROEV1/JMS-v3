@@ -106,14 +106,29 @@ Deno.serve(async (req) => {
     }
 
     // Get Google Service Account credentials with detailed logging
+    console.log('=== DEBUGGING GOOGLE SERVICE ACCOUNT ===');
     const serviceAccountKey = Deno.env.get('GOOGLE_SERVICE_ACCOUNT_KEY');
-    console.log('Google Service Account Key configured:', !!serviceAccountKey);
+    console.log('Environment variable exists:', !!serviceAccountKey);
+    console.log('Environment variable type:', typeof serviceAccountKey);
+    if (serviceAccountKey) {
+      console.log('Environment variable length:', serviceAccountKey.length);
+      console.log('Environment variable starts with:', serviceAccountKey.substring(0, 50));
+    }
+    
+    // List all available environment variables for debugging
+    console.log('Available environment variables:');
+    for (const [key, value] of Object.entries(Deno.env.toObject())) {
+      if (key.includes('GOOGLE') || key.includes('SERVICE') || key.includes('ACCOUNT')) {
+        console.log(`${key}: ${value ? 'EXISTS' : 'NOT_SET'}`);
+      }
+    }
+    console.log('=== END DEBUG ===');
     
     if (!serviceAccountKey) {
       console.error('Google Service Account credentials not configured');
-      return new Response(JSON.stringify({ 
+      return new Response(JSON.stringify({
         success: false,
-        error: 'Google Service Account credentials not configured. Please add the GOOGLE_SERVICE_ACCOUNT_KEY secret in Supabase.' 
+        error: 'Google Service Account credentials not configured. Please add the GOOGLE_SERVICE_ACCOUNT_KEY secret in Supabase.'
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
