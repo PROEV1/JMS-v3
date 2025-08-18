@@ -140,11 +140,7 @@ export function ScheduleStatusNavigation({ currentStatus }: ScheduleStatusNaviga
         ]);
 
         // Fetch order-based counts
-        const [needsSchedulingResult, scheduledResult, onHoldResult] = await Promise.all([
-          supabase
-            .from('orders')
-            .select('*', { count: 'exact', head: true })
-            .eq('status_enhanced', 'awaiting_install_booking'),
+        const [scheduledResult, onHoldResult] = await Promise.all([
           supabase
             .from('orders')
             .select('*', { count: 'exact', head: true })
@@ -155,8 +151,19 @@ export function ScheduleStatusNavigation({ currentStatus }: ScheduleStatusNaviga
             .eq('status_enhanced', 'on_hold_parts_docs')
         ]);
 
-        // For needs-scheduling, subtract orders with active offers
-        let needsSchedulingCount = needsSchedulingResult.count || 0;
+        // For needs-scheduling, get count of orders with no engineer and no active offers
+        let needsSchedulingCount = 0;
+        
+        // First get orders that need scheduling (no engineer assigned)
+        const { count: unassignedOrdersCount } = await supabase
+          .from('orders')
+          .select('*', { count: 'exact', head: true })
+          .eq('status_enhanced', 'awaiting_install_booking')
+          .is('engineer_id', null);
+        
+        needsSchedulingCount = unassignedOrdersCount || 0;
+        
+        // Subtract any unassigned orders that have active offers
         if (needsSchedulingCount > 0) {
           const { data: activeOffers } = await supabase
             .from('job_offers')
@@ -165,13 +172,14 @@ export function ScheduleStatusNavigation({ currentStatus }: ScheduleStatusNaviga
             .gt('expires_at', new Date().toISOString());
           
           if (activeOffers?.length) {
-            const { count: ordersWithOffersCount } = await supabase
+            const { count: unassignedOrdersWithOffersCount } = await supabase
               .from('orders')
               .select('*', { count: 'exact', head: true })
               .eq('status_enhanced', 'awaiting_install_booking')
+              .is('engineer_id', null)
               .in('id', activeOffers.map(offer => offer.order_id));
             
-            needsSchedulingCount = Math.max(0, needsSchedulingCount - (ordersWithOffersCount || 0));
+            needsSchedulingCount = Math.max(0, needsSchedulingCount - (unassignedOrdersWithOffersCount || 0));
           }
         }
 
