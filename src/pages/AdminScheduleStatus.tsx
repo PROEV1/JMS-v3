@@ -74,39 +74,35 @@ export default function AdminScheduleStatus() {
           setOrders([]);
         }
       } else if (status === 'ready-to-book') {
-        // Step 1: Get accepted offer order IDs
-        const { data: offersData, error: offersError } = await supabase
-          .from('job_offers')
-          .select('order_id, offered_date, engineer_id')
-          .eq('status', 'accepted')
-          .order('accepted_at', { ascending: false });
+        // Filter for orders that are awaiting_install_booking with accepted offers
+        const { data: ordersData, error: ordersError } = await supabase
+          .from('orders')
+          .select(`
+            *,
+            client:clients(*),
+            quote:quotes(*),
+            engineer:engineers(*)
+          `)
+          .eq('status_enhanced', 'awaiting_install_booking')
+          .order('created_at', { ascending: false });
 
-        if (offersError) {
-          console.error('Error fetching accepted offers data:', offersError);
+        if (ordersError) {
+          console.error('Error fetching orders data:', ordersError);
           setOrders([]);
-        } else if (offersData && offersData.length > 0) {
-          // Step 2: Get orders for those IDs
-          const orderIds = offersData.map(offer => offer.order_id);
-          const { data: ordersData, error: ordersError } = await supabase
-            .from('orders')
-            .select(`
-              *,
-              client:clients(*),
-              quote:quotes(*),
-              engineer:engineers(*)
-            `)
-            .in('id', orderIds)
-            .order('created_at', { ascending: false });
-
-          if (ordersError) {
-            console.error('Error fetching orders data:', ordersError);
-            setOrders([]);
-          } else {
-            setOrders(ordersData || []);
-          }
         } else {
-          setOrders([]);
+          // Filter to only orders that have accepted offers
+          const { data: acceptedOffers } = await supabase
+            .from('job_offers')
+            .select('order_id')
+            .eq('status', 'accepted');
+
+          const ordersWithAcceptedOffers = new Set(acceptedOffers?.map(offer => offer.order_id) || []);
+          const readyToBookOrders = (ordersData || []).filter(order => 
+            ordersWithAcceptedOffers.has(order.id)
+          );
+          setOrders(readyToBookOrders);
         }
+
       } else if (status === 'date-rejected') {
         // Step 1: Get rejected offer order IDs
         const { data: offersData, error: offersError } = await supabase

@@ -196,6 +196,120 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
     }
   };
 
+  const handleConfirmAndSchedule = async (orderId: string) => {
+    try {
+      // Get the accepted offer for this order
+      const acceptedOffer = offers.find(offer => 
+        offer.order_id === orderId && offer.status === 'accepted'
+      );
+      
+      if (!acceptedOffer) {
+        toast.error('No accepted offer found for this order');
+        return;
+      }
+
+      // Update the order to scheduled status
+      const { error: orderError } = await supabase
+        .from('orders')
+        .update({
+          engineer_id: acceptedOffer.engineer_id,
+          scheduled_install_date: acceptedOffer.offered_date,
+          status_enhanced: 'scheduled'
+        })
+        .eq('id', orderId);
+
+      if (orderError) throw orderError;
+
+      // Log the activity
+      await supabase.rpc('log_order_activity', {
+        p_order_id: orderId,
+        p_activity_type: 'installation_confirmed',
+        p_description: 'Installation confirmed and scheduled by admin',
+        p_details: {
+          offer_id: acceptedOffer.id,
+          engineer_id: acceptedOffer.engineer_id,
+          scheduled_date: acceptedOffer.offered_date,
+          method: 'admin_confirmation'
+        }
+      });
+
+      // Send confirmation emails to client and engineer
+      await supabase.functions.invoke('send-order-status-email', {
+        body: {
+          order_id: orderId,
+          status: 'scheduled',
+          recipient_type: 'both'
+        }
+      });
+
+      toast.success('Installation confirmed and scheduled. Confirmation emails sent.');
+      refetchOffers();
+      if (onUpdate) onUpdate();
+    } catch (error) {
+      console.error('Failed to confirm and schedule:', error);
+      toast.error('Failed to confirm and schedule installation');
+    }
+  };
+
+  const handleCancelAndRestart = async (orderId: string) => {
+    try {
+      // Find and reject the accepted offer
+      const acceptedOffer = offers.find(offer => 
+        offer.order_id === orderId && offer.status === 'accepted'
+      );
+      
+      if (!acceptedOffer) {
+        toast.error('No accepted offer found for this order');
+        return;
+      }
+
+      // Update the job offer to rejected
+      const { error: offerError } = await supabase
+        .from('job_offers')
+        .update({
+          status: 'rejected',
+          rejected_at: new Date().toISOString(),
+          rejection_reason: 'Booking cancelled by admin'
+        })
+        .eq('id', acceptedOffer.id);
+
+      if (offerError) throw offerError;
+
+      // Clear any engineer assignment and revert to awaiting_install_booking
+      const { error: orderError } = await supabase
+        .from('orders')
+        .update({
+          engineer_id: null,
+          scheduled_install_date: null,
+          status_enhanced: 'awaiting_install_booking'
+        })
+        .eq('id', orderId);
+
+      if (orderError) throw orderError;
+
+      // Log the activity
+      await supabase.rpc('log_order_activity', {
+        p_order_id: orderId,
+        p_activity_type: 'booking_cancelled',
+        p_description: 'Installation booking cancelled, returned to scheduling queue',
+        p_details: {
+          offer_id: acceptedOffer.id,
+          engineer_id: acceptedOffer.engineer_id,
+          offered_date: acceptedOffer.offered_date,
+          reason: 'Booking cancelled by admin',
+          method: 'admin_cancellation'
+        }
+      });
+
+      toast.success('Booking cancelled. Job returned to scheduling queue.');
+      refetchOffers();
+      if (onUpdate) onUpdate();
+    } catch (error) {
+      console.error('Failed to cancel and restart:', error);
+      toast.error('Failed to cancel booking');
+    }
+  };
+
   const handleAssignment = async (engineerId: string, date: string, action: 'send_offer' | 'confirm_book') => {
     if (!selectedOrder) return;
 
@@ -363,6 +477,30 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                   </TableCell>
                    <TableCell>
                      {(() => {
+                       // For Ready to Book page - show accepted offer engineer and date
+                       if (title === 'Ready to Book') {
+                         const acceptedOffer = offers.find(offer => 
+                           offer.order_id === order.id && offer.status === 'accepted'
+                         );
+                         if (acceptedOffer && acceptedOffer.engineer) {
+                           return (
+                             <div className="flex flex-col">
+                               <span className="font-medium">{acceptedOffer.engineer.name}</span>
+                               <span className="text-xs text-muted-foreground">
+                                 {new Date(acceptedOffer.offered_date).toLocaleDateString('en-GB', {
+                                   day: '2-digit',
+                                   month: '2-digit',
+                                   year: 'numeric'
+                                 })}
+                               </span>
+                             </div>
+                           );
+                         } else {
+                           return <Badge variant="destructive" className="text-xs">No Engineer</Badge>;
+                         }
+                       }
+                       
+                       // For other pages - show active offer engineer or order engineer
                        const activeOffer = getActiveOfferForOrder(order.id);
                        if (activeOffer && activeOffer.engineer) {
                          return (
@@ -410,7 +548,31 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                        const activeOffer = getActiveOfferForOrder(order.id);
                        const latestOffer = getLatestOfferForOrder(order.id);
                        
-                       if (activeOffer && title === 'Date Offered') {
+                       if (title === 'Ready to Book') {
+                         // For Ready to Book page - show Confirm & Schedule and Cancel/Restart buttons
+                         return (
+                           <div className="flex gap-2">
+                             <Button
+                               size="sm"
+                               variant="destructive"
+                               onClick={() => handleConfirmAndSchedule(order.id)}
+                               className="text-xs"
+                             >
+                               <Check className="w-4 h-4 mr-1" />
+                               Confirm & Schedule
+                             </Button>
+                             <Button
+                               size="sm"
+                               variant="outline"
+                               onClick={() => handleCancelAndRestart(order.id)}
+                               className="text-xs"
+                             >
+                               <XCircle className="w-4 h-4 mr-1" />
+                               Cancel / Restart Scheduling
+                             </Button>
+                           </div>
+                         );
+                       } else if (activeOffer && title === 'Date Offered') {
                          // For Date Offered page - show Accept/Reject buttons
                          return (
                            <div className="flex gap-2">
