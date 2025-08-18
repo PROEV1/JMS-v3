@@ -124,7 +124,7 @@ export function SchedulingHub({}: SchedulingHubProps) {
   };
 
   const handleWeekView = () => {
-    navigate('/admin/schedule', { state: { tab: 'calendar' } });
+    navigate('/admin/schedule', { state: { tab: 'week-view' } });
   };
 
   if (kpiLoading || ordersLoading) {

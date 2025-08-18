@@ -1,26 +1,54 @@
 import React, { useEffect, useState } from 'react';
-import { AdminScheduleCalendar } from '@/components/scheduling/AdminScheduleCalendar';
-import { EnhancedSchedulePipeline } from '@/components/scheduling/EnhancedSchedulePipeline';
+import { WeekViewCalendar } from '@/components/scheduling/WeekViewCalendar';
 import { SchedulingSettingsPanel } from '@/components/admin/SchedulingSettingsPanel';
 import { SchedulingHub } from '@/components/scheduling/SchedulingHub';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function AdminSchedule() {
   const { role: userRole, loading } = useUserRole();
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState('hub');
+  const [currentDate, setCurrentDate] = useState(new Date());
+
+  // Fetch orders and engineers for the week view
+  const { data: orders = [] } = useQuery({
+    queryKey: ['orders-for-calendar'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('status_enhanced', 'scheduled');
+      
+      if (error) throw error;
+      return data || [];
+    }
+  });
+
+  const { data: engineers = [] } = useQuery({
+    queryKey: ['engineers-for-calendar'],  
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('engineers')
+        .select('*');
+      
+      if (error) throw error;
+      return data || [];
+    }
+  });
 
   useEffect(() => {
     // Check for tab in URL params or navigation state
     const tabFromUrl = searchParams.get('tab');
     const tabFromState = location.state?.tab;
     
-    if (tabFromUrl && ['hub', 'calendar', 'pipeline', 'settings'].includes(tabFromUrl)) {
+    if (tabFromUrl && ['hub', 'week-view', 'settings'].includes(tabFromUrl)) {
       setActiveTab(tabFromUrl);
-    } else if (tabFromState && ['hub', 'calendar', 'pipeline', 'settings'].includes(tabFromState)) {
+    } else if (tabFromState && ['hub', 'week-view', 'settings'].includes(tabFromState)) {
       setActiveTab(tabFromState);
     }
   }, [searchParams, location.state]);
@@ -47,20 +75,25 @@ export default function AdminSchedule() {
   return (
     <div className="container mx-auto py-6">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="hub">Scheduling Hub</TabsTrigger>
-          <TabsTrigger value="calendar">Schedule Calendar</TabsTrigger>
-          <TabsTrigger value="pipeline">Pipeline View</TabsTrigger>
+          <TabsTrigger value="week-view">Engineer Week View</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
         <TabsContent value="hub" className="mt-6">
           <SchedulingHub />
         </TabsContent>
-        <TabsContent value="calendar" className="mt-6">
-          <AdminScheduleCalendar />
-        </TabsContent>
-        <TabsContent value="pipeline" className="mt-6">
-          <EnhancedSchedulePipeline />
+        <TabsContent value="week-view" className="mt-6">
+          <WeekViewCalendar
+            orders={orders}
+            engineers={engineers}
+            onOrderClick={(order) => {
+              // Handle order click if needed
+              console.log('Order clicked:', order);
+            }}
+            currentDate={currentDate}
+            onDateChange={setCurrentDate}
+          />
         </TabsContent>
         <TabsContent value="settings" className="mt-6">
           <SchedulingSettingsPanel />
