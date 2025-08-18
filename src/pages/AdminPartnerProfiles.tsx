@@ -10,11 +10,12 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Edit, Upload, FileSpreadsheet } from 'lucide-react';
+import { Plus, Edit, Upload, FileSpreadsheet, Trash2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import MappingConfiguration from '@/components/admin/MappingConfiguration';
 import ImportRunModal from '@/components/admin/ImportRunModal';
+import { DeletePartnerJobsModal } from '@/components/admin/DeletePartnerJobsModal';
 
 interface ImportProfile {
   id: string;
@@ -39,6 +40,7 @@ export default function AdminPartnerProfiles() {
   const [editingProfile, setEditingProfile] = useState<ImportProfile | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState<string | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     source_type: 'csv' as 'csv' | 'gsheet',
@@ -228,13 +230,22 @@ export default function AdminPartnerProfiles() {
           <h1 className="text-2xl font-bold">Import Profiles</h1>
           <p className="text-muted-foreground">Partner: {partner?.name}</p>
         </div>
-        <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-          <DialogTrigger asChild>
-            <Button onClick={() => { resetForm(); }}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Profile
-            </Button>
-          </DialogTrigger>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setShowDeleteDialog(true)}
+            className="text-destructive hover:text-destructive"
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Delete Imported Jobs
+          </Button>
+          <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+            <DialogTrigger asChild>
+              <Button onClick={() => { resetForm(); }}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Profile
+              </Button>
+            </DialogTrigger>
           <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
@@ -324,6 +335,7 @@ export default function AdminPartnerProfiles() {
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       <div className="grid gap-4">
@@ -385,6 +397,16 @@ export default function AdminPartnerProfiles() {
           sourceType={profiles?.find(p => p.id === showImportDialog)?.source_type || 'csv'}
           gsheetId={profiles?.find(p => p.id === showImportDialog)?.gsheet_id || undefined}
           gsheetSheetName={profiles?.find(p => p.id === showImportDialog)?.gsheet_sheet_name || undefined}
+        />
+      )}
+
+      {/* Delete Jobs Modal */}
+      {partnerId && partner && (
+        <DeletePartnerJobsModal
+          isOpen={showDeleteDialog}
+          onClose={() => setShowDeleteDialog(false)}
+          partnerId={partnerId}
+          partnerName={partner.name}
         />
       )}
     </div>
