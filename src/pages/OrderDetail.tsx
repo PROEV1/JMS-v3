@@ -47,6 +47,7 @@ interface Order {
     full_name: string;
     email: string;
     address: string | null;
+    postcode: string | null;
     phone?: string;
   };
   quote: {
@@ -139,7 +140,7 @@ export default function OrderDetail() {
         .from('orders')
         .select(`
           *,
-          client:clients(id, full_name, email, address, phone),
+          client:clients(id, full_name, email, address, postcode, phone),
           quote:quotes(
             id,
             quote_number,
