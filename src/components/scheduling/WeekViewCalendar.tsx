@@ -3,8 +3,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Order, Engineer, getStatusColor } from '@/utils/schedulingUtils';
-import { ChevronLeft, ChevronRight, User, AlertTriangle, Clock, MapPin } from 'lucide-react';
+import { ChevronLeft, ChevronRight, User, AlertTriangle, Clock, MapPin, Eye, EyeOff } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 interface WeekViewCalendarProps {
   orders: Order[];
@@ -22,7 +24,43 @@ export function WeekViewCalendar({
   onDateChange
 }: WeekViewCalendarProps) {
   const [weekStart, setWeekStart] = useState<Date>(getWeekStart(currentDate));
+  const [showOfferHolds, setShowOfferHolds] = useState<boolean>(true);
   const navigate = useNavigate();
+
+  // Fetch active job offers for the current week
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekStart.getDate() + 6);
+  
+  const { data: jobOffers = [] } = useQuery({
+    queryKey: ['job-offers', weekStart.toISOString().split('T')[0], weekEnd.toISOString().split('T')[0]],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('job_offers')
+        .select(`
+          *,
+          order:orders!inner(
+            id,
+            order_number,
+            scheduled_install_date,
+            client:clients(full_name)
+          )
+        `)
+        .gte('offered_date', weekStart.toISOString().split('T')[0])
+        .lte('offered_date', weekEnd.toISOString().split('T')[0])
+        .or(
+          'and(status.eq.pending,expires_at.gt.' + new Date().toISOString() + '),status.eq.accepted'
+        );
+
+      if (error) {
+        console.error('Error fetching job offers:', error);
+        return [];
+      }
+
+      // Filter out offers where the order is already scheduled
+      return data?.filter(offer => !offer.order?.scheduled_install_date) || [];
+    },
+    enabled: showOfferHolds
+  });
 
   useEffect(() => {
     setWeekStart(getWeekStart(currentDate));
@@ -92,6 +130,16 @@ export function WeekViewCalendar({
     return date.toDateString() === new Date().toDateString();
   };
 
+  const getOfferHoldsForEngineerAndDate = (engineerId: string, date: Date) => {
+    if (!showOfferHolds) return [];
+    
+    return jobOffers?.filter(offer => 
+      offer.engineer_id === engineerId &&
+      offer.offered_date &&
+      new Date(offer.offered_date).toDateString() === date.toDateString()
+    ) || [];
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -100,17 +148,28 @@ export function WeekViewCalendar({
             <User className="h-5 w-5" />
             Engineer Week View
           </CardTitle>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => navigateWeek('prev')}>
-              <ChevronLeft className="h-4 w-4" />
+          <div className="flex items-center gap-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowOfferHolds(!showOfferHolds)}
+              className="flex items-center gap-2 text-xs"
+            >
+              {showOfferHolds ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+              Offer Holds
             </Button>
-            <span className="text-sm font-medium min-w-[120px] text-center">
-              {weekStart.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' })} - {' '}
-              {weekDays[6].toLocaleDateString('en-GB', { month: 'short', day: 'numeric', year: 'numeric' })}
-            </span>
-            <Button variant="outline" size="sm" onClick={() => navigateWeek('next')}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => navigateWeek('prev')}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-sm font-medium min-w-[120px] text-center">
+                {weekStart.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' })} - {' '}
+                {weekDays[6].toLocaleDateString('en-GB', { month: 'short', day: 'numeric', year: 'numeric' })}
+              </span>
+              <Button variant="outline" size="sm" onClick={() => navigateWeek('next')}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
       </CardHeader>
@@ -151,105 +210,137 @@ export function WeekViewCalendar({
                       )}
                     </div>
                   </td>
-                  {weekDays.map((day, dayIndex) => {
-                    const dayOrders = getOrdersForEngineerAndDate(engineer.id, day);
-                    const workload = getEngineerWorkload(engineer.id, day);
-                    const capacityStatus = getEngineerCapacityStatus(engineer.id, day);
-                    const isOverloaded = workload > 2;
-                    const isBusy = workload > 1;
-                    const isOverCapacity = capacityStatus.isOverCapacity;
-                    
-                    return (
-                      <td 
-                        key={dayIndex} 
-                        className={`
-                          p-2 border-r text-center align-top
-                          ${isWeekend(day) ? 'bg-muted/30' : ''}
-                          ${isToday(day) ? 'bg-primary/5' : ''}
-                          ${isOverCapacity ? 'bg-red-100/70 border-red-300' : ''}
-                          ${isOverloaded && !isOverCapacity ? 'bg-red-50/50 border-red-200' : ''}
-                          ${isBusy && !isOverloaded && !isOverCapacity ? 'bg-yellow-50/50 border-yellow-200' : ''}
-                        `}
-                      >
-                        <div className="space-y-2 min-h-[80px] p-1">
-                          {workload > 0 && (
-                            <div className="flex flex-col items-center justify-center mb-2 gap-1">
-                              <Badge 
-                                variant="outline" 
-                                className={`
-                                  text-xs px-2 py-1
-                                  ${isOverCapacity ? 'text-red-700 border-red-400 bg-red-100' : ''}
-                                  ${isOverloaded && !isOverCapacity ? 'text-red-600 border-red-300 bg-red-50' : ''}
-                                  ${isBusy && !isOverloaded && !isOverCapacity ? 'text-yellow-600 border-yellow-300 bg-yellow-50' : ''}
-                                  ${workload === 1 && !isOverCapacity ? 'text-green-600 border-green-300 bg-green-50' : ''}
-                                `}
-                              >
-                                {workload} {workload === 1 ? 'job' : 'jobs'}
-                              </Badge>
-                              {isOverCapacity && (
-                                <Badge variant="outline" className="text-xs px-1 py-0.5 text-red-700 border-red-400 bg-red-100">
-                                  {capacityStatus.totalHours}h / {capacityStatus.workingHours}h
-                                </Badge>
-                              )}
-                            </div>
-                          )}
-                          
-                          {dayOrders.slice(0, 3).map((order) => (
-                            <div
-                              key={order.id}
-                              className="bg-white border border-border rounded-md p-2 cursor-pointer hover:shadow-md transition-all duration-200 hover:border-primary/40 min-h-[60px] flex flex-col justify-between"
-                              style={{ 
-                                borderLeftColor: getStatusColor(order.status_enhanced),
-                                borderLeftWidth: '3px'
-                              }}
-                              onClick={() => navigate(`/admin/order/${order.id}`)}
-                            >
-                              <div className="space-y-1">
-                                <div className="flex items-center gap-1 text-xs font-medium text-primary">
-                                  <span>Install</span>
-                                </div>
-                                
-                                {order.postcode && (
-                                  <div className="flex items-center gap-1 text-xs font-semibold">
-                                    <MapPin className="h-3 w-3" />
-                                    <span>{order.postcode}</span>
-                                  </div>
-                                )}
-                                
-                                <div className="text-xs text-muted-foreground truncate">
-                                  {order.client?.full_name}
-                                </div>
-                              </div>
-                              
-                              <div className="flex items-center justify-between mt-1">
-                                {order.time_window && (
-                                  <div className="text-xs text-muted-foreground">{order.time_window}</div>
-                                )}
-                                {order.estimated_duration_hours && (
-                                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                    <Clock className="h-3 w-3" />
-                                    <span>{order.estimated_duration_hours}h</span>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                          
-                          {dayOrders.length > 3 && (
-                            <div className="text-xs text-muted-foreground text-center py-1">
-                              +{dayOrders.length - 3} more
-                            </div>
-                          )}
+                   {weekDays.map((day, dayIndex) => {
+                     const dayOrders = getOrdersForEngineerAndDate(engineer.id, day);
+                     const offerHolds = getOfferHoldsForEngineerAndDate(engineer.id, day);
+                     const workload = getEngineerWorkload(engineer.id, day);
+                     const capacityStatus = getEngineerCapacityStatus(engineer.id, day);
+                     const isOverloaded = workload > 2;
+                     const isBusy = workload > 1;
+                     const isOverCapacity = capacityStatus.isOverCapacity;
+                     
+                     return (
+                       <td 
+                         key={dayIndex} 
+                         className={`
+                           p-2 border-r text-center align-top
+                           ${isWeekend(day) ? 'bg-muted/30' : ''}
+                           ${isToday(day) ? 'bg-primary/5' : ''}
+                           ${isOverCapacity ? 'bg-red-100/70 border-red-300' : ''}
+                           ${isOverloaded && !isOverCapacity ? 'bg-red-50/50 border-red-200' : ''}
+                           ${isBusy && !isOverloaded && !isOverCapacity ? 'bg-yellow-50/50 border-yellow-200' : ''}
+                         `}
+                       >
+                         <div className="space-y-2 min-h-[80px] p-1">
+                           {workload > 0 && (
+                             <div className="flex flex-col items-center justify-center mb-2 gap-1">
+                               <Badge 
+                                 variant="outline" 
+                                 className={`
+                                   text-xs px-2 py-1
+                                   ${isOverCapacity ? 'text-red-700 border-red-400 bg-red-100' : ''}
+                                   ${isOverloaded && !isOverCapacity ? 'text-red-600 border-red-300 bg-red-50' : ''}
+                                   ${isBusy && !isOverloaded && !isOverCapacity ? 'text-yellow-600 border-yellow-300 bg-yellow-50' : ''}
+                                   ${workload === 1 && !isOverCapacity ? 'text-green-600 border-green-300 bg-green-50' : ''}
+                                 `}
+                               >
+                                 {workload} {workload === 1 ? 'job' : 'jobs'}
+                               </Badge>
+                               {isOverCapacity && (
+                                 <Badge variant="outline" className="text-xs px-1 py-0.5 text-red-700 border-red-400 bg-red-100">
+                                   {capacityStatus.totalHours}h / {capacityStatus.workingHours}h
+                                 </Badge>
+                               )}
+                             </div>
+                           )}
+                           
+                           {/* Offer Holds */}
+                           {offerHolds.map((offer) => (
+                             <div
+                               key={offer.id}
+                               className="bg-amber-50 border border-dashed border-amber-300 rounded-md p-2 min-h-[50px] flex flex-col justify-between"
+                               onClick={() => navigate(`/admin/orders/${offer.order_id}`)}
+                             >
+                               <div className="space-y-1">
+                                 <Badge variant="outline" className="text-xs px-1 py-0.5 text-amber-700 border-amber-400 bg-amber-100 w-fit">
+                                   Offer Hold
+                                 </Badge>
+                                 
+                                 <div className="text-xs text-muted-foreground truncate">
+                                   #{offer.order?.order_number}
+                                 </div>
+                                 
+                                 <div className="text-xs text-muted-foreground truncate">
+                                   {offer.order?.client?.full_name}
+                                 </div>
+                               </div>
+                               
+                               <div className="flex items-center justify-between mt-1">
+                                 {offer.time_window && (
+                                   <div className="text-xs text-amber-600">{offer.time_window}</div>
+                                 )}
+                                 <div className="text-xs text-amber-600 capitalize">{offer.status}</div>
+                               </div>
+                             </div>
+                           ))}
+                           
+                           {/* Scheduled Orders */}
+                           {dayOrders.slice(0, 3).map((order) => (
+                             <div
+                               key={order.id}
+                               className="bg-white border border-border rounded-md p-2 cursor-pointer hover:shadow-md transition-all duration-200 hover:border-primary/40 min-h-[60px] flex flex-col justify-between"
+                               style={{ 
+                                 borderLeftColor: getStatusColor(order.status_enhanced),
+                                 borderLeftWidth: '3px'
+                               }}
+                               onClick={() => navigate(`/admin/order/${order.id}`)}
+                             >
+                               <div className="space-y-1">
+                                 <div className="flex items-center gap-1 text-xs font-medium text-primary">
+                                   <span>Install</span>
+                                 </div>
+                                 
+                                 {order.postcode && (
+                                   <div className="flex items-center gap-1 text-xs font-semibold">
+                                     <MapPin className="h-3 w-3" />
+                                     <span>{order.postcode}</span>
+                                   </div>
+                                 )}
+                                 
+                                 <div className="text-xs text-muted-foreground truncate">
+                                   {order.client?.full_name}
+                                 </div>
+                               </div>
+                               
+                               <div className="flex items-center justify-between mt-1">
+                                 {order.time_window && (
+                                   <div className="text-xs text-muted-foreground">{order.time_window}</div>
+                                 )}
+                                 {order.estimated_duration_hours && (
+                                   <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                     <Clock className="h-3 w-3" />
+                                     <span>{order.estimated_duration_hours}h</span>
+                                   </div>
+                                 )}
+                               </div>
+                             </div>
+                           ))}
+                           
+                           {dayOrders.length > 3 && (
+                             <div className="text-xs text-muted-foreground text-center py-1">
+                               +{dayOrders.length - 3} more
+                             </div>
+                           )}
 
-                          {(isOverloaded || isOverCapacity) && (
-                            <div className="flex items-center justify-center mt-1">
-                              <AlertTriangle className={`h-3 w-3 ${isOverCapacity ? 'text-red-600' : 'text-red-500'}`} />
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                    );
-                  })}
+                           {(isOverloaded || isOverCapacity) && (
+                             <div className="flex items-center justify-center mt-1">
+                               <AlertTriangle className={`h-3 w-3 ${isOverCapacity ? 'text-red-600' : 'text-red-500'}`} />
+                             </div>
+                           )}
+                         </div>
+                       </td>
+                     );
+                   })}
                 </tr>
               ))}
             </tbody>
@@ -273,6 +364,10 @@ export function WeekViewCalendar({
           <div className="flex items-center gap-1">
             <div className="w-3 h-3 rounded bg-red-200 border border-red-400"></div>
             <span>Over Capacity (Hours)</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-3 rounded bg-amber-100 border border-dashed border-amber-300"></div>
+            <span>Offer Hold</span>
           </div>
           <div className="flex items-center gap-1">
             <div className="w-3 h-3 rounded bg-muted"></div>
