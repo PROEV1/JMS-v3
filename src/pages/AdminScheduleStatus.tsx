@@ -62,6 +62,78 @@ export default function AdminScheduleStatus() {
           const ordersWithOffers = offersData?.map(offer => offer.orders).filter(Boolean) || [];
           setOrders(ordersWithOffers);
         }
+      } else if (status === 'ready-to-book') {
+        // For ready-to-book, query accepted job_offers and get corresponding orders
+        const { data: offersData, error: offersError } = await supabase
+          .from('job_offers')
+          .select(`
+            order_id,
+            orders!inner(
+              *,
+              client:clients(*),
+              quote:quotes(*),
+              engineer:engineers(*)
+            )
+          `)
+          .eq('status', 'accepted')
+          .order('accepted_at', { ascending: false });
+
+        if (offersError) {
+          console.error('Error fetching accepted offers data:', offersError);
+          setOrders([]);
+        } else {
+          // Extract orders from the offers data and flatten
+          const ordersWithOffers = offersData?.map(offer => offer.orders).filter(Boolean) || [];
+          setOrders(ordersWithOffers);
+        }
+      } else if (status === 'date-rejected') {
+        // For date-rejected, query rejected job_offers and get corresponding orders
+        const { data: offersData, error: offersError } = await supabase
+          .from('job_offers')
+          .select(`
+            order_id,
+            orders!inner(
+              *,
+              client:clients(*),
+              quote:quotes(*),
+              engineer:engineers(*)
+            )
+          `)
+          .eq('status', 'rejected')
+          .order('rejected_at', { ascending: false });
+
+        if (offersError) {
+          console.error('Error fetching rejected offers data:', offersError);
+          setOrders([]);
+        } else {
+          // Extract orders from the offers data and flatten
+          const ordersWithOffers = offersData?.map(offer => offer.orders).filter(Boolean) || [];
+          setOrders(ordersWithOffers);
+        }
+      } else if (status === 'offer-expired') {
+        // For offer-expired, query expired job_offers and get corresponding orders
+        const { data: offersData, error: offersError } = await supabase
+          .from('job_offers')
+          .select(`
+            order_id,
+            orders!inner(
+              *,
+              client:clients(*),
+              quote:quotes(*),
+              engineer:engineers(*)
+            )
+          `)
+          .eq('status', 'expired')
+          .order('expired_at', { ascending: false });
+
+        if (offersError) {
+          console.error('Error fetching expired offers data:', offersError);
+          setOrders([]);
+        } else {
+          // Extract orders from the offers data and flatten
+          const ordersWithOffers = offersData?.map(offer => offer.orders).filter(Boolean) || [];
+          setOrders(ordersWithOffers);
+        }
       } else {
         // For other statuses, query orders normally
         let statusFilter: string;
@@ -133,6 +205,16 @@ export default function AdminScheduleStatus() {
         return 'Jobs Needing Scheduling';
       case 'date-offered':
         return 'Date Offered';
+      case 'ready-to-book':
+        return 'Ready to Book';
+      case 'date-rejected':
+        return 'Date Rejected';
+      case 'offer-expired':
+        return 'Offer Expired';
+      case 'on-hold':
+        return 'On Hold - Parts/Docs';
+      case 'cancelled':
+        return 'Cancelled';
       case 'scheduled':
         return 'Scheduled Jobs';
       case 'in-progress':

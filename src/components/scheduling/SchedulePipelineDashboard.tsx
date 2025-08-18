@@ -12,6 +12,9 @@ interface SchedulePipelineDashboardProps {
 
 interface JobOfferCount {
   pending: number;
+  accepted: number;
+  rejected: number;
+  expired: number;
 }
 
 interface StatusTile {
@@ -89,12 +92,18 @@ function StatusTile({ tile, orders, totalJobs, navigate, offerCounts }: {
   navigate: (path: string) => void;
   offerCounts: JobOfferCount;
 }) {
-  // Special handling for "Date Offered" tile - count active offers instead of orders
+  // Special handling for offer-based tiles - count offers instead of orders
   let count: number;
   let tileOrders: Order[] = [];
   
   if (tile.id === 'date_offered') {
     count = offerCounts.pending;
+  } else if (tile.id === 'date_accepted') {
+    count = offerCounts.accepted;
+  } else if (tile.id === 'date_rejected') {
+    count = offerCounts.rejected;
+  } else if (tile.id === 'offer_expired') {
+    count = offerCounts.expired;
   } else {
     tileOrders = orders.filter(order => 
       tile.statusValues.includes(order.status_enhanced)
@@ -154,20 +163,42 @@ function StatusTile({ tile, orders, totalJobs, navigate, offerCounts }: {
 
 export function SchedulePipelineDashboard({ orders }: SchedulePipelineDashboardProps) {
   const navigate = useNavigate();
-  const [offerCounts, setOfferCounts] = useState<JobOfferCount>({ pending: 0 });
+  const [offerCounts, setOfferCounts] = useState<JobOfferCount>({ 
+    pending: 0, 
+    accepted: 0, 
+    rejected: 0, 
+    expired: 0 
+  });
 
-  // Fetch active job offers count
+  // Fetch job offers counts for all statuses
   useEffect(() => {
     const fetchOfferCounts = async () => {
-      const { data, error } = await supabase
-        .from('job_offers')
-        .select('id', { count: 'exact' })
-        .eq('status', 'pending')
-        .gt('expires_at', new Date().toISOString());
+      const [pendingResult, acceptedResult, rejectedResult, expiredResult] = await Promise.all([
+        supabase
+          .from('job_offers')
+          .select('id', { count: 'exact' })
+          .eq('status', 'pending')
+          .gt('expires_at', new Date().toISOString()),
+        supabase
+          .from('job_offers')
+          .select('id', { count: 'exact' })
+          .eq('status', 'accepted'),
+        supabase
+          .from('job_offers')
+          .select('id', { count: 'exact' })
+          .eq('status', 'rejected'),
+        supabase
+          .from('job_offers')
+          .select('id', { count: 'exact' })
+          .eq('status', 'expired')
+      ]);
 
-      if (!error) {
-        setOfferCounts({ pending: data?.length || 0 });
-      }
+      setOfferCounts({
+        pending: pendingResult.data?.length || 0,
+        accepted: acceptedResult.data?.length || 0,
+        rejected: rejectedResult.data?.length || 0,
+        expired: expiredResult.data?.length || 0
+      });
     };
 
     fetchOfferCounts();
