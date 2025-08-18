@@ -88,13 +88,13 @@ function StatusNavTile({ tile, count, isActive, navigate }: {
   return (
     <Card 
       className={cn(
-        "cursor-pointer transition-all duration-200 hover:shadow-md active:scale-[0.98] min-w-[140px]",
+        "cursor-pointer transition-shadow transition-colors duration-200 hover:shadow-md active:translate-y-px min-w-[140px] min-h-[88px]",
         tile.colorClass,
-        isActive && "ring-2 ring-primary ring-offset-2"
+        isActive && "ring-inset ring-2 ring-primary"
       )}
       onClick={() => navigate(tile.route)}
     >
-      <CardContent className="p-4">
+      <CardContent className="p-3 flex flex-col justify-between">
         <div className="flex items-center gap-2 mb-2">
           <div className="p-1.5 bg-white/60 rounded-md">
             <IconComponent className="h-3.5 w-3.5 text-foreground" />
@@ -103,7 +103,7 @@ function StatusNavTile({ tile, count, isActive, navigate }: {
         </div>
         
         <div className="text-center">
-          <div className="text-xl font-bold text-foreground">{count}</div>
+          <div className="text-xl font-bold text-foreground tabular-nums min-w-[2ch]">{count}</div>
         </div>
       </CardContent>
     </Card>
@@ -199,8 +199,8 @@ export function ScheduleStatusNavigation({ currentStatus }: ScheduleStatusNaviga
     return (
       <div className="flex items-center gap-4 overflow-x-auto pb-2">
         {statusTiles.map(tile => (
-          <Card key={tile.id} className="min-w-[140px] animate-pulse">
-            <CardContent className="p-4">
+          <Card key={tile.id} className="min-w-[140px] min-h-[88px] animate-pulse">
+            <CardContent className="p-3">
               <div className="h-12 bg-muted rounded"></div>
             </CardContent>
           </Card>
@@ -211,7 +211,7 @@ export function ScheduleStatusNavigation({ currentStatus }: ScheduleStatusNaviga
 
   return (
     <div className="mb-6">
-      <div className="flex items-center gap-4 overflow-x-auto pb-2">
+      <div className="flex items-center gap-4 overflow-x-auto overflow-y-visible pt-1 pb-2">
         {statusTiles.map(tile => (
           <StatusNavTile
             key={tile.id}
