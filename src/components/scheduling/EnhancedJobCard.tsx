@@ -1,244 +1,200 @@
-import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { CalendarDays, User, MapPin, Clock, MoreVertical, Send, Bot, Calendar, X, RotateCcw } from 'lucide-react';
-import { Order } from '@/utils/schedulingUtils';
-import { OfferStatusBadge } from './OfferStatusBadge';
-import { SendOfferModal } from './SendOfferModal';
-import { SmartAssignmentModal } from './SmartAssignmentModal';
-import { useJobOffers } from '@/hooks/useJobOffers';
-import { toast } from 'sonner';
 
-interface Engineer {
-  id: string;
-  name: string;
-  email: string;
-  availability?: boolean;
-}
+import React, { useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Calendar, MapPin, Clock, User, AlertTriangle, Wrench } from 'lucide-react';
+import { Order } from '@/utils/schedulingUtils';
+import { SmartAssignmentModal } from './SmartAssignmentModal';
+import { SendOfferModal } from './SendOfferModal';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface EnhancedJobCardProps {
   order: Order;
-  engineers: Engineer[];
+  engineers: any[];
   onUpdate?: () => void;
-  showOfferActions?: boolean;
 }
 
-export function EnhancedJobCard({ 
-  order, 
-  engineers, 
-  onUpdate, 
-  showOfferActions = false 
-}: EnhancedJobCardProps) {
+export function EnhancedJobCard({ order, engineers, onUpdate }: EnhancedJobCardProps) {
+  const [showSmartAssign, setShowSmartAssign] = useState(false);
   const [showSendOffer, setShowSendOffer] = useState(false);
-  const [showSmartAssignment, setShowSmartAssignment] = useState(false);
-  
-  const { offers, loading, refetch, releaseOffer, resendOffer } = useJobOffers(order.id);
-  const activeOffer = offers.find(offer => offer.status === 'pending');
-  const latestOffer = offers.length > 0 ? offers[0] : null;
 
-  const handleReleaseOffer = async (offerId: string) => {
-    try {
-      await releaseOffer(offerId);
-      toast.success('Offer slot released');
-      onUpdate?.();
-    } catch (error: any) {
-      toast.error('Failed to release offer');
-    }
-  };
-
-  const handleResendOffer = async (offerId: string) => {
-    try {
-      await resendOffer(offerId);
-      toast.success('Offer resent successfully');
-    } catch (error: any) {
-      toast.error('Failed to resend offer');
-    }
-  };
-
-  const getBucketStatus = () => {
-    if (latestOffer) {
-      switch (latestOffer.status) {
-        case 'pending':
-          return 'date_offered';
-        case 'accepted':
-          return 'date_accepted';
-        case 'rejected':
-          return 'date_rejected';
-        default:
-          return order.status_enhanced;
-      }
-    }
-    return order.status_enhanced;
-  };
-
-  const getStatusDisplay = () => {
-    const bucketStatus = getBucketStatus();
-    switch (bucketStatus) {
+  const getStatusColor = (status: string) => {
+    switch (status) {
       case 'awaiting_install_booking':
-        return 'Awaiting Installation';
-      case 'date_offered':
-        return 'Date Offered';
-      case 'date_accepted':
-        return 'Ready to Book';
-      case 'date_rejected':
-        return 'Date Rejected';
+        return 'destructive';
+      case 'scheduled':
+        return 'default';
+      case 'in_progress':
+        return 'secondary';
+      case 'completed':
+        return 'default';
       default:
-        return order.status_enhanced?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        return 'secondary';
+    }
+  };
+
+  const handleAssignment = async (engineerId: string, date: string, action: 'send_offer' | 'confirm_book') => {
+    try {
+      if (action === 'send_offer') {
+        // Send offer to client
+        const { data, error } = await supabase.functions.invoke('send-offer', {
+          body: {
+            order_id: order.id,
+            engineer_id: engineerId,
+            offered_date: date,
+            time_window: order.time_window,
+            delivery_channel: 'email'
+          }
+        });
+
+        if (error || data?.error) {
+          throw new Error(data?.error || 'Failed to send offer');
+        }
+
+        // Log activity
+        await supabase.rpc('log_order_activity', {
+          p_order_id: order.id,
+          p_activity_type: 'offer_sent',
+          p_description: `Installation offer sent via Smart Assignment`,
+          p_details: {
+            engineer_id: engineerId,
+            offered_date: date,
+            time_window: order.time_window,
+            method: 'smart_assignment'
+          }
+        });
+
+      } else if (action === 'confirm_book') {
+        // Direct booking - update order
+        const { error: updateError } = await supabase
+          .from('orders')
+          .update({
+            engineer_id: engineerId,
+            scheduled_install_date: date,
+            status_enhanced: 'scheduled'
+          })
+          .eq('id', order.id);
+
+        if (updateError) {
+          throw new Error('Failed to book installation');
+        }
+
+        // Log activity
+        await supabase.rpc('log_order_activity', {
+          p_order_id: order.id,
+          p_activity_type: 'installation_booked',
+          p_description: `Installation directly booked via Smart Assignment`,
+          p_details: {
+            engineer_id: engineerId,
+            scheduled_date: date,
+            time_window: order.time_window,
+            method: 'smart_assignment_direct'
+          }
+        });
+      }
+
+      // Refresh the parent component
+      if (onUpdate) {
+        onUpdate();
+      }
+
+    } catch (error: any) {
+      console.error('Assignment error:', error);
+      throw error;
     }
   };
 
   return (
     <>
-      <Card className="w-full">
+      <Card className="hover:shadow-md transition-shadow">
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-medium">
-              #{order.order_number}
-            </CardTitle>
-            <div className="flex items-center gap-2">
-              {latestOffer && (
-                <OfferStatusBadge offer={latestOffer} showTimeRemaining />
-              )}
-              <Badge variant="outline" className="text-xs">
-                {getStatusDisplay()}
-              </Badge>
-              {showOfferActions && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                      <MoreVertical className="w-4 h-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => setShowSendOffer(true)}>
-                      <Send className="w-4 h-4 mr-2" />
-                      Send Offer
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setShowSmartAssignment(true)}>
-                      <Bot className="w-4 h-4 mr-2" />
-                      Smart Assign
-                    </DropdownMenuItem>
-                    {activeOffer && (
-                      <>
-                        <DropdownMenuItem onClick={() => handleReleaseOffer(activeOffer.id)}>
-                          <X className="w-4 h-4 mr-2" />
-                          Release Slot
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleResendOffer(activeOffer.id)}>
-                          <RotateCcw className="w-4 h-4 mr-2" />
-                          Resend Offer
-                        </DropdownMenuItem>
-                      </>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
+          <div className="flex items-start justify-between">
+            <div>
+              <CardTitle className="text-base font-medium">
+                {order.order_number}
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                {order.client?.full_name}
+              </p>
             </div>
+            <Badge variant={getStatusColor(order.status_enhanced)}>
+              {order.status_enhanced.replace('_', ' ')}
+            </Badge>
           </div>
         </CardHeader>
-        
-        <CardContent>
-          <div className="space-y-3">
-            {/* Client Info */}
-            <div className="flex items-center gap-2 text-sm">
-              <User className="w-4 h-4 text-muted-foreground" />
-              <span className="font-medium">{order.client?.full_name}</span>
+
+        <CardContent className="space-y-3">
+          <div className="space-y-2 text-sm">
+            <div className="flex items-center gap-2">
+              <MapPin className="w-4 h-4 text-muted-foreground" />
+              <span className="truncate">
+                {order.job_address || order.client?.address || 'No address'}
+              </span>
             </div>
 
-            {/* Location */}
-            {(order.job_address || order.postcode) && (
-              <div className="flex items-start gap-2 text-sm">
-                <MapPin className="w-4 h-4 text-muted-foreground mt-0.5" />
-                <div>
-                  {order.job_address && (
-                    <p className="text-muted-foreground">{order.job_address}</p>
-                  )}
-                  {order.postcode && (
-                    <p className="font-medium">{order.postcode}</p>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Duration */}
-            {order.estimated_duration_hours && (
-              <div className="flex items-center gap-2 text-sm">
-                <Clock className="w-4 h-4 text-muted-foreground" />
-                <span>{order.estimated_duration_hours}h estimated</span>
-              </div>
-            )}
-
-            {/* Engineer Assignment (if any) */}
-            {order.engineer_id && order.engineer && (
-              <div className="flex items-center gap-2 text-sm">
-                <User className="w-4 h-4 text-muted-foreground" />
-                <span>Assigned: {order.engineer.name}</span>
-              </div>
-            )}
-
-            {/* Scheduled Date (if any) */}
             {order.scheduled_install_date && (
-              <div className="flex items-center gap-2 text-sm">
-                <CalendarDays className="w-4 h-4 text-muted-foreground" />
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-muted-foreground" />
                 <span>
-                  {new Date(order.scheduled_install_date).toLocaleDateString('en-GB', {
-                    weekday: 'short',
-                    month: 'short',
-                    day: 'numeric'
-                  })}
+                  {new Date(order.scheduled_install_date).toLocaleDateString()}
                 </span>
               </div>
             )}
 
-            {/* Latest Offer Details */}
-            {latestOffer && latestOffer.status === 'pending' && (
-              <div className="pt-2 border-t">
-                <div className="flex items-center gap-2 text-sm">
-                  <Send className="w-4 h-4 text-muted-foreground" />
-                  <span>
-                    Offered: {new Date(latestOffer.offered_date).toLocaleDateString('en-GB', {
-                      weekday: 'short',
-                      month: 'short',
-                      day: 'numeric'
-                    })}
-                  </span>
-                </div>
-                {latestOffer.engineer && (
-                  <div className="flex items-center gap-2 text-sm mt-1">
-                    <User className="w-4 h-4 text-muted-foreground" />
-                    <span>Engineer: {latestOffer.engineer.name}</span>
-                  </div>
-                )}
+            {order.engineer_id && (
+              <div className="flex items-center gap-2">
+                <User className="w-4 h-4 text-muted-foreground" />
+                <span>
+                  {engineers.find(e => e.id === order.engineer_id)?.name || 'Unknown Engineer'}
+                </span>
+              </div>
+            )}
+
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4 text-muted-foreground" />
+              <span>{order.estimated_duration_hours || 2}h duration</span>
+            </div>
+
+            {order.time_window && (
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-muted-foreground" />
+                <span>{order.time_window}</span>
               </div>
             )}
           </div>
+
+          {order.status_enhanced === 'awaiting_install_booking' && (
+            <div className="flex gap-2 pt-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setShowSmartAssign(true)}
+                className="flex-1 text-xs"
+              >
+                <Wrench className="w-3 h-3 mr-1" />
+                Smart Assign
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* Modals */}
+      <SmartAssignmentModal
+        isOpen={showSmartAssign}
+        onClose={() => setShowSmartAssign(false)}
+        order={order}
+        engineers={engineers}
+        onAssign={handleAssignment}
+      />
+
       <SendOfferModal
         isOpen={showSendOffer}
         onClose={() => setShowSendOffer(false)}
         order={order}
         engineers={engineers}
-        onOfferSent={() => {
-          refetch();
-          onUpdate?.();
-        }}
-      />
-
-      <SmartAssignmentModal
-        isOpen={showSmartAssignment}
-        onClose={() => setShowSmartAssignment(false)}
-        order={order}
-        engineers={engineers.map(e => ({ ...e, availability: e.availability ?? true }))}
-        onAssign={async (engineerId, date) => {
-          // Handle smart assignment - could automatically send offer
-          console.log('Smart assigned:', engineerId, date);
-          onUpdate?.();
-        }}
+        onOfferSent={onUpdate}
       />
     </>
   );
