@@ -1,3 +1,4 @@
+# Supabase project configuration
 project_id = "qvppvstgconmzzjsryna"
 
 [auth]
