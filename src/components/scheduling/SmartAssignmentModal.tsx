@@ -9,7 +9,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Order, Engineer, getSmartEngineerRecommendations } from '@/utils/schedulingUtils';
+import { Order, Engineer, getSmartEngineerRecommendations, getOrderEstimatedHours } from '@/utils/schedulingUtils';
 import { getBestPostcode } from '@/utils/postcodeUtils';
 import { MapPin, Clock, User, AlertTriangle, CheckCircle, Send, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
@@ -139,7 +139,7 @@ export function SmartAssignmentModal({
                   <strong>Address:</strong> {order.job_address || order.client?.address}
                 </div>
                 <div>
-                  <strong>Duration:</strong> {order.estimated_duration_hours || 2} hours
+                  <strong>Duration:</strong> {getOrderEstimatedHours(order)} hours
                 </div>
                 {order.time_window && (
                   <div>

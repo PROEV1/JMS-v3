@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CalendarDays, Clock, User, Mail, MessageSquare, Send } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Order } from '@/utils/schedulingUtils';
+import { Order, getOrderEstimatedHours } from '@/utils/schedulingUtils';
 
 interface Engineer {
   id: string;
@@ -129,7 +129,7 @@ export function SendOfferModal({
               </div>
               <div>
                 <Label className="text-sm font-medium text-muted-foreground">Estimated Duration</Label>
-                <p className="text-sm">{order.estimated_duration_hours || 2} hours</p>
+                <p className="text-sm">{getOrderEstimatedHours(order)} hours</p>
               </div>
             </CardContent>
           </Card>

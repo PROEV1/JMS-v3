@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Order, Engineer, getStatusColor } from '@/utils/schedulingUtils';
+import { Order, Engineer, getStatusColor, getOrderEstimatedHours } from '@/utils/schedulingUtils';
 import { ChevronLeft, ChevronRight, User, AlertTriangle, Clock, MapPin, Eye, EyeOff } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -111,7 +111,7 @@ export function WeekViewCalendar({
   } => {
     const dayOrders = getOrdersForEngineerAndDate(engineerId, date);
     const totalHours = dayOrders.reduce((total, order) => 
-      total + (order.estimated_duration_hours || 2), 0
+      total + getOrderEstimatedHours(order), 0
     );
     
     // Assume 8-hour working day for visual indicator
@@ -319,7 +319,7 @@ export function WeekViewCalendar({
                                  {order.estimated_duration_hours && (
                                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
                                      <Clock className="h-3 w-3" />
-                                     <span>{order.estimated_duration_hours}h</span>
+                                     <span>{getOrderEstimatedHours(order)}h</span>
                                    </div>
                                  )}
                                </div>

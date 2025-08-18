@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import { Order, EngineerSettings } from './schedulingUtils';
+import { Order, EngineerSettings, getOrderEstimatedHours, getOrderEstimatedMinutes } from './schedulingUtils';
 import { getLiveDistance } from './schedulingUtils';
 
 export interface DayFitResult {
@@ -111,7 +111,7 @@ export async function calculateDayFit(
         scheduling_conflicts: virtualOrder.scheduling_conflicts || [],
         travel_time_minutes: null,
         updated_at: new Date().toISOString(),
-        estimated_duration_hours: virtualOrder.estimated_duration_hours || 2,
+        estimated_duration_hours: getOrderEstimatedHours(virtualOrder),
         time_window: virtualOrder.time_window || null,
         postcode: virtualOrder.postcode || '',
         is_partner_job: virtualOrder.is_partner_job || false,
@@ -150,7 +150,7 @@ export async function calculateDayFit(
         scheduling_conflicts: newOrder.scheduling_conflicts || [],
         travel_time_minutes: null,
         updated_at: new Date().toISOString(),
-        estimated_duration_hours: newOrder.estimated_duration_hours || 2,
+        estimated_duration_hours: getOrderEstimatedHours(newOrder),
         time_window: newOrder.time_window || null,
         postcode: newOrder.postcode || '',
         is_partner_job: newOrder.is_partner_job || false,
@@ -215,7 +215,7 @@ export async function calculateDayFit(
 async function calculateTotalDayTime(engineer: EngineerSettings, orders: any[]): Promise<number> {
   if (!engineer.starting_postcode || orders.length === 0) {
     // Just sum job durations if no starting postcode
-    return orders.reduce((total, order) => total + (order.estimated_duration_hours || 2) * 60, 0);
+    return orders.reduce((total, order) => total + getOrderEstimatedMinutes(order), 0);
   }
 
   let totalMinutes = 0;
@@ -223,7 +223,7 @@ async function calculateTotalDayTime(engineer: EngineerSettings, orders: any[]):
   let remainingOrders = [...orders];
 
   // Add job durations
-  totalMinutes += orders.reduce((total, order) => total + (order.estimated_duration_hours || 2) * 60, 0);
+  totalMinutes += orders.reduce((total, order) => total + getOrderEstimatedMinutes(order), 0);
 
     // Calculate travel time using nearest-neighbor approximation
     while (remainingOrders.length > 0) {

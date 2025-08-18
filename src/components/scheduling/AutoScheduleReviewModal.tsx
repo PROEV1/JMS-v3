@@ -8,7 +8,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { CalendarDays, Clock, User, AlertTriangle, CheckCircle, Bot, Send, Package } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Order, EngineerSettings } from '@/utils/schedulingUtils';
+import { Order, EngineerSettings, getOrderEstimatedHours, getOrderEstimatedMinutes } from '@/utils/schedulingUtils';
 import { getSmartEngineerRecommendations, getSchedulingSettings, getAllEngineersForScheduling, getEngineerDailyWorkload } from '@/utils/schedulingUtils';
 import { calculateDayFit } from '@/utils/dayFitUtils';
 
@@ -141,7 +141,7 @@ export function AutoScheduleReviewModal({
             // Check if adding this order would exceed daily capacity using virtual orders
             const virtualOrders = virtualEntry.orders.map(vOrder => ({
               ...vOrder,
-              estimated_duration_hours: vOrder.estimated_duration_hours || 2
+              estimated_duration_hours: getOrderEstimatedHours(vOrder)
             }));
 
             try {
@@ -163,7 +163,7 @@ export function AutoScheduleReviewModal({
               const updatedEntry: VirtualLedgerEntry = {
                 ...virtualEntry,
                 jobCount: virtualEntry.jobCount + 1,
-                estimatedMinutes: virtualEntry.estimatedMinutes + ((order.estimated_duration_hours || 2) * 60),
+                estimatedMinutes: virtualEntry.estimatedMinutes + getOrderEstimatedMinutes(order),
                 orders: [...virtualEntry.orders, order]
               };
               

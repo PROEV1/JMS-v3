@@ -183,7 +183,7 @@ serve(async (req: Request) => {
       const workDayMinutes = (endTime[0] * 60 + endTime[1]) - (startTime[0] * 60 + startTime[1])
       
       // Add estimated duration for this new job
-      const jobDurationMinutes = (order.estimated_duration_hours || 2) * 60
+      const jobDurationMinutes = (order.estimated_duration_hours || 3) * 60
       const totalWithNewJob = currentTimeMinutes + jobDurationMinutes
       
       // Allow 15 minutes leniency

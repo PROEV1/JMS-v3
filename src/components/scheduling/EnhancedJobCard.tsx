@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Calendar, MapPin, Clock, User, AlertTriangle, Wrench } from 'lucide-react';
-import { Order } from '@/utils/schedulingUtils';
+import { Order, getOrderEstimatedHours } from '@/utils/schedulingUtils';
 import { SmartAssignmentModal } from './SmartAssignmentModal';
 import { SendOfferModal } from './SendOfferModal';
 import { supabase } from '@/integrations/supabase/client';
@@ -154,7 +154,7 @@ export function EnhancedJobCard({ order, engineers, onUpdate }: EnhancedJobCardP
 
             <div className="flex items-center gap-2">
               <Clock className="w-4 h-4 text-muted-foreground" />
-              <span>{order.estimated_duration_hours || 2}h duration</span>
+              <span>{getOrderEstimatedHours(order)}h duration</span>
             </div>
 
             {order.time_window && (

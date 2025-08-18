@@ -2,6 +2,20 @@ import { supabase } from '@/integrations/supabase/client';
 import { normalizePostcode, getBestPostcode, getOutwardCode } from './postcodeUtils';
 import { calculateDayFit } from './dayFitUtils';
 
+// Default job duration constants
+export const DEFAULT_JOB_DURATION_HOURS = 3;
+
+// Helper functions for consistent duration handling
+export const getOrderEstimatedHours = (order: Order): number => {
+  return order.estimated_duration_hours && order.estimated_duration_hours > 0 
+    ? order.estimated_duration_hours 
+    : DEFAULT_JOB_DURATION_HOURS;
+};
+
+export const getOrderEstimatedMinutes = (order: Order): number => {
+  return getOrderEstimatedHours(order) * 60;
+};
+
 // Legacy interfaces for backward compatibility
 export interface Order {
   id: string;
