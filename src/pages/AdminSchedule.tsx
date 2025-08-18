@@ -1,5 +1,6 @@
 import React from 'react';
 import { AdminScheduleCalendar } from '@/components/scheduling/AdminScheduleCalendar';
+import { EnhancedSchedulePipeline } from '@/components/scheduling/EnhancedSchedulePipeline';
 import { SchedulingSettingsPanel } from '@/components/admin/SchedulingSettingsPanel';
 import { useUserRole } from '@/hooks/useUserRole';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -29,12 +30,16 @@ export default function AdminSchedule() {
   return (
     <div className="container mx-auto py-6">
       <Tabs defaultValue="calendar" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="calendar">Schedule Calendar</TabsTrigger>
-          <TabsTrigger value="settings">Scheduling Settings</TabsTrigger>
+          <TabsTrigger value="pipeline">Pipeline View</TabsTrigger>
+          <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
         <TabsContent value="calendar" className="mt-6">
           <AdminScheduleCalendar />
+        </TabsContent>
+        <TabsContent value="pipeline" className="mt-6">
+          <EnhancedSchedulePipeline />
         </TabsContent>
         <TabsContent value="settings" className="mt-6">
           <SchedulingSettingsPanel />

@@ -10,8 +10,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Order, Engineer } from '@/utils/schedulingUtils';
 import { getLocationDisplayText } from '@/utils/postcodeUtils';
 import { SmartAssignmentModal } from '@/components/scheduling/SmartAssignmentModal';
+import { SendOfferModal } from '@/components/scheduling/SendOfferModal';
+import { AutoScheduleReviewModal } from '@/components/scheduling/AutoScheduleReviewModal';
+import { useJobOffers } from '@/hooks/useJobOffers';
 import { toast } from 'sonner';
-import { ArrowLeft, Search, Filter, Calendar, User, MapPin, PoundSterling, Users } from 'lucide-react';
+import { ArrowLeft, Search, Filter, Calendar, User, MapPin, PoundSterling, Users, Clock, Send } from 'lucide-react';
 
 interface StatusPageConfig {
   title: string;
@@ -77,6 +80,10 @@ export function ScheduleStatusListPage() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showAssignmentModal, setShowAssignmentModal] = useState(false);
+  const [showOfferModal, setShowOfferModal] = useState(false);
+  const [showAutoScheduleModal, setShowAutoScheduleModal] = useState(false);
+
+  const { offers, loading: offersLoading, refetch, getActiveOffers } = useJobOffers();
 
   const config = status ? statusConfigs[status] : null;
 
@@ -108,6 +115,9 @@ export function ScheduleStatusListPage() {
 
         if (engineersError) throw engineersError;
         setEngineers(engineersData || []);
+        
+        // Load offers for status context
+        await refetch();
       } catch (error) {
         console.error('Error loading data:', error);
         toast.error('Failed to load data');
@@ -183,6 +193,34 @@ export function ScheduleStatusListPage() {
   const handleShowRecommendations = (order: Order) => {
     setSelectedOrder(order);
     setShowAssignmentModal(true);
+  };
+
+  const handleSendOffer = (order: Order) => {
+    setSelectedOrder(order);
+    setShowOfferModal(true);
+  };
+
+  const handleAutoScheduleReview = () => {
+    const needsSchedulingOrders = orders.filter(order => 
+      ['needs_scheduling', 'awaiting_install_booking', 'date_rejected', 'offer_expired'].includes(order.status_enhanced)
+    );
+    setShowAutoScheduleModal(true);
+  };
+
+  const handleOfferSent = async () => {
+    await refetch();
+    // Refresh orders to update any status changes
+    const { data: ordersData } = await supabase
+      .from('orders')
+      .select(`
+        *,
+        client:clients(*),
+        engineer:engineers(*)
+      `)
+      .in('status_enhanced', config!.statusValues as any);
+    setOrders(ordersData || []);
+    setShowOfferModal(false);
+    setSelectedOrder(null);
   };
 
   const handleAssignEngineer = async (engineerId: string, date: string) => {
@@ -264,9 +302,21 @@ export function ScheduleStatusListPage() {
           </h1>
           <p className="text-muted-foreground">{config.description}</p>
         </div>
-        <Badge variant="secondary" className="ml-auto px-3 py-1">
-          {filteredOrders.length} jobs
-        </Badge>
+        <div className="ml-auto flex items-center gap-2">
+          {status === 'needs-scheduling' && (
+            <Button 
+              onClick={handleAutoScheduleReview}
+              variant="default"
+              className="bg-gradient-to-r from-blue-600 to-blue-700"
+            >
+              <Send className="h-4 w-4 mr-2" />
+              Auto-Schedule & Review
+            </Button>
+          )}
+          <Badge variant="secondary" className="px-3 py-1">
+            {filteredOrders.length} jobs
+          </Badge>
+        </div>
       </div>
 
       {/* Filters */}
@@ -396,14 +446,24 @@ export function ScheduleStatusListPage() {
                         </Button>
                         {/* Show recommendations button for unassigned jobs in scheduling statuses */}
                         {!order.engineer_id && (status === 'needs-scheduling' || status === 'date-rejected') && (
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => handleShowRecommendations(order)}
-                          >
-                            <Users className="h-4 w-4 mr-1" />
-                            Show Recommendations
-                          </Button>
+                          <>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => handleShowRecommendations(order)}
+                            >
+                              <Users className="h-4 w-4 mr-1" />
+                              Smart Assign
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleSendOffer(order)}
+                            >
+                              <Clock className="h-4 w-4 mr-1" />
+                              Send Offer
+                            </Button>
+                          </>
                         )}
                       </div>
                     </TableCell>
@@ -428,6 +488,35 @@ export function ScheduleStatusListPage() {
           onAssign={handleAssignEngineer}
         />
       )}
+
+      {/* Send Offer Modal */}
+      {selectedOrder && (
+        <SendOfferModal
+          isOpen={showOfferModal}
+          onClose={() => {
+            setShowOfferModal(false);
+            setSelectedOrder(null);
+          }}
+          order={selectedOrder}
+          engineers={engineers}
+          onOfferSent={handleOfferSent}
+        />
+      )}
+
+      {/* Auto-Schedule Review Modal */}
+      <AutoScheduleReviewModal
+        isOpen={showAutoScheduleModal}
+        onClose={() => setShowAutoScheduleModal(false)}
+        orders={orders.filter(order => 
+          ['needs_scheduling', 'awaiting_install_booking', 'date_rejected', 'offer_expired'].includes(order.status_enhanced)
+        )}
+        engineers={engineers}
+        onOffersSubmitted={async () => {
+          await refetch();
+          setShowAutoScheduleModal(false);
+          toast.success('Offers sent successfully');
+        }}
+      />
     </div>
   );
 }
