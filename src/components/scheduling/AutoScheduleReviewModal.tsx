@@ -20,11 +20,15 @@ interface Engineer {
 
 interface ProposedAssignment {
   order: Order;
-  recommendedEngineer: any;
+  selectedCandidate: any; // Currently selected candidate (can be primary or fallback)
+  primaryCandidate: any; // Original recommendation
   proposedDate: Date;
   conflicts: string[];
   score: number;
-  alternatives?: any[]; // Store alternative candidates for fallback
+  alternatives: any[]; // All alternative candidates for fallback
+  status: 'ready' | 'preflight_checking' | 'preflight_failed' | 'sending' | 'sent' | 'failed';
+  statusMessage?: string;
+  usedFallback?: number; // Index of fallback used (0 = primary, 1+ = fallback)
 }
 
 interface VirtualLedgerEntry {
@@ -64,6 +68,7 @@ export function AutoScheduleReviewModal({
   const [generated, setGenerated] = useState(false);
   const [virtualLedger, setVirtualLedger] = useState<Map<string, VirtualLedgerEntry>>(new Map());
   const [batchCapacityInfo, setBatchCapacityInfo] = useState<BatchCapacityInfo[]>([]);
+  const [preflightChecking, setPreflightChecking] = useState(false);
 
   useEffect(() => {
     if (isOpen && orders.length > 0 && !generated) {
@@ -200,11 +205,13 @@ export function AutoScheduleReviewModal({
           if (assignedCandidate) {
             proposals.push({
               order,
-              recommendedEngineer: assignedCandidate,
+              selectedCandidate: assignedCandidate,
+              primaryCandidate: assignedCandidate,
               proposedDate: new Date(assignedCandidate.availableDate),
               conflicts: assignedCandidate.reasons.filter(r => r.includes('conflict') || r.includes('warning')),
               score: assignedCandidate.score,
-              alternatives: alternatives.slice(0, 3) // Keep top 3 alternatives
+              alternatives: [assignedCandidate, ...alternatives.slice(0, 4)], // Keep primary + 4 alternatives
+              status: 'ready'
             });
           } else {
             console.log(`❌ No suitable candidate found for order ${order.order_number} after virtual capacity check`);
@@ -231,23 +238,179 @@ export function AutoScheduleReviewModal({
     }
   };
 
+  // Switch to a fallback option for a specific proposal
+  const handleUseFallback = async (proposalIndex: number, candidateIndex: number) => {
+    const proposal = proposedAssignments[proposalIndex];
+    const newCandidate = proposal.alternatives[candidateIndex];
+    
+    console.log(`Switching order ${proposal.order.order_number} to fallback #${candidateIndex}: ${newCandidate.engineer.name}`);
+    
+    // Update virtual ledger - remove old assignment
+    const oldLedgerKey = `${proposal.selectedCandidate.engineer.id}_${proposal.selectedCandidate.availableDate}`;
+    const oldEntry = virtualLedger.get(oldLedgerKey);
+    if (oldEntry && oldEntry.jobCount > 0) {
+      const updatedOldEntry = {
+        ...oldEntry,
+        jobCount: oldEntry.jobCount - 1,
+        estimatedMinutes: oldEntry.estimatedMinutes - getOrderEstimatedMinutes(proposal.order),
+        orders: oldEntry.orders.filter(o => o.id !== proposal.order.id)
+      };
+      
+      if (updatedOldEntry.jobCount === 0) {
+        virtualLedger.delete(oldLedgerKey);
+      } else {
+        virtualLedger.set(oldLedgerKey, updatedOldEntry);
+      }
+    }
+    
+    // Add new assignment to virtual ledger
+    const newLedgerKey = `${newCandidate.engineer.id}_${newCandidate.availableDate}`;
+    const newEntry = virtualLedger.get(newLedgerKey) || {
+      engineerId: newCandidate.engineer.id,
+      date: newCandidate.availableDate,
+      jobCount: 0,
+      estimatedMinutes: 0,
+      orders: []
+    };
+    
+    const updatedNewEntry = {
+      ...newEntry,
+      jobCount: newEntry.jobCount + 1,
+      estimatedMinutes: newEntry.estimatedMinutes + getOrderEstimatedMinutes(proposal.order),
+      orders: [...newEntry.orders, proposal.order]
+    };
+    
+    virtualLedger.set(newLedgerKey, updatedNewEntry);
+    
+    // Update the proposal
+    const updatedProposal = {
+      ...proposal,
+      selectedCandidate: newCandidate,
+      proposedDate: new Date(newCandidate.availableDate),
+      usedFallback: candidateIndex,
+      status: 'ready' as const
+    };
+    
+    // Update assignments array
+    const newAssignments = [...proposedAssignments];
+    newAssignments[proposalIndex] = updatedProposal;
+    setProposedAssignments(newAssignments);
+    
+    // Refresh batch capacity info
+    const newCapacityInfo = Array.from(virtualLedger.values()).map(entry => ({
+      engineerName: proposal.alternatives.find(alt => alt.engineer.id === entry.engineerId)?.engineer.name || 'Unknown',
+      date: entry.date,
+      currentJobs: 0, // Will be fetched async if needed
+      maxJobs: 3, // Default - could fetch from settings
+      reservedInBatch: entry.jobCount
+    }));
+    setBatchCapacityInfo(newCapacityInfo);
+    
+    toast.success(`Switched to ${newCandidate.engineer.name} for order ${proposal.order.order_number}`);
+  };
+
+  // Perform preflight checks before sending offers
+  const runPreflightChecks = async () => {
+    setPreflightChecking(true);
+    console.log('Running preflight capacity checks for all proposals...');
+    
+    try {
+      const updatedAssignments = [...proposedAssignments];
+      
+      for (let i = 0; i < updatedAssignments.length; i++) {
+        const proposal = updatedAssignments[i];
+        updatedAssignments[i] = { ...proposal, status: 'preflight_checking' };
+        setProposedAssignments([...updatedAssignments]); // Update UI
+        
+        // Get virtual orders for this engineer/date from current batch
+        const virtualOrdersForCheck = Array.from(virtualLedger.values())
+          .filter(entry => 
+            entry.engineerId === proposal.selectedCandidate.engineer.id && 
+            entry.date === proposal.selectedCandidate.availableDate
+          )
+          .flatMap(entry => entry.orders.filter(o => o.id !== proposal.order.id))
+          .map(order => ({
+            id: order.id,
+            estimated_duration_hours: getOrderEstimatedHours(order)
+          }));
+        
+        const { data: preflightResult, error } = await supabase.functions.invoke('preflight-capacity-check', {
+          body: {
+            order_id: proposal.order.id,
+            engineer_id: proposal.selectedCandidate.engineer.id,
+            offered_date: proposal.selectedCandidate.availableDate || proposal.proposedDate.toISOString(),
+            virtual_orders: virtualOrdersForCheck
+          }
+        });
+        
+        if (error) {
+          updatedAssignments[i] = {
+            ...proposal,
+            status: 'preflight_failed',
+            statusMessage: 'Preflight check failed'
+          };
+        } else if (!preflightResult.canFit) {
+          updatedAssignments[i] = {
+            ...proposal,
+            status: 'preflight_failed',
+            statusMessage: preflightResult.reason
+          };
+        } else {
+          updatedAssignments[i] = {
+            ...proposal,
+            status: 'ready',
+            statusMessage: undefined
+          };
+        }
+      }
+      
+      setProposedAssignments(updatedAssignments);
+      
+    } catch (error) {
+      console.error('Error running preflight checks:', error);
+      toast.error('Failed to run preflight capacity checks');
+    } finally {
+      setPreflightChecking(false);
+    }
+  };
+
   const handleSubmitOffers = async () => {
+    // First run preflight checks
+    await runPreflightChecks();
+    
+    // Check if any proposals failed preflight
+    const failedPreflights = proposedAssignments.filter(p => p.status === 'preflight_failed');
+    if (failedPreflights.length > 0) {
+      toast.error(`${failedPreflights.length} proposal(s) failed preflight checks. Please use fallback options or adjust assignments.`);
+      return;
+    }
+    
     setSubmitting(true);
-    console.log('Starting resilient offer submission with fallback alternatives for', proposedAssignments.length, 'proposals');
+    console.log('Starting resilient offer submission with automatic fallbacks for', proposedAssignments.length, 'proposals');
     
     try {
       let successCount = 0;
       let failureCount = 0;
+      const updatedAssignments = [...proposedAssignments];
 
-      for (const proposal of proposedAssignments) {
+      for (let i = 0; i < updatedAssignments.length; i++) {
+        const proposal = updatedAssignments[i];
         let offerSent = false;
         
-        // Try primary assignment first
-        const candidates = [proposal.recommendedEngineer, ...(proposal.alternatives || [])];
+        // Try all candidates starting from selected
+        const selectedIndex = proposal.alternatives.findIndex(alt => alt === proposal.selectedCandidate);
+        const candidatesToTry = [
+          ...proposal.alternatives.slice(selectedIndex),
+          ...proposal.alternatives.slice(0, selectedIndex)
+        ];
         
-        for (let attemptIndex = 0; attemptIndex < candidates.length && !offerSent; attemptIndex++) {
-          const candidate = candidates[attemptIndex];
-          const attemptType = attemptIndex === 0 ? 'primary' : `fallback ${attemptIndex}`;
+        updatedAssignments[i] = { ...proposal, status: 'sending' };
+        setProposedAssignments([...updatedAssignments]);
+        
+        for (let attemptIndex = 0; attemptIndex < candidatesToTry.length && !offerSent; attemptIndex++) {
+          const candidate = candidatesToTry[attemptIndex];
+          const isOriginalSelection = candidate === proposal.selectedCandidate;
+          const attemptType = isOriginalSelection ? 'selected' : `fallback ${attemptIndex}`;
           
           try {
             console.log(`Sending ${attemptType} offer for order ${proposal.order.order_number} to ${candidate.engineer.name}`);
@@ -268,20 +431,29 @@ export function AutoScheduleReviewModal({
               const errorMsg = data?.error || 'Failed to send offer';
               console.log(`${attemptType} offer failed for ${proposal.order.order_number}: ${errorMsg}`);
               
-              if (attemptIndex === candidates.length - 1) {
+              if (attemptIndex === candidatesToTry.length - 1) {
                 // This was the last candidate
                 throw new Error(errorMsg);
               }
-              // Try next candidate
-              continue;
+              continue; // Try next candidate
             }
 
             // Success!
             successCount++;
             offerSent = true;
+            
+            const finalFallbackIndex = proposal.alternatives.findIndex(alt => alt === candidate);
+            updatedAssignments[i] = {
+              ...proposal,
+              status: 'sent',
+              statusMessage: `Offer sent to ${candidate.engineer.name}`,
+              usedFallback: finalFallbackIndex,
+              selectedCandidate: candidate
+            };
+            
             console.log(`✅ ${attemptType} offer sent successfully for ${proposal.order.order_number} to ${candidate.engineer.name}`);
             
-            if (attemptIndex > 0) {
+            if (!isOriginalSelection) {
               toast.info(`Order ${proposal.order.order_number}: Used fallback engineer ${candidate.engineer.name}`, {
                 duration: 4000
               });
@@ -289,13 +461,19 @@ export function AutoScheduleReviewModal({
             
           } catch (error) {
             console.error(`${attemptType} attempt failed for order ${proposal.order.order_number}:`, error);
-            if (attemptIndex === candidates.length - 1) {
+            if (attemptIndex === candidatesToTry.length - 1) {
               // All alternatives exhausted
               failureCount++;
-              toast.error(`Failed to send offer for order ${proposal.order.order_number}: all alternatives exhausted`);
+              updatedAssignments[i] = {
+                ...proposal,
+                status: 'failed',
+                statusMessage: `All alternatives exhausted: ${error.message}`
+              };
             }
           }
         }
+        
+        setProposedAssignments([...updatedAssignments]);
       }
 
       console.log('Resilient offer submission complete. Success:', successCount, 'Failed:', failureCount);
@@ -304,7 +482,10 @@ export function AutoScheduleReviewModal({
         const message = `Successfully sent ${successCount} installation offer${successCount > 1 ? 's' : ''}${failureCount > 0 ? `, ${failureCount} failed after trying all alternatives` : ''}`;
         toast.success(message);
         onOffersSubmitted?.();
-        onClose();
+        
+        setTimeout(() => {
+          onClose();
+        }, 2000); // Give time to see the final status
       } else {
         toast.error('Failed to send any offers despite trying alternatives');
       }
@@ -437,40 +618,72 @@ export function AutoScheduleReviewModal({
               <ScrollArea className="flex-1 h-full">
                 <div className="space-y-4 pr-4">
                   {proposedAssignments.map((proposal, index) => (
-                    <Card key={proposal.order.id} className={proposal.conflicts.length > 0 ? 'border-warning' : 'border-success'}>
+                    <Card key={proposal.order.id} className={`${proposal.conflicts.length > 0 ? 'border-warning' : 'border-success'} ${proposal.status === 'preflight_failed' ? 'border-destructive' : ''} ${proposal.status === 'sent' ? 'border-green-500' : ''}`}>
                       <CardHeader className="pb-3">
                         <div className="flex items-center justify-between">
                           <CardTitle className="text-lg flex items-center gap-2">
-                            {proposal.conflicts.length === 0 ? (
+                            {proposal.status === 'sent' ? (
+                              <CheckCircle className="w-5 h-5 text-green-500" />
+                            ) : proposal.status === 'preflight_failed' || proposal.status === 'failed' ? (
+                              <AlertTriangle className="w-5 h-5 text-destructive" />
+                            ) : proposal.status === 'preflight_checking' || proposal.status === 'sending' ? (
+                              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
+                            ) : proposal.conflicts.length === 0 ? (
                               <CheckCircle className="w-5 h-5 text-success" />
                             ) : (
                               <AlertTriangle className="w-5 h-5 text-warning" />
                             )}
                             Order #{proposal.order.order_number}
+                            {proposal.usedFallback !== undefined && proposal.usedFallback > 0 && (
+                              <Badge variant="outline" className="text-xs">
+                                Fallback #{proposal.usedFallback}
+                              </Badge>
+                            )}
                           </CardTitle>
-                          <Badge variant={proposal.conflicts.length === 0 ? 'default' : 'secondary'}>
-                            Score: {Math.round(proposal.score)}
-                          </Badge>
+                          <div className="flex items-center gap-2">
+                            <Badge variant={proposal.conflicts.length === 0 ? 'default' : 'secondary'}>
+                              Score: {Math.round(proposal.score)}
+                            </Badge>
+                            {proposal.status === 'sent' && (
+                              <Badge variant="default" className="bg-green-500">
+                                Sent
+                              </Badge>
+                            )}
+                          </div>
                         </div>
+                        
+                        {/* Status Message */}
+                        {proposal.statusMessage && (
+                          <p className={`text-sm mt-2 ${
+                            proposal.status === 'sent' ? 'text-green-600' : 
+                            proposal.status === 'preflight_failed' || proposal.status === 'failed' ? 'text-destructive' :
+                            'text-muted-foreground'
+                          }`}>
+                            {proposal.statusMessage}
+                          </p>
+                        )}
                       </CardHeader>
+                      
                       <CardContent>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           {/* Order Info */}
                           <div>
-                            <Label className="text-sm font-medium text-muted-foreground">Client</Label>
+                            <Label className="text-sm font-medium text-muted-foreground">Client & Duration</Label>
                             <p className="font-semibold">{proposal.order.client?.full_name}</p>
-                            <p className="text-sm text-muted-foreground">{proposal.order.postcode}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {proposal.order.postcode} • {getOrderEstimatedHours(proposal.order)}h job
+                            </p>
                           </div>
 
                           {/* Engineer Assignment */}
                           <div>
                             <Label className="text-sm font-medium text-muted-foreground flex items-center gap-1">
                               <User className="w-4 h-4" />
-                              Assigned Engineer
+                              Selected Engineer
                             </Label>
-                            <p className="font-semibold">{proposal.recommendedEngineer.engineer.name}</p>
+                            <p className="font-semibold">{proposal.selectedCandidate.engineer.name}</p>
                             <p className="text-sm text-muted-foreground">
-                              {proposal.recommendedEngineer.distance}km • {proposal.recommendedEngineer.travelTime}min travel
+                              {proposal.selectedCandidate.distance}km • {proposal.selectedCandidate.travelTime}min travel
                             </p>
                           </div>
 
@@ -491,8 +704,20 @@ export function AutoScheduleReviewModal({
                           </div>
                         </div>
 
+                        {/* Status-specific alerts */}
+                        {proposal.status === 'preflight_failed' && (
+                          <Alert className="mt-4 border-destructive">
+                            <AlertTriangle className="w-4 h-4" />
+                            <AlertDescription>
+                              <strong>Capacity Check Failed:</strong> {proposal.statusMessage}
+                              <br />
+                              <span className="text-sm">Please select a fallback option below.</span>
+                            </AlertDescription>
+                          </Alert>
+                        )}
+
                         {/* Conflicts/Warnings */}
-                        {proposal.conflicts.length > 0 && (
+                        {proposal.conflicts.length > 0 && proposal.status !== 'preflight_failed' && (
                           <div className="mt-4 pt-4 border-t">
                             <Label className="text-sm font-medium text-warning mb-2 flex items-center gap-1">
                               <AlertTriangle className="w-4 h-4" />
@@ -508,40 +733,81 @@ export function AutoScheduleReviewModal({
                           </div>
                         )}
 
-                        {/* Reasons */}
+                        {/* Enhanced Fallback Options */}
                         <div className="mt-4 pt-4 border-t">
-                          <Label className="text-sm font-medium text-muted-foreground mb-2">Recommendation Factors</Label>
-                          <div className="flex flex-wrap gap-1">
-                            {proposal.recommendedEngineer.reasons.slice(0, 3).map((reason: string, i: number) => (
-                              <Badge key={i} variant="outline" className="text-xs">
-                                {reason}
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Alternatives Info */}
-                        {proposal.alternatives && proposal.alternatives.length > 0 && (
-                          <div className="mt-4 pt-4 border-t">
-                            <Label className="text-sm font-medium text-muted-foreground mb-2">Fallback Options</Label>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                              {proposal.alternatives.slice(0, 2).map((alt: any, i: number) => (
-                                <div key={i} className="text-xs p-2 bg-muted/30 rounded border">
-                                  <div className="font-medium">{alt.engineer.name}</div>
-                                  <div className="text-muted-foreground">
-                                    {new Date(alt.availableDate).toLocaleDateString('en-GB', { 
-                                      month: 'short', 
-                                      day: 'numeric' 
-                                    })} • {alt.travelTime}min
+                          <Label className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-1">
+                            <Clock className="w-4 h-4" />
+                            Fallback Options ({proposal.alternatives.length} available)
+                          </Label>
+                          
+                          <div className="space-y-2">
+                            {proposal.alternatives.slice(0, 5).map((alt: any, altIndex: number) => {
+                              const isSelected = alt === proposal.selectedCandidate;
+                              const isPrimary = altIndex === 0;
+                              
+                              return (
+                                <div key={altIndex} className={`p-3 rounded border transition-colors ${
+                                  isSelected ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
+                                } ${proposal.status === 'sent' || proposal.status === 'sending' ? 'opacity-50' : ''}`}>
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex-1">
+                                      <div className="flex items-center gap-2 mb-1">
+                                        <span className="font-medium">{alt.engineer.name}</span>
+                                        {isPrimary && (
+                                          <Badge variant="outline" className="text-xs">Primary</Badge>
+                                        )}
+                                        {isSelected && (
+                                          <Badge variant="default" className="text-xs">Selected</Badge>
+                                        )}
+                                      </div>
+                                      
+                                      <div className="grid grid-cols-2 gap-4 text-sm text-muted-foreground">
+                                        <div>
+                                          <CalendarDays className="w-3 h-3 inline mr-1" />
+                                          {new Date(alt.availableDate).toLocaleDateString('en-GB', {
+                                            weekday: 'short',
+                                            month: 'short', 
+                                            day: 'numeric'
+                                          })}
+                                        </div>
+                                        <div>
+                                          <Clock className="w-3 h-3 inline mr-1" />
+                                          {alt.travelTime}min • {alt.distance}km
+                                        </div>
+                                      </div>
+                                      
+                                      {alt.reasons && alt.reasons.length > 0 && (
+                                        <div className="mt-1">
+                                          <Badge variant="outline" className="text-xs">
+                                            {alt.reasons[0]}
+                                          </Badge>
+                                        </div>
+                                      )}
+                                    </div>
+                                    
+                                    {!isSelected && proposal.status === 'ready' && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => handleUseFallback(index, altIndex)}
+                                        disabled={submitting || preflightChecking}
+                                      >
+                                        Use This
+                                      </Button>
+                                    )}
                                   </div>
                                 </div>
-                              ))}
-                            </div>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Used automatically if primary assignment fails
-                            </p>
+                              );
+                            })}
                           </div>
-                        )}
+                          
+                          <p className="text-xs text-muted-foreground mt-2">
+                            {proposal.status === 'ready' ? 
+                              'Click "Use This" to switch assignments or these will be tried automatically if the selected option fails.' :
+                              'Alternatives are tried automatically if the primary fails during sending.'
+                            }
+                          </p>
+                        </div>
                       </CardContent>
                     </Card>
                   ))}
@@ -567,14 +833,25 @@ export function AutoScheduleReviewModal({
               Cancel
             </Button>
             {!loading && proposedAssignments.length > 0 && (
-              <Button 
-                onClick={handleSubmitOffers}
-                disabled={submitting}
-                className="flex items-center gap-2"
-              >
-                <Send className="w-4 h-4" />
-                {submitting ? 'Sending Offers...' : `Send ${proposedAssignments.length} Offer${proposedAssignments.length > 1 ? 's' : ''}`}
-              </Button>
+              <>
+                <Button 
+                  variant="outline"
+                  onClick={runPreflightChecks}
+                  disabled={submitting || preflightChecking}
+                  className="flex items-center gap-2"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  {preflightChecking ? 'Checking...' : 'Preflight Check'}
+                </Button>
+                <Button 
+                  onClick={handleSubmitOffers}
+                  disabled={submitting || preflightChecking}
+                  className="flex items-center gap-2"
+                >
+                  <Send className="w-4 h-4" />
+                  {submitting ? 'Sending Offers...' : `Send ${proposedAssignments.length} Offer${proposedAssignments.length > 1 ? 's' : ''}`}
+                </Button>
+              </>
             )}
           </div>
         </div>
