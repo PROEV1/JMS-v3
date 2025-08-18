@@ -15,6 +15,7 @@ import { AgreementSection } from '@/components/admin/sections/AgreementSection';
 import { JobStatusTimelineSection } from '@/components/admin/sections/JobStatusTimelineSection';
 import { ActivityHistorySection } from '@/components/admin/sections/ActivityHistorySection';
 import { EngineerUploadsSection } from '@/components/admin/sections/EngineerUploadsSection';
+import { ClientBlockedDatesSection } from '@/components/admin/sections/ClientBlockedDatesSection';
 import { OrderStatusEnhanced } from '@/components/admin/EnhancedJobStatusBadge';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
@@ -621,6 +622,12 @@ export default function OrderDetail() {
 
             {/* Activity & History */}
             <ActivityHistorySection orderId={orderId!} />
+
+            {/* Client Blocked Dates */}
+            <ClientBlockedDatesSection 
+              clientId={order.client.id}
+              onDataChange={fetchOrder}
+            />
 
             {/* Engineer Uploads & Completion */}
             <EngineerUploadsSection 
