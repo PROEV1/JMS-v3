@@ -480,6 +480,81 @@ export type Database = {
         }
         Relationships: []
       }
+      job_offers: {
+        Row: {
+          accepted_at: string | null
+          client_token: string
+          created_at: string
+          created_by: string | null
+          delivery_channel: string
+          delivery_details: Json | null
+          engineer_id: string
+          expired_at: string | null
+          expires_at: string
+          id: string
+          offered_date: string
+          order_id: string
+          rejected_at: string | null
+          rejection_reason: string | null
+          status: Database["public"]["Enums"]["offer_status"]
+          time_window: string | null
+          updated_at: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          client_token: string
+          created_at?: string
+          created_by?: string | null
+          delivery_channel?: string
+          delivery_details?: Json | null
+          engineer_id: string
+          expired_at?: string | null
+          expires_at: string
+          id?: string
+          offered_date: string
+          order_id: string
+          rejected_at?: string | null
+          rejection_reason?: string | null
+          status?: Database["public"]["Enums"]["offer_status"]
+          time_window?: string | null
+          updated_at?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          client_token?: string
+          created_at?: string
+          created_by?: string | null
+          delivery_channel?: string
+          delivery_details?: Json | null
+          engineer_id?: string
+          expired_at?: string | null
+          expires_at?: string
+          id?: string
+          offered_date?: string
+          order_id?: string
+          rejected_at?: string | null
+          rejection_reason?: string | null
+          status?: Database["public"]["Enums"]["offer_status"]
+          time_window?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_offers_engineer_id_fkey"
+            columns: ["engineer_id"]
+            isOneToOne: false
+            referencedRelation: "engineers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_offers_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lead_history: {
         Row: {
           client_id: string
@@ -894,6 +969,7 @@ export type Database = {
           installation_date: string | null
           installation_notes: string | null
           internal_install_notes: string | null
+          is_partner_job: boolean | null
           job_address: string | null
           manual_status_notes: string | null
           manual_status_override: boolean | null
@@ -928,6 +1004,7 @@ export type Database = {
           installation_date?: string | null
           installation_notes?: string | null
           internal_install_notes?: string | null
+          is_partner_job?: boolean | null
           job_address?: string | null
           manual_status_notes?: string | null
           manual_status_override?: boolean | null
@@ -962,6 +1039,7 @@ export type Database = {
           installation_date?: string | null
           installation_notes?: string | null
           internal_install_notes?: string | null
+          is_partner_job?: boolean | null
           job_address?: string | null
           manual_status_notes?: string | null
           manual_status_override?: boolean | null
@@ -1529,13 +1607,25 @@ export type Database = {
         Args: { p_order_id: string }
         Returns: Json
       }
+      generate_client_token: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       get_engineer_daily_workload: {
+        Args: { p_date: string; p_engineer_id: string }
+        Returns: number
+      }
+      get_engineer_daily_workload_with_holds: {
         Args: { p_date: string; p_engineer_id: string }
         Returns: number
       }
       get_engineer_id_for_user: {
         Args: { user_uuid: string }
         Returns: string
+      }
+      get_engineer_soft_holds: {
+        Args: { p_date: string; p_engineer_id: string }
+        Returns: number
       }
       get_user_role: {
         Args: { user_id: string }
@@ -1598,6 +1688,7 @@ export type Database = {
     }
     Enums: {
       message_status: "sending" | "sent" | "delivered" | "failed"
+      offer_status: "pending" | "accepted" | "rejected" | "expired"
       order_status_enhanced:
         | "quote_accepted"
         | "awaiting_payment"
@@ -1751,6 +1842,7 @@ export const Constants = {
   public: {
     Enums: {
       message_status: ["sending", "sent", "delivered", "failed"],
+      offer_status: ["pending", "accepted", "rejected", "expired"],
       order_status_enhanced: [
         "quote_accepted",
         "awaiting_payment",

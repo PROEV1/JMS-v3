@@ -78,6 +78,7 @@ export async function calculateDayFit(
         estimated_duration_hours: newOrder.estimated_duration_hours || 2,
         time_window: newOrder.time_window || null,
         postcode: newOrder.postcode || '',
+        is_partner_job: newOrder.is_partner_job || false,
         // Ensure required fields are present
         status: newOrder.status || 'awaiting_payment',
         status_enhanced: (newOrder.status_enhanced || 'quote_accepted') as any,

@@ -46,7 +46,7 @@ import OrderDetail from "@/pages/OrderDetail";
 import PublicQuoteView from "@/pages/PublicQuoteView";
 import Auth from "@/pages/Auth";
 import SetupPassword from "@/pages/SetupPassword";
-import NotFound from "@/pages/NotFound";
+import ClientOfferView from "@/pages/ClientOfferView";
 
 const queryClient = new QueryClient();
 
@@ -98,6 +98,7 @@ const App = () => (
             <Route path="/admin/order/:orderId" element={<Layout><OrderDetail /></Layout>} />
             <Route path="/order/:orderId" element={<Layout><OrderDetail /></Layout>} />
             <Route path="/quote/:shareToken" element={<PublicQuoteView />} />
+            <Route path="/offer/:token" element={<ClientOfferView />} />
             {/* Auth page as home page */}
             <Route path="/" element={<Auth />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

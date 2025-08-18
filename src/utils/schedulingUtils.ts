@@ -20,6 +20,7 @@ export interface Order {
   estimated_duration_hours?: number;
   installation_notes?: string;
   scheduling_conflicts?: any; // Allow Json or any[]
+  is_partner_job?: boolean;
   client?: {
     full_name: string;
     email: string;
