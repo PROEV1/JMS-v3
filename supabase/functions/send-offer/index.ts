@@ -269,10 +269,20 @@ serve(async (req: Request) => {
 
     // Send via email (primary channel)
     if (delivery_channel === 'email' || offerConfig.auto_fallback_email) {
+      let emailSent = false;
+      let deliveryDetails = {
+        ...jobOffer.delivery_details,
+        sent_at: new Date().toISOString()
+      };
+
+      // Try primary email address first
+      const primaryFromAddress = offerConfig.from_address || 'ProEV Scheduling <no-reply@proev.co.uk>';
+      
       try {
-        console.log('Sending email offer to:', order.client.email, 'with URL:', offerUrl);
+        console.log('Sending email offer to:', order.client.email, 'from:', primaryFromAddress, 'with URL:', offerUrl);
+        
         const emailResponse = await resend.emails.send({
-          from: offerConfig.from_address || 'ProEV Scheduling <no-reply@proev.co.uk>',
+          from: primaryFromAddress,
           to: [order.client.email],
           subject: `Installation Date Offered - ${order.order_number}`,
           html: `
@@ -299,25 +309,87 @@ serve(async (req: Request) => {
         });
 
         console.log('Email sent successfully to:', order.client.email, 'Message ID:', emailResponse.data?.id);
+        emailSent = true;
         
-        // Update job offer with delivery details including message ID
-        await supabase
-          .from('job_offers')
-          .update({
-            delivery_details: {
-              ...jobOffer.delivery_details,
-              email_sent: true,
-              resend_message_id: emailResponse.data?.id,
-              sent_at: new Date().toISOString()
-            }
-          })
-          .eq('id', jobOffer.id);
-      } catch (emailError) {
-        console.error('Failed to send email:', emailError);
-        if (delivery_channel === 'email') {
-          throw new Error('Failed to send email offer');
+        deliveryDetails = {
+          ...deliveryDetails,
+          email_sent: true,
+          resend_message_id: emailResponse.data?.id,
+          primary_sender: primaryFromAddress,
+          fallback_used: false
+        };
+
+      } catch (primaryError) {
+        console.error('Primary email send failed:', primaryError);
+        console.log('Attempting fallback with onboarding@resend.dev');
+        
+        // Try fallback email address
+        try {
+          const fallbackResponse = await resend.emails.send({
+            from: 'ProEV Scheduling <onboarding@resend.dev>',
+            to: [order.client.email],
+            subject: `Installation Date Offered - ${order.order_number}`,
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #2563eb;">Installation Slot Available</h2>
+                <p>Dear ${order.client.full_name},</p>
+                <p>${messageContent}</p>
+                <div style="margin: 20px 0; padding: 20px; background-color: #f8fafc; border-radius: 8px;">
+                  <p><strong>Order:</strong> ${order.order_number}</p>
+                  <p><strong>Proposed Date:</strong> ${templateData.offered_date}</p>
+                  <p><strong>Engineer:</strong> ${engineer.name}</p>
+                  <p><strong>Time Window:</strong> ${templateData.time_window}</p>
+                </div>
+                <div style="text-align: center; margin: 30px 0;">
+                  <a href="${offerUrl}" style="background-color: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                    Accept or Reject Offer
+                  </a>
+                </div>
+                <p style="color: #6b7280; font-size: 14px;">
+                  This offer expires at ${expiresAt.toLocaleString('en-GB')}
+                </p>
+              </div>
+            `
+          });
+
+          console.log('Fallback email sent successfully to:', order.client.email, 'Message ID:', fallbackResponse.data?.id);
+          emailSent = true;
+          
+          deliveryDetails = {
+            ...deliveryDetails,
+            email_sent: true,
+            resend_message_id: fallbackResponse.data?.id,
+            primary_sender: primaryFromAddress,
+            primary_error: primaryError.message,
+            fallback_used: true,
+            fallback_sender: 'onboarding@resend.dev'
+          };
+
+        } catch (fallbackError) {
+          console.error('Fallback email send also failed:', fallbackError);
+          
+          deliveryDetails = {
+            ...deliveryDetails,
+            email_sent: false,
+            primary_sender: primaryFromAddress,
+            primary_error: primaryError.message,
+            fallback_used: true,
+            fallback_error: fallbackError.message
+          };
+
+          if (delivery_channel === 'email') {
+            throw new Error(`Failed to send email offer: Primary (${primaryError.message}), Fallback (${fallbackError.message})`);
+          }
         }
       }
+
+      // Update job offer with delivery details
+      await supabase
+        .from('job_offers')
+        .update({
+          delivery_details: deliveryDetails
+        })
+        .eq('id', jobOffer.id);
     }
 
     // Log activity
