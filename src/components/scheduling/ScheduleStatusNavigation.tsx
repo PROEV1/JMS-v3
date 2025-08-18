@@ -179,7 +179,7 @@ export function ScheduleStatusNavigation({ currentStatus }: ScheduleStatusNaviga
           }
         }
 
-        // For ready-to-book, count orders with status awaiting_install_booking that have accepted offers
+        // For ready-to-book, count orders with accepted offers that haven't been scheduled yet
         let readyToBookCount = 0;
         const { data: acceptedOffers } = await supabase
           .from('job_offers')
@@ -191,6 +191,7 @@ export function ScheduleStatusNavigation({ currentStatus }: ScheduleStatusNaviga
             .from('orders')
             .select('*', { count: 'exact', head: true })
             .eq('status_enhanced', 'awaiting_install_booking')
+            .is('scheduled_install_date', null)
             .in('id', acceptedOffers.map(offer => offer.order_id));
           
           readyToBookCount = ordersWithAcceptedOffersCount || 0;

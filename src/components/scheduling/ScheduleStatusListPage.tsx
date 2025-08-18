@@ -111,7 +111,7 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
     if (!activeOffer) return;
 
     try {
-      // Update the job offer status to accepted
+      // Update the job offer status to accepted (don't schedule yet)
       const { error: offerError } = await supabase
         .from('job_offers')
         .update({
@@ -122,32 +122,20 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
 
       if (offerError) throw offerError;
 
-      // Update the order with engineer and scheduled date
-      const { error: orderError } = await supabase
-        .from('orders')
-        .update({
-          engineer_id: activeOffer.engineer_id,
-          scheduled_install_date: activeOffer.offered_date,
-          status_enhanced: 'scheduled'
-        })
-        .eq('id', orderId);
-
-      if (orderError) throw orderError;
-
       // Log the activity
       await supabase.rpc('log_order_activity', {
         p_order_id: orderId,
         p_activity_type: 'offer_accepted',
-        p_description: 'Installation offer accepted by admin',
+        p_description: 'Installation offer accepted by admin - moved to ready-to-book',
         p_details: {
           offer_id: activeOffer.id,
           engineer_id: activeOffer.engineer_id,
-          scheduled_date: activeOffer.offered_date,
+          offered_date: activeOffer.offered_date,
           method: 'admin_manual'
         }
       });
 
-      toast.success('Offer accepted and installation scheduled');
+      toast.success('Offer accepted - job moved to Ready to Book');
       refetchOffers();
       if (onUpdate) onUpdate();
     } catch (error) {

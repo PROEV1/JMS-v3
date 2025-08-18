@@ -74,7 +74,7 @@ export default function AdminScheduleStatus() {
           setOrders([]);
         }
       } else if (status === 'ready-to-book') {
-        // Filter for orders that are awaiting_install_booking with accepted offers
+        // Filter for orders that are awaiting_install_booking with accepted offers but not scheduled yet
         const { data: ordersData, error: ordersError } = await supabase
           .from('orders')
           .select(`
@@ -84,6 +84,7 @@ export default function AdminScheduleStatus() {
             engineer:engineers(*)
           `)
           .eq('status_enhanced', 'awaiting_install_booking')
+          .is('scheduled_install_date', null)
           .order('created_at', { ascending: false });
 
         if (ordersError) {

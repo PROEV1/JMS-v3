@@ -84,7 +84,7 @@ serve(async (req: Request) => {
     const responseTime = now.toISOString();
 
     if (response === 'accept') {
-      // Accept the offer - update job offer and order
+      // Accept the offer - only update job offer status, don't schedule yet
       const { error: updateOfferError } = await supabase
         .from('job_offers')
         .update({
@@ -97,35 +97,21 @@ serve(async (req: Request) => {
         throw new Error('Failed to update offer status');
       }
 
-      // Update the order with the accepted assignment
-      const { error: updateOrderError } = await supabase
-        .from('orders')
-        .update({
-          engineer_id: jobOffer.engineer_id,
-          scheduled_install_date: jobOffer.offered_date,
-          time_window: jobOffer.time_window
-        })
-        .eq('id', jobOffer.order_id);
-
-      if (updateOrderError) {
-        throw new Error('Failed to update order assignment');
-      }
-
       // Log activity
       await supabase.rpc('log_order_activity', {
         p_order_id: jobOffer.order_id,
         p_activity_type: 'offer_accepted',
-        p_description: `Client accepted installation offer for ${new Date(jobOffer.offered_date).toLocaleDateString()} with ${jobOffer.engineer.name}`,
+        p_description: `Client accepted installation offer for ${new Date(jobOffer.offered_date).toLocaleDateString()} with ${jobOffer.engineer.name} - Ready to book`,
         p_details: {
           offer_id: jobOffer.id,
           engineer_id: jobOffer.engineer_id,
-          scheduled_date: jobOffer.offered_date,
+          offered_date: jobOffer.offered_date,
           time_window: jobOffer.time_window,
           accepted_at: responseTime
         }
       });
 
-      console.log(`Offer accepted for order ${jobOffer.order.order_number}`);
+      console.log(`Offer accepted for order ${jobOffer.order.order_number} - moved to ready-to-book`);
 
     } else if (response === 'reject') {
       // Reject the offer
