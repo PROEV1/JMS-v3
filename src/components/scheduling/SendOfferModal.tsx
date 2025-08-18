@@ -69,9 +69,11 @@ export function SendOfferModal({
         throw new Error(data?.error || 'Failed to send offer');
       }
 
-      toast.success('Installation offer sent successfully!');
-      onOfferSent?.();
-      onClose();
+       toast.success('Installation offer sent successfully!');
+       onOfferSent?.();
+       // Trigger refresh for status tiles
+       window.dispatchEvent(new CustomEvent('scheduling:refresh'));
+       onClose();
 
     } catch (err: any) {
       console.error('Error sending offer:', err);

@@ -653,19 +653,21 @@ export function AdminScheduleCalendar() {
                 if (action === 'send_offer') {
                   // Send offer to client
                   try {
-                    const { error } = await supabase.functions.invoke('send-offer', {
-                      body: {
-                        orderId: selectedOrder.id,
-                        engineerId,
-                        offeredDate: date,
-                        timeWindow: selectedOrder.time_window || 'AM',
-                        deliveryChannel: 'email'
-                      }
-                    });
+                     const { error } = await supabase.functions.invoke('send-offer', {
+                       body: {
+                         order_id: selectedOrder.id,
+                         engineer_id: engineerId,
+                         offered_date: date,
+                         time_window: selectedOrder.time_window || 'AM',
+                         delivery_channel: 'email'
+                       }
+                     });
 
-                    if (error) throw error;
-                    await loadData();
-                    toast.success('Offer sent to client successfully');
+                     if (error) throw error;
+                     await loadData();
+                     // Trigger refresh for status tiles
+                     window.dispatchEvent(new CustomEvent('scheduling:refresh'));
+                     toast.success('Offer sent to client successfully');
                   } catch (error) {
                     console.error('Error sending offer:', error);
                     toast.error('Failed to send offer to client');

@@ -67,13 +67,10 @@ export default function AdminScheduleStatus() {
           if (ordersError) {
             console.error('Error fetching orders data:', ordersError);
             setOrders([]);
-          } else {
-            // Filter out orders that don't have engineer or are back to awaiting_install_booking
-            const validDateOfferedOrders = (ordersData || []).filter(order => 
-              order.engineer_id !== null && order.status_enhanced !== 'awaiting_install_booking'
-            );
-            setOrders(validDateOfferedOrders);
-          }
+           } else {
+             // Show all orders that have active pending offers regardless of their current status
+             setOrders(ordersData || []);
+           }
         } else {
           setOrders([]);
         }

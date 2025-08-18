@@ -95,10 +95,13 @@ export function EnhancedJobCard({ order, engineers, onUpdate }: EnhancedJobCardP
         });
       }
 
-      // Refresh the parent component
-      if (onUpdate) {
-        onUpdate();
-      }
+        // Refresh the parent component
+        if (onUpdate) {
+          onUpdate();
+        }
+        
+        // Trigger refresh for status tiles
+        window.dispatchEvent(new CustomEvent('scheduling:refresh'));
 
     } catch (error: any) {
       console.error('Assignment error:', error);

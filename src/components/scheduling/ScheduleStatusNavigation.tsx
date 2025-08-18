@@ -128,14 +128,9 @@ export function ScheduleStatusNavigation({ currentStatus }: ScheduleStatusNaviga
 
         let dateOfferedCount = 0;
         if (pendingOffers?.length) {
-          const { count: validDateOfferedCount } = await supabase
-            .from('orders')
-            .select('*', { count: 'exact', head: true })
-            .in('id', pendingOffers.map(offer => offer.order_id))
-            .not('engineer_id', 'is', null)
-            .not('status_enhanced', 'eq', 'awaiting_install_booking');
-          
-          dateOfferedCount = validDateOfferedCount || 0;
+          // Count unique order IDs with pending offers (regardless of order status)
+          const uniqueOrderIds = [...new Set(pendingOffers.map(offer => offer.order_id))];
+          dateOfferedCount = uniqueOrderIds.length;
         }
 
         const [rejectedResult, expiredResult] = await Promise.all([
@@ -229,6 +224,14 @@ export function ScheduleStatusNavigation({ currentStatus }: ScheduleStatusNaviga
     };
 
     fetchCounts();
+    
+    // Listen for scheduling refresh events
+    const handleRefresh = () => {
+      fetchCounts();
+    };
+    
+    window.addEventListener('scheduling:refresh', handleRefresh);
+    return () => window.removeEventListener('scheduling:refresh', handleRefresh);
   }, []);
 
   if (loading) {
