@@ -1611,6 +1611,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      get_engineer_daily_time_with_holds: {
+        Args: { p_date: string; p_engineer_id: string }
+        Returns: number
+      }
       get_engineer_daily_workload: {
         Args: { p_date: string; p_engineer_id: string }
         Returns: number

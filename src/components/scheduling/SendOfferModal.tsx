@@ -75,7 +75,14 @@ export function SendOfferModal({
 
     } catch (err: any) {
       console.error('Error sending offer:', err);
-      toast.error(err.message || 'Failed to send offer');
+      
+      // Handle capacity-specific errors with more detail
+      const errorMessage = err.message || 'Failed to send offer';
+      if (errorMessage.includes('at capacity') || errorMessage.includes('exceed') || errorMessage.includes('not available')) {
+        toast.error(errorMessage);
+      } else {
+        toast.error('Failed to send offer. Please try again.');
+      }
     } finally {
       setSending(false);
     }

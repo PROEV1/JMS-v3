@@ -265,13 +265,13 @@ export const getSmartEngineerRecommendations = async (order: Order, postcode?: s
                  continue;
                }
 
-               // Check daily workload
-               const dailyWorkload = await getEngineerDailyWorkload(engineer.id, checkDate.toISOString().split('T')[0]);
-               if (dailyWorkload >= settings.max_jobs_per_day) {
-                 checkDate.setDate(checkDate.getDate() + 1);
-                 daysChecked++;
-                 continue;
-               }
+                // Check daily workload
+                const dailyWorkload = await getEngineerDailyWorkload(engineer.id, checkDate.toISOString().split('T')[0]);
+                if (dailyWorkload >= settings.max_jobs_per_day) {
+                  checkDate.setDate(checkDate.getDate() + 1);
+                  daysChecked++;
+                  continue;
+                }
 
                // Check if engineer can fit all jobs in their working day
                const dayFit = await calculateDayFit(engineer, checkDate, order, settings.day_lenience_minutes);
@@ -304,12 +304,12 @@ export const getSmartEngineerRecommendations = async (order: Order, postcode?: s
                   continue;
                 }
 
-                const dailyWorkload = await getEngineerDailyWorkload(engineer.id, checkDate.toISOString().split('T')[0]);
-                if (dailyWorkload >= settings.max_jobs_per_day) {
-                  checkDate.setDate(checkDate.getDate() + 1);
-                  daysChecked++;
-                  continue;
-                }
+                 const dailyWorkload = await getEngineerDailyWorkload(engineer.id, checkDate.toISOString().split('T')[0]);
+                 if (dailyWorkload >= settings.max_jobs_per_day) {
+                   checkDate.setDate(checkDate.getDate() + 1);
+                   daysChecked++;
+                   continue;
+                 }
 
                 const dayFit = await calculateDayFit(engineer, checkDate, order, settings.day_lenience_minutes);
                 if (dayFit.canFit) {
@@ -482,7 +482,7 @@ export const clearDistanceCache = () => {
 export async function getEngineerDailyWorkload(engineerId: string, date: string): Promise<number> {
   try {
     const { data, error } = await supabase
-      .rpc('get_engineer_daily_workload', {
+      .rpc('get_engineer_daily_workload_with_holds', {
         p_engineer_id: engineerId,
         p_date: date
       });

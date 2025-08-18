@@ -58,12 +58,79 @@ serve(async (req: Request) => {
     // Get engineer details
     const { data: engineer, error: engineerError } = await supabase
       .from('engineers')
-      .select('*')
+      .select(`
+        *,
+        engineer_availability(*)
+      `)
       .eq('id', engineer_id)
       .single();
 
     if (engineerError || !engineer) {
       throw new Error('Engineer not found');
+    }
+
+    // Check engineer availability on offered date
+    const offerDate = new Date(offered_date)
+    const dayOfWeek = offerDate.getDay()
+    
+    const workingHour = engineer.engineer_availability?.find(
+      (wh: any) => wh.day_of_week === dayOfWeek && wh.is_available
+    )
+
+    if (!workingHour) {
+      throw new Error('Engineer not available on this day of the week');
+    }
+
+    // Check engineer's daily capacity including existing offers
+    const dateStr = offerDate.toISOString().split('T')[0]
+    
+    // Check current workload with holds
+    const { data: currentWorkload, error: workloadError } = await supabase
+      .rpc('get_engineer_daily_workload_with_holds', {
+        p_engineer_id: engineer_id,
+        p_date: dateStr
+      })
+
+    if (workloadError) {
+      console.error('Error checking engineer workload:', workloadError)
+      throw new Error('Failed to check engineer capacity');
+    }
+
+    // Get scheduling settings for max jobs per day
+    const { data: settings, error: settingsError } = await supabase
+      .from('admin_settings')
+      .select('setting_value')
+      .eq('setting_key', 'scheduling')
+      .single()
+
+    const maxJobsPerDay = settings?.setting_value?.maxJobsPerDay || 3
+
+    if (currentWorkload >= maxJobsPerDay) {
+      throw new Error(`Engineer at capacity (${currentWorkload}/${maxJobsPerDay} jobs on this date)`);
+    }
+
+    // Check if engineer's working day would be exceeded
+    const { data: currentTimeMinutes, error: timeError } = await supabase
+      .rpc('get_engineer_daily_time_with_holds', {
+        p_engineer_id: engineer_id,
+        p_date: dateStr
+      })
+
+    if (!timeError && currentTimeMinutes !== null) {
+      // Calculate work day duration
+      const startTime = workingHour.start_time.split(':').map(Number)
+      const endTime = workingHour.end_time.split(':').map(Number)
+      const workDayMinutes = (endTime[0] * 60 + endTime[1]) - (startTime[0] * 60 + startTime[1])
+      
+      // Add estimated duration for this new job
+      const jobDurationMinutes = (order.estimated_duration_hours || 2) * 60
+      const totalWithNewJob = currentTimeMinutes + jobDurationMinutes
+      
+      // Allow 15 minutes leniency
+      if (totalWithNewJob > workDayMinutes + 15) {
+        const overage = totalWithNewJob - workDayMinutes
+        throw new Error(`Would exceed working hours by ${Math.floor(overage / 60)}h ${overage % 60}m`);
+      }
     }
 
     // Get offer configuration

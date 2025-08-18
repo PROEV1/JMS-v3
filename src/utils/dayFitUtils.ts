@@ -39,21 +39,54 @@ export async function calculateDayFit(
     const endTimeMinutes = parseTime(workingHour.end_time);
     const workDayMinutes = (endTimeMinutes - startTimeMinutes) + lenienceMinutes;
 
-    // Get existing orders for this engineer on this date
-    const dateStr = date.toISOString().split('T')[0];
-    const { data: existingOrders, error } = await supabase
-      .from('orders')
-      .select('*')
-      .eq('engineer_id', engineer.id)
-      .gte('scheduled_install_date', `${dateStr}T00:00:00`)
-      .lt('scheduled_install_date', `${dateStr}T23:59:59`)
-      .neq('status_enhanced', 'completed');
+  // Get existing orders for this engineer on this date
+  const dateStr = date.toISOString().split('T')[0];
+  const { data: existingOrders, error } = await supabase
+    .from('orders')
+    .select('*')
+    .eq('engineer_id', engineer.id)
+    .gte('scheduled_install_date', `${dateStr}T00:00:00`)
+    .lt('scheduled_install_date', `${dateStr}T23:59:59`)
+    .neq('status_enhanced', 'completed');
 
-    if (error) throw error;
+  if (error) throw error;
 
-    // Include the new order if provided (convert to database format)
-    const allOrders = [...(existingOrders || [])];
-    if (newOrder && (!newOrder.id || !allOrders.find(o => o.id === newOrder.id))) {
+  // Get active job offers for this engineer on this date (soft holds)
+  const { data: jobOffers, error: offersError } = await supabase
+    .from('job_offers')
+    .select(`
+      *,
+      orders!inner(*)
+    `)
+    .eq('engineer_id', engineer.id)
+    .gte('offered_date', `${dateStr}T00:00:00`)
+    .lt('offered_date', `${dateStr}T23:59:59`)
+    .in('status', ['pending', 'accepted']);
+
+  if (offersError) throw offersError;
+
+  // Filter valid offers (pending non-expired or accepted non-scheduled)
+  const validOffers = (jobOffers || []).filter(offer => {
+    if (offer.status === 'pending' && new Date(offer.expires_at) > new Date()) return true;
+    if (offer.status === 'accepted') {
+      const order = offer.orders;
+      return !order?.scheduled_install_date || new Date(order.scheduled_install_date).toDateString() !== date.toDateString();
+    }
+    return false;
+  });
+
+  // Include the new order if provided (convert to database format)
+  const allOrders = [...(existingOrders || [])];
+  
+  // Add orders from valid job offers (soft holds)
+  validOffers.forEach(offer => {
+    const offerOrder = offer.orders;
+    if (offerOrder && !allOrders.find(o => o.id === offerOrder.id)) {
+      allOrders.push(offerOrder);
+    }
+  });
+
+  if (newOrder && (!newOrder.id || !allOrders.find(o => o.id === newOrder.id))) {
       // Convert the Order interface to match database schema
       const dbOrder = {
         ...newOrder,
