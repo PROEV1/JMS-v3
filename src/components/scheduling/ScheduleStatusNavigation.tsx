@@ -119,12 +119,26 @@ export function ScheduleStatusNavigation({ currentStatus }: ScheduleStatusNaviga
     const fetchCounts = async () => {
       try {
         // Fetch offer-based counts
-        const [pendingResult, rejectedResult, expiredResult] = await Promise.all([
-          supabase
-            .from('job_offers')
+        // For date-offered, we need to count pending offers for orders that have engineers and aren't back to awaiting_install_booking
+        const { data: pendingOffers } = await supabase
+          .from('job_offers')
+          .select('order_id')
+          .eq('status', 'pending')
+          .gt('expires_at', new Date().toISOString());
+
+        let dateOfferedCount = 0;
+        if (pendingOffers?.length) {
+          const { count: validDateOfferedCount } = await supabase
+            .from('orders')
             .select('*', { count: 'exact', head: true })
-            .eq('status', 'pending')
-            .gt('expires_at', new Date().toISOString()),
+            .in('id', pendingOffers.map(offer => offer.order_id))
+            .not('engineer_id', 'is', null)
+            .not('status_enhanced', 'eq', 'awaiting_install_booking');
+          
+          dateOfferedCount = validDateOfferedCount || 0;
+        }
+
+        const [rejectedResult, expiredResult] = await Promise.all([
           supabase
             .from('job_offers')
             .select('*', { count: 'exact', head: true })
@@ -199,7 +213,7 @@ export function ScheduleStatusNavigation({ currentStatus }: ScheduleStatusNaviga
 
         setCounts({
           'needs-scheduling': needsSchedulingCount,
-          'date-offered': pendingResult.count || 0,
+          'date-offered': dateOfferedCount,
           'ready-to-book': readyToBookCount,
           'date-rejected': rejectedResult.count || 0,
           'offer-expired': expiredResult.count || 0,
