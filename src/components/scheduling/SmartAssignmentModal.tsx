@@ -126,35 +126,11 @@ export function SmartAssignmentModal({
             </CardContent>
           </Card>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Date Selection */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Select Date</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Calendar
-                  mode="single"
-                  selected={selectedDate}
-                  onSelect={setSelectedDate}
-                  disabled={(date) => date < new Date()}
-                  className="rounded-md border"
-                />
-              </CardContent>
-            </Card>
-
-            {/* Engineer Suggestions */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">
-                  Engineer Suggestions
-                  {selectedDate && (
-                    <span className="text-sm font-normal text-muted-foreground ml-2">
-                      for {selectedDate.toLocaleDateString()}
-                    </span>
-                  )}
-                </CardTitle>
-              </CardHeader>
+          {/* Engineer Suggestions */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Engineer Suggestions</CardTitle>
+            </CardHeader>
               <CardContent>
                 {loading ? (
                   <div className="text-center py-8">
@@ -163,17 +139,18 @@ export function SmartAssignmentModal({
                   </div>
                 ) : suggestions.length === 0 ? (
                   <p className="text-center py-8 text-muted-foreground">
-                    Select a date to see engineer suggestions
+                    No engineer suggestions available
                   </p>
                 ) : (
                   <div className="space-y-3 max-h-80 overflow-y-auto">
                     {suggestions.map((suggestion) => (
-                        <Card
+                      <Card
                         key={suggestion.engineer.id}
-                        className={`
-                          cursor-pointer transition-all duration-200 hover:shadow-md
-                          ${selectedEngineerId === suggestion.engineer.id ? 'ring-2 ring-primary' : ''}
-                        `}
+                        className={`cursor-pointer transition-all duration-200 hover:shadow-md ${
+                          selectedEngineerId === suggestion.engineer.id 
+                            ? 'ring-2 ring-primary bg-primary/5 border-primary' 
+                            : 'border-border hover:border-primary/50'
+                        }`}
                         onClick={() => {
                           setSelectedEngineerId(suggestion.engineer.id);
                           if (suggestion.availableDate) {
@@ -227,8 +204,7 @@ export function SmartAssignmentModal({
                   </div>
                 )}
               </CardContent>
-            </Card>
-          </div>
+          </Card>
 
           {/* Actions */}
           <div className="flex justify-end gap-3">
