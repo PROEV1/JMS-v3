@@ -7,6 +7,43 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
+// Helper function to parse dates more tolerantly
+function parseDate(dateStr: string): Date | null {
+  if (!dateStr || dateStr.trim() === '') return null;
+  
+  try {
+    // Handle common date formats
+    const cleaned = dateStr.trim();
+    
+    // Try DD/MM/YYYY or DD/MM/YYYY HH:MM format
+    const ddmmPattern = /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{1,2}))?/;
+    const ddmmMatch = cleaned.match(ddmmPattern);
+    if (ddmmMatch) {
+      const [, day, month, year, hour = '0', minute = '0'] = ddmmMatch;
+      const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hour), parseInt(minute));
+      if (!isNaN(date.getTime())) return date;
+    }
+    
+    // Try MM/DD/YYYY format
+    const mmddPattern = /^(\d{1,2})\/(\d{1,2})\/(\d{4})/;
+    const mmddMatch = cleaned.match(mmddPattern);
+    if (mmddMatch) {
+      const [, month, day, year] = mmddMatch;
+      const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+      if (!isNaN(date.getTime())) return date;
+    }
+    
+    // Try ISO format or other standard formats
+    const date = new Date(cleaned);
+    if (!isNaN(date.getTime())) return date;
+    
+    return null;
+  } catch (error) {
+    console.error(`Date parsing error for "${dateStr}":`, error);
+    return null;
+  }
+}
+
 interface ImportRequest {
   profile_id: string;
   csv_data?: string;
@@ -22,6 +59,29 @@ interface ImportResult {
     skipped_count: number;
     errors: Array<{ row: number; error: string; data?: any }>;
     warnings: Array<{ row: number; warning: string; data?: any }>;
+  };
+  preview?: {
+    updates: Array<{ 
+      row: number; 
+      external_id: string; 
+      current_status: string; 
+      new_status: string; 
+      reason: string;
+      data?: any;
+    }>;
+    skips: Array<{ 
+      row: number; 
+      external_id: string; 
+      reason: string; 
+      data?: any;
+    }>;
+    inserts: Array<{ 
+      row: number; 
+      external_id: string; 
+      status: string; 
+      reason: string;
+      data?: any;
+    }>;
   };
 }
 
@@ -118,7 +178,12 @@ Deno.serve(async (req) => {
         skipped_count: 0,
         errors: [],
         warnings: []
-      }
+      },
+      preview: dry_run ? {
+        updates: [],
+        skips: [],
+        inserts: []
+      } : undefined
     };
 
     let csvRows: string[][] = [];
@@ -257,11 +322,20 @@ Deno.serve(async (req) => {
 
         // Handle special status: INSTALL_DATE_CONFIRMED
         if (mappedData.partner_status === 'INSTALL_DATE_CONFIRMED' && mappedData.scheduled_date) {
-          orderData.partner_confirmed_externally = true;
-          orderData.partner_confirmed_at = new Date().toISOString();
-          orderData.external_confirmation_source = 'partner_jms';
-          orderData.scheduled_install_date = new Date(mappedData.scheduled_date).toISOString();
-          orderData.status_enhanced = 'scheduled';
+          const parsedDate = parseDate(mappedData.scheduled_date);
+          if (parsedDate) {
+            orderData.partner_confirmed_externally = true;
+            orderData.partner_confirmed_at = new Date().toISOString();
+            orderData.external_confirmation_source = 'partner_jms';
+            orderData.scheduled_install_date = parsedDate.toISOString();
+            orderData.status_enhanced = 'scheduled';
+          } else {
+            result.summary.warnings.push({
+              row: rowNumber,
+              warning: `Invalid scheduled_date format: ${mappedData.scheduled_date}`,
+              data: mappedData
+            });
+          }
         } else if (!shouldSuppress) {
           orderData.status_enhanced = internalStatus;
         }
@@ -310,11 +384,60 @@ Deno.serve(async (req) => {
             });
           }
         } else {
-          // Dry run - just log what would happen
+          // Dry run - provide detailed preview information
+          const previewLimit = 100; // Limit preview results for performance
+          
           if (existingOrder) {
             result.summary.updated_count++;
+            
+            // Add to preview if we haven't hit the limit
+            if (result.preview && result.preview.updates.length < previewLimit) {
+              let reason = `Status would be updated to: ${orderData.status_enhanced}`;
+              
+              if (shouldSuppress) {
+                reason = `Scheduling suppressed (${mappedData.partner_status})`;
+              } else if (mappedData.partner_status === 'INSTALL_DATE_CONFIRMED') {
+                reason = `Status confirmed by partner with scheduled date: ${mappedData.scheduled_date}`;
+              }
+              
+              // Check if status would regress
+              const statusProgression = ['awaiting_payment', 'awaiting_agreement', 'awaiting_install_booking', 'scheduled', 'in_progress', 'install_completed_pending_qa', 'completed'];
+              const currentIndex = statusProgression.indexOf(existingOrder.status_enhanced);
+              const newIndex = statusProgression.indexOf(internalStatus);
+              
+              if (currentIndex > newIndex && !shouldSuppress && mappedData.partner_status !== 'INSTALL_DATE_CONFIRMED') {
+                reason = `Status would NOT regress from ${existingOrder.status_enhanced} to ${internalStatus}`;
+              }
+              
+              result.preview.updates.push({
+                row: rowNumber,
+                external_id: mappedData.partner_external_id,
+                current_status: existingOrder.status_enhanced,
+                new_status: orderData.status_enhanced || existingOrder.status_enhanced,
+                reason,
+                data: {
+                  partner_status: mappedData.partner_status,
+                  sub_partner: mappedData.sub_partner,
+                  scheduled_date: mappedData.scheduled_date
+                }
+              });
+            }
           } else {
             result.summary.skipped_count++;
+            
+            // Add to preview if we haven't hit the limit
+            if (result.preview && result.preview.skips.length < previewLimit) {
+              result.preview.skips.push({
+                row: rowNumber,
+                external_id: mappedData.partner_external_id,
+                reason: 'Order does not exist in system - cannot create new orders without client context',
+                data: {
+                  partner_status: mappedData.partner_status,
+                  sub_partner: mappedData.sub_partner,
+                  scheduled_date: mappedData.scheduled_date
+                }
+              });
+            }
           }
         }
 

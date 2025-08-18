@@ -205,12 +205,15 @@ export default function AdminPartnerProfiles() {
         title: dryRun ? 'Dry run completed' : 'Import completed',
         description: `Processed ${data.summary.processed} rows. ${data.summary.inserted_count} inserted, ${data.summary.updated_count} updated, ${data.summary.skipped_count} skipped. ${data.summary.errors.length} errors.`
       });
+
+      return data; // Return the result for the modal to display
     } catch (error: any) {
       toast({ 
         title: 'Import failed', 
         description: error.message, 
         variant: 'destructive' 
       });
+      throw error; // Re-throw so the modal can handle it
     }
   };
 
