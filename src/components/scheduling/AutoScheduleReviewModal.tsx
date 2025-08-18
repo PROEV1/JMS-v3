@@ -69,6 +69,10 @@ export function AutoScheduleReviewModal({
   const [virtualLedger, setVirtualLedger] = useState<Map<string, VirtualLedgerEntry>>(new Map());
   const [batchCapacityInfo, setBatchCapacityInfo] = useState<BatchCapacityInfo[]>([]);
   const [preflightChecking, setPreflightChecking] = useState(false);
+  const [progressCurrent, setProgressCurrent] = useState(0);
+  const [progressTotal, setProgressTotal] = useState(0);
+  // Cache for workload lookups to speed up generation
+  const [workloadCache, setWorkloadCache] = useState<Map<string, number>>(new Map());
 
   useEffect(() => {
     if (isOpen && orders.length > 0 && !generated) {
@@ -78,6 +82,8 @@ export function AutoScheduleReviewModal({
 
   const generateProposals = async () => {
     setLoading(true);
+    setProgressCurrent(0);
+    setProgressTotal(orders.length);
     console.log('Starting intelligent batch scheduling for', orders.length, 'orders with virtual capacity tracking');
     
     try {
@@ -86,12 +92,16 @@ export function AutoScheduleReviewModal({
       const proposals: ProposedAssignment[] = [];
       const ledger = new Map<string, VirtualLedgerEntry>();
       const capacityInfo: BatchCapacityInfo[] = [];
+      const cache = new Map<string, number>(); // Cache for workload lookups
       
       console.log('Loaded', allEngineers.length, 'engineers and settings:', settings);
       
-      for (const order of orders) {
+      for (let orderIndex = 0; orderIndex < orders.length; orderIndex++) {
+        const order = orders[orderIndex];
+        setProgressCurrent(orderIndex + 1);
+        
         try {
-          console.log(`\n🔄 Processing order ${order.order_number} (${orders.indexOf(order) + 1}/${orders.length})`);
+          console.log(`\n🔄 Processing order ${order.order_number} (${orderIndex + 1}/${orders.length})`);
           
           // Get all recommendations for this order
           const recommendations = await getSmartEngineerRecommendations(order, order.postcode, {
@@ -107,11 +117,15 @@ export function AutoScheduleReviewModal({
 
           let assignedCandidate = null;
           const alternatives: any[] = [];
+          
+          // Limit to top 6 candidates for performance
+          const candidatesToCheck = recommendations.recommendations.slice(0, 6);
 
           // Try each candidate in order of preference
-          for (let i = 0; i < recommendations.recommendations.length; i++) {
-            const candidate = recommendations.recommendations[i];
+          for (let i = 0; i < candidatesToCheck.length; i++) {
+            const candidate = candidatesToCheck[i];
             const ledgerKey = `${candidate.engineer.id}_${candidate.availableDate}`;
+            const cacheKey = `${candidate.engineer.id}_${candidate.availableDate}`;
             
             console.log(`  🔍 Checking candidate ${i + 1}: ${candidate.engineer.name} on ${candidate.availableDate}`);
             
@@ -124,8 +138,13 @@ export function AutoScheduleReviewModal({
               orders: []
             };
 
-            // Get current database workload for this engineer/date
-            const currentWorkload = await getEngineerDailyWorkload(candidate.engineer.id, candidate.availableDate);
+            // Get current database workload (use cache if available)
+            let currentWorkload = cache.get(cacheKey);
+            if (currentWorkload === undefined) {
+              currentWorkload = await getEngineerDailyWorkload(candidate.engineer.id, candidate.availableDate);
+              cache.set(cacheKey, currentWorkload);
+            }
+            
             const totalVirtualJobs = currentWorkload + virtualEntry.jobCount;
             
             // Check job count limit
@@ -224,10 +243,12 @@ export function AutoScheduleReviewModal({
 
       console.log(`\n🎯 Batch scheduling complete: ${proposals.length}/${orders.length} orders scheduled`);
       console.log('Virtual capacity reservations:', Array.from(ledger.values()));
+      console.log('Workload cache hits:', cache.size, 'unique engineer-date combinations cached');
 
       setVirtualLedger(ledger);
       setBatchCapacityInfo(capacityInfo);
       setProposedAssignments(proposals);
+      setWorkloadCache(cache);
       setGenerated(true);
       
     } catch (error) {
@@ -235,6 +256,8 @@ export function AutoScheduleReviewModal({
       toast.error('Failed to generate intelligent scheduling proposals');
     } finally {
       setLoading(false);
+      setProgressCurrent(0);
+      setProgressTotal(0);
     }
   };
 
@@ -504,7 +527,7 @@ export function AutoScheduleReviewModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-[95vw] max-h-[95vh] w-full flex flex-col">
+      <DialogContent className="h-[85vh] w-[95vw] max-w-[1200px] flex flex-col overflow-hidden">
         <DialogHeader className="flex-shrink-0 pb-4 border-b">
           <DialogTitle className="flex items-center gap-2">
             <Bot className="w-5 h-5" />
@@ -512,17 +535,35 @@ export function AutoScheduleReviewModal({
           </DialogTitle>
           <DialogDescription>
             Review AI-generated scheduling proposals and submit offers to clients.
+            {progressTotal > 0 && (
+              <div className="flex items-center gap-2 mt-2">
+                <div className="text-xs text-muted-foreground">
+                  Processing {progressCurrent}/{progressTotal} orders
+                </div>
+                <div className="w-20 h-1 bg-muted rounded-full">
+                  <div 
+                    className="h-full bg-primary rounded-full transition-all duration-200"
+                    style={{ width: `${(progressCurrent / progressTotal) * 100}%` }}
+                  />
+                </div>
+              </div>
+            )}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 min-h-0">
-          <ScrollArea className="h-full pr-2">
-            <div className="space-y-4 py-4">
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <ScrollArea className="h-full">
+            <div className="space-y-4 p-1">
               {loading ? (
                 <div className="flex flex-col items-center justify-center h-64">
                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
                   <p className="text-muted-foreground">Generating smart scheduling proposals...</p>
-                  <p className="text-sm text-muted-foreground mt-2">Analyzing engineer availability, travel times, and workloads</p>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    {progressTotal > 0 
+                      ? `Processing ${progressCurrent}/${progressTotal} orders - using cache for faster lookups`
+                      : "Analyzing engineer availability, travel times, and workloads"
+                    }
+                  </p>
                 </div>
               ) : proposedAssignments.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-64">
