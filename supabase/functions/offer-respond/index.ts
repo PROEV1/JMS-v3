@@ -12,7 +12,8 @@ const supabase = createClient(
 );
 
 interface OfferResponse {
-  token: string;
+  token?: string;
+  offer_id?: string;
   response: 'accept' | 'reject';
   rejection_reason?: string;
   block_this_date?: boolean;
@@ -28,11 +29,11 @@ serve(async (req: Request) => {
   }
 
   try {
-    const { token, response, rejection_reason, block_this_date, block_date_range }: OfferResponse = await req.json();
+    const { token, offer_id, response, rejection_reason, block_this_date, block_date_range }: OfferResponse = await req.json();
 
-    if (!token || !response) {
+    if ((!token && !offer_id) || !response) {
       return new Response(
-        JSON.stringify({ error: 'Token and response are required' }),
+        JSON.stringify({ error: 'Either token or offer_id and response are required' }),
         {
           status: 400,
           headers: { 'Content-Type': 'application/json', ...corsHeaders }
@@ -40,25 +41,70 @@ serve(async (req: Request) => {
       );
     }
 
-    // Get the offer
-    const { data: jobOffer, error: offerError } = await supabase
-      .from('job_offers')
-      .select(`
-        *,
-        order:orders!inner(*),
-        engineer:engineers(*)
-      `)
-      .eq('client_token', token)
-      .single();
+    let jobOffer;
 
-    if (offerError || !jobOffer) {
-      return new Response(
-        JSON.stringify({ error: 'Offer not found' }),
-        {
-          status: 404,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders }
-        }
-      );
+    if (token) {
+      // External access via token (from email links)
+      const { data, error } = await supabase
+        .from('job_offers')
+        .select(`
+          *,
+          order:orders!inner(*),
+          engineer:engineers(*)
+        `)
+        .eq('client_token', token)
+        .single();
+
+      if (error || !data) {
+        return new Response(
+          JSON.stringify({ error: 'Offer not found' }),
+          {
+            status: 404,
+            headers: { 'Content-Type': 'application/json', ...corsHeaders }
+          }
+        );
+      }
+      
+      jobOffer = data;
+    } else if (offer_id) {
+      // Authenticated client access via offer ID
+      // For authenticated access, we need to verify the client owns this order
+      const authHeader = req.headers.get('Authorization');
+      if (!authHeader) {
+        return new Response(
+          JSON.stringify({ error: 'Authorization required for offer_id access' }),
+          {
+            status: 401,
+            headers: { 'Content-Type': 'application/json', ...corsHeaders }
+          }
+        );
+      }
+
+      // Verify client access
+      const { data, error } = await supabase
+        .from('job_offers')
+        .select(`
+          *,
+          order:orders!inner(
+            *,
+            client:clients!inner(user_id)
+          ),
+          engineer:engineers(*)
+        `)
+        .eq('id', offer_id)
+        .single();
+
+      if (error || !data) {
+        return new Response(
+          JSON.stringify({ error: 'Offer not found' }),
+          {
+            status: 404,
+            headers: { 'Content-Type': 'application/json', ...corsHeaders }
+          }
+        );
+      }
+
+      jobOffer = data;
     }
 
     // Check if offer has expired

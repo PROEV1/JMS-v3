@@ -20,10 +20,24 @@ import {
   FileText,
   CreditCard,
   User,
-  MapPin
+  MapPin,
+  XCircle,
+  AlertCircle
 } from "lucide-react";
 import { AgreementSigningModal } from "@/components/AgreementSigningModal";
 
+interface JobOffer {
+  id: string;
+  status: 'pending' | 'accepted' | 'rejected' | 'expired';
+  offered_date: string;
+  time_window?: string;
+  expires_at: string;
+  engineer: {
+    name: string;
+    email: string;
+  };
+  created_at: string;
+}
 
 interface ClientOrder {
   id: string;
@@ -65,11 +79,14 @@ export default function EnhancedClientOrderView() {
   const [activeStep, setActiveStep] = useState(0);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [agreementModalOpen, setAgreementModalOpen] = useState(false);
+  const [jobOffers, setJobOffers] = useState<JobOffer[]>([]);
+  const [offerLoading, setOfferLoading] = useState(false);
   const { lastStatus } = useOrderStatusSync(orderId!);
 
   useEffect(() => {
     if (orderId) {
       checkPendingPayments();
+      fetchJobOffers();
     }
   }, [orderId]);
 
@@ -226,6 +243,67 @@ export default function EnhancedClientOrderView() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchJobOffers = async () => {
+    if (!orderId) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('job_offers')
+        .select(`
+          *,
+          engineer:engineers(name, email)
+        `)
+        .eq('order_id', orderId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching job offers:', error);
+        return;
+      }
+
+      setJobOffers(data || []);
+    } catch (error) {
+      console.error('Error fetching job offers:', error);
+    }
+  };
+
+  const handleOfferResponse = async (offerId: string, response: 'accept' | 'reject', rejectionReason?: string) => {
+    setOfferLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('offer-respond', {
+        body: {
+          offer_id: offerId,
+          response,
+          rejection_reason: rejectionReason
+        }
+      });
+
+      if (error || data?.error) {
+        throw new Error(data?.error || `Failed to ${response} offer`);
+      }
+
+      toast({
+        title: response === 'accept' ? "Offer Accepted!" : "Offer Declined",
+        description: response === 'accept' 
+          ? "Your installation has been confirmed and scheduled!" 
+          : "We'll find another suitable time for your installation.",
+      });
+      
+      // Refresh data
+      await Promise.all([fetchOrder(), fetchJobOffers()]);
+      
+    } catch (error) {
+      console.error(`Error ${response}ing offer:`, error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : `Failed to ${response} offer`,
+        variant: "destructive",
+      });
+    } finally {
+      setOfferLoading(false);
     }
   };
 
@@ -611,41 +689,121 @@ export default function EnhancedClientOrderView() {
           )}
 
           {activeStep === 2 && (
-            <Card className="p-6">
-              <div className="mb-6">
-                <h2 className="text-xl font-semibold text-blue-600">
-                  Step 3 of 4 - Submit Install Preferences
-                </h2>
-                <p className="text-muted-foreground">Awaiting scheduling confirmation</p>
-              </div>
-
-              {order.scheduled_install_date ? (
-                <div className="text-center py-8">
-                  <Calendar className="h-16 w-16 text-green-600 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-green-800 mb-2">Installation Scheduled!</h3>
-                  <p className="text-muted-foreground">
-                    {format(new Date(order.scheduled_install_date), 'EEEE, MMMM d, yyyy')}
-                    {order.engineer && ` with ${order.engineer.name}`}
-                  </p>
+            <div className="space-y-6">
+              {/* Main Scheduling Card */}
+              <Card className="p-6">
+                <div className="mb-6">
+                  <h2 className="text-xl font-semibold text-blue-600">
+                    Step 3 of 4 - Submit Install Preferences
+                  </h2>
+                  <p className="text-muted-foreground">Awaiting scheduling confirmation</p>
                 </div>
-              ) : (
-                <div className="text-center py-8">
-                  <Clock className="h-16 w-16 text-blue-600 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">Awaiting Scheduling by Pro EV Team</h3>
-                  <p className="text-muted-foreground mb-6">
-                    Our team will contact you shortly to schedule your installation
-                  </p>
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <p className="text-sm text-blue-800">
-                      <strong>What happens next:</strong><br />
-                      • Our team will review your order<br />
-                      • We'll contact you to arrange a suitable installation date<br />
-                      • You'll receive confirmation once scheduled
+
+                {order.scheduled_install_date ? (
+                  <div className="text-center py-8">
+                    <Calendar className="h-16 w-16 text-green-600 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-green-800 mb-2">Installation Scheduled!</h3>
+                    <p className="text-muted-foreground">
+                      {format(new Date(order.scheduled_install_date), 'EEEE, MMMM d, yyyy')}
+                      {order.engineer && ` with ${order.engineer.name}`}
                     </p>
                   </div>
-                </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <Clock className="h-16 w-16 text-blue-600 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">Awaiting Scheduling by Pro EV Team</h3>
+                    <p className="text-muted-foreground mb-6">
+                      Our team will contact you shortly to schedule your installation
+                    </p>
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <p className="text-sm text-blue-800">
+                        <strong>What happens next:</strong><br />
+                        • Our team will review your order<br />
+                        • We'll contact you to arrange a suitable installation date<br />
+                        • You'll receive confirmation once scheduled
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </Card>
+
+              {/* Pending Offers Card */}
+              {jobOffers.length > 0 && (
+                <Card className="p-6">
+                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <AlertCircle className="h-5 w-5 text-amber-600" />
+                    Installation Date Offers
+                  </h3>
+                  <p className="text-muted-foreground mb-4">
+                    We have found available installation slots for you. Please review and respond to the offers below.
+                  </p>
+                  
+                  <div className="space-y-4">
+                    {jobOffers.map((offer) => {
+                      const isExpired = new Date(offer.expires_at) < new Date();
+                      const isPending = offer.status === 'pending' && !isExpired;
+                      
+                      return (
+                        <div key={offer.id} className="border rounded-lg p-4">
+                          <div className="flex items-start justify-between mb-3">
+                            <div>
+                              <h4 className="font-medium">
+                                {format(new Date(offer.offered_date), 'EEEE, MMMM d, yyyy')}
+                              </h4>
+                              <p className="text-sm text-muted-foreground">
+                                Engineer: {offer.engineer.name}
+                                {offer.time_window && ` • Time: ${offer.time_window}`}
+                              </p>
+                              {isPending && (
+                                <p className="text-xs text-amber-600 mt-1">
+                                  Expires: {format(new Date(offer.expires_at), 'PPp')}
+                                </p>
+                              )}
+                            </div>
+                            
+                            <Badge 
+                              variant={
+                                offer.status === 'accepted' ? 'default' :
+                                offer.status === 'rejected' ? 'destructive' :
+                                isExpired ? 'secondary' : 'outline'
+                              }
+                            >
+                              {offer.status === 'accepted' && <CheckCircle className="h-3 w-3 mr-1" />}
+                              {offer.status === 'rejected' && <XCircle className="h-3 w-3 mr-1" />}
+                              {isExpired ? 'Expired' : offer.status.charAt(0).toUpperCase() + offer.status.slice(1)}
+                            </Badge>
+                          </div>
+                          
+                          {isPending && (
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                onClick={() => handleOfferResponse(offer.id, 'accept')}
+                                disabled={offerLoading}
+                                className="bg-green-600 hover:bg-green-700"
+                              >
+                                <CheckCircle className="h-4 w-4 mr-2" />
+                                Accept
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleOfferResponse(offer.id, 'reject', 'Not suitable')}
+                                disabled={offerLoading}
+                                className="border-red-300 text-red-600 hover:bg-red-50"
+                              >
+                                <XCircle className="h-4 w-4 mr-2" />
+                                Decline
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </Card>
               )}
-            </Card>
+            </div>
           )}
 
           {activeStep === 3 && (
