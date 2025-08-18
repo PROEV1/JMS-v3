@@ -54,6 +54,7 @@ export function AppSidebar({ userRole }: AppSidebarProps) {
     { icon: Users, label: 'Leads', href: '/admin/leads', action: () => navigate('/admin/leads') },
     { icon: Package, label: 'Products', href: '/admin/products', action: () => navigate('/admin/products') },
     { icon: MessageCircle, label: 'Messages', href: '/admin/messages', action: () => navigate('/admin/messages') },
+    { icon: Users, label: 'Partners', href: '/admin/partners', action: () => navigate('/admin/partners') },
     ...(canManageUsers ? [{ icon: UserCog, label: 'Users', href: '/admin/users', action: () => navigate('/admin/users') }] : []),
     { icon: Settings, label: 'Settings', href: '/admin/settings', action: () => navigate('/admin/settings') },
   ];
