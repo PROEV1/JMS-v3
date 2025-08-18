@@ -42,12 +42,12 @@ export function useJobOffers(orderId?: string) {
         .from('job_offers')
         .select(`
           *,
-          order:orders!inner(
+          order:orders!job_offers_order_id_fkey(
             order_number,
             client_id,
             client:clients(full_name, email)
           ),
-          engineer:engineers(name, email)
+          engineer:engineers!job_offers_engineer_id_fkey(name, email)
         `)
         .order('created_at', { ascending: false });
 

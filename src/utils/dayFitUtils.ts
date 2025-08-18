@@ -57,7 +57,7 @@ export async function calculateDayFit(
     .from('job_offers')
     .select(`
       *,
-      orders!inner(*)
+      orders!job_offers_order_id_fkey(*)
     `)
     .eq('engineer_id', engineer.id)
     .gte('offered_date', `${dateStr}T00:00:00`)

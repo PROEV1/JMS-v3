@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Order, Engineer, getStatusColor, getOrderEstimatedHours } from '@/utils/schedulingUtils';
 import { ChevronLeft, ChevronRight, User, AlertTriangle, Clock, MapPin, Eye, EyeOff } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
 interface WeekViewCalendarProps {
@@ -26,6 +26,7 @@ export function WeekViewCalendar({
   const [weekStart, setWeekStart] = useState<Date>(getWeekStart(currentDate));
   const [showOfferHolds, setShowOfferHolds] = useState<boolean>(true);
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   // Fetch active job offers for the current week
   const weekEnd = new Date(weekStart);
@@ -38,7 +39,7 @@ export function WeekViewCalendar({
         .from('job_offers')
         .select(`
           *,
-          order:orders!inner(
+          order:orders!job_offers_order_id_fkey(
             id,
             order_number,
             scheduled_install_date,
@@ -65,6 +66,42 @@ export function WeekViewCalendar({
   useEffect(() => {
     setWeekStart(getWeekStart(currentDate));
   }, [currentDate]);
+
+  // Set up real-time listeners for job offers and orders
+  useEffect(() => {
+    const jobOffersChannel = supabase
+      .channel('job-offers-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'job_offers'
+        },
+        () => {
+          // Invalidate job offers query when changes occur
+          queryClient.invalidateQueries({ queryKey: ['job-offers'] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'orders'
+        },
+        () => {
+          // Invalidate orders-related queries when orders change
+          queryClient.invalidateQueries({ queryKey: ['orders-for-calendar'] });
+          queryClient.invalidateQueries({ queryKey: ['job-offers'] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(jobOffersChannel);
+    };
+  }, [queryClient]);
 
   function getWeekStart(date: Date): Date {
     const d = new Date(date);

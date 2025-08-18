@@ -258,7 +258,7 @@ export default function EnhancedClientOrderView() {
         .from('job_offers')
         .select(`
           *,
-          engineer:engineers(name, email)
+          engineer:engineers!job_offers_engineer_id_fkey(name, email)
         `)
         .eq('order_id', orderId)
         .order('created_at', { ascending: false });

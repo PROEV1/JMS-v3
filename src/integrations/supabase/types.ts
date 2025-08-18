@@ -540,6 +540,20 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fk_job_offers_engineer_id"
+            columns: ["engineer_id"]
+            isOneToOne: false
+            referencedRelation: "engineers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_job_offers_order_id"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "job_offers_engineer_id_fkey"
             columns: ["engineer_id"]
             isOneToOne: false

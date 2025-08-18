@@ -103,6 +103,16 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Delete related records first (due to foreign key constraints)
     
+    // Delete job offers (defensive cleanup, should be handled by CASCADE)
+    const { error: offersError } = await supabaseAdmin
+      .from('job_offers')
+      .delete()
+      .eq('order_id', orderId);
+
+    if (offersError) {
+      console.error('Error deleting job offers:', offersError);
+    }
+    
     // Delete order activity
     const { error: activityError } = await supabaseAdmin
       .from('order_activity')
