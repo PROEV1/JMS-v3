@@ -53,18 +53,23 @@ export function AutoScheduleReviewModal({
 
   const generateProposals = async () => {
     setLoading(true);
+    console.log('Starting to generate proposals for', orders.length, 'orders');
     try {
       const proposals: ProposedAssignment[] = [];
       
       for (const order of orders) {
         try {
+          console.log('Getting recommendations for order:', order.order_number, 'postcode:', order.postcode);
           // Get smart recommendations for this order
           const recommendations = await getSmartEngineerRecommendations(order, order.postcode, {
             startDate: new Date()
           });
 
+          console.log('Recommendations result for', order.order_number, ':', recommendations);
+
           if (recommendations.recommendations && recommendations.recommendations.length > 0) {
             const bestEngineer = recommendations.recommendations[0];
+            console.log('Best engineer for', order.order_number, ':', bestEngineer);
             
             proposals.push({
               order,
@@ -73,6 +78,8 @@ export function AutoScheduleReviewModal({
               conflicts: bestEngineer.reasons.filter(r => r.includes('conflict') || r.includes('warning')),
               score: bestEngineer.score
             });
+          } else {
+            console.log('No recommendations found for order:', order.order_number);
           }
         } catch (error) {
           console.error(`Error getting recommendations for order ${order.id}:`, error);
@@ -80,6 +87,7 @@ export function AutoScheduleReviewModal({
         }
       }
 
+      console.log('Final proposals generated:', proposals.length, proposals);
       setProposedAssignments(proposals);
       setGenerated(true);
     } catch (error) {
@@ -92,6 +100,7 @@ export function AutoScheduleReviewModal({
 
   const handleSubmitOffers = async () => {
     setSubmitting(true);
+    console.log('Starting to submit offers for', proposedAssignments.length, 'proposals');
     try {
       let successCount = 0;
       let failureCount = 0;
@@ -99,26 +108,35 @@ export function AutoScheduleReviewModal({
       // Send offers for all proposed assignments
       for (const proposal of proposedAssignments) {
         try {
+          console.log('Sending offer for order:', proposal.order.order_number, 'to engineer:', proposal.recommendedEngineer.engineer.name);
+          const offerData = {
+            order_id: proposal.order.id,
+            engineer_id: proposal.recommendedEngineer.engineer.id,
+            offered_date: proposal.proposedDate.toISOString(),
+            time_window: 'AM (9:00 - 12:00)', // Default time window
+            delivery_channel: 'email'
+          };
+          console.log('Offer data:', offerData);
+
           const { data, error } = await supabase.functions.invoke('send-offer', {
-            body: {
-              order_id: proposal.order.id,
-              engineer_id: proposal.recommendedEngineer.engineer.id,
-              offered_date: proposal.proposedDate.toISOString(),
-              time_window: 'AM (9:00 - 12:00)', // Default time window
-              delivery_channel: 'email'
-            }
+            body: offerData
           });
+
+          console.log('Send offer response:', { data, error });
 
           if (error || data?.error) {
             throw new Error(data?.error || 'Failed to send offer');
           }
 
           successCount++;
+          console.log('Successfully sent offer for order:', proposal.order.order_number);
         } catch (error) {
           console.error(`Failed to send offer for order ${proposal.order.order_number}:`, error);
           failureCount++;
         }
       }
+
+      console.log('Finished sending offers. Success:', successCount, 'Failed:', failureCount);
 
       if (successCount > 0) {
         toast.success(`Successfully sent ${successCount} installation offer${successCount > 1 ? 's' : ''}${failureCount > 0 ? `, ${failureCount} failed` : ''}`);
