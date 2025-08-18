@@ -41,7 +41,7 @@ export function ScheduleStatusListPage({
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showSendOffer, setShowSendOffer] = useState(false);
   const [showSmartAssign, setShowSmartAssign] = useState(false);
-  const [showAutoSchedule, setShowAutoSchedule] = useState(false);
+  const [showAutoScheduleModal, setShowAutoScheduleModal] = useState(false);
 
   const filteredOrders = orders.filter(order => 
     order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -160,7 +160,7 @@ export function ScheduleStatusListPage({
         
         {showAutoSchedule && (
           <Button 
-            onClick={() => setShowAutoSchedule(true)}
+            onClick={() => setShowAutoScheduleModal(true)}
             className="flex items-center gap-2"
           >
             <CalendarIcon className="w-4 h-4" />
@@ -305,8 +305,8 @@ export function ScheduleStatusListPage({
       )}
 
       <AutoScheduleReviewModal
-        isOpen={showAutoSchedule}
-        onClose={() => setShowAutoSchedule(false)}
+        isOpen={showAutoScheduleModal}
+        onClose={() => setShowAutoScheduleModal(false)}
         orders={filteredOrders}
         engineers={engineers}
         onOffersSubmitted={onUpdate}

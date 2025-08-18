@@ -274,7 +274,6 @@ export function EnhancedSchedulePipeline() {
                                   fetchData();
                                   refetchOffers();
                                 }}
-                                showOfferActions={column.showOfferActions}
                               />
                             </div>
                           )}
