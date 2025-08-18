@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
@@ -158,27 +159,30 @@ export function ScheduleStatusNavigation({ currentStatus }: ScheduleStatusNaviga
           .select('*', { count: 'exact', head: true })
           .eq('status', 'expired');
 
-        // Fetch order-based counts
+        // Fetch order-based counts - exclude scheduling_suppressed orders from active flow
         const [scheduledResult, onHoldResult] = await Promise.all([
           supabase
             .from('orders')
             .select('*', { count: 'exact', head: true })
-            .eq('status_enhanced', 'scheduled'),
+            .eq('status_enhanced', 'scheduled')
+            .eq('scheduling_suppressed', false),
           supabase
             .from('orders')
             .select('*', { count: 'exact', head: true })
-            .eq('status_enhanced', 'on_hold_parts_docs')
+            .or('status_enhanced.eq.on_hold_parts_docs,scheduling_suppressed.eq.true')
         ]);
 
         // For needs-scheduling, get count of orders with no engineer and no active offers
+        // Exclude scheduling_suppressed orders
         let needsSchedulingCount = 0;
         
-        // First get orders that need scheduling (no engineer assigned)
+        // First get orders that need scheduling (no engineer assigned) and not suppressed
         const { count: unassignedOrdersCount } = await supabase
           .from('orders')
           .select('*', { count: 'exact', head: true })
           .eq('status_enhanced', 'awaiting_install_booking')
-          .is('engineer_id', null);
+          .is('engineer_id', null)
+          .eq('scheduling_suppressed', false);
         
         needsSchedulingCount = unassignedOrdersCount || 0;
         
@@ -196,6 +200,7 @@ export function ScheduleStatusNavigation({ currentStatus }: ScheduleStatusNaviga
               .select('*', { count: 'exact', head: true })
               .eq('status_enhanced', 'awaiting_install_booking')
               .is('engineer_id', null)
+              .eq('scheduling_suppressed', false)
               .in('id', activeOffers.map(offer => offer.order_id));
             
             needsSchedulingCount = Math.max(0, needsSchedulingCount - (unassignedOrdersWithOffersCount || 0));
@@ -203,6 +208,7 @@ export function ScheduleStatusNavigation({ currentStatus }: ScheduleStatusNaviga
         }
 
         // For ready-to-book, count orders with accepted offers that haven't been scheduled yet
+        // Exclude scheduling_suppressed orders
         let readyToBookCount = 0;
         const { data: acceptedOffers } = await supabase
           .from('job_offers')
@@ -215,6 +221,7 @@ export function ScheduleStatusNavigation({ currentStatus }: ScheduleStatusNaviga
             .select('*', { count: 'exact', head: true })
             .eq('status_enhanced', 'awaiting_install_booking')
             .is('scheduled_install_date', null)
+            .eq('scheduling_suppressed', false)
             .in('id', acceptedOffers.map(offer => offer.order_id));
           
           readyToBookCount = ordersWithAcceptedOffersCount || 0;

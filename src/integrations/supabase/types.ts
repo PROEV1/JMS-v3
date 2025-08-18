@@ -979,6 +979,7 @@ export type Database = {
           engineer_signature_data: string | null
           engineer_signed_off_at: string | null
           estimated_duration_hours: number | null
+          external_confirmation_source: string | null
           id: string
           installation_date: string | null
           installation_notes: string | null
@@ -988,14 +989,25 @@ export type Database = {
           manual_status_notes: string | null
           manual_status_override: boolean | null
           order_number: string
+          partner_confirmed_at: string | null
+          partner_confirmed_externally: boolean | null
+          partner_external_id: string | null
+          partner_external_url: string | null
+          partner_id: string | null
+          partner_metadata: Json
+          partner_status: string | null
+          partner_status_raw: string | null
           postcode: string | null
           quote_id: string
           scheduled_install_date: string | null
           scheduling_conflicts: Json | null
+          scheduling_suppressed: boolean
+          scheduling_suppressed_reason: string | null
           status: string
           status_enhanced:
             | Database["public"]["Enums"]["order_status_enhanced"]
             | null
+          sub_partner: string | null
           time_window: string | null
           total_amount: number
           travel_time_minutes: number | null
@@ -1014,6 +1026,7 @@ export type Database = {
           engineer_signature_data?: string | null
           engineer_signed_off_at?: string | null
           estimated_duration_hours?: number | null
+          external_confirmation_source?: string | null
           id?: string
           installation_date?: string | null
           installation_notes?: string | null
@@ -1023,14 +1036,25 @@ export type Database = {
           manual_status_notes?: string | null
           manual_status_override?: boolean | null
           order_number: string
+          partner_confirmed_at?: string | null
+          partner_confirmed_externally?: boolean | null
+          partner_external_id?: string | null
+          partner_external_url?: string | null
+          partner_id?: string | null
+          partner_metadata?: Json
+          partner_status?: string | null
+          partner_status_raw?: string | null
           postcode?: string | null
           quote_id: string
           scheduled_install_date?: string | null
           scheduling_conflicts?: Json | null
+          scheduling_suppressed?: boolean
+          scheduling_suppressed_reason?: string | null
           status?: string
           status_enhanced?:
             | Database["public"]["Enums"]["order_status_enhanced"]
             | null
+          sub_partner?: string | null
           time_window?: string | null
           total_amount?: number
           travel_time_minutes?: number | null
@@ -1049,6 +1073,7 @@ export type Database = {
           engineer_signature_data?: string | null
           engineer_signed_off_at?: string | null
           estimated_duration_hours?: number | null
+          external_confirmation_source?: string | null
           id?: string
           installation_date?: string | null
           installation_notes?: string | null
@@ -1058,14 +1083,25 @@ export type Database = {
           manual_status_notes?: string | null
           manual_status_override?: boolean | null
           order_number?: string
+          partner_confirmed_at?: string | null
+          partner_confirmed_externally?: boolean | null
+          partner_external_id?: string | null
+          partner_external_url?: string | null
+          partner_id?: string | null
+          partner_metadata?: Json
+          partner_status?: string | null
+          partner_status_raw?: string | null
           postcode?: string | null
           quote_id?: string
           scheduled_install_date?: string | null
           scheduling_conflicts?: Json | null
+          scheduling_suppressed?: boolean
+          scheduling_suppressed_reason?: string | null
           status?: string
           status_enhanced?:
             | Database["public"]["Enums"]["order_status_enhanced"]
             | null
+          sub_partner?: string | null
           time_window?: string | null
           total_amount?: number
           travel_time_minutes?: number | null
@@ -1087,6 +1123,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "orders_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "orders_quote_id_fkey"
             columns: ["quote_id"]
             isOneToOne: false
@@ -1094,6 +1137,158 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      partner_import_logs: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          dry_run: boolean
+          errors: Json
+          id: string
+          inserted_count: number
+          partner_id: string
+          profile_id: string | null
+          run_id: string | null
+          skipped_count: number
+          total_rows: number
+          updated_count: number
+          warnings: Json
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          dry_run?: boolean
+          errors?: Json
+          id?: string
+          inserted_count?: number
+          partner_id: string
+          profile_id?: string | null
+          run_id?: string | null
+          skipped_count?: number
+          total_rows?: number
+          updated_count?: number
+          warnings?: Json
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          dry_run?: boolean
+          errors?: Json
+          id?: string
+          inserted_count?: number
+          partner_id?: string
+          profile_id?: string | null
+          run_id?: string | null
+          skipped_count?: number
+          total_rows?: number
+          updated_count?: number
+          warnings?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_import_logs_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partner_import_logs_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "partner_import_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      partner_import_profiles: {
+        Row: {
+          column_mappings: Json
+          created_at: string
+          created_by: string | null
+          engineer_mapping_rules: Json
+          gsheet_id: string | null
+          gsheet_sheet_name: string | null
+          id: string
+          is_active: boolean
+          name: string
+          partner_id: string
+          source_type: string
+          status_mappings: Json
+          status_override_rules: Json
+          updated_at: string
+        }
+        Insert: {
+          column_mappings?: Json
+          created_at?: string
+          created_by?: string | null
+          engineer_mapping_rules?: Json
+          gsheet_id?: string | null
+          gsheet_sheet_name?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          partner_id: string
+          source_type: string
+          status_mappings?: Json
+          status_override_rules?: Json
+          updated_at?: string
+        }
+        Update: {
+          column_mappings?: Json
+          created_at?: string
+          created_by?: string | null
+          engineer_mapping_rules?: Json
+          gsheet_id?: string | null
+          gsheet_sheet_name?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          partner_id?: string
+          source_type?: string
+          status_mappings?: Json
+          status_override_rules?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_import_profiles_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      partners: {
+        Row: {
+          base_url: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          slug: string | null
+          updated_at: string
+        }
+        Insert: {
+          base_url?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          slug?: string | null
+          updated_at?: string
+        }
+        Update: {
+          base_url?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          slug?: string | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       payments: {
         Row: {
@@ -1664,6 +1859,21 @@ export type Database = {
           p_description: string
           p_details?: Json
           p_order_id: string
+        }
+        Returns: string
+      }
+      log_partner_import: {
+        Args: {
+          p_dry_run: boolean
+          p_errors?: Json
+          p_inserted_count: number
+          p_partner_id: string
+          p_profile_id: string
+          p_run_id: string
+          p_skipped_count: number
+          p_total_rows: number
+          p_updated_count: number
+          p_warnings?: Json
         }
         Returns: string
       }
