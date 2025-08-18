@@ -2,12 +2,6 @@ project_id = "qvppvstgconmzzjsryna"
 
 [auth]
 enabled = true
-schema = "auth"
-anon_key_env = "ANON_KEY"
-service_role_key_env = "SERVICE_ROLE_KEY"
-
-[db]
-shadow_database_url = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
 
 [functions.offer-lookup]
 verify_jwt = false
