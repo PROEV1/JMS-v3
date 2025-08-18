@@ -36,40 +36,83 @@ export default function AdminScheduleStatus() {
         })) || []);
       }
 
-      // Fetch orders based on status
-      let statusFilter: string;
-      switch (status) {
-        case 'needs-scheduling':
-          statusFilter = 'awaiting_install_booking';
-          break;
-        case 'scheduled':
-          statusFilter = 'scheduled';
-          break;
-        case 'in-progress':
-          statusFilter = 'in_progress';
-          break;
-        case 'completed':
-          statusFilter = 'completed';
-          break;
-        default:
-          statusFilter = status || 'awaiting_install_booking';
-      }
+      // Handle different status types
+      if (status === 'date-offered') {
+        // For date-offered, query job_offers and get corresponding orders
+        const { data: offersData, error: offersError } = await supabase
+          .from('job_offers')
+          .select(`
+            order_id,
+            orders!inner(
+              *,
+              client:clients(*),
+              quote:quotes(*),
+              engineer:engineers(*)
+            )
+          `)
+          .eq('status', 'pending')
+          .gt('expires_at', new Date().toISOString())
+          .order('created_at', { ascending: false });
 
-      const { data: ordersData, error: ordersError } = await supabase
-        .from('orders')
-        .select(`
-          *,
-          client:clients(*),
-          quote:quotes(*),
-          engineer:engineers(*)
-        `)
-        .eq('status_enhanced', statusFilter as any)
-        .order('created_at', { ascending: false });
-
-      if (ordersError) {
-        console.error('Error fetching orders:', ordersError);
+        if (offersError) {
+          console.error('Error fetching offers data:', offersError);
+          setOrders([]);
+        } else {
+          // Extract orders from the offers data and flatten
+          const ordersWithOffers = offersData?.map(offer => offer.orders).filter(Boolean) || [];
+          setOrders(ordersWithOffers);
+        }
       } else {
-        setOrders(ordersData || []);
+        // For other statuses, query orders normally
+        let statusFilter: string;
+        switch (status) {
+          case 'needs-scheduling':
+            statusFilter = 'awaiting_install_booking';
+            break;
+          case 'scheduled':
+            statusFilter = 'scheduled';
+            break;
+          case 'in-progress':
+            statusFilter = 'in_progress';
+            break;
+          case 'completed':
+            statusFilter = 'completed';
+            break;
+          default:
+            statusFilter = status || 'awaiting_install_booking';
+        }
+
+        const { data: ordersData, error: ordersError } = await supabase
+          .from('orders')
+          .select(`
+            *,
+            client:clients(*),
+            quote:quotes(*),
+            engineer:engineers(*)
+          `)
+          .eq('status_enhanced', statusFilter as any)
+          .order('created_at', { ascending: false });
+
+        if (ordersError) {
+          console.error('Error fetching orders:', ordersError);
+          setOrders([]);
+        } else {
+          let filteredOrders = ordersData || [];
+
+          // For needs-scheduling, filter out orders that have active offers
+          if (status === 'needs-scheduling') {
+            const { data: activeOffers } = await supabase
+              .from('job_offers')
+              .select('order_id')
+              .eq('status', 'pending')
+              .gt('expires_at', new Date().toISOString());
+
+            const ordersWithActiveOffers = new Set(activeOffers?.map(offer => offer.order_id) || []);
+            filteredOrders = filteredOrders.filter(order => !ordersWithActiveOffers.has(order.id));
+          }
+
+          setOrders(filteredOrders);
+        }
       }
     } catch (error) {
       console.error('Error in fetchData:', error);
@@ -88,6 +131,8 @@ export default function AdminScheduleStatus() {
     switch (status) {
       case 'needs-scheduling':
         return 'Jobs Needing Scheduling';
+      case 'date-offered':
+        return 'Date Offered';
       case 'scheduled':
         return 'Scheduled Jobs';
       case 'in-progress':
