@@ -209,12 +209,12 @@ export default function AdminScheduleStatus() {
         } else {
           let filteredOrders = ordersData || [];
 
-          // For needs-scheduling, filter to only orders that need scheduling (no engineer assigned and no active offers)
+          // For needs-scheduling, filter to only orders that need scheduling (no engineer assigned and no active/pending offers)
           if (status === 'needs-scheduling') {
             const { data: activeOffers } = await supabase
               .from('job_offers')
               .select('order_id')
-              .eq('status', 'pending')
+              .in('status', ['pending', 'accepted'])
               .gt('expires_at', new Date().toISOString());
 
             const ordersWithActiveOffers = new Set(activeOffers?.map(offer => offer.order_id) || []);

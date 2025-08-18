@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Search, Send, Wrench, User, Calendar as CalendarIcon, MapPin, RotateCcw, XCircle, Calendar, Check, X } from 'lucide-react';
+import { Search, Send, Wrench, User, Calendar as CalendarIcon, MapPin, RotateCcw, XCircle, Calendar, Check, X, Eye } from 'lucide-react';
 import { Order, Engineer } from '@/utils/schedulingUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -617,26 +617,35 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                          } else {
                            // No active offer - show normal actions
                            return (
-                             <div className="flex gap-2">
-                               <Button
-                                 size="sm"
-                                 variant="outline"
-                                 onClick={() => handleSmartAssign(order)}
-                                 className="text-xs"
-                               >
-                                 <Wrench className="w-4 h-4 mr-1" />
-                                 Smart Assign
-                               </Button>
-                               <Button
-                                 size="sm"
-                                 variant="outline"
-                                 onClick={() => handleSendOffer(order)}
-                                 className="text-xs"
-                               >
-                                 <Send className="w-4 h-4 mr-1" />
-                                 {latestOffer ? 'Send New Offer' : 'Send Offer'}
-                               </Button>
-                             </div>
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => window.open(`/admin/orders/${order.id}`, '_blank')}
+                                  className="text-xs"
+                                >
+                                  <Eye className="w-4 h-4 mr-1" />
+                                  View Job
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleSmartAssign(order)}
+                                  className="text-xs"
+                                >
+                                  <Wrench className="w-4 h-4 mr-1" />
+                                  Smart Assign
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleSendOffer(order)}
+                                  className="text-xs"
+                                >
+                                  <Send className="w-4 h-4 mr-1" />
+                                  {latestOffer ? 'Send New Offer' : 'Send Offer'}
+                                </Button>
+                              </div>
                            );
                          }
                        } else {
