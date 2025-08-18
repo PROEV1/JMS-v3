@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Search, Send, Wrench, User, Calendar as CalendarIcon, MapPin, RotateCcw, XCircle, Calendar } from 'lucide-react';
+import { Search, Send, Wrench, User, Calendar as CalendarIcon, MapPin, RotateCcw, XCircle, Calendar, Check, X } from 'lucide-react';
 import { Order, Engineer } from '@/utils/schedulingUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -103,6 +103,96 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
       if (onUpdate) onUpdate();
     } catch (error) {
       toast.error('Failed to release offer');
+    }
+  };
+
+  const handleAcceptOffer = async (orderId: string) => {
+    const activeOffer = getActiveOfferForOrder(orderId);
+    if (!activeOffer) return;
+
+    try {
+      // Update the job offer status to accepted
+      const { error: offerError } = await supabase
+        .from('job_offers')
+        .update({
+          status: 'accepted',
+          accepted_at: new Date().toISOString()
+        })
+        .eq('id', activeOffer.id);
+
+      if (offerError) throw offerError;
+
+      // Update the order with engineer and scheduled date
+      const { error: orderError } = await supabase
+        .from('orders')
+        .update({
+          engineer_id: activeOffer.engineer_id,
+          scheduled_install_date: activeOffer.offered_date,
+          status_enhanced: 'scheduled'
+        })
+        .eq('id', orderId);
+
+      if (orderError) throw orderError;
+
+      // Log the activity
+      await supabase.rpc('log_order_activity', {
+        p_order_id: orderId,
+        p_activity_type: 'offer_accepted',
+        p_description: 'Installation offer accepted by admin',
+        p_details: {
+          offer_id: activeOffer.id,
+          engineer_id: activeOffer.engineer_id,
+          scheduled_date: activeOffer.offered_date,
+          method: 'admin_manual'
+        }
+      });
+
+      toast.success('Offer accepted and installation scheduled');
+      refetchOffers();
+      if (onUpdate) onUpdate();
+    } catch (error) {
+      console.error('Failed to accept offer:', error);
+      toast.error('Failed to accept offer');
+    }
+  };
+
+  const handleRejectOffer = async (orderId: string) => {
+    const activeOffer = getActiveOfferForOrder(orderId);
+    if (!activeOffer) return;
+
+    try {
+      // Update the job offer status to rejected
+      const { error: offerError } = await supabase
+        .from('job_offers')
+        .update({
+          status: 'rejected',
+          rejected_at: new Date().toISOString(),
+          rejection_reason: 'Rejected by admin'
+        })
+        .eq('id', activeOffer.id);
+
+      if (offerError) throw offerError;
+
+      // Log the activity
+      await supabase.rpc('log_order_activity', {
+        p_order_id: orderId,
+        p_activity_type: 'offer_rejected',
+        p_description: 'Installation offer rejected by admin',
+        p_details: {
+          offer_id: activeOffer.id,
+          engineer_id: activeOffer.engineer_id,
+          offered_date: activeOffer.offered_date,
+          rejection_reason: 'Rejected by admin',
+          method: 'admin_manual'
+        }
+      });
+
+      toast.success('Offer rejected');
+      refetchOffers();
+      if (onUpdate) onUpdate();
+    } catch (error) {
+      console.error('Failed to reject offer:', error);
+      toast.error('Failed to reject offer');
     }
   };
 
@@ -271,13 +361,29 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                       £{order.total_amount ? Number(order.total_amount).toLocaleString() : '0'}
                     </div>
                   </TableCell>
-                  <TableCell>
-                    {order.engineer_id ? (
-                      engineers.find(e => e.id === order.engineer_id)?.name || 'Unknown Engineer'
-                    ) : (
-                      <Badge variant="destructive" className="text-xs">Unassigned</Badge>
-                    )}
-                  </TableCell>
+                   <TableCell>
+                     {(() => {
+                       const activeOffer = getActiveOfferForOrder(order.id);
+                       if (activeOffer && activeOffer.engineer) {
+                         return (
+                           <div className="flex flex-col">
+                             <span className="font-medium">{activeOffer.engineer.name}</span>
+                             <span className="text-xs text-muted-foreground">
+                               {new Date(activeOffer.offered_date).toLocaleDateString('en-GB', {
+                                 day: '2-digit',
+                                 month: '2-digit',
+                                 year: 'numeric'
+                               })}
+                             </span>
+                           </div>
+                         );
+                       } else if (order.engineer_id) {
+                         return engineers.find(e => e.id === order.engineer_id)?.name || 'Unknown Engineer';
+                       } else {
+                         return <Badge variant="destructive" className="text-xs">Unassigned</Badge>;
+                       }
+                     })()}
+                   </TableCell>
                   <TableCell>
                     {(() => {
                       const latestOffer = getLatestOfferForOrder(order.id);
@@ -299,68 +405,94 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                         }) : 'Recent'}
                     </div>
                   </TableCell>
-                  <TableCell>
-                    {order.status_enhanced === 'awaiting_install_booking' ? (
-                      (() => {
-                        const activeOffer = getActiveOfferForOrder(order.id);
-                        const latestOffer = getLatestOfferForOrder(order.id);
-                        
-                        if (activeOffer) {
-                          // Has active pending offer - show resend/release options
-                          return (
-                            <div className="flex gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleResendOffer(order.id)}
-                                className="text-xs"
-                              >
-                                <RotateCcw className="w-4 h-4 mr-1" />
-                                Resend
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleReleaseOffer(order.id)}
-                                className="text-xs"
-                              >
-                                <XCircle className="w-4 h-4 mr-1" />
-                                Release
-                              </Button>
-                            </div>
-                          );
-                        } else {
-                          // No active offer - show normal actions
-                          return (
-                            <div className="flex gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleSmartAssign(order)}
-                                className="text-xs"
-                              >
-                                <Wrench className="w-4 h-4 mr-1" />
-                                Smart Assign
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleSendOffer(order)}
-                                className="text-xs"
-                              >
-                                <Send className="w-4 h-4 mr-1" />
-                                {latestOffer ? 'Send New Offer' : 'Send Offer'}
-                              </Button>
-                            </div>
-                          );
-                        }
-                      })()
-                    ) : (
-                      <Button size="sm" variant="outline" className="text-xs">
-                        View Details
-                      </Button>
-                    )}
-                  </TableCell>
+                   <TableCell>
+                     {(() => {
+                       const activeOffer = getActiveOfferForOrder(order.id);
+                       const latestOffer = getLatestOfferForOrder(order.id);
+                       
+                       if (activeOffer && title === 'Date Offered') {
+                         // For Date Offered page - show Accept/Reject buttons
+                         return (
+                           <div className="flex gap-2">
+                             <Button
+                               size="sm"
+                               variant="default"
+                               onClick={() => handleAcceptOffer(order.id)}
+                               className="text-xs bg-green-600 hover:bg-green-700"
+                             >
+                               <Check className="w-4 h-4 mr-1" />
+                               Accept
+                             </Button>
+                             <Button
+                               size="sm"
+                               variant="destructive"
+                               onClick={() => handleRejectOffer(order.id)}
+                               className="text-xs"
+                             >
+                               <X className="w-4 h-4 mr-1" />
+                               Reject
+                             </Button>
+                           </div>
+                         );
+                       } else if (order.status_enhanced === 'awaiting_install_booking') {
+                         if (activeOffer) {
+                           // Has active pending offer - show resend/release options
+                           return (
+                             <div className="flex gap-2">
+                               <Button
+                                 size="sm"
+                                 variant="outline"
+                                 onClick={() => handleResendOffer(order.id)}
+                                 className="text-xs"
+                               >
+                                 <RotateCcw className="w-4 h-4 mr-1" />
+                                 Resend
+                               </Button>
+                               <Button
+                                 size="sm"
+                                 variant="outline"
+                                 onClick={() => handleReleaseOffer(order.id)}
+                                 className="text-xs"
+                               >
+                                 <XCircle className="w-4 h-4 mr-1" />
+                                 Release
+                               </Button>
+                             </div>
+                           );
+                         } else {
+                           // No active offer - show normal actions
+                           return (
+                             <div className="flex gap-2">
+                               <Button
+                                 size="sm"
+                                 variant="outline"
+                                 onClick={() => handleSmartAssign(order)}
+                                 className="text-xs"
+                               >
+                                 <Wrench className="w-4 h-4 mr-1" />
+                                 Smart Assign
+                               </Button>
+                               <Button
+                                 size="sm"
+                                 variant="outline"
+                                 onClick={() => handleSendOffer(order)}
+                                 className="text-xs"
+                               >
+                                 <Send className="w-4 h-4 mr-1" />
+                                 {latestOffer ? 'Send New Offer' : 'Send Offer'}
+                               </Button>
+                             </div>
+                           );
+                         }
+                       } else {
+                         return (
+                           <Button size="sm" variant="outline" className="text-xs">
+                             View Details
+                           </Button>
+                         );
+                       }
+                     })()}
+                   </TableCell>
                 </TableRow>
               ))
             )}

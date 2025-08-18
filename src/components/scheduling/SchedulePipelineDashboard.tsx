@@ -1,12 +1,17 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Order } from '@/utils/schedulingUtils';
 import { Clock, Calendar, CheckCircle, XCircle, AlertTriangle, Package, Ban } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface SchedulePipelineDashboardProps {
   orders: Order[];
+}
+
+interface JobOfferCount {
+  pending: number;
 }
 
 interface StatusTile {
@@ -77,25 +82,34 @@ const statusTiles: StatusTile[] = [
   }
 ];
 
-function StatusTile({ tile, orders, totalJobs, navigate }: {
+function StatusTile({ tile, orders, totalJobs, navigate, offerCounts }: {
   tile: StatusTile;
   orders: Order[];
   totalJobs: number;
   navigate: (path: string) => void;
+  offerCounts: JobOfferCount;
 }) {
-  const tileOrders = orders.filter(order => 
-    tile.statusValues.includes(order.status_enhanced)
-  );
+  // Special handling for "Date Offered" tile - count active offers instead of orders
+  let count: number;
+  let tileOrders: Order[] = [];
   
-  const count = tileOrders.length;
+  if (tile.id === 'date_offered') {
+    count = offerCounts.pending;
+  } else {
+    tileOrders = orders.filter(order => 
+      tile.statusValues.includes(order.status_enhanced)
+    );
+    count = tileOrders.length;
+  }
+  
   const percentage = totalJobs > 0 ? Math.round((count / totalJobs) * 100) : 0;
   
   // Calculate average days waiting (using current date since created_at might not be available)
-  const avgDaysWaiting = count > 0 ? Math.round(
+  const avgDaysWaiting = (count > 0 && tileOrders.length > 0) ? Math.round(
     tileOrders.reduce((sum, order) => {
       // Use a default of 7 days if we can't calculate actual days
       return sum + 7;
-    }, 0) / count
+    }, 0) / tileOrders.length
   ) : 0;
 
   const IconComponent = tile.icon;
@@ -140,7 +154,25 @@ function StatusTile({ tile, orders, totalJobs, navigate }: {
 
 export function SchedulePipelineDashboard({ orders }: SchedulePipelineDashboardProps) {
   const navigate = useNavigate();
-  
+  const [offerCounts, setOfferCounts] = useState<JobOfferCount>({ pending: 0 });
+
+  // Fetch active job offers count
+  useEffect(() => {
+    const fetchOfferCounts = async () => {
+      const { data, error } = await supabase
+        .from('job_offers')
+        .select('id', { count: 'exact' })
+        .eq('status', 'pending')
+        .gt('expires_at', new Date().toISOString());
+
+      if (!error) {
+        setOfferCounts({ pending: data?.length || 0 });
+      }
+    };
+
+    fetchOfferCounts();
+  }, []);
+
   // Stats calculation for summary badges
   const totalJobs = orders.length;
   const needsScheduling = orders.filter(o => 
@@ -189,6 +221,7 @@ export function SchedulePipelineDashboard({ orders }: SchedulePipelineDashboardP
             orders={orders}
             totalJobs={totalJobs}
             navigate={navigate}
+            offerCounts={offerCounts}
           />
         ))}
       </div>
