@@ -271,7 +271,7 @@ serve(async (req: Request) => {
     if (delivery_channel === 'email' || offerConfig.auto_fallback_email) {
       try {
         console.log('Sending email offer to:', order.client.email, 'with URL:', offerUrl);
-        await resend.emails.send({
+        const emailResponse = await resend.emails.send({
           from: offerConfig.from_address || 'ProEV Scheduling <no-reply@proev.co.uk>',
           to: [order.client.email],
           subject: `Installation Date Offered - ${order.order_number}`,
@@ -298,7 +298,20 @@ serve(async (req: Request) => {
           `
         });
 
-        console.log('Email sent successfully to:', order.client.email);
+        console.log('Email sent successfully to:', order.client.email, 'Message ID:', emailResponse.data?.id);
+        
+        // Update job offer with delivery details including message ID
+        await supabase
+          .from('job_offers')
+          .update({
+            delivery_details: {
+              ...jobOffer.delivery_details,
+              email_sent: true,
+              resend_message_id: emailResponse.data?.id,
+              sent_at: new Date().toISOString()
+            }
+          })
+          .eq('id', jobOffer.id);
       } catch (emailError) {
         console.error('Failed to send email:', emailError);
         if (delivery_channel === 'email') {

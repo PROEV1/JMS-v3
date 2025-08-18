@@ -751,7 +751,7 @@ export default function EnhancedClientOrderView() {
                                 {format(new Date(offer.offered_date), 'EEEE, MMMM d, yyyy')}
                               </h4>
                               <p className="text-sm text-muted-foreground">
-                                Engineer: {offer.engineer.name}
+                                Engineer: {offer.engineer?.name || 'Pro EV engineer'}
                                 {offer.time_window && ` • Time: ${offer.time_window}`}
                               </p>
                               {isPending && (
