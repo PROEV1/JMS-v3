@@ -69,7 +69,7 @@ export function AutoScheduleReviewModal({
             proposals.push({
               order,
               recommendedEngineer: bestEngineer,
-              proposedDate: new Date(bestEngineer.earliestAvailableDate),
+              proposedDate: new Date(bestEngineer.availableDate),
               conflicts: bestEngineer.reasons.filter(r => r.includes('conflict') || r.includes('warning')),
               score: bestEngineer.score
             });
@@ -148,8 +148,8 @@ export function AutoScheduleReviewModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader>
+      <DialogContent className="max-w-5xl h-[90vh] flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <Bot className="w-5 h-5" />
             Auto-Schedule & Review
@@ -159,7 +159,7 @@ export function AutoScheduleReviewModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 min-h-0 overflow-hidden">
           {loading ? (
             <div className="flex flex-col items-center justify-center h-64">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
@@ -213,8 +213,8 @@ export function AutoScheduleReviewModal({
               )}
 
               {/* Proposals List */}
-              <ScrollArea className="flex-1">
-                <div className="space-y-4">
+              <ScrollArea className="flex-1 h-0">
+                <div className="space-y-4 pr-4">
                   {proposedAssignments.map((proposal, index) => (
                     <Card key={proposal.order.id} className={proposal.conflicts.length > 0 ? 'border-warning' : 'border-success'}>
                       <CardHeader className="pb-3">
@@ -308,7 +308,7 @@ export function AutoScheduleReviewModal({
         </div>
 
         {/* Actions */}
-        <div className="flex justify-between items-center pt-4 border-t">
+        <div className="flex-shrink-0 flex justify-between items-center pt-4 border-t">
           <div className="text-sm text-muted-foreground">
             {proposedAssignments.length > 0 && (
               <>Offers will be sent via email with 24-hour expiration</>
