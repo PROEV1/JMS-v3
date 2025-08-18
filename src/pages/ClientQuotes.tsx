@@ -91,91 +91,30 @@ export default function ClientQuotes() {
       
       setAcceptingQuoteId(quoteId);
       
-      // Get current user's client record
-      const { data: client, error: clientError } = await supabase
-        .from('clients')
-        .select('id, address')
-        .eq('user_id', session.user.id)
-        .single();
+      // Call the edge function to handle quote acceptance
+      const { data, error } = await supabase.functions.invoke('client-accept-quote', {
+        body: { quoteId }
+      });
 
-      if (clientError || !client) {
-        console.error('Client error:', clientError);
-        throw new Error('Client record not found');
+      if (error) {
+        console.error('Edge function error:', error);
+        throw new Error(error.message || 'Failed to accept quote');
       }
 
-      // Get quote details
-      const { data: quote, error: quoteError } = await supabase
-        .from('quotes')
-        .select('id, status, total_cost, client_id')
-        .eq('id', quoteId)
-        .eq('client_id', client.id)
-        .single();
-
-      if (quoteError || !quote) {
-        console.error('Quote error:', quoteError);
-        throw new Error('Quote not found or access denied');
-      }
-
-      // Check if order already exists
-      const { data: existingOrder } = await supabase
-        .from('orders')
-        .select('id')
-        .eq('quote_id', quoteId)
-        .maybeSingle();
-
-      let orderId: string;
-
-      if (existingOrder) {
-        orderId = existingOrder.id;
-      } else {
-        // Create new order
-        const depositAmount = Math.round(quote.total_cost * 0.25 * 100) / 100;
-        
-        const { data: newOrder, error: orderError } = await supabase
-          .from('orders')
-          .insert({
-            client_id: client.id,
-            quote_id: quoteId,
-            total_amount: quote.total_cost,
-            deposit_amount: depositAmount,
-            job_address: client.address || null,
-            status: 'awaiting_payment',
-            order_number: '' // Will be set by database trigger
-          })
-          .select('id')
-          .single();
-
-        if (orderError || !newOrder) {
-          console.error('Order creation error:', orderError);
-          throw new Error('Failed to create order');
-        }
-
-        orderId = newOrder.id;
-      }
-
-      // Accept the quote
-      if (quote.status !== 'accepted') {
-        const { error: updateError } = await supabase
-          .from('quotes')
-          .update({ 
-            status: 'accepted', 
-            accepted_at: new Date().toISOString() 
-          })
-          .eq('id', quoteId);
-
-        if (updateError) {
-          console.error('Quote update error:', updateError);
-          throw new Error('Failed to accept quote');
-        }
+      if (!data || !data.orderId) {
+        throw new Error('Invalid response from quote acceptance');
       }
 
       toast({
         title: "Quote Accepted",
-        description: "Redirecting to your order...",
+        description: data.orderCreated ? "Order created successfully!" : "Quote accepted, order already exists",
       });
 
+      // Refresh quotes to show updated status
+      fetchQuotes();
+
       // Redirect to the order page
-      navigate(`/client/orders/${orderId}`);
+      navigate(`/client/orders/${data.orderId}`);
     } catch (error) {
       console.error('Error accepting quote:', error);
       toast({

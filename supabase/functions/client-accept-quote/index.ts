@@ -67,16 +67,16 @@ serve(async (req) => {
       )
     }
 
-    // Create Supabase client with user's JWT for RLS compliance
+    // Create admin client for all operations (bypasses RLS)
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
+    
+    // Create user client only for RLS-compliant reads
     const jwt = authHeader.replace('Bearer ', '')
     const supabaseClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
       global: {
         headers: { Authorization: authHeader }
       }
     })
-
-    // Also create admin client for auth verification
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
     const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(jwt)
     
     if (authError || !user) {
@@ -151,8 +151,8 @@ serve(async (req) => {
       // Calculate deposit (25% of total cost)
       const depositAmount = Math.round(quote.total_cost * 0.25 * 100) / 100
 
-      // Create new order using user client (RLS compliant)
-      const { data: newOrder, error: orderError } = await supabaseClient
+      // Create new order using admin client (bypasses RLS)
+      const { data: newOrder, error: orderError } = await supabaseAdmin
         .from('orders')
         .insert({
           client_id: client.id,
@@ -179,15 +179,16 @@ serve(async (req) => {
       orderCreated = true
     }
 
-    // Accept the quote if it's not already accepted using user client (RLS compliant)
+    // Accept the quote if it's not already accepted using admin client (bypasses RLS)
     if (quote.status !== 'accepted') {
-      const { error: updateError } = await supabaseClient
+      const { error: updateError } = await supabaseAdmin
         .from('quotes')
         .update({ 
           status: 'accepted', 
           accepted_at: new Date().toISOString() 
         })
         .eq('id', quoteId)
+        .eq('client_id', client.id) // Extra safety check
 
       if (updateError) {
         console.error('Quote update error:', updateError)
