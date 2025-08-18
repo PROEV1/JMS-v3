@@ -40,8 +40,6 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
-    
     // Get request body
     const body = await req.json()
     console.log('Request body:', body)
@@ -57,37 +55,42 @@ serve(async (req) => {
 
     console.log('Processing quote acceptance for:', quoteId)
 
-    // Get the JWT from the request (if available)
+    // Get the JWT from the request (required for RLS)
     const authHeader = req.headers.get('Authorization')
     console.log('Auth header present:', !!authHeader)
     
-    let user = null
-    if (authHeader) {
-      const jwt = authHeader.replace('Bearer ', '')
-      const { data: { user: authUser }, error: authError } = await supabaseAdmin.auth.getUser(jwt)
-      
-      if (authError) {
-        console.error('Auth error:', authError)
-        return new Response(
-          JSON.stringify({ error: 'Invalid authorization' }),
-          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-      }
-      user = authUser
+    if (!authHeader) {
+      console.log('No authorization header')
+      return new Response(
+        JSON.stringify({ error: 'Authorization header required' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
-    if (!user) {
-      console.log('No valid user found')
+    // Create Supabase client with user's JWT for RLS compliance
+    const jwt = authHeader.replace('Bearer ', '')
+    const supabaseClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
+      global: {
+        headers: { Authorization: authHeader }
+      }
+    })
+
+    // Also create admin client for auth verification
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(jwt)
+    
+    if (authError || !user) {
+      console.error('Auth error:', authError)
       return new Response(
-        JSON.stringify({ error: 'Authentication required' }),
+        JSON.stringify({ error: 'Invalid authorization' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
     console.log('User authenticated:', user.email)
 
-    // Get client record for this user
-    const { data: client, error: clientError } = await supabaseAdmin
+    // Get client record for this user using user client (RLS compliant)
+    const { data: client, error: clientError } = await supabaseClient
       .from('clients')
       .select('id, address, postcode')
       .eq('user_id', user.id)
@@ -103,8 +106,8 @@ serve(async (req) => {
 
     console.log('Client found:', client.id)
 
-    // Get quote and verify it belongs to this client
-    const { data: quote, error: quoteError } = await supabaseAdmin
+    // Get quote and verify it belongs to this client using user client (RLS compliant)
+    const { data: quote, error: quoteError } = await supabaseClient
       .from('quotes')
       .select('id, status, total_cost, client_id')
       .eq('id', quoteId)
@@ -121,8 +124,8 @@ serve(async (req) => {
 
     console.log('Quote found:', quote.id, 'Status:', quote.status)
 
-    // Check if there's already an order for this quote
-    const { data: existingOrder, error: orderCheckError } = await supabaseAdmin
+    // Check if there's already an order for this quote using user client (RLS compliant)
+    const { data: existingOrder, error: orderCheckError } = await supabaseClient
       .from('orders')
       .select('id')
       .eq('quote_id', quoteId)
@@ -148,8 +151,8 @@ serve(async (req) => {
       // Calculate deposit (25% of total cost)
       const depositAmount = Math.round(quote.total_cost * 0.25 * 100) / 100
 
-      // Create new order
-      const { data: newOrder, error: orderError } = await supabaseAdmin
+      // Create new order using user client (RLS compliant)
+      const { data: newOrder, error: orderError } = await supabaseClient
         .from('orders')
         .insert({
           client_id: client.id,
@@ -176,9 +179,9 @@ serve(async (req) => {
       orderCreated = true
     }
 
-    // Accept the quote if it's not already accepted
+    // Accept the quote if it's not already accepted using user client (RLS compliant)
     if (quote.status !== 'accepted') {
-      const { error: updateError } = await supabaseAdmin
+      const { error: updateError } = await supabaseClient
         .from('quotes')
         .update({ 
           status: 'accepted', 
