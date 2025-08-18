@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { ScheduleStatusListPage } from '@/components/scheduling/ScheduleStatusListPage';
+import { ScheduleStatusNavigation } from '@/components/scheduling/ScheduleStatusNavigation';
 import { supabase } from '@/integrations/supabase/client';
 import { Order } from '@/utils/schedulingUtils';
 
@@ -275,12 +276,15 @@ export default function AdminScheduleStatus() {
   }
 
   return (
-    <ScheduleStatusListPage
-      orders={orders}
-      engineers={engineers}
-      title={getTitle()}
-      onUpdate={fetchData}
-      showAutoSchedule={status === 'needs-scheduling'}
-    />
+    <div>
+      <ScheduleStatusNavigation currentStatus={status} />
+      <ScheduleStatusListPage
+        orders={orders}
+        engineers={engineers}
+        title={getTitle()}
+        onUpdate={fetchData}
+        showAutoSchedule={status === 'needs-scheduling'}
+      />
+    </div>
   );
 }
