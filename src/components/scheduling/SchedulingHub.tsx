@@ -49,7 +49,8 @@ export function SchedulingHub({}: SchedulingHubProps) {
         supabase
           .from('orders')
           .select('*', { count: 'exact', head: true })
-          .eq('status_enhanced', 'awaiting_install_booking'),
+          .eq('status_enhanced', 'awaiting_install_booking')
+          .is('engineer_id', null),
         
         // Pending offers
         supabase
@@ -123,7 +124,7 @@ export function SchedulingHub({}: SchedulingHubProps) {
   };
 
   const handleWeekView = () => {
-    navigate('/admin/schedule?tab=calendar');
+    navigate('/admin/schedule', { state: { tab: 'calendar' } });
   };
 
   if (kpiLoading || ordersLoading) {

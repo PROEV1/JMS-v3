@@ -1,13 +1,29 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { AdminScheduleCalendar } from '@/components/scheduling/AdminScheduleCalendar';
 import { EnhancedSchedulePipeline } from '@/components/scheduling/EnhancedSchedulePipeline';
 import { SchedulingSettingsPanel } from '@/components/admin/SchedulingSettingsPanel';
 import { SchedulingHub } from '@/components/scheduling/SchedulingHub';
 import { useUserRole } from '@/hooks/useUserRole';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export default function AdminSchedule() {
   const { role: userRole, loading } = useUserRole();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState('hub');
+
+  useEffect(() => {
+    // Check for tab in URL params or navigation state
+    const tabFromUrl = searchParams.get('tab');
+    const tabFromState = location.state?.tab;
+    
+    if (tabFromUrl && ['hub', 'calendar', 'pipeline', 'settings'].includes(tabFromUrl)) {
+      setActiveTab(tabFromUrl);
+    } else if (tabFromState && ['hub', 'calendar', 'pipeline', 'settings'].includes(tabFromState)) {
+      setActiveTab(tabFromState);
+    }
+  }, [searchParams, location.state]);
 
   if (loading) {
     return (
@@ -30,7 +46,7 @@ export default function AdminSchedule() {
 
   return (
     <div className="container mx-auto py-6">
-      <Tabs defaultValue="hub" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="hub">Scheduling Hub</TabsTrigger>
           <TabsTrigger value="calendar">Schedule Calendar</TabsTrigger>
