@@ -4,7 +4,13 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { MoreHorizontal, UserPlus, UserMinus, Calendar, ExternalLink, CheckCircle } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Order } from '@/types';
+import { Database } from '@/integrations/supabase/types';
+
+type Order = Database['public']['Tables']['orders']['Row'] & {
+  clients?: { name: string; email: string; phone: string; };
+  quotes?: { products?: any[]; };
+  engineer?: { name: string; email: string; region?: string; };
+};
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -14,9 +20,10 @@ interface EnhancedJobCardProps {
   onAssignEngineer?: (orderId: string) => void;
   onUnassign?: (orderId: string) => void;
   onSchedule?: (orderId: string) => void;
+  onUpdate?: () => void;
 }
 
-export function EnhancedJobCard({ order, onAssignEngineer, onUnassign, onSchedule }: EnhancedJobCardProps) {
+export function EnhancedJobCard({ order, onAssignEngineer, onUnassign, onSchedule, onUpdate }: EnhancedJobCardProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -33,6 +40,7 @@ export function EnhancedJobCard({ order, onAssignEngineer, onUnassign, onSchedul
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
+      onUpdate?.();
       toast({ title: 'Engineer unassigned successfully' });
     },
     onError: (error: any) => {
@@ -44,8 +52,39 @@ export function EnhancedJobCard({ order, onAssignEngineer, onUnassign, onSchedul
     },
   });
 
+  const { mutate: confirmInPartner } = useMutation({
+    mutationFn: async (orderId: string) => {
+      const { error } = await supabase
+        .from('orders')
+        .update({
+          partner_confirmed_externally: true,
+          partner_confirmed_at: new Date().toISOString(),
+          external_confirmation_source: 'manual_ops'
+        })
+        .eq('id', orderId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      onUpdate?.();
+      toast({ title: 'Order marked as confirmed in partner system' });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: 'Error confirming order',
+        description: error.message,
+        variant: 'destructive'
+      });
+    },
+  });
+
   const handleUnassign = (orderId: string) => {
     unassignEngineer(orderId);
+  };
+
+  const handlePartnerConfirm = (orderId: string) => {
+    confirmInPartner(orderId);
   };
 
   return (
@@ -67,7 +106,7 @@ export function EnhancedJobCard({ order, onAssignEngineer, onUnassign, onSchedul
               )}
             </CardTitle>
             <div className="text-sm text-muted-foreground">
-              <p>{order.clients?.full_name}</p>
+              <p>{order.clients?.name}</p>
               {order.sub_partner && (
                 <p className="text-xs">Dealer: {order.sub_partner}</p>
               )}
@@ -124,9 +163,9 @@ export function EnhancedJobCard({ order, onAssignEngineer, onUnassign, onSchedul
 
       <CardContent className="pt-0 space-y-3">
         {order.engineer_id ? (
-          <div className="space-y-1 text-sm text-muted-foreground border-b pb-3">
+            <div className="space-y-1 text-sm text-muted-foreground border-b pb-3">
             <p>
-              Engineer: {order.engineers?.full_name} ({order.engineers?.email})
+              Engineer: {order.engineer?.name} ({order.engineer?.email})
             </p>
             {order.scheduled_install_date ? (
               <p>
@@ -149,7 +188,7 @@ export function EnhancedJobCard({ order, onAssignEngineer, onUnassign, onSchedul
           <div>
             Duration:{' '}
             <span className="font-medium text-foreground">
-              {order.job_duration_minutes} mins
+              {order.estimated_duration_hours ? (order.estimated_duration_hours * 60) : 240} mins
             </span>
           </div>
           <div>
@@ -176,31 +215,3 @@ export function EnhancedJobCard({ order, onAssignEngineer, onUnassign, onSchedul
     </Card>
   );
 }
-
-// Add handler for partner confirmation
-const handlePartnerConfirm = async (orderId: string) => {
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-
-  try {
-    const { error } = await supabase
-      .from('orders')
-      .update({
-        partner_confirmed_externally: true,
-        partner_confirmed_at: new Date().toISOString(),
-        external_confirmation_source: 'manual_ops'
-      })
-      .eq('id', orderId);
-
-    if (error) throw error;
-
-    queryClient.invalidateQueries({ queryKey: ['orders'] });
-    toast({ title: 'Order marked as confirmed in partner system' });
-  } catch (error: any) {
-    toast({ 
-      title: 'Error confirming order',
-      description: error.message,
-      variant: 'destructive'
-    });
-  }
-};

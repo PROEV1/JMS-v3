@@ -122,7 +122,22 @@ export async function calculateDayFit(
         deposit_amount: virtualOrder.deposit_amount || 0,
         amount_paid: virtualOrder.amount_paid || 0,
         scheduled_install_date: null,
-        engineer_id: virtualOrder.engineer_id || null
+        engineer_id: virtualOrder.engineer_id || null,
+        // Partner-related fields
+        external_confirmation_source: null,
+        partner_confirmed_at: null,
+        partner_confirmed_externally: false,
+        partner_external_id: null,
+        partner_id: null,
+        partner_job_reference: null,
+        partner_status: null,
+        partner_sub_contractor: null,
+        scheduling_suppressed: false,
+        partner_external_url: null,
+        partner_metadata: null,
+        partner_status_raw: null,
+        scheduling_suppressed_reason: null,
+        sub_partner: null
       };
       allOrders.push(dbVirtualOrder);
     }
@@ -161,7 +176,22 @@ export async function calculateDayFit(
         deposit_amount: newOrder.deposit_amount || 0,
         amount_paid: newOrder.amount_paid || 0,
         scheduled_install_date: null,
-        engineer_id: newOrder.engineer_id || null
+        engineer_id: newOrder.engineer_id || null,
+        // Partner-related fields
+        external_confirmation_source: null,
+        partner_confirmed_at: null,
+        partner_confirmed_externally: false,
+        partner_external_id: null,
+        partner_id: null,
+        partner_job_reference: null,
+        partner_status: null,
+        partner_sub_contractor: null,
+        scheduling_suppressed: false,
+        partner_external_url: null,
+        partner_metadata: null,
+        partner_status_raw: null,
+        scheduling_suppressed_reason: null,
+        sub_partner: null
       };
       allOrders.push(dbOrder);
     }

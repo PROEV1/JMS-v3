@@ -5,7 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Bot, Plus, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { Order } from '@/utils/schedulingUtils';
+import { Database } from '@/integrations/supabase/types';
+
+type DatabaseOrder = Database['public']['Tables']['orders']['Row'] & {
+  clients?: { name: string; email: string; phone: string; };
+  quotes?: { products?: any[]; };
+  engineer?: { name: string; email: string; region?: string; };
+};
 import { EnhancedJobCard } from './EnhancedJobCard';
 import { AutoScheduleReviewModal } from './AutoScheduleReviewModal';
 import { useJobOffers } from '@/hooks/useJobOffers';
@@ -21,7 +27,7 @@ interface Engineer {
 interface PipelineColumn {
   id: string;
   title: string;
-  orders: Order[];
+  orders: DatabaseOrder[];
   color: string;
   description?: string;
   showOfferActions?: boolean;
@@ -110,7 +116,7 @@ export function EnhancedSchedulePipeline() {
 
       // Categorize orders with offer status consideration
       const orders = ordersResponse.data || [];
-      const ordersByStatus: Record<string, Order[]> = {
+      const ordersByStatus: Record<string, DatabaseOrder[]> = {
         awaiting_install_booking: [],
         date_offered: [],
         date_accepted: [],
@@ -270,7 +276,6 @@ export function EnhancedSchedulePipeline() {
                             >
                               <EnhancedJobCard
                                 order={order}
-                                engineers={engineers.map(e => ({ ...e, availability: e.availability ?? true }))}
                                 onUpdate={() => {
                                   fetchData();
                                   refetchOffers();

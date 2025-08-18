@@ -7,13 +7,8 @@ import {
   HelpCircle,
 } from 'lucide-react'
 
-import { MainNavItem } from '@/types'
-import { Icons } from '@/components/icons'
 import { NavLink } from 'react-router-dom'
 
-interface Props {
-  items?: MainNavItem[]
-}
 
 export function AdminSidebar() {
   const sidebarItems = [
