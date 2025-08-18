@@ -105,24 +105,9 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Get Google Service Account credentials with detailed logging
-    console.log('=== DEBUGGING GOOGLE SERVICE ACCOUNT ===');
+    // Get Google Service Account credentials
     const serviceAccountKey = Deno.env.get('GOOGLE_SERVICE_ACCOUNT_KEY');
-    console.log('Environment variable exists:', !!serviceAccountKey);
-    console.log('Environment variable type:', typeof serviceAccountKey);
-    if (serviceAccountKey) {
-      console.log('Environment variable length:', serviceAccountKey.length);
-      console.log('Environment variable starts with:', serviceAccountKey.substring(0, 50));
-    }
-    
-    // List all available environment variables for debugging
-    console.log('Available environment variables:');
-    for (const [key, value] of Object.entries(Deno.env.toObject())) {
-      if (key.includes('GOOGLE') || key.includes('SERVICE') || key.includes('ACCOUNT')) {
-        console.log(`${key}: ${value ? 'EXISTS' : 'NOT_SET'}`);
-      }
-    }
-    console.log('=== END DEBUG ===');
+    console.log('Google Service Account Key configured:', !!serviceAccountKey);
     
     if (!serviceAccountKey) {
       console.error('Google Service Account credentials not configured');
@@ -243,8 +228,8 @@ Deno.serve(async (req) => {
     console.log('Access token obtained successfully');
 
     // Fetch sheet data with better error handling and logging
-    const range = `${sheet_name}!A1:ZZ${preview_rows + 1}`;
-    const sheetsUrl = `https://sheets.googleapis.com/v4/spreadsheets/${gsheet_id}/values/${range}`;
+    const range = `'${sheet_name}'!A1:ZZ${preview_rows + 1}`;
+    const sheetsUrl = `https://sheets.googleapis.com/v4/spreadsheets/${gsheet_id}/values/${encodeURIComponent(range)}`;
     
     console.log(`Fetching sheet data: ID=${gsheet_id.substring(0, 10)}..., Range=${range}`);
     
