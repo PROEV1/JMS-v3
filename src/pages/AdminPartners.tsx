@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -25,6 +26,7 @@ interface Partner {
 export default function AdminPartners() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [editingPartner, setEditingPartner] = useState<Partner | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [formData, setFormData] = useState({
@@ -213,76 +215,76 @@ export default function AdminPartners() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => window.open(`/admin/partners/${partner.id}/profiles`, '_blank')}
+                  onClick={() => navigate(`/admin/partners/${partner.id}/profiles`)}
                 >
                   <Settings className="h-4 w-4 mr-1" />
                   Profiles
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleEdit(partner)}
-                >
-                  <Edit className="h-4 w-4" />
-                </Button>
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleEdit(partner)}
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Edit Partner</DialogTitle>
+                    </DialogHeader>
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                      <div>
+                        <Label htmlFor="edit-name">Partner Name</Label>
+                        <Input
+                          id="edit-name"
+                          value={formData.name}
+                          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="edit-slug">Slug (optional)</Label>
+                        <Input
+                          id="edit-slug"
+                          value={formData.slug}
+                          onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
+                          placeholder="partner-name"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="edit-base_url">Base URL (optional)</Label>
+                        <Input
+                          id="edit-base_url"
+                          value={formData.base_url}
+                          onChange={(e) => setFormData({ ...formData, base_url: e.target.value })}
+                          placeholder="https://partner-jms.com"
+                        />
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          id="edit-is_active"
+                          checked={formData.is_active}
+                          onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
+                        />
+                        <Label htmlFor="edit-is_active">Active</Label>
+                      </div>
+                      <div className="flex justify-end space-x-2">
+                        <Button type="button" variant="outline" onClick={() => setEditingPartner(null)}>
+                          Cancel
+                        </Button>
+                        <Button type="submit">Update</Button>
+                      </div>
+                    </form>
+                  </DialogContent>
+                </Dialog>
               </div>
             </CardHeader>
           </Card>
         ))}
       </div>
 
-      {editingPartner && (
-        <Dialog open={!!editingPartner} onOpenChange={() => setEditingPartner(null)}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Edit Partner</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="edit-name">Partner Name</Label>
-                <Input
-                  id="edit-name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="edit-slug">Slug (optional)</Label>
-                <Input
-                  id="edit-slug"
-                  value={formData.slug}
-                  onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
-                  placeholder="partner-name"
-                />
-              </div>
-              <div>
-                <Label htmlFor="edit-base_url">Base URL (optional)</Label>
-                <Input
-                  id="edit-base_url"
-                  value={formData.base_url}
-                  onChange={(e) => setFormData({ ...formData, base_url: e.target.value })}
-                  placeholder="https://partner-jms.com"
-                />
-              </div>
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="edit-is_active"
-                  checked={formData.is_active}
-                  onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
-                />
-                <Label htmlFor="edit-is_active">Active</Label>
-              </div>
-              <div className="flex justify-end space-x-2">
-                <Button type="button" variant="outline" onClick={() => setEditingPartner(null)}>
-                  Cancel
-                </Button>
-                <Button type="submit">Update</Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
-      )}
     </div>
   );
 }
