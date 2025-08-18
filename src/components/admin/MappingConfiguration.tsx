@@ -63,7 +63,14 @@ export default function MappingConfiguration({
   const [newOverrideRule, setNewOverrideRule] = useState({ status: '', suppress: false });
 
   const fetchGoogleSheetsPreview = async () => {
-    if (!gsheetId) return;
+    if (!gsheetId) {
+      toast({
+        title: "Missing Sheet ID",
+        description: "Please provide a Google Sheet ID first.",
+        variant: "destructive",
+      });
+      return;
+    }
     
     setIsLoadingPreview(true);
     try {
@@ -75,19 +82,46 @@ export default function MappingConfiguration({
         }
       });
 
-      if (error) throw error;
-
-      if (data.success) {
-        setAvailableColumns(data.headers || []);
-        toast({ title: 'Sheet preview loaded successfully' });
+      if (error) {
+        console.error('Supabase function error:', error);
+        throw new Error(error.message || 'Failed to connect to Google Sheets service');
+      }
+      
+      if (data.success && data.headers) {
+        setAvailableColumns(data.headers);
+        toast({
+          title: "Success",
+          description: `Loaded ${data.headers.length} columns from Google Sheet`,
+        });
       } else {
-        throw new Error(data.error);
+        throw new Error(data.error || 'Failed to fetch sheet data');
       }
     } catch (error: any) {
-      toast({ 
-        title: 'Failed to load sheet preview', 
-        description: error.message, 
-        variant: 'destructive' 
+      console.error('Failed to fetch Google Sheets preview:', error);
+      
+      let errorMessage = 'Failed to load Google Sheet columns. ';
+      let actionMessage = '';
+      
+      if (error.message?.includes('not found') || error.message?.includes('404')) {
+        errorMessage += 'Sheet not found.';
+        actionMessage = 'Please check the Sheet ID and make sure the sheet exists.';
+      } else if (error.message?.includes('Access denied') || error.message?.includes('403')) {
+        errorMessage += 'Access denied.';
+        actionMessage = 'Please share the sheet with the service account email and grant view permissions.';
+      } else if (error.message?.includes('credentials not configured')) {
+        errorMessage += 'Service account not configured.';
+        actionMessage = 'Please contact your administrator to configure Google Sheets access.';
+      } else if (error.message?.includes('Invalid Google Service Account')) {
+        errorMessage += 'Invalid service account credentials.';
+        actionMessage = 'Please contact your administrator to check the Google Service Account setup.';
+      } else {
+        errorMessage += error.message || 'Unknown error occurred.';
+      }
+      
+      toast({
+        title: "Error Loading Sheet",
+        description: `${errorMessage} ${actionMessage}`,
+        variant: "destructive",
       });
     } finally {
       setIsLoadingPreview(false);
@@ -140,50 +174,73 @@ export default function MappingConfiguration({
     <div className="space-y-6">
       {/* Column Mappings */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader>
           <CardTitle>Column Mappings</CardTitle>
-          {sourceType === 'gsheet' && gsheetId && (
-            <Button 
-              onClick={fetchGoogleSheetsPreview} 
-              disabled={isLoadingPreview}
-              variant="outline"
-              size="sm"
-            >
-              <FileSpreadsheet className="h-4 w-4 mr-2" />
-              {isLoadingPreview ? 'Loading...' : 'Load Columns'}
-            </Button>
-          )}
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4">
-            {ORDER_FIELDS.map((field) => (
-              <div key={field.key} className="flex items-center gap-4">
-                <div className="w-1/3">
-                  <Label className="flex items-center gap-2">
-                    {field.label}
-                    {field.required && <Badge variant="destructive" className="text-xs">Required</Badge>}
-                  </Label>
-                </div>
-                <div className="w-2/3">
-                  <Select
-                    value={columnMappings[field.key] || 'none'}
-                    onValueChange={(value) => updateColumnMapping(field.key, value === 'none' ? '' : value)}
+          <div className="space-y-4">
+            {sourceType === 'gsheet' && gsheetId && (
+              <div className="space-y-2 p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-medium text-blue-900 dark:text-blue-100">Google Sheets Integration</h4>
+                  <Button 
+                    onClick={fetchGoogleSheetsPreview} 
+                    disabled={isLoadingPreview}
+                    variant="outline"
+                    size="sm"
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select source column" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">-- None --</SelectItem>
-                      {availableColumns.map((column) => (
-                        <SelectItem key={column} value={column}>
-                          {column}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    <FileSpreadsheet className="h-4 w-4 mr-2" />
+                    {isLoadingPreview ? 'Loading...' : 'Load Columns'}
+                  </Button>
+                </div>
+                <div className="text-xs text-blue-700 dark:text-blue-300 space-y-1">
+                  <p>• Ensure the Google Sheet is shared with the service account</p>
+                  <p>• Grant "Viewer" permissions to the service account email</p>
+                  <p>• Check that the Sheet ID is correct and the sheet exists</p>
+                  {availableColumns.length === 0 && (
+                    <p className="text-orange-600 dark:text-orange-400 font-medium">
+                      → Click "Load Columns" to fetch available columns from your sheet
+                    </p>
+                  )}
                 </div>
               </div>
-            ))}
+            )}
+            
+            <div className="grid gap-4">
+              {ORDER_FIELDS.map((field) => (
+                <div key={field.key} className="flex items-center gap-4">
+                  <div className="w-1/3">
+                    <Label className="flex items-center gap-2">
+                      {field.label}
+                      {field.required && <Badge variant="destructive" className="text-xs">Required</Badge>}
+                    </Label>
+                  </div>
+                  <div className="w-2/3">
+                    <Select
+                      value={columnMappings[field.key] || 'none'}
+                      onValueChange={(value) => updateColumnMapping(field.key, value === 'none' ? '' : value)}
+                      disabled={sourceType === 'gsheet' && availableColumns.length === 0}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={
+                          sourceType === 'gsheet' && availableColumns.length === 0
+                            ? "Load columns first..."
+                            : "Select source column"
+                        } />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">-- None --</SelectItem>
+                        {availableColumns.map((column) => (
+                          <SelectItem key={column} value={column}>
+                            {column}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </CardContent>
       </Card>
