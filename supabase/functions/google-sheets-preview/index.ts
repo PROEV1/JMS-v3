@@ -225,13 +225,72 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-    console.log('Access token obtained successfully');
+     console.log('Access token obtained successfully');
+
+    // First, get the spreadsheet metadata to see available sheets
+    console.log('Getting spreadsheet metadata...');
+    const metadataUrl = `https://sheets.googleapis.com/v4/spreadsheets/${gsheet_id}`;
+    const metadataResponse = await fetch(metadataUrl, {
+      headers: { 'Authorization': `Bearer ${tokenData.access_token}` }
+    });
+
+    if (!metadataResponse.ok) {
+      const metadataError = await metadataResponse.json();
+      console.error('Failed to get spreadsheet metadata:', metadataError);
+      return new Response(JSON.stringify({ 
+        success: false,
+        error: 'Failed to access spreadsheet metadata. Please check Sheet ID and permissions.',
+        service_account_email: credentials.client_email
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const metadata = await metadataResponse.json();
+    console.log('Available sheets:', metadata.sheets?.map((s: any) => s.properties.title));
+    
+    // Find the correct sheet name (case-insensitive)
+    const availableSheets = metadata.sheets?.map((s: any) => s.properties.title) || [];
+    let actualSheetName = sheet_name;
+    
+    if (!availableSheets.includes(sheet_name)) {
+      // Try to find a case-insensitive match
+      const lowerSheetName = sheet_name.toLowerCase();
+      const matchedSheet = availableSheets.find((name: string) => name.toLowerCase() === lowerSheetName);
+      
+      if (matchedSheet) {
+        actualSheetName = matchedSheet;
+        console.log(`Sheet name corrected from "${sheet_name}" to "${actualSheetName}"`);
+      } else {
+        console.error(`Sheet "${sheet_name}" not found. Available sheets:`, availableSheets);
+        return new Response(JSON.stringify({ 
+          success: false,
+          error: `Sheet "${sheet_name}" not found. Available sheets: ${availableSheets.join(', ')}`,
+          available_sheets: availableSheets
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
 
     // Fetch sheet data with better error handling and logging
-    const range = `'${sheet_name}'!A1:ZZ${preview_rows + 1}`;
+    let range;
+    // Handle sheet names with spaces properly - use the actual sheet name found
+    if (actualSheetName.includes(' ') || actualSheetName.includes("'")) {
+      range = `'${actualSheetName.replace(/'/g, "''")}'!A1:ZZ${preview_rows + 1}`;
+    } else {
+      range = `${actualSheetName}!A1:ZZ${preview_rows + 1}`;
+    }
+    
+    console.log(`Original sheet name: "${sheet_name}"`);
+    console.log(`Actual sheet name: "${actualSheetName}"`);
+    console.log(`Constructed range: "${range}"`);
+    
     const sheetsUrl = `https://sheets.googleapis.com/v4/spreadsheets/${gsheet_id}/values/${encodeURIComponent(range)}`;
     
-    console.log(`Fetching sheet data: ID=${gsheet_id.substring(0, 10)}..., Range=${range}`);
+    console.log(`Final URL: ${sheetsUrl}`);
     
     const sheetsResponse = await fetch(sheetsUrl, {
       headers: { 'Authorization': `Bearer ${tokenData.access_token}` }
