@@ -202,17 +202,20 @@ export const getSmartEngineerRecommendations = async (order: Order, postcode?: s
             return null;
           }
 
-          // Initial service area check - now more permissive, final check via Mapbox
+          // Service area check - now soft preference unless strict mode enabled
           const serviceCheck = canEngineerServePostcode(engineer, finalPostcode);
-          if (!serviceCheck.canServe) {
-            exclusionReasons[engineer.name].push(`No service area coverage for ${finalPostcode}`);
-            console.log(`Engineer ${engineer.name} has no service area for ${finalPostcode}`);
+          const hasServiceAreaMatch = serviceCheck.canServe;
+          
+          // Only hard-exclude if strict service area matching is required
+          if (settings.require_service_area_match && !hasServiceAreaMatch) {
+            exclusionReasons[engineer.name].push(`No service area coverage for ${finalPostcode} (strict mode)`);
+            console.log(`Engineer ${engineer.name} excluded - no service area for ${finalPostcode} (strict mode enabled)`);
             return null;
           }
 
           // Get live distance and travel time from Mapbox
           let distance = 0;
-          let travelTime = serviceCheck.travelTime || 60;
+          let travelTime = hasServiceAreaMatch ? (serviceCheck.travelTime || 60) : 80; // Default higher if no service area match
           
            if (engineer.starting_postcode) {
              try {
@@ -220,13 +223,14 @@ export const getSmartEngineerRecommendations = async (order: Order, postcode?: s
                distance = distanceResult.distance;
                travelTime = distanceResult.duration;
                
-               // Final check: respect engineer's travel time limits based on actual Mapbox data
-               const maxTravelMinutes = serviceCheck.travelTime || 80;
-               if (travelTime > maxTravelMinutes) {
-                 exclusionReasons[engineer.name].push(`Travel time ${travelTime}min exceeds limit ${maxTravelMinutes}min`);
-                 console.log(`Engineer ${engineer.name} travel time ${travelTime} exceeds limit ${maxTravelMinutes}`);
-                 return null;
-               }
+                // Final check: respect engineer's travel time limits based on actual Mapbox data
+                // Use service area limit if matched, otherwise use global fallback
+                const maxTravelMinutes = hasServiceAreaMatch ? (serviceCheck.travelTime || 80) : (settings.max_travel_minutes_fallback || 120);
+                if (travelTime > maxTravelMinutes) {
+                  exclusionReasons[engineer.name].push(`Travel time ${travelTime}min exceeds limit ${maxTravelMinutes}min`);
+                  console.log(`Engineer ${engineer.name} travel time ${travelTime} exceeds limit ${maxTravelMinutes}`);
+                  return null;
+                }
              } catch (error) {
                console.warn(`Failed to get live distance for ${engineer.name}:`, error);
                // Fallback to estimated travel time from service area
@@ -327,8 +331,8 @@ export const getSmartEngineerRecommendations = async (order: Order, postcode?: s
           // Calculate recommendation score (kept for display purposes)
           const score = calculateEngineerScore(engineer, distance, travelTime, availableDate, dailyWorkloadThatDay);
           
-          // Generate recommendation reasons including workload info
-          const reasons = generateRecommendationReasons(engineer, distance, travelTime, availableDate, minimumDate, dailyWorkloadThatDay);
+          // Generate recommendation reasons including workload info and service area status
+          const reasons = generateRecommendationReasons(engineer, distance, travelTime, availableDate, minimumDate, dailyWorkloadThatDay, hasServiceAreaMatch);
 
           return {
             engineer: engineer as Engineer,
@@ -505,6 +509,8 @@ export async function getSchedulingSettings(): Promise<{
   require_client_confirmation: boolean;
   recommendation_search_horizon_days: number;
   top_recommendations_count: number;
+  require_service_area_match?: boolean;
+  max_travel_minutes_fallback?: number;
 }> {
   try {
     const { data: schedulingRules, error: schedulingError } = await supabase
@@ -530,7 +536,9 @@ export async function getSchedulingSettings(): Promise<{
       allow_holiday_bookings: false,
       require_client_confirmation: true,
       recommendation_search_horizon_days: 120,
-      top_recommendations_count: 3
+      top_recommendations_count: 3,
+      require_service_area_match: false,
+      max_travel_minutes_fallback: 120,
     };
 
     // Safely merge settings, ensuring they're objects
@@ -559,7 +567,9 @@ export async function getSchedulingSettings(): Promise<{
       allow_holiday_bookings: false,
       require_client_confirmation: true,
       recommendation_search_horizon_days: 120,
-      top_recommendations_count: 3
+      top_recommendations_count: 3,
+      require_service_area_match: false,
+      max_travel_minutes_fallback: 120,
     };
   }
 }
@@ -608,7 +618,8 @@ function generateRecommendationReasons(
   travelTime: number,
   availableDate: Date,
   minimumDate: Date,
-  dailyWorkload: number = 0
+  dailyWorkload: number = 0,
+  hasServiceAreaMatch: boolean = true
 ): string[] {
   const reasons: string[] = [];
 
@@ -629,6 +640,11 @@ function generateRecommendationReasons(
     reasons.push(`Reasonable distance (${distance.toFixed(1)}mi, ${travelTime}min)`);
   } else {
     reasons.push(`${distance.toFixed(1)}mi away, ${travelTime}min travel`);
+  }
+
+  // Service area status
+  if (!hasServiceAreaMatch) {
+    reasons.push('Outside declared service areas (allowed by settings)');
   }
 
   // Engineer qualifications
@@ -748,12 +764,12 @@ export function isEngineerAvailableOnDate(
 
 /**
  * Check if engineer can serve a postcode based on service areas
- * Now uses proper outward code matching and allows Mapbox to determine final eligibility
+ * Now supports letter-only prefixes and uses soft matching for recommendations
  */
 export function canEngineerServePostcode(
   engineer: EngineerSettings,
   postcode: string
-): { canServe: boolean; travelTime?: number } {
+): { canServe: boolean; travelTime?: number; matchType?: 'exact' | 'prefix' | 'area' } {
   if (!engineer.service_areas || engineer.service_areas.length === 0) {
     return { canServe: false };
   }
@@ -765,26 +781,43 @@ export function canEngineerServePostcode(
     return { canServe: false };
   }
 
-  // Check if engineer serves this postcode area with more flexible matching
+  // Check if engineer serves this postcode area with flexible matching
   for (const area of engineer.service_areas) {
-    const areaOutwardCode = getOutwardCode(area.postcode_area);
+    const configuredArea = area.postcode_area.toUpperCase().trim();
     
-    // Exact match first
+    // Handle letter-only areas (e.g., "MK", "LU", "SG")
+    if (/^[A-Z]{1,2}$/.test(configuredArea)) {
+      const jobAreaLetters = jobOutwardCode.replace(/\d+[A-Z]?$/, ''); // Extract letters only
+      if (jobAreaLetters === configuredArea) {
+        return { 
+          canServe: true, 
+          travelTime: area.max_travel_minutes,
+          matchType: 'area'
+        };
+      }
+    }
+    
+    // Extract outward code from configured area for traditional matching
+    const areaOutwardCode = getOutwardCode(configuredArea);
+    
+    // Exact match (e.g., "DA5" matches "DA5")
     if (areaOutwardCode === jobOutwardCode) {
       return { 
         canServe: true, 
-        travelTime: area.max_travel_minutes 
+        travelTime: area.max_travel_minutes,
+        matchType: 'exact'
       };
     }
     
-    // Partial match for same area (e.g., "DA" area covers "DA1", "DA5", etc.)
+    // Partial match for same area prefix (e.g., "DA1" covers other "DA" areas)
     const jobAreaPrefix = jobOutwardCode.replace(/\d+[A-Z]?$/, ''); // Remove digits and optional letter
     const areaPrefix = areaOutwardCode.replace(/\d+[A-Z]?$/, '');
     
     if (jobAreaPrefix === areaPrefix && jobAreaPrefix.length >= 1) {
       return { 
         canServe: true, 
-        travelTime: area.max_travel_minutes 
+        travelTime: area.max_travel_minutes,
+        matchType: 'prefix'
       };
     }
   }
@@ -854,9 +887,10 @@ export function validateEngineerSetup(engineer: EngineerSettings): {
     missingItems.push('Starting postcode');
   }
 
-  if (!engineer.service_areas || engineer.service_areas.length === 0) {
-    missingItems.push('Service areas');
-  }
+  // Service areas are now optional - engineers can be included based on Mapbox distance alone
+  // if (!engineer.service_areas || engineer.service_areas.length === 0) {
+  //   missingItems.push('Service areas');
+  // }
 
   // For working hours, we'll default to Mon-Fri 9-5 if none configured
   // This allows engineers to show up in recommendations even if they haven't

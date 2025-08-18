@@ -21,6 +21,8 @@ interface SchedulingSettings {
   require_client_confirmation: boolean;
   recommendation_search_horizon_days?: number;
   top_recommendations_count?: number;
+  require_service_area_match?: boolean;
+  max_travel_minutes_fallback?: number;
 }
 
 export function SchedulingSettingsPanel() {
@@ -111,6 +113,8 @@ export function SchedulingSettingsPanel() {
         allow_weekend_bookings: settings.allow_weekend_bookings,
         allow_holiday_bookings: settings.allow_holiday_bookings,
         require_client_confirmation: settings.require_client_confirmation,
+        require_service_area_match: settings.require_service_area_match,
+        max_travel_minutes_fallback: settings.max_travel_minutes_fallback,
       };
 
       // Save scheduling rules
@@ -491,6 +495,40 @@ export function SchedulingSettingsPanel() {
                   require_client_confirmation: checked 
                 }))}
               />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>Strict Service Area Matching</Label>
+                <p className="text-xs text-muted-foreground">
+                  Only show engineers with declared service areas for the job postcode
+                </p>
+              </div>
+              <Switch
+                checked={settings.require_service_area_match || false}
+                onCheckedChange={(checked) => setSettings(prev => ({ 
+                  ...prev, 
+                  require_service_area_match: checked 
+                }))}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="max_travel_fallback">Max Travel Minutes (no service area)</Label>
+              <Input
+                id="max_travel_fallback"
+                type="number"
+                min="60"
+                max="300"
+                value={settings.max_travel_minutes_fallback || 120}
+                onChange={(e) => setSettings(prev => ({ 
+                  ...prev, 
+                  max_travel_minutes_fallback: parseInt(e.target.value) || 120 
+                }))}
+              />
+              <p className="text-xs text-muted-foreground">
+                Travel time limit for engineers with no declared service area for the postcode
+              </p>
             </div>
           </div>
         </div>
