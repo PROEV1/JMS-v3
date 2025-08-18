@@ -618,12 +618,12 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                            // No active offer - show normal actions
                            return (
                               <div className="flex gap-2">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => window.open(`/admin/orders/${order.id}`, '_blank')}
-                                  className="text-xs"
-                                >
+                                 <Button
+                                   size="sm"
+                                   variant="outline"
+                                   onClick={() => window.open(`/admin/order/${order.id}`, '_blank')}
+                                   className="text-xs"
+                                 >
                                   <Eye className="w-4 h-4 mr-1" />
                                   View Job
                                 </Button>
