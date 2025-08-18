@@ -119,16 +119,12 @@ export function ScheduleStatusNavigation({ currentStatus }: ScheduleStatusNaviga
     const fetchCounts = async () => {
       try {
         // Fetch offer-based counts
-        const [pendingResult, acceptedResult, rejectedResult, expiredResult] = await Promise.all([
+        const [pendingResult, rejectedResult, expiredResult] = await Promise.all([
           supabase
             .from('job_offers')
             .select('*', { count: 'exact', head: true })
             .eq('status', 'pending')
             .gt('expires_at', new Date().toISOString()),
-          supabase
-            .from('job_offers')
-            .select('*', { count: 'exact', head: true })
-            .eq('status', 'accepted'),
           supabase
             .from('job_offers')
             .select('*', { count: 'exact', head: true })
@@ -183,10 +179,27 @@ export function ScheduleStatusNavigation({ currentStatus }: ScheduleStatusNaviga
           }
         }
 
+        // For ready-to-book, count orders with status awaiting_install_booking that have accepted offers
+        let readyToBookCount = 0;
+        const { data: acceptedOffers } = await supabase
+          .from('job_offers')
+          .select('order_id')
+          .eq('status', 'accepted');
+        
+        if (acceptedOffers?.length) {
+          const { count: ordersWithAcceptedOffersCount } = await supabase
+            .from('orders')
+            .select('*', { count: 'exact', head: true })
+            .eq('status_enhanced', 'awaiting_install_booking')
+            .in('id', acceptedOffers.map(offer => offer.order_id));
+          
+          readyToBookCount = ordersWithAcceptedOffersCount || 0;
+        }
+
         setCounts({
           'needs-scheduling': needsSchedulingCount,
           'date-offered': pendingResult.count || 0,
-          'ready-to-book': acceptedResult.count || 0,
+          'ready-to-book': readyToBookCount,
           'date-rejected': rejectedResult.count || 0,
           'offer-expired': expiredResult.count || 0,
           'scheduled': scheduledResult.count || 0,
