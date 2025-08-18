@@ -25,6 +25,7 @@ import {
   AlertCircle
 } from "lucide-react";
 import { AgreementSigningModal } from "@/components/AgreementSigningModal";
+import { RejectOfferModal } from "@/components/RejectOfferModal";
 
 interface JobOffer {
   id: string;
@@ -81,6 +82,9 @@ export default function EnhancedClientOrderView() {
   const [agreementModalOpen, setAgreementModalOpen] = useState(false);
   const [jobOffers, setJobOffers] = useState<JobOffer[]>([]);
   const [offerLoading, setOfferLoading] = useState(false);
+  const [rejectModalOpen, setRejectModalOpen] = useState(false);
+  const [selectedOfferId, setSelectedOfferId] = useState<string | null>(null);
+  const [selectedOfferDate, setSelectedOfferDate] = useState<string>('');
   const { lastStatus } = useOrderStatusSync(orderId!);
 
   useEffect(() => {
@@ -270,15 +274,32 @@ export default function EnhancedClientOrderView() {
     }
   };
 
-  const handleOfferResponse = async (offerId: string, response: 'accept' | 'reject', rejectionReason?: string) => {
+  const handleOfferResponse = async (offerId: string, response: 'accept' | 'reject', rejectionData?: {
+    reason: string;
+    blockThisDate: boolean;
+    blockDateRange?: {
+      start_date: string;
+      end_date: string;
+    };
+  }) => {
     setOfferLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('offer-respond', {
-        body: {
-          offer_id: offerId,
-          response,
-          rejection_reason: rejectionReason
+      const requestBody: any = {
+        offer_id: offerId,
+        response
+      };
+
+      if (response === 'reject' && rejectionData) {
+        requestBody.rejection_reason = rejectionData.reason;
+        requestBody.block_this_date = rejectionData.blockThisDate;
+        
+        if (rejectionData.blockDateRange) {
+          requestBody.block_date_range = rejectionData.blockDateRange;
         }
+      }
+
+      const { data, error } = await supabase.functions.invoke('offer-respond', {
+        body: requestBody
       });
 
       if (error || data?.error) {
@@ -305,6 +326,17 @@ export default function EnhancedClientOrderView() {
     } finally {
       setOfferLoading(false);
     }
+  };
+
+  const handleRejectClick = (offerId: string, offeredDate: string) => {
+    setSelectedOfferId(offerId);
+    setSelectedOfferDate(offeredDate);
+    setRejectModalOpen(true);
+  };
+
+  const handleRejectOffer = async (rejectionData: any) => {
+    if (!selectedOfferId) return;
+    await handleOfferResponse(selectedOfferId, 'reject', rejectionData);
   };
 
   const formatCurrency = (amount: number) => {
@@ -788,7 +820,7 @@ export default function EnhancedClientOrderView() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => handleOfferResponse(offer.id, 'reject', 'Not suitable')}
+                                onClick={() => handleRejectClick(offer.id, offer.offered_date)}
                                 disabled={offerLoading}
                                 className="border-red-300 text-red-600 hover:bg-red-50"
                               >
@@ -900,6 +932,19 @@ export default function EnhancedClientOrderView() {
             description: "Your agreement has been signed successfully!",
           });
         }}
+      />
+
+      {/* Reject Offer Modal */}
+      <RejectOfferModal
+        isOpen={rejectModalOpen}
+        onClose={() => {
+          setRejectModalOpen(false);
+          setSelectedOfferId(null);
+          setSelectedOfferDate('');
+        }}
+        onReject={handleRejectOffer}
+        offeredDate={selectedOfferDate}
+        loading={offerLoading}
       />
     </div>
   );
