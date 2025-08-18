@@ -649,10 +649,33 @@ export function AdminScheduleCalendar() {
               }}
               order={selectedOrder}
               engineers={engineers}
-              onAssign={async (engineerId, date) => {
-                await updateOrderAssignment(selectedOrder.id, engineerId, date);
-                await loadData();
-                toast.success('Job reassigned successfully');
+              onAssign={async (engineerId, date, action) => {
+                if (action === 'send_offer') {
+                  // Send offer to client
+                  try {
+                    const { error } = await supabase.functions.invoke('send-offer', {
+                      body: {
+                        orderId: selectedOrder.id,
+                        engineerId,
+                        offeredDate: date,
+                        timeWindow: selectedOrder.time_window || 'AM',
+                        deliveryChannel: 'email'
+                      }
+                    });
+
+                    if (error) throw error;
+                    await loadData();
+                    toast.success('Offer sent to client successfully');
+                  } catch (error) {
+                    console.error('Error sending offer:', error);
+                    toast.error('Failed to send offer to client');
+                  }
+                } else {
+                  // Confirm and book the job
+                  await updateOrderAssignment(selectedOrder.id, engineerId, date);
+                  await loadData();
+                  toast.success('Job scheduled successfully');
+                }
               }}
             />
             
