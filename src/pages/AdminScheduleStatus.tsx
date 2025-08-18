@@ -8,7 +8,7 @@ interface Engineer {
   id: string;
   name: string;
   email: string;
-  availability?: boolean;
+  availability: boolean;
 }
 
 export default function AdminScheduleStatus() {
@@ -30,7 +30,10 @@ export default function AdminScheduleStatus() {
       if (engineersError) {
         console.error('Error fetching engineers:', engineersError);
       } else {
-        setEngineers(engineersData || []);
+        setEngineers(engineersData?.map(engineer => ({
+          ...engineer,
+          availability: engineer.availability ?? true
+        })) || []);
       }
 
       // Fetch orders based on status

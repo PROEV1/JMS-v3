@@ -231,7 +231,7 @@ export function AutoScheduleReviewModal({
               )}
 
               {/* Proposals List */}
-              <ScrollArea className="flex-1 h-0">
+              <ScrollArea className="flex-1 h-full">
                 <div className="space-y-4 pr-4">
                   {proposedAssignments.map((proposal, index) => (
                     <Card key={proposal.order.id} className={proposal.conflicts.length > 0 ? 'border-warning' : 'border-success'}>

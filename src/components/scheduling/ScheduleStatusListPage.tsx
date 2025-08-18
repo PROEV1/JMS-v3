@@ -1,48 +1,36 @@
-
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import React, { useState } from 'react';
+import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { 
-  Calendar, 
-  MapPin, 
-  Clock, 
-  User, 
-  Search, 
-  Filter,
-  Send,
-  Wrench,
-  Calendar as CalendarIcon
-} from 'lucide-react';
-import { Order } from '@/utils/schedulingUtils';
+import { Badge } from '@/components/ui/badge';
+import { Search, Send, Wrench, User, Calendar as CalendarIcon, MapPin, RotateCcw, XCircle, Calendar } from 'lucide-react';
+import { Order, Engineer } from '@/utils/schedulingUtils';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import { SendOfferModal } from './SendOfferModal';
 import { SmartAssignmentModal } from './SmartAssignmentModal';
 import { AutoScheduleReviewModal } from './AutoScheduleReviewModal';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
+import { OfferStatusBadge } from './OfferStatusBadge';
+import { useJobOffers } from '@/hooks/useJobOffers';
 
 interface ScheduleStatusListPageProps {
   orders: Order[];
-  engineers: any[];
+  engineers: Engineer[];
   onUpdate?: () => void;
   title: string;
   showAutoSchedule?: boolean;
 }
 
-export function ScheduleStatusListPage({ 
-  orders, 
-  engineers, 
-  onUpdate, 
-  title,
-  showAutoSchedule = false 
-}: ScheduleStatusListPageProps) {
+export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, showAutoSchedule = false }: ScheduleStatusListPageProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showSendOffer, setShowSendOffer] = useState(false);
   const [showSmartAssign, setShowSmartAssign] = useState(false);
   const [showAutoScheduleModal, setShowAutoScheduleModal] = useState(false);
+  
+  // Fetch all job offers for the displayed orders
+  const { offers, refetch: refetchOffers, releaseOffer, resendOffer } = useJobOffers();
 
   const filteredOrders = orders.filter(order => 
     order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -73,6 +61,49 @@ export function ScheduleStatusListPage({
   const handleSmartAssign = (order: Order) => {
     setSelectedOrder(order);
     setShowSmartAssign(true);
+  };
+
+  // Helper function to get active offer for an order
+  const getActiveOfferForOrder = (orderId: string) => {
+    return offers.find(offer => 
+      offer.order_id === orderId && 
+      offer.status === 'pending' && 
+      new Date(offer.expires_at) > new Date()
+    );
+  };
+
+  // Helper function to get latest offer for an order (any status)
+  const getLatestOfferForOrder = (orderId: string) => {
+    const orderOffers = offers.filter(offer => offer.order_id === orderId);
+    return orderOffers.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+  };
+
+  const handleResendOffer = async (orderId: string) => {
+    const latestOffer = getLatestOfferForOrder(orderId);
+    if (!latestOffer) return;
+
+    try {
+      await resendOffer(latestOffer.id);
+      toast.success('Offer resent successfully');
+      refetchOffers();
+      if (onUpdate) onUpdate();
+    } catch (error) {
+      toast.error('Failed to resend offer');
+    }
+  };
+
+  const handleReleaseOffer = async (orderId: string) => {
+    const activeOffer = getActiveOfferForOrder(orderId);
+    if (!activeOffer) return;
+
+    try {
+      await releaseOffer(activeOffer.id);
+      toast.success('Offer released successfully');
+      refetchOffers();
+      if (onUpdate) onUpdate();
+    } catch (error) {
+      toast.error('Failed to release offer');
+    }
   };
 
   const handleAssignment = async (engineerId: string, date: string, action: 'send_offer' | 'confirm_book') => {
@@ -193,6 +224,7 @@ export function ScheduleStatusListPage({
               <TableHead>Postcode</TableHead>
               <TableHead>Value</TableHead>
               <TableHead>Engineer</TableHead>
+              <TableHead>Offer Status</TableHead>
               <TableHead>Created</TableHead>
               <TableHead>Actions</TableHead>
             </TableRow>
@@ -200,7 +232,7 @@ export function ScheduleStatusListPage({
           <TableBody>
             {filteredOrders.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-12">
+                <TableCell colSpan={8} className="text-center py-12">
                   <div className="flex flex-col items-center">
                     <Calendar className="w-12 h-12 text-muted-foreground mb-4" />
                     <h3 className="text-lg font-medium mb-2">No jobs found</h3>
@@ -247,6 +279,16 @@ export function ScheduleStatusListPage({
                     )}
                   </TableCell>
                   <TableCell>
+                    {(() => {
+                      const latestOffer = getLatestOfferForOrder(order.id);
+                      return latestOffer ? (
+                        <OfferStatusBadge offer={latestOffer} showTimeRemaining />
+                      ) : (
+                        <span className="text-xs text-muted-foreground">No offers</span>
+                      );
+                    })()}
+                  </TableCell>
+                  <TableCell>
                     <div className="flex items-center gap-2">
                       <Calendar className="w-4 h-4 text-muted-foreground" />
                       {(order as any).created_at ? 
@@ -259,26 +301,60 @@ export function ScheduleStatusListPage({
                   </TableCell>
                   <TableCell>
                     {order.status_enhanced === 'awaiting_install_booking' ? (
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleSmartAssign(order)}
-                          className="text-xs"
-                        >
-                          <Wrench className="w-4 h-4 mr-1" />
-                          Smart Assign
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleSendOffer(order)}
-                          className="text-xs"
-                        >
-                          <Send className="w-4 h-4 mr-1" />
-                          Send Offer
-                        </Button>
-                      </div>
+                      (() => {
+                        const activeOffer = getActiveOfferForOrder(order.id);
+                        const latestOffer = getLatestOfferForOrder(order.id);
+                        
+                        if (activeOffer) {
+                          // Has active pending offer - show resend/release options
+                          return (
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleResendOffer(order.id)}
+                                className="text-xs"
+                              >
+                                <RotateCcw className="w-4 h-4 mr-1" />
+                                Resend
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleReleaseOffer(order.id)}
+                                className="text-xs"
+                              >
+                                <XCircle className="w-4 h-4 mr-1" />
+                                Release
+                              </Button>
+                            </div>
+                          );
+                        } else {
+                          // No active offer - show normal actions
+                          return (
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleSmartAssign(order)}
+                                className="text-xs"
+                              >
+                                <Wrench className="w-4 h-4 mr-1" />
+                                Smart Assign
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleSendOffer(order)}
+                                className="text-xs"
+                              >
+                                <Send className="w-4 h-4 mr-1" />
+                                {latestOffer ? 'Send New Offer' : 'Send Offer'}
+                              </Button>
+                            </div>
+                          );
+                        }
+                      })()
                     ) : (
                       <Button size="sm" variant="outline" className="text-xs">
                         View Details
@@ -303,7 +379,10 @@ export function ScheduleStatusListPage({
             }}
             order={selectedOrder}
             engineers={engineers}
-            onOfferSent={onUpdate}
+            onOfferSent={() => {
+              if (onUpdate) onUpdate();
+              refetchOffers();
+            }}
           />
 
           <SmartAssignmentModal
@@ -319,13 +398,18 @@ export function ScheduleStatusListPage({
         </>
       )}
 
-      <AutoScheduleReviewModal
-        isOpen={showAutoScheduleModal}
-        onClose={() => setShowAutoScheduleModal(false)}
-        orders={filteredOrders}
-        engineers={engineers}
-        onOffersSubmitted={onUpdate}
-      />
+      {showAutoSchedule && showAutoScheduleModal && (
+        <AutoScheduleReviewModal
+          isOpen={showAutoScheduleModal}
+          onClose={() => setShowAutoScheduleModal(false)}
+          orders={orders.filter(order => order.status_enhanced === 'awaiting_install_booking')}
+          engineers={engineers}
+          onOffersSubmitted={() => {
+            if (onUpdate) onUpdate();
+            refetchOffers();
+          }}
+        />
+      )}
     </div>
   );
 }
