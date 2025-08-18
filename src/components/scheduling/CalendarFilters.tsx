@@ -2,6 +2,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { Engineer } from '@/utils/schedulingUtils';
 import { Filter } from 'lucide-react';
 
@@ -11,6 +12,7 @@ interface CalendarFiltersProps {
     engineerId: string;
     region: string;
     status: string;
+    showOfferHolds: boolean;
   };
   onFiltersChange: (filters: any) => void;
 }
@@ -28,7 +30,7 @@ export function CalendarFilters({ engineers, filters, onFiltersChange }: Calenda
     { value: 'completed', label: 'Completed' }
   ];
 
-  const updateFilter = (key: string, value: string) => {
+  const updateFilter = (key: string, value: string | boolean) => {
     onFiltersChange({
       ...filters,
       [key]: value
@@ -39,7 +41,8 @@ export function CalendarFilters({ engineers, filters, onFiltersChange }: Calenda
     onFiltersChange({
       engineerId: 'all-engineers',
       region: 'all-regions',
-      status: 'all-statuses'
+      status: 'all-statuses',
+      showOfferHolds: true
     });
   };
 
@@ -102,6 +105,17 @@ export function CalendarFilters({ engineers, filters, onFiltersChange }: Calenda
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <Switch 
+              id="show-offers" 
+              checked={filters.showOfferHolds}
+              onCheckedChange={(checked) => updateFilter('showOfferHolds', checked)}
+            />
+            <label htmlFor="show-offers" className="text-sm font-medium">
+              Show date-offered holds
+            </label>
           </div>
 
           <Button variant="outline" onClick={clearFilters}>

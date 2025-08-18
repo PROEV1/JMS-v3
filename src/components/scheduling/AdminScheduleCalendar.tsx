@@ -33,16 +33,27 @@ interface CalendarEvent {
   start: Date;
   end: Date;
   resource: {
-    order: Order;
+    order?: Order;
+    jobOffer?: any;
     engineerId?: string;
     status: string;
     conflicts: any[];
+    isOfferHold?: boolean;
+  };
+  extendedProps?: {
+    orderId: string;
+    orderNumber: string;
+    clientName: string;
+    engineerName: string;
+    status: string;
+    address: string;
   };
 }
 
 export function AdminScheduleCalendar() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [engineers, setEngineers] = useState<Engineer[]>([]);
+  const [jobOffers, setJobOffers] = useState<any[]>([]);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isAssignmentModalOpen, setIsAssignmentModalOpen] = useState(false);
@@ -52,7 +63,8 @@ export function AdminScheduleCalendar() {
   const [filters, setFilters] = useState({
     engineerId: 'all-engineers',
     region: 'all-regions',
-    status: 'all-statuses'
+    status: 'all-statuses',
+    showOfferHolds: true
   });
   const [loading, setLoading] = useState(true);
   const [showRecommendations, setShowRecommendations] = useState(false);
@@ -85,8 +97,22 @@ export function AdminScheduleCalendar() {
 
       if (engineersError) throw engineersError;
 
+      // Load active job offers (pending and accepted, not expired)
+      const { data: offersData, error: offersError } = await supabase
+        .from('job_offers')
+        .select(`
+          *,
+          order:orders(*),
+          engineer:engineers(*)
+        `)
+        .in('status', ['pending', 'accepted'])
+        .gt('expires_at', new Date().toISOString());
+
+      if (offersError) throw offersError;
+
       setOrders(ordersData || []);
       setEngineers(engineersData || []);
+      setJobOffers(offersData || []);
     } catch (error) {
       console.error('Error loading data:', error);
       toast.error('Failed to load scheduling data');
@@ -98,6 +124,34 @@ export function AdminScheduleCalendar() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Helper to format job offers as calendar events
+  const formatOfferForCalendar = (offer: any): CalendarEvent => {
+    const start = new Date(offer.offered_date);
+    const end = new Date(start.getTime() + 4 * 60 * 60 * 1000); // 4 hour duration
+    
+    return {
+      id: `offer-${offer.id}`,
+      title: `[OFFER HOLD] ${offer.order?.order_number} - ${offer.order?.client?.full_name}`,
+      start,
+      end,
+      resource: {
+        jobOffer: offer,
+        engineerId: offer.engineer_id,
+        status: offer.status,
+        conflicts: [],
+        isOfferHold: true
+      },
+      extendedProps: {
+        orderId: offer.order?.id || '',
+        orderNumber: offer.order?.order_number || '',
+        clientName: offer.order?.client?.full_name || '',
+        engineerName: offer.engineer?.name || '',
+        status: offer.status,
+        address: offer.order?.job_address || ''
+      }
+    };
+  };
 
   // Filter and format events
   useEffect(() => {
@@ -125,8 +179,30 @@ export function AdminScheduleCalendar() {
     }
 
     const formattedEvents = filteredOrders.map(formatOrderForCalendar);
+    
+    // Add offer holds if enabled
+    if (filters.showOfferHolds) {
+      let filteredOffers = jobOffers;
+      
+      // Apply same filters to offers
+      if (filters.engineerId && filters.engineerId !== 'all-engineers') {
+        filteredOffers = filteredOffers.filter(offer => 
+          offer.engineer_id === filters.engineerId
+        );
+      }
+
+      if (filters.region && filters.region !== 'all-regions') {
+        filteredOffers = filteredOffers.filter(offer => 
+          offer.engineer?.region === filters.region
+        );
+      }
+
+      const offerEvents = filteredOffers.map(formatOfferForCalendar);
+      formattedEvents.push(...offerEvents as any);
+    }
+    
     setEvents(formattedEvents);
-  }, [orders, filters]);
+  }, [orders, jobOffers, filters]);
 
   // Handle drag and drop from sidebar
   const handleJobDrop = useCallback(async (
@@ -135,6 +211,23 @@ export function AdminScheduleCalendar() {
     slotInfo: any
   ) => {
     try {
+      // Check for existing offer holds at this time
+      const conflictingOffer = jobOffers.find(offer => {
+        if (offer.engineer_id !== engineerId) return false;
+        
+        const offerStart = new Date(offer.offered_date);
+        const offerEnd = new Date(offerStart.getTime() + 4 * 60 * 60 * 1000);
+        const slotStart = new Date(slotInfo.start);
+        const slotEnd = new Date(slotInfo.end);
+        
+        return (slotStart < offerEnd && slotEnd > offerStart);
+      });
+      
+      if (conflictingOffer) {
+        toast.error(`Cannot assign job: There's an existing offer hold for ${conflictingOffer.order?.order_number} at this time`);
+        return;
+      }
+
       // Check if assignment would exceed engineer's capacity
       const order = orders.find(o => o.id === orderId);
       const engineer = engineers.find(e => e.id === engineerId);
@@ -177,7 +270,7 @@ export function AdminScheduleCalendar() {
       console.error('Error assigning job:', error);
       toast.error('Failed to assign job');
     }
-  }, [loadData, orders, engineers]);
+  }, [loadData, orders, engineers, jobOffers]);
 
   // Handle event selection
   const handleSelectEvent = useCallback((event: CalendarEvent) => {
@@ -281,21 +374,31 @@ export function AdminScheduleCalendar() {
   // Custom event component
   const EventComponent = ({ event }: { event: CalendarEvent }) => {
     const hasConflicts = event.resource.conflicts.length > 0;
+    const isOfferHold = event.resource.isOfferHold;
     
     return (
       <div className={`
         p-1 rounded text-xs font-medium
         ${hasConflicts ? 'border-2 border-destructive' : ''}
+        ${isOfferHold ? 'border-2 border-dashed border-orange-400' : ''}
       `}>
         <div className="flex items-center gap-1">
           {hasConflicts && (
             <span className="text-destructive">⚠️</span>
           )}
+          {isOfferHold && (
+            <span className="text-orange-500">🔒</span>
+          )}
           <span className="truncate">{event.title}</span>
         </div>
-        {event.resource.order.time_window && (
+        {event.resource.order?.time_window && (
           <div className="text-xs opacity-75">
             {event.resource.order.time_window}
+          </div>
+        )}
+        {isOfferHold && (
+          <div className="text-xs opacity-75 text-orange-600">
+            Expires: {new Date(event.resource.jobOffer.expires_at).toLocaleString()}
           </div>
         )}
       </div>
@@ -304,15 +407,17 @@ export function AdminScheduleCalendar() {
 
   // Custom event style getter
   const eventStyleGetter = (event: CalendarEvent) => {
-    const backgroundColor = getStatusColor(event.resource.status);
+    const isOfferHold = event.resource.isOfferHold;
+    const backgroundColor = isOfferHold ? '#FED7AA' : getStatusColor(event.resource.status);
     const hasConflicts = event.resource.conflicts.length > 0;
     
     return {
       style: {
         backgroundColor,
         borderRadius: '4px',
-        opacity: 0.8,
-        border: hasConflicts ? '2px solid hsl(var(--destructive))' : 'none',
+        opacity: isOfferHold ? 0.6 : 0.8,
+        border: hasConflicts ? '2px solid hsl(var(--destructive))' : 
+                isOfferHold ? '2px dashed #FB923C' : 'none',
         fontSize: '12px'
       }
     };
