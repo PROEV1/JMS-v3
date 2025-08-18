@@ -442,46 +442,40 @@ export function AutoScheduleReviewModal({
             successCount++;
             offerSent = true;
             
-            const finalFallbackIndex = proposal.alternatives.findIndex(alt => alt === candidate);
             updatedAssignments[i] = {
               ...proposal,
               status: 'sent',
-              statusMessage: `Offer sent to ${candidate.engineer.name}`,
-              usedFallback: finalFallbackIndex,
-              selectedCandidate: candidate
+              statusMessage: `Offer sent to ${candidate.engineer.name} successfully`
             };
             
-            console.log(`✅ ${attemptType} offer sent successfully for ${proposal.order.order_number} to ${candidate.engineer.name}`);
-            
-            if (!isOriginalSelection) {
-              toast.info(`Order ${proposal.order.order_number}: Used fallback engineer ${candidate.engineer.name}`, {
-                duration: 4000
-              });
-            }
+            console.log(`✅ ${attemptType} offer sent successfully for ${proposal.order.order_number}`);
             
           } catch (error) {
-            console.error(`${attemptType} attempt failed for order ${proposal.order.order_number}:`, error);
+            console.error(`${attemptType} offer failed:`, error);
+            
             if (attemptIndex === candidatesToTry.length - 1) {
-              // All alternatives exhausted
-              failureCount++;
+              // This was the last candidate - mark as failed
               updatedAssignments[i] = {
                 ...proposal,
                 status: 'failed',
-                statusMessage: `All alternatives exhausted: ${error.message}`
+                statusMessage: `All fallbacks failed: ${error.message}`
               };
+              failureCount++;
             }
           }
         }
         
-        setProposedAssignments([...updatedAssignments]);
+        setProposedAssignments([...updatedAssignments]); // Update UI after each proposal
       }
 
-      console.log('Resilient offer submission complete. Success:', successCount, 'Failed:', failureCount);
-
+      // Final status update
+      setProposedAssignments(updatedAssignments);
+      
       if (successCount > 0) {
-        const message = `Successfully sent ${successCount} installation offer${successCount > 1 ? 's' : ''}${failureCount > 0 ? `, ${failureCount} failed after trying all alternatives` : ''}`;
-        toast.success(message);
-        onOffersSubmitted?.();
+        toast.success(`Successfully sent ${successCount} of ${proposedAssignments.length} offers`);
+        if (onOffersSubmitted) {
+          onOffersSubmitted();
+        }
         
         setTimeout(() => {
           onClose();
@@ -498,8 +492,6 @@ export function AutoScheduleReviewModal({
     }
   };
 
-  const hasConflicts = proposedAssignments.some(p => p.conflicts.length > 0);
-
   const handleClose = () => {
     if (!loading && !submitting) {
       setGenerated(false);
@@ -512,354 +504,258 @@ export function AutoScheduleReviewModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-5xl h-[90vh] flex flex-col">
-        <DialogHeader className="flex-shrink-0">
+      <DialogContent className="max-w-[95vw] max-h-[95vh] w-full flex flex-col">
+        <DialogHeader className="flex-shrink-0 pb-4 border-b">
           <DialogTitle className="flex items-center gap-2">
             <Bot className="w-5 h-5" />
-            Auto-Schedule & Review
+            Auto-Schedule Review & Batch Submission
           </DialogTitle>
           <DialogDescription>
-            Review AI-generated scheduling proposals for {orders.length} job{orders.length > 1 ? 's' : ''} before sending offers
+            Review AI-generated scheduling proposals and submit offers to clients.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 min-h-0 overflow-hidden">
-          {loading ? (
-            <div className="flex flex-col items-center justify-center h-64">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
-              <p className="text-muted-foreground">Generating smart scheduling proposals...</p>
-              <p className="text-sm text-muted-foreground mt-2">Analyzing engineer availability, travel times, and workloads</p>
-            </div>
-          ) : proposedAssignments.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-64">
-              <AlertTriangle className="w-12 h-12 text-warning mb-4" />
-              <p className="text-muted-foreground">No scheduling proposals could be generated</p>
-              <p className="text-sm text-muted-foreground mt-2">Check engineer availability and service areas</p>
-            </div>
-          ) : (
-            <>
-              {/* Summary */}
-              <div className="grid grid-cols-4 gap-4 mb-6">
-                <Card>
-                  <CardContent className="pt-4">
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-primary">{proposedAssignments.length}</p>
-                      <p className="text-sm text-muted-foreground">Proposals Generated</p>
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="pt-4">
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-success">{proposedAssignments.filter(p => p.conflicts.length === 0).length}</p>
-                      <p className="text-sm text-muted-foreground">No Conflicts</p>
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="pt-4">
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-warning">{proposedAssignments.filter(p => p.conflicts.length > 0).length}</p>
-                      <p className="text-sm text-muted-foreground">With Warnings</p>
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="pt-4">
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-accent">{batchCapacityInfo.length}</p>
-                      <p className="text-sm text-muted-foreground">Slots Reserved</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Virtual Capacity Info */}
-              {batchCapacityInfo.length > 0 && (
-                <Card className="mb-4 border-accent/20 bg-accent/5">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <Package className="w-4 h-4 text-accent" />
-                      Intelligent Slot Reservation Active
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 text-sm">
-                      {batchCapacityInfo.map((info, index) => (
-                        <div key={index} className="flex items-center justify-between p-2 bg-background rounded border">
-                          <span className="font-medium">{info.engineerName}</span>
-                          <Badge variant="outline" className="text-xs">
-                            {info.date}: {info.currentJobs + info.reservedInBatch}/{info.maxJobs}
-                            {info.reservedInBatch > 0 && (
-                              <span className="ml-1 text-accent">+{info.reservedInBatch}</span>
-                            )}
-                          </Badge>
+        <div className="flex-1 overflow-hidden">
+          <ScrollArea className="h-full pr-2">
+            <div className="space-y-4 py-4">
+              {loading ? (
+                <div className="flex flex-col items-center justify-center h-64">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
+                  <p className="text-muted-foreground">Generating smart scheduling proposals...</p>
+                  <p className="text-sm text-muted-foreground mt-2">Analyzing engineer availability, travel times, and workloads</p>
+                </div>
+              ) : proposedAssignments.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-64">
+                  <AlertTriangle className="w-12 h-12 text-warning mb-4" />
+                  <p className="text-muted-foreground">No scheduling proposals could be generated</p>
+                  <p className="text-sm text-muted-foreground mt-2">Check engineer availability and service areas</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {/* Summary Section */}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base">Batch Summary</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div className="text-center p-2 bg-blue-50 rounded">
+                          <div className="text-lg font-bold text-blue-700">{proposedAssignments.length}</div>
+                          <div className="text-xs text-blue-600">Jobs Scheduled</div>
                         </div>
-                      ))}
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Reserved slots prevent double-booking during batch scheduling
-                    </p>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Conflicts Alert */}
-              {hasConflicts && (
-                <Alert className="mb-4">
-                  <AlertTriangle className="w-4 h-4" />
-                  <AlertDescription>
-                    Some proposals have warnings or conflicts. Review carefully before proceeding.
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              {/* Proposals List */}
-              <ScrollArea className="flex-1 h-full">
-                <div className="space-y-4 pr-4">
-                  {proposedAssignments.map((proposal, index) => (
-                    <Card key={proposal.order.id} className={`${proposal.conflicts.length > 0 ? 'border-warning' : 'border-success'} ${proposal.status === 'preflight_failed' ? 'border-destructive' : ''} ${proposal.status === 'sent' ? 'border-green-500' : ''}`}>
-                      <CardHeader className="pb-3">
-                        <div className="flex items-center justify-between">
-                          <CardTitle className="text-lg flex items-center gap-2">
-                            {proposal.status === 'sent' ? (
-                              <CheckCircle className="w-5 h-5 text-green-500" />
-                            ) : proposal.status === 'preflight_failed' || proposal.status === 'failed' ? (
-                              <AlertTriangle className="w-5 h-5 text-destructive" />
-                            ) : proposal.status === 'preflight_checking' || proposal.status === 'sending' ? (
-                              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
-                            ) : proposal.conflicts.length === 0 ? (
-                              <CheckCircle className="w-5 h-5 text-success" />
-                            ) : (
-                              <AlertTriangle className="w-5 h-5 text-warning" />
-                            )}
-                            Order #{proposal.order.order_number}
-                            {proposal.usedFallback !== undefined && proposal.usedFallback > 0 && (
-                              <Badge variant="outline" className="text-xs">
-                                Fallback #{proposal.usedFallback}
-                              </Badge>
-                            )}
-                          </CardTitle>
-                          <div className="flex items-center gap-2">
-                            <Badge variant={proposal.conflicts.length === 0 ? 'default' : 'secondary'}>
-                              Score: {Math.round(proposal.score)}
-                            </Badge>
-                            {proposal.status === 'sent' && (
-                              <Badge variant="default" className="bg-green-500">
-                                Sent
-                              </Badge>
-                            )}
+                        <div className="text-center p-2 bg-green-50 rounded">
+                          <div className="text-lg font-bold text-green-700">
+                            {proposedAssignments.filter(p => p.status === 'ready').length}
                           </div>
+                          <div className="text-xs text-green-600">Ready to Send</div>
                         </div>
-                        
-                        {/* Status Message */}
-                        {proposal.statusMessage && (
-                          <p className={`text-sm mt-2 ${
-                            proposal.status === 'sent' ? 'text-green-600' : 
-                            proposal.status === 'preflight_failed' || proposal.status === 'failed' ? 'text-destructive' :
-                            'text-muted-foreground'
-                          }`}>
-                            {proposal.statusMessage}
-                          </p>
-                        )}
+                        <div className="text-center p-2 bg-orange-50 rounded">
+                          <div className="text-lg font-bold text-orange-700">
+                            {proposedAssignments.filter(p => p.conflicts.length > 0).length}
+                          </div>
+                          <div className="text-xs text-orange-600">With Conflicts</div>
+                        </div>
+                        <div className="text-center p-2 bg-purple-50 rounded">
+                          <div className="text-lg font-bold text-purple-700">
+                            {new Set(proposedAssignments.map(p => p.selectedCandidate?.engineer.id)).size}
+                          </div>
+                          <div className="text-xs text-purple-600">Engineers Used</div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Virtual Capacity Info */}
+                  {batchCapacityInfo.length > 0 && (
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base">Virtual Capacity Reservations</CardTitle>
                       </CardHeader>
-                      
                       <CardContent>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          {/* Order Info */}
-                          <div>
-                            <Label className="text-sm font-medium text-muted-foreground">Client & Duration</Label>
-                            <p className="font-semibold">{proposal.order.client?.full_name}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {proposal.order.postcode} • {getOrderEstimatedHours(proposal.order)}h job
-                            </p>
-                          </div>
-
-                          {/* Engineer Assignment */}
-                          <div>
-                            <Label className="text-sm font-medium text-muted-foreground flex items-center gap-1">
-                              <User className="w-4 h-4" />
-                              Selected Engineer
-                            </Label>
-                            <p className="font-semibold">{proposal.selectedCandidate.engineer.name}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {proposal.selectedCandidate.distance}km • {proposal.selectedCandidate.travelTime}min travel
-                            </p>
-                          </div>
-
-                          {/* Proposed Date */}
-                          <div>
-                            <Label className="text-sm font-medium text-muted-foreground flex items-center gap-1">
-                              <CalendarDays className="w-4 h-4" />
-                              Proposed Date
-                            </Label>
-                            <p className="font-semibold">
-                              {proposal.proposedDate.toLocaleDateString('en-GB', {
-                                weekday: 'short',
-                                month: 'short',
-                                day: 'numeric'
-                              })}
-                            </p>
-                            <p className="text-sm text-muted-foreground">Morning slot</p>
-                          </div>
-                        </div>
-
-                        {/* Status-specific alerts */}
-                        {proposal.status === 'preflight_failed' && (
-                          <Alert className="mt-4 border-destructive">
-                            <AlertTriangle className="w-4 h-4" />
-                            <AlertDescription>
-                              <strong>Capacity Check Failed:</strong> {proposal.statusMessage}
-                              <br />
-                              <span className="text-sm">Please select a fallback option below.</span>
-                            </AlertDescription>
-                          </Alert>
-                        )}
-
-                        {/* Conflicts/Warnings */}
-                        {proposal.conflicts.length > 0 && proposal.status !== 'preflight_failed' && (
-                          <div className="mt-4 pt-4 border-t">
-                            <Label className="text-sm font-medium text-warning mb-2 flex items-center gap-1">
-                              <AlertTriangle className="w-4 h-4" />
-                              Warnings
-                            </Label>
-                            <div className="space-y-1">
-                              {proposal.conflicts.map((conflict, i) => (
-                                <p key={i} className="text-sm text-muted-foreground">
-                                  • {conflict}
-                                </p>
-                              ))}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                          {batchCapacityInfo.map((info, index) => (
+                            <div key={index} className="p-2 bg-gray-50 rounded text-sm">
+                              <div className="font-medium">{info.engineerName}</div>
+                              <div className="text-xs text-gray-600">{new Date(info.date).toLocaleDateString()}</div>
+                              <div className="text-xs mt-1">
+                                {info.currentJobs + info.reservedInBatch}/{info.maxJobs} jobs (+{info.reservedInBatch} in batch)
+                              </div>
                             </div>
-                          </div>
-                        )}
-
-                        {/* Enhanced Fallback Options */}
-                        <div className="mt-4 pt-4 border-t">
-                          <Label className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-1">
-                            <Clock className="w-4 h-4" />
-                            Fallback Options ({proposal.alternatives.length} available)
-                          </Label>
-                          
-                          <div className="space-y-2">
-                            {proposal.alternatives.slice(0, 5).map((alt: any, altIndex: number) => {
-                              const isSelected = alt === proposal.selectedCandidate;
-                              const isPrimary = altIndex === 0;
-                              
-                              return (
-                                <div key={altIndex} className={`p-3 rounded border transition-colors ${
-                                  isSelected ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
-                                } ${proposal.status === 'sent' || proposal.status === 'sending' ? 'opacity-50' : ''}`}>
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex-1">
-                                      <div className="flex items-center gap-2 mb-1">
-                                        <span className="font-medium">{alt.engineer.name}</span>
-                                        {isPrimary && (
-                                          <Badge variant="outline" className="text-xs">Primary</Badge>
-                                        )}
-                                        {isSelected && (
-                                          <Badge variant="default" className="text-xs">Selected</Badge>
-                                        )}
-                                      </div>
-                                      
-                                      <div className="grid grid-cols-2 gap-4 text-sm text-muted-foreground">
-                                        <div>
-                                          <CalendarDays className="w-3 h-3 inline mr-1" />
-                                          {new Date(alt.availableDate).toLocaleDateString('en-GB', {
-                                            weekday: 'short',
-                                            month: 'short', 
-                                            day: 'numeric'
-                                          })}
-                                        </div>
-                                        <div>
-                                          <Clock className="w-3 h-3 inline mr-1" />
-                                          {alt.travelTime}min • {alt.distance}km
-                                        </div>
-                                      </div>
-                                      
-                                      {alt.reasons && alt.reasons.length > 0 && (
-                                        <div className="mt-1">
-                                          <Badge variant="outline" className="text-xs">
-                                            {alt.reasons[0]}
-                                          </Badge>
-                                        </div>
-                                      )}
-                                    </div>
-                                    
-                                    {!isSelected && proposal.status === 'ready' && (
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => handleUseFallback(index, altIndex)}
-                                        disabled={submitting || preflightChecking}
-                                      >
-                                        Use This
-                                      </Button>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                          
-                          <p className="text-xs text-muted-foreground mt-2">
-                            {proposal.status === 'ready' ? 
-                              'Click "Use This" to switch assignments or these will be tried automatically if the selected option fails.' :
-                              'Alternatives are tried automatically if the primary fails during sending.'
-                            }
-                          </p>
+                          ))}
                         </div>
                       </CardContent>
                     </Card>
-                  ))}
+                  )}
+
+                  {/* Conflict Alerts */}
+                  {proposedAssignments.some(p => p.conflicts.length > 0 || p.status === 'preflight_failed') && (
+                    <Alert>
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertDescription>
+                        Some proposals have conflicts or failed preflight checks. Review and consider using fallback options before submitting.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  {/* Individual Proposals */}
+                  <div className="space-y-3">
+                    {proposedAssignments.map((proposal, index) => (
+                      <Card key={proposal.order.id} className={`${
+                        proposal.status === 'preflight_failed' ? 'border-red-300 bg-red-50' :
+                        proposal.status === 'ready' ? 'border-green-300 bg-green-50' :
+                        proposal.status === 'sending' || proposal.status === 'preflight_checking' ? 'border-yellow-300 bg-yellow-50' :
+                        proposal.status === 'sent' ? 'border-blue-300 bg-blue-50' :
+                        proposal.status === 'failed' ? 'border-red-300 bg-red-50' :
+                        'border-gray-300'
+                      }`}>
+                        <CardHeader className="pb-2">
+                          <div className="flex items-center justify-between">
+                            <CardTitle className="text-sm flex items-center gap-2">
+                              <Package className="w-4 h-4" />
+                              {proposal.order.order_number}
+                              {proposal.usedFallback && proposal.usedFallback > 0 && (
+                                <Badge variant="outline" className="text-xs">
+                                  Fallback #{proposal.usedFallback}
+                                </Badge>
+                              )}
+                            </CardTitle>
+                            <Badge 
+                              variant={
+                                proposal.status === 'ready' ? 'default' :
+                                proposal.status === 'preflight_failed' ? 'destructive' :
+                                proposal.status === 'sending' || proposal.status === 'preflight_checking' ? 'secondary' :
+                                proposal.status === 'sent' ? 'default' :
+                                proposal.status === 'failed' ? 'destructive' :
+                                'outline'
+                              }
+                            >
+                              {proposal.status === 'ready' && <CheckCircle className="w-3 h-3 mr-1" />}
+                              {proposal.status === 'preflight_failed' && <AlertTriangle className="w-3 h-3 mr-1" />}
+                              {proposal.status === 'sending' && 'Sending...'}
+                              {proposal.status === 'preflight_checking' && 'Checking...'}
+                              {proposal.status === 'sent' && 'Sent ✓'}
+                              {proposal.status === 'failed' && 'Failed'}
+                              {proposal.status === 'ready' && 'Ready'}
+                              {proposal.status === 'preflight_failed' && 'Failed Check'}
+                            </Badge>
+                          </div>
+                          {proposal.statusMessage && (
+                            <p className="text-xs text-red-600">{proposal.statusMessage}</p>
+                          )}
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                          {/* Order Details */}
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                            <div>
+                              <span className="font-medium">Client:</span>
+                              <div className="text-muted-foreground">{proposal.order.client?.full_name}</div>
+                              <div className="text-xs text-muted-foreground">{proposal.order.postcode}</div>
+                            </div>
+                            <div>
+                              <span className="font-medium">Duration:</span>
+                              <div className="text-muted-foreground">{getOrderEstimatedHours(proposal.order)}h</div>
+                            </div>
+                            <div>
+                              <span className="font-medium">Score:</span>
+                              <div className="text-muted-foreground">{Math.round(proposal.score * 100)}/100</div>
+                            </div>
+                          </div>
+
+                          {/* Assignment Details */}
+                          <div className="p-3 bg-white rounded border">
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                                <User className="w-3 h-3" />
+                                <span className="text-sm font-medium">{proposal.selectedCandidate?.engineer.name}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <CalendarDays className="w-3 h-3" />
+                                <span className="text-sm">{new Date(proposal.proposedDate).toLocaleDateString('en-GB', {
+                                  weekday: 'short',
+                                  day: 'numeric',
+                                  month: 'short'
+                                })}</span>
+                              </div>
+                            </div>
+                            
+                            {/* Conflicts */}
+                            {proposal.conflicts.length > 0 && (
+                              <div className="mt-2">
+                                <div className="flex items-center gap-2 text-orange-600 text-xs mb-1">
+                                  <AlertTriangle className="w-3 h-3" />
+                                  <span>Issues:</span>
+                                </div>
+                                <div className="pl-4">
+                                  {proposal.conflicts.map((conflict, i) => (
+                                    <div key={i} className="text-xs text-orange-700">• {conflict}</div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Fallback Options */}
+                            {proposal.alternatives.length > 1 && (
+                              <div className="mt-2">
+                                <div className="text-xs font-medium mb-1">Alternatives:</div>
+                                <div className="space-y-1">
+                                  {proposal.alternatives.slice(1, 3).map((alt, altIndex) => (
+                                    <div key={altIndex} className="flex items-center justify-between text-xs p-2 bg-gray-50 rounded">
+                                      <span className="text-xs">
+                                        {alt.engineer.name} • {new Date(alt.availableDate).toLocaleDateString('en-GB', {
+                                          weekday: 'short',
+                                          day: 'numeric',
+                                          month: 'short'
+                                        })} • {Math.round(alt.score * 100)}
+                                      </span>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => handleUseFallback(index, altIndex + 1)}
+                                        disabled={submitting}
+                                        className="h-5 px-2 text-xs"
+                                      >
+                                        Use
+                                      </Button>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
                 </div>
-              </ScrollArea>
-            </>
-          )}
+              )}
+            </div>
+          </ScrollArea>
         </div>
 
-        {/* Actions */}
-        <div className="flex-shrink-0 flex justify-between items-center pt-4 border-t">
-          <div className="text-sm text-muted-foreground">
-            {proposedAssignments.length > 0 && (
-              <>Offers will be sent via email with 24-hour expiration</>
-            )}
-          </div>
-          <div className="flex gap-3">
-            <Button 
-              variant="outline" 
-              onClick={handleClose}
-              disabled={loading || submitting}
+        <div className="flex-shrink-0 flex items-center justify-between pt-3 border-t bg-background">
+          <Button variant="outline" onClick={handleClose} disabled={submitting}>
+            Cancel
+          </Button>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              onClick={runPreflightChecks}
+              disabled={submitting || preflightChecking || proposedAssignments.length === 0}
             >
-              Cancel
+              <Clock className="w-4 h-4 mr-2" />
+              {preflightChecking ? 'Checking...' : 'Run Preflight'}
             </Button>
-            {!loading && proposedAssignments.length > 0 && (
-              <>
-                <Button 
-                  variant="outline"
-                  onClick={runPreflightChecks}
-                  disabled={submitting || preflightChecking}
-                  className="flex items-center gap-2"
-                >
-                  <CheckCircle className="w-4 h-4" />
-                  {preflightChecking ? 'Checking...' : 'Preflight Check'}
-                </Button>
-                <Button 
-                  onClick={handleSubmitOffers}
-                  disabled={submitting || preflightChecking}
-                  className="flex items-center gap-2"
-                >
-                  <Send className="w-4 h-4" />
-                  {submitting ? 'Sending Offers...' : `Send ${proposedAssignments.length} Offer${proposedAssignments.length > 1 ? 's' : ''}`}
-                </Button>
-              </>
-            )}
+            <Button
+              onClick={handleSubmitOffers}
+              disabled={submitting || proposedAssignments.length === 0}
+              className="flex items-center gap-2"
+            >
+              <Send className="w-4 h-4" />
+              {submitting ? 'Sending...' : `Send ${proposedAssignments.filter(p => p.status === 'ready').length} Offers`}
+            </Button>
           </div>
         </div>
       </DialogContent>
     </Dialog>
   );
-}
-
-function Label({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <div className={className}>{children}</div>;
 }

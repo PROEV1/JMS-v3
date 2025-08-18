@@ -131,10 +131,8 @@ export function EnhancedSchedulePipeline() {
           
           switch (latestOffer.status) {
             case 'pending':
-              // Only override to date_offered if order has engineer and isn't back to awaiting_install_booking
-              if (order.engineer_id && order.status_enhanced !== 'awaiting_install_booking') {
-                targetStatus = 'date_offered';
-              }
+              // Show as date_offered when there's a pending offer
+              targetStatus = 'date_offered';
               break;
             case 'accepted':
               targetStatus = 'date_accepted';

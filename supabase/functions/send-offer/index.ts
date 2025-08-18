@@ -392,6 +392,20 @@ serve(async (req: Request) => {
         .eq('id', jobOffer.id);
     }
 
+    // Update order with engineer assignment and set status to date_offered
+    const { error: updateError } = await supabase
+      .from('orders')
+      .update({
+        engineer_id: engineer_id,
+        status_enhanced: 'date_offered'
+      })
+      .eq('id', order_id);
+
+    if (updateError) {
+      console.error('Failed to update order with engineer assignment:', updateError);
+      // Don't fail the whole request, just log the error
+    }
+
     // Log activity
     await supabase.rpc('log_order_activity', {
       p_order_id: order_id,
