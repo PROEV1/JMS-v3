@@ -17,7 +17,8 @@ export async function calculateDayFit(
   engineer: EngineerSettings,
   date: Date,
   newOrder?: Order,
-  lenienceMinutes: number = 15
+  lenienceMinutes: number = 15,
+  additionalVirtualOrders: Order[] = []
 ): Promise<DayFitResult> {
   try {
     // Get engineer's working hours for this day
@@ -83,6 +84,47 @@ export async function calculateDayFit(
     const offerOrder = offer.orders;
     if (offerOrder && !allOrders.find(o => o.id === offerOrder.id)) {
       allOrders.push(offerOrder);
+    }
+  });
+
+  // Add virtual orders from batch scheduling (for capacity simulation)
+  additionalVirtualOrders.forEach(virtualOrder => {
+    if (!allOrders.find(o => o.id === virtualOrder.id)) {
+      // Convert virtual Order to database format
+      const dbVirtualOrder = {
+        ...virtualOrder,
+        admin_qa_notes: null,
+        agreement_document_url: null,
+        agreement_signed_at: null,
+        created_at: new Date().toISOString(),
+        engineer_notes: null,
+        engineer_signature_data: null,
+        engineer_signed_off_at: null,
+        installation_date: null,
+        installation_notes: null,
+        internal_install_notes: null,
+        job_address: virtualOrder.job_address || null,
+        manual_status_notes: null,
+        manual_status_override: false,
+        order_number: virtualOrder.order_number || 'VIRTUAL',
+        quote_id: 'virtual-quote-id', // Not in Order interface but required by DB
+        scheduling_conflicts: virtualOrder.scheduling_conflicts || [],
+        travel_time_minutes: null,
+        updated_at: new Date().toISOString(),
+        estimated_duration_hours: virtualOrder.estimated_duration_hours || 2,
+        time_window: virtualOrder.time_window || null,
+        postcode: virtualOrder.postcode || '',
+        is_partner_job: virtualOrder.is_partner_job || false,
+        // Ensure required fields are present
+        status: virtualOrder.status || 'awaiting_payment',
+        status_enhanced: (virtualOrder.status_enhanced || 'quote_accepted') as any,
+        total_amount: virtualOrder.total_amount || 0,
+        deposit_amount: virtualOrder.deposit_amount || 0,
+        amount_paid: virtualOrder.amount_paid || 0,
+        scheduled_install_date: null,
+        engineer_id: virtualOrder.engineer_id || null
+      };
+      allOrders.push(dbVirtualOrder);
     }
   });
 
@@ -246,9 +288,10 @@ export async function wouldExceedCapacity(
   engineer: EngineerSettings,
   date: Date,
   newOrder: Order,
-  lenienceMinutes: number = 15
+  lenienceMinutes: number = 15,
+  additionalVirtualOrders: Order[] = []
 ): Promise<{ wouldExceed: boolean; reason: string }> {
-  const dayFit = await calculateDayFit(engineer, date, newOrder, lenienceMinutes);
+  const dayFit = await calculateDayFit(engineer, date, newOrder, lenienceMinutes, additionalVirtualOrders);
   
   return {
     wouldExceed: !dayFit.canFit,
