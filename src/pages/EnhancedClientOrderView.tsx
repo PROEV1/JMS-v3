@@ -277,10 +277,10 @@ export default function EnhancedClientOrderView() {
   const handleOfferResponse = async (offerId: string, response: 'accept' | 'reject', rejectionData?: {
     reason: string;
     blockThisDate: boolean;
-    blockDateRange?: {
+    blockDateRanges?: Array<{
       start_date: string;
       end_date: string;
-    };
+    }>;
   }) => {
     setOfferLoading(true);
     try {
@@ -293,8 +293,8 @@ export default function EnhancedClientOrderView() {
         requestBody.rejection_reason = rejectionData.reason;
         requestBody.block_this_date = rejectionData.blockThisDate;
         
-        if (rejectionData.blockDateRange) {
-          requestBody.block_date_range = rejectionData.blockDateRange;
+        if (rejectionData.blockDateRanges) {
+          requestBody.blockDateRanges = rejectionData.blockDateRanges;
         }
       }
 

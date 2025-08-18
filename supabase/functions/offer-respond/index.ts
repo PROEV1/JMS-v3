@@ -21,6 +21,10 @@ interface OfferResponse {
     start_date: string;
     end_date: string;
   };
+  blockDateRanges?: Array<{
+    start_date: string;
+    end_date: string;
+  }>;
 }
 
 serve(async (req: Request) => {
@@ -29,7 +33,7 @@ serve(async (req: Request) => {
   }
 
   try {
-    const { token, offer_id, response, rejection_reason, block_this_date, block_date_range }: OfferResponse = await req.json();
+    const { token, offer_id, response, rejection_reason, block_this_date, block_date_range, blockDateRanges }: OfferResponse = await req.json();
 
     if ((!token && !offer_id) || !response) {
       return new Response(
@@ -179,60 +183,110 @@ serve(async (req: Request) => {
         throw new Error('Failed to update offer status');
       }
 
-      // Handle date blocking if requested
-      if (block_this_date) {
-        const offeredDateOnly = jobOffer.offered_date.split('T')[0];
-        
-        const { error: blockDateError } = await supabase
-          .from('client_blocked_dates')
-          .insert({
-            client_id: jobOffer.order.client_id,
-            blocked_date: offeredDateOnly,
-            reason: `Auto-blocked: Rejected offer for ${new Date(offeredDateOnly).toLocaleDateString('en-GB')}`
-          });
-        
-        if (blockDateError) {
-          console.error('Failed to block offered date:', blockDateError);
-        } else {
-          console.log(`Blocked date ${offeredDateOnly} for client ${jobOffer.order.client_id}`);
-        }
+      // Reset order to awaiting_install_booking
+      const { error: resetOrderError } = await supabase
+        .from('orders')
+        .update({
+          engineer_id: null,
+          scheduled_install_date: null,
+          status_enhanced: 'awaiting_install_booking'
+        })
+        .eq('id', jobOffer.order_id);
+
+      if (resetOrderError) {
+        console.error('Failed to reset order status:', resetOrderError);
       }
 
-      // Handle date range blocking if requested
-      if (block_date_range && block_date_range.start_date && block_date_range.end_date) {
-        const startDate = new Date(block_date_range.start_date);
-        const endDate = new Date(block_date_range.end_date);
-        const blockedDates = [];
-        
-        // Generate all dates in the range
-        const currentDate = new Date(startDate);
-        while (currentDate <= endDate) {
-          blockedDates.push({
-            client_id: jobOffer.order.client_id,
-            blocked_date: currentDate.toISOString().split('T')[0],
-            reason: `Unavailable: ${startDate.toLocaleDateString('en-GB')} to ${endDate.toLocaleDateString('en-GB')}`
-          });
-          currentDate.setDate(currentDate.getDate() + 1);
-        }
+      // Collect all dates to block in a Set to avoid duplicates
+      const datesToBlock = new Set<string>();
+      const blockingMessages: string[] = [];
 
-        if (blockedDates.length > 0) {
-          const { error: blockRangeError } = await supabase
-            .from('client_blocked_dates')
-            .insert(blockedDates);
+      // Add offered date if requested
+      if (block_this_date) {
+        const offeredDateOnly = jobOffer.offered_date.split('T')[0];
+        datesToBlock.add(offeredDateOnly);
+        blockingMessages.push(`${new Date(offeredDateOnly).toLocaleDateString('en-GB')}`);
+      }
+
+      // Combine legacy single range with new multiple ranges
+      const allRanges = [];
+      if (block_date_range?.start_date && block_date_range.end_date) {
+        allRanges.push(block_date_range);
+      }
+      if (blockDateRanges && Array.isArray(blockDateRanges)) {
+        allRanges.push(...blockDateRanges);
+      }
+
+      // Process all date ranges
+      for (const range of allRanges) {
+        if (range.start_date && range.end_date) {
+          const startDate = new Date(range.start_date);
+          const endDate = new Date(range.end_date);
           
-          if (blockRangeError) {
-            console.error('Failed to block date range:', blockRangeError);
+          const currentDate = new Date(startDate);
+          while (currentDate <= endDate) {
+            datesToBlock.add(currentDate.toISOString().split('T')[0]);
+            currentDate.setDate(currentDate.getDate() + 1);
+          }
+          
+          // Add human-readable message
+          if (startDate.getTime() === endDate.getTime()) {
+            blockingMessages.push(`${startDate.toLocaleDateString('en-GB')}`);
           } else {
-            console.log(`Blocked ${blockedDates.length} dates for client ${jobOffer.order.client_id}`);
+            blockingMessages.push(`${startDate.toLocaleDateString('en-GB')} → ${endDate.toLocaleDateString('en-GB')}`);
           }
         }
       }
 
-      // Log activity
+      // Insert blocked dates using upsert to prevent duplicates
+      if (datesToBlock.size > 0) {
+        const blockedDatesArray = Array.from(datesToBlock).map(date => ({
+          client_id: jobOffer.order.client_id,
+          blocked_date: date,
+          reason: `Client unavailable: ${blockingMessages.join(', ')}`
+        }));
+
+        const { error: blockDatesError } = await supabase
+          .from('client_blocked_dates')
+          .upsert(blockedDatesArray, {
+            onConflict: 'client_id,blocked_date',
+            ignoreDuplicates: true
+          });
+        
+        if (blockDatesError) {
+          console.error('Failed to block date range:', blockDatesError);
+        } else {
+          console.log(`Blocked ${datesToBlock.size} dates for client ${jobOffer.order.client_id}`);
+        }
+
+        // Update order scheduling conflicts for admin visibility
+        const existingConflicts = jobOffer.order.scheduling_conflicts || [];
+        const newConflict = {
+          type: 'client_unavailability',
+          message: `Client unavailable ${blockingMessages.join(', ')}`,
+          ranges: allRanges,
+          blocked_dates: Array.from(datesToBlock),
+          source: 'client_rejection',
+          created_at: responseTime
+        };
+
+        const { error: conflictsError } = await supabase
+          .from('orders')
+          .update({
+            scheduling_conflicts: [...existingConflicts, newConflict]
+          })
+          .eq('id', jobOffer.order_id);
+
+        if (conflictsError) {
+          console.error('Failed to update scheduling conflicts:', conflictsError);
+        }
+      }
+
+      // Log activity with better details
       await supabase.rpc('log_order_activity', {
         p_order_id: jobOffer.order_id,
         p_activity_type: 'offer_rejected',
-        p_description: `Client rejected installation offer for ${new Date(jobOffer.offered_date).toLocaleDateString()}`,
+        p_description: `Client rejected installation offer for ${new Date(jobOffer.offered_date).toLocaleDateString()} - ${datesToBlock.size > 0 ? `Blocked ${datesToBlock.size} dates` : 'No dates blocked'}`,
         p_details: {
           offer_id: jobOffer.id,
           engineer_id: jobOffer.engineer_id,
@@ -240,7 +294,9 @@ serve(async (req: Request) => {
           rejection_reason: rejection_reason || 'No reason provided',
           rejected_at: responseTime,
           blocked_this_date: block_this_date || false,
-          blocked_date_range: block_date_range || null
+          blocked_date_ranges: allRanges,
+          blocked_dates_count: datesToBlock.size,
+          blocking_summary: blockingMessages
         }
       });
 

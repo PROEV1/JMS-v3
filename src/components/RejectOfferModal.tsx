@@ -5,7 +5,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { XCircle } from 'lucide-react';
+import { XCircle, Plus, Minus } from 'lucide-react';
+
+interface DateRange {
+  start_date: string;
+  end_date: string;
+}
 
 interface RejectOfferModalProps {
   isOpen: boolean;
@@ -13,10 +18,7 @@ interface RejectOfferModalProps {
   onReject: (rejectionData: {
     reason: string;
     blockThisDate: boolean;
-    blockDateRange?: {
-      start_date: string;
-      end_date: string;
-    };
+    blockDateRanges?: DateRange[];
   }) => Promise<void>;
   offeredDate: string;
   loading?: boolean;
@@ -31,23 +33,24 @@ export function RejectOfferModal({
 }: RejectOfferModalProps) {
   const [rejectionReason, setRejectionReason] = useState('');
   const [blockThisDate, setBlockThisDate] = useState(true);
-  const [blockDateRange, setBlockDateRange] = useState(false);
-  const [blockStartDate, setBlockStartDate] = useState('');
-  const [blockEndDate, setBlockEndDate] = useState('');
+  const [enableMultipleRanges, setEnableMultipleRanges] = useState(false);
+  const [dateRanges, setDateRanges] = useState<DateRange[]>([{ start_date: '', end_date: '' }]);
 
   const handleSubmit = async () => {
     if (!rejectionReason.trim()) {
       return;
     }
 
+    // Filter out empty or invalid date ranges
+    const validRanges = dateRanges.filter(range => 
+      range.start_date && range.end_date && new Date(range.start_date) <= new Date(range.end_date)
+    );
+
     const rejectionData = {
       reason: rejectionReason.trim(),
       blockThisDate,
-      ...(blockDateRange && blockStartDate && blockEndDate ? {
-        blockDateRange: {
-          start_date: blockStartDate,
-          end_date: blockEndDate
-        }
+      ...(enableMultipleRanges && validRanges.length > 0 ? {
+        blockDateRanges: validRanges
       } : {})
     };
 
@@ -58,16 +61,32 @@ export function RejectOfferModal({
   const handleClose = () => {
     setRejectionReason('');
     setBlockThisDate(true);
-    setBlockDateRange(false);
-    setBlockStartDate('');
-    setBlockEndDate('');
+    setEnableMultipleRanges(false);
+    setDateRanges([{ start_date: '', end_date: '' }]);
     onClose();
   };
 
-  const isValidDateRange = !blockDateRange || 
-    (blockStartDate && blockEndDate && new Date(blockStartDate) <= new Date(blockEndDate));
+  const addDateRange = () => {
+    setDateRanges([...dateRanges, { start_date: '', end_date: '' }]);
+  };
 
-  const canSubmit = rejectionReason.trim() && isValidDateRange && !loading;
+  const removeDateRange = (index: number) => {
+    if (dateRanges.length > 1) {
+      setDateRanges(dateRanges.filter((_, i) => i !== index));
+    }
+  };
+
+  const updateDateRange = (index: number, field: keyof DateRange, value: string) => {
+    const newRanges = [...dateRanges];
+    newRanges[index] = { ...newRanges[index], [field]: value };
+    setDateRanges(newRanges);
+  };
+
+  const isValidDateRanges = !enableMultipleRanges || dateRanges.every(range => 
+    !range.start_date || !range.end_date || new Date(range.start_date) <= new Date(range.end_date)
+  );
+
+  const canSubmit = rejectionReason.trim() && isValidDateRanges && !loading;
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -117,51 +136,79 @@ export function RejectOfferModal({
 
             <div className="flex items-start space-x-2">
               <Checkbox
-                id="block-date-range"
-                checked={blockDateRange}
-                onCheckedChange={(checked) => setBlockDateRange(checked as boolean)}
+                id="block-date-ranges"
+                checked={enableMultipleRanges}
+                onCheckedChange={(checked) => setEnableMultipleRanges(checked as boolean)}
               />
               <div className="grid gap-1.5 leading-none">
-                <Label htmlFor="block-date-range" className="text-sm font-medium">
-                  Block a date range
+                <Label htmlFor="block-date-ranges" className="text-sm font-medium">
+                  Block additional periods
                 </Label>
                 <p className="text-xs text-muted-foreground">
-                  Block multiple dates when you're away or unavailable
+                  Block multiple date ranges when you're away or unavailable
                 </p>
               </div>
             </div>
 
-            {blockDateRange && (
-              <div className="grid grid-cols-2 gap-3 ml-6">
-                <div>
-                  <Label htmlFor="start-date" className="text-xs">From</Label>
-                  <Input
-                    id="start-date"
-                    type="date"
-                    value={blockStartDate}
-                    onChange={(e) => setBlockStartDate(e.target.value)}
-                    min={new Date().toISOString().split('T')[0]}
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="end-date" className="text-xs">To</Label>
-                  <Input
-                    id="end-date"
-                    type="date"
-                    value={blockEndDate}
-                    onChange={(e) => setBlockEndDate(e.target.value)}
-                    min={blockStartDate || new Date().toISOString().split('T')[0]}
-                    className="mt-1"
-                  />
-                </div>
-              </div>
-            )}
+            {enableMultipleRanges && (
+              <div className="space-y-3 ml-6">
+                {dateRanges.map((range, index) => (
+                  <div key={index} className="flex items-center gap-3">
+                    <div className="grid grid-cols-2 gap-3 flex-1">
+                      <div>
+                        <Label className="text-xs">From</Label>
+                        <Input
+                          type="date"
+                          value={range.start_date}
+                          onChange={(e) => updateDateRange(index, 'start_date', e.target.value)}
+                          min={new Date().toISOString().split('T')[0]}
+                          className="mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">To</Label>
+                        <Input
+                          type="date"
+                          value={range.end_date}
+                          onChange={(e) => updateDateRange(index, 'end_date', e.target.value)}
+                          min={range.start_date || new Date().toISOString().split('T')[0]}
+                          className="mt-1"
+                        />
+                      </div>
+                    </div>
+                    {dateRanges.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => removeDateRange(index)}
+                        className="mt-6"
+                      >
+                        <Minus className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+                
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addDateRange}
+                  className="mt-2"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Another Period
+                </Button>
 
-            {blockDateRange && blockStartDate && blockEndDate && new Date(blockStartDate) > new Date(blockEndDate) && (
-              <p className="text-xs text-destructive ml-6">
-                Start date cannot be after end date
-              </p>
+                {dateRanges.some(range => 
+                  range.start_date && range.end_date && new Date(range.start_date) > new Date(range.end_date)
+                ) && (
+                  <p className="text-xs text-destructive">
+                    Start dates cannot be after end dates
+                  </p>
+                )}
+              </div>
             )}
           </div>
 

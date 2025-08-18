@@ -648,13 +648,52 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                               </div>
                            );
                          }
-                       } else {
-                         return (
-                           <Button size="sm" variant="outline" className="text-xs">
-                             View Details
-                           </Button>
-                         );
-                       }
+                        } else if (title === 'Date Rejected') {
+                          // For Date Rejected - always show Smart Assign and working View Job link
+                          return (
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => window.open(`/admin/order/${order.id}`, '_blank')}
+                                className="text-xs"
+                              >
+                                <Eye className="w-4 h-4 mr-1" />
+                                View Job
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleSmartAssign(order)}
+                                className="text-xs"
+                              >
+                                <Wrench className="w-4 h-4 mr-1" />
+                                Smart Assign
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleSendOffer(order)}
+                                className="text-xs"
+                              >
+                                <Send className="w-4 h-4 mr-1" />
+                                Send Offer
+                              </Button>
+                            </div>
+                          );
+                        } else {
+                          return (
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              className="text-xs"
+                              onClick={() => window.open(`/admin/order/${order.id}`, '_blank')}
+                            >
+                              <Eye className="w-4 h-4 mr-1" />
+                              View Job
+                            </Button>
+                          );
+                        }
                      })()}
                    </TableCell>
                 </TableRow>
