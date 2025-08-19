@@ -779,34 +779,36 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                              } else if (activeOffer && title === 'Date Offered') {
                                const timeRemaining = getTimeRemaining(activeOffer.expires_at);
                                return (
-                                 <>
-                                   <div className="text-xs text-muted-foreground mb-1">
+                                 <div className="flex flex-col gap-1 items-end">
+                                   <div className="text-xs text-muted-foreground">
                                      Expires: {timeRemaining}
                                    </div>
-                                   <Button
-                                     size="sm"
-                                     onClick={() => handleAcceptOffer(order.id)}
-                                     className="text-xs px-3 py-1 h-7 bg-green-600 hover:bg-green-700"
-                                   >
-                                     Accept
-                                   </Button>
-                                   <Button
-                                     size="sm"
-                                     variant="destructive"
-                                     onClick={() => handleRejectOffer(order.id)}
-                                     className="text-xs px-3 py-1 h-7"
-                                   >
-                                     Reject
-                                   </Button>
-                                   <Button
-                                     size="sm"
-                                     variant="outline"
-                                     onClick={() => navigate(`/admin/order/${order.id}`)}
-                                     className="text-xs px-3 py-1 h-7"
-                                   >
-                                     View Job
-                                   </Button>
-                                 </>
+                                   <div className="flex gap-2">
+                                     <Button
+                                       size="sm"
+                                       onClick={() => handleAcceptOffer(order.id)}
+                                       className="text-xs px-3 py-1 h-7 bg-green-600 hover:bg-green-700"
+                                     >
+                                       Accept
+                                     </Button>
+                                     <Button
+                                       size="sm"
+                                       variant="destructive"
+                                       onClick={() => handleRejectOffer(order.id)}
+                                       className="text-xs px-3 py-1 h-7"
+                                     >
+                                       Reject
+                                     </Button>
+                                     <Button
+                                       size="sm"
+                                       variant="outline"
+                                       onClick={() => navigate(`/admin/order/${order.id}`)}
+                                       className="text-xs px-3 py-1 h-7"
+                                     >
+                                       View Job
+                                     </Button>
+                                   </div>
+                                 </div>
                                );
                              } else if (title === 'Date Rejected') {
                                return (
