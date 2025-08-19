@@ -564,11 +564,10 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
       {/* Jobs List with Column Headers and Hybrid Table-Card Layout */}
       <div className="space-y-3">
         {/* Column Headers - Desktop Only */}
-        <div className="hidden lg:grid lg:grid-cols-11 gap-4 px-4 py-3 text-sm font-medium text-muted-foreground bg-muted/30 border-b rounded-t-lg">
+        <div className="hidden lg:grid lg:grid-cols-10 gap-4 px-4 py-3 text-sm font-medium text-muted-foreground bg-muted/30 border-b rounded-t-lg">
           <div className="col-span-2">Job ID</div>
           <div className="col-span-2">Client</div>
           <div className="col-span-1">Value</div>
-          <div className="col-span-1">Engineer</div>
           <div className="col-span-2">Status</div>
           <div className="col-span-1">Created</div>
           <div className="col-span-2">Actions</div>
@@ -601,13 +600,16 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                 >
                   <CardContent className="px-4 py-2">
                     {/* Desktop Layout - Table-like Grid */}
-                    <div className="hidden lg:grid lg:grid-cols-11 gap-4 items-center">
+                    <div className="hidden lg:grid lg:grid-cols-10 gap-4 items-center">
                       {/* Job ID */}
                       <div className="col-span-2">
-                        <div className="font-semibold text-sm text-foreground">
-                          <span className="capitalize">
-                            {order.job_type?.replace('_', ' ') || 'Installation'} – {order.order_number}
+                        <div className="space-y-1">
+                          <span className="text-sm font-bold text-foreground capitalize">
+                            {order.job_type?.replace('_', ' ') || 'Installation'}
                           </span>
+                          <div className="text-xs text-muted-foreground">
+                            {order.order_number}
+                          </div>
                         </div>
                       </div>
 
@@ -634,26 +636,13 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                         )}
                       </div>
 
-                      {/* Engineer Status Pill */}
-                      <div className="col-span-1">
-                        {order.engineer_id ? (
-                          <Badge className="text-xs px-2 py-1 bg-green-100 text-green-700 border-green-300">
-                            {engineers.find(e => e.id === order.engineer_id)?.name || 'Assigned'}
-                          </Badge>
-                        ) : (
-                          <Badge variant="destructive" className="text-xs px-2 py-1">
-                            Unassigned
-                          </Badge>
-                        )}
-                      </div>
-
                       {/* Status - Horizontal Badges */}
                       <div className="col-span-2">
                         <div className="flex items-center gap-1 flex-wrap">
-                          <Badge variant={jobStatus.variant} className="text-xs px-2 py-1">
-                            {jobStatus.label}
+                          <Badge variant="secondary" className="text-xs px-2 py-1 bg-slate-100 text-slate-600 border-slate-200">
+                            Needs Scheduling
                           </Badge>
-                          <Badge variant={offersStatus.variant} className="text-xs px-2 py-1">
+                          <Badge variant="outline" className="text-xs px-2 py-1 border-slate-300 text-slate-600">
                             {offersStatus.label}
                           </Badge>
                         </div>
@@ -776,14 +765,17 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                     {/* Mobile Layout - Stacked */}
                     <div className="lg:hidden space-y-3">
                       <div className="flex items-center justify-between">
-                        <div className="font-semibold text-sm text-foreground">
-                          <span className="capitalize">
-                            {order.job_type?.replace('_', ' ') || 'Installation'} – {order.order_number}
+                        <div className="space-y-1">
+                          <span className="text-sm font-bold text-foreground capitalize">
+                            {order.job_type?.replace('_', ' ') || 'Installation'}
                           </span>
+                          <div className="text-xs text-muted-foreground">
+                            {order.order_number}
+                          </div>
                         </div>
                         <div className="flex gap-1">
-                          <Badge variant={jobStatus.variant} className="text-xs px-2 py-1">
-                            {jobStatus.label}
+                          <Badge variant="secondary" className="text-xs px-2 py-1 bg-slate-100 text-slate-600 border-slate-200">
+                            Needs Scheduling
                           </Badge>
                         </div>
                       </div>
@@ -799,16 +791,10 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                             </div>
                           </div>
                           <div className="flex gap-1">
-                            {order.engineer_id ? (
-                              <Badge className="text-xs px-2 py-1 bg-green-100 text-green-700 border-green-300">
-                                {engineers.find(e => e.id === order.engineer_id)?.name || 'Assigned'}
-                              </Badge>
-                            ) : (
-                              <Badge variant="destructive" className="text-xs px-2 py-1">
-                                Unassigned
-                              </Badge>
-                            )}
-                            <Badge variant={offersStatus.variant} className="text-xs px-2 py-1">
+                            <Badge variant="secondary" className="text-xs px-2 py-1 bg-slate-100 text-slate-600 border-slate-200">
+                              Needs Scheduling
+                            </Badge>
+                            <Badge variant="outline" className="text-xs px-2 py-1 border-slate-300 text-slate-600">
                               {offersStatus.label}
                             </Badge>
                           </div>
