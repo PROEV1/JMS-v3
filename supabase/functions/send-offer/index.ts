@@ -293,7 +293,7 @@ serve(async (req: Request) => {
     const isEmailSuppressed = await checkSuppression();
 
     let deliveryDetails = {
-      ...jobOffer.delivery_details,
+      ...(jobOffer.delivery_details || {}),
       sent_at: new Date().toISOString()
     };
 
