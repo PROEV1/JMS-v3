@@ -1,5 +1,4 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
 import Layout from '@/components/Layout';
 import { useAuth } from '@/hooks/useAuth';
@@ -49,23 +48,12 @@ import ClientOfferView from '@/pages/ClientOfferView';
 import EnhancedClientOrderView from '@/pages/EnhancedClientOrderView';
 import OrderDetail from '@/pages/OrderDetail';
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 5 * 60 * 1000, // 5 minutes
-      refetchOnWindowFocus: false,
-    },
-  },
-});
-
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <Router>
-        <AppContent />
-        <Toaster />
-      </Router>
-    </QueryClientProvider>
+    <Router>
+      <AppContent />
+      <Toaster />
+    </Router>
   );
 }
 
