@@ -5,12 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { CalendarDays, Clock, User, AlertTriangle, CheckCircle, Bot, Send, Package } from 'lucide-react';
+import { CalendarDays, Clock, User, AlertTriangle, CheckCircle, Bot, Send, Package, MapPin } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Order, EngineerSettings, getOrderEstimatedHours, getOrderEstimatedMinutes } from '@/utils/schedulingUtils';
 import { getSmartEngineerRecommendations, getSchedulingSettings, getAllEngineersForScheduling, getEngineerDailyWorkload } from '@/utils/schedulingUtils';
 import { calculateDayFit } from '@/utils/dayFitUtils';
+import { getLocationDisplayText } from '@/utils/postcodeUtils';
 
 interface Engineer {
   id: string;
@@ -690,7 +691,10 @@ export function AutoScheduleReviewModal({
                             <div>
                               <span className="font-medium">Client:</span>
                               <div className="text-muted-foreground">{proposal.order.client?.full_name}</div>
-                              <div className="text-xs text-muted-foreground">{proposal.order.postcode}</div>
+                              <div className="text-xs text-muted-foreground flex items-center gap-1">
+                                <MapPin className="w-3 h-3" />
+                                {getLocationDisplayText(proposal.order)}
+                              </div>
                             </div>
                             <div>
                               <span className="font-medium">Duration:</span>
@@ -698,7 +702,7 @@ export function AutoScheduleReviewModal({
                             </div>
                             <div>
                               <span className="font-medium">Score:</span>
-                              <div className="text-muted-foreground">{Math.round(proposal.score * 100)}/100</div>
+                              <div className="text-muted-foreground">{Math.round(proposal.score)}</div>
                             </div>
                           </div>
 
@@ -741,13 +745,13 @@ export function AutoScheduleReviewModal({
                                 <div className="space-y-1">
                                   {proposal.alternatives.slice(1, 3).map((alt, altIndex) => (
                                     <div key={altIndex} className="flex items-center justify-between text-xs p-2 bg-gray-50 rounded">
-                                      <span className="text-xs">
-                                        {alt.engineer.name} • {new Date(alt.availableDate).toLocaleDateString('en-GB', {
-                                          weekday: 'short',
-                                          day: 'numeric',
-                                          month: 'short'
-                                        })} • {Math.round(alt.score * 100)}
-                                      </span>
+                                       <span className="text-xs">
+                                         {alt.engineer.name} • {new Date(alt.availableDate).toLocaleDateString('en-GB', {
+                                           weekday: 'short',
+                                           day: 'numeric',
+                                           month: 'short'
+                                         })} • Score: {Math.round(alt.score)}
+                                       </span>
                                       <Button
                                         size="sm"
                                         variant="outline"
