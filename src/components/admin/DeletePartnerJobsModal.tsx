@@ -5,7 +5,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Trash2, AlertTriangle, BarChart3 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Loader2, Trash2, AlertTriangle, BarChart3, HelpCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -112,8 +113,8 @@ export function DeletePartnerJobsModal({ isOpen, onClose, partnerId, partnerName
   };
 
   const handleDelete = () => {
-    if (confirmationText !== "DELETE") {
-      toast.error("Please type DELETE to confirm");
+    if (confirmationText.toUpperCase() !== "DELETE") {
+      toast.error("Please type DELETE to confirm (case-insensitive)");
       return;
     }
     deleteMutation.mutate();
@@ -126,11 +127,12 @@ export function DeletePartnerJobsModal({ isOpen, onClose, partnerId, partnerName
     onClose();
   };
 
-  const isDeleteDisabled = confirmationText !== "DELETE" || !previewStats || previewStats.orders === 0;
+  const isDeleteDisabled = confirmationText.toUpperCase() !== "DELETE" || !previewStats || previewStats.orders === 0;
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl">
+    <TooltipProvider>
+      <Dialog open={isOpen} onOpenChange={handleClose}>
+        <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Trash2 className="h-5 w-5 text-destructive" />
@@ -144,7 +146,17 @@ export function DeletePartnerJobsModal({ isOpen, onClose, partnerId, partnerName
         <div className="space-y-6">
           <div className="space-y-4">
             <div>
-              <Label htmlFor="run-selector">Import Run Scope</Label>
+              <div className="flex items-center gap-2 mb-2">
+                <Label htmlFor="run-selector">Import Run Scope</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Choose "All partner jobs" to delete everything, or select a specific import run to only delete jobs from that import.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
               <Select value={selectedRun} onValueChange={setSelectedRun}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select import run" />
@@ -162,19 +174,26 @@ export function DeletePartnerJobsModal({ isOpen, onClose, partnerId, partnerName
             </div>
 
             <div className="flex gap-2">
-              <Button
-                onClick={handlePreview}
-                disabled={dryRunMutation.isPending}
-                variant="outline"
-                className="flex items-center gap-2"
-              >
-                {dryRunMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <BarChart3 className="h-4 w-4" />
-                )}
-                Preview Deletion
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    onClick={handlePreview}
+                    disabled={dryRunMutation.isPending}
+                    variant="outline"
+                    className="flex items-center gap-2"
+                  >
+                    {dryRunMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <BarChart3 className="h-4 w-4" />
+                    )}
+                    Preview Deletion
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>See how many records will be deleted without actually deleting them</p>
+                </TooltipContent>
+              </Tooltip>
             </div>
           </div>
 
@@ -228,14 +247,28 @@ export function DeletePartnerJobsModal({ isOpen, onClose, partnerId, partnerName
                   </Alert>
 
                   <div>
-                    <Label htmlFor="confirmation">Type "DELETE" to confirm deletion:</Label>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Label htmlFor="confirmation">Type "DELETE" to confirm deletion:</Label>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Case-insensitive confirmation. You can type "delete", "DELETE", or "Delete"</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
                     <Input
                       id="confirmation"
                       value={confirmationText}
                       onChange={(e) => setConfirmationText(e.target.value)}
-                      placeholder="DELETE"
+                      placeholder="DELETE (case-insensitive)"
                       className="mt-1"
+                      autoFocus
                     />
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Type exactly "DELETE" to enable the delete button (case doesn't matter)
+                    </p>
                   </div>
 
                   <Button
@@ -269,7 +302,8 @@ export function DeletePartnerJobsModal({ isOpen, onClose, partnerId, partnerName
             </div>
           )}
         </div>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+    </TooltipProvider>
   );
 }
