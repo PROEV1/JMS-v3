@@ -45,7 +45,44 @@ serve(async (req) => {
   console.log('Processing partner import request with JWT validation');
 
   try {
-    const { partner_name, sheet_id, sheet_name, run_id } = await req.json();
+    // Handle OPTIONS request for CORS
+    if (req.method === 'OPTIONS') {
+      return new Response(null, {
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+          'Access-Control-Allow-Methods': 'POST, OPTIONS'
+        }
+      });
+    }
+
+    // Validate request method
+    if (req.method !== 'POST') {
+      throw new Error('Only POST requests are allowed');
+    }
+
+    // Parse and validate request body
+    let body;
+    try {
+      const text = await req.text();
+      console.log('Request body text length:', text.length);
+      
+      if (!text || text.trim() === '') {
+        throw new Error('Request body is empty');
+      }
+      
+      body = JSON.parse(text);
+    } catch (parseError) {
+      console.error('JSON parsing error:', parseError);
+      throw new Error(`Invalid JSON in request body: ${parseError.message}`);
+    }
+
+    const { partner_name, sheet_id, sheet_name, run_id } = body;
+    
+    // Validate required parameters
+    if (!partner_name || !sheet_id || !sheet_name) {
+      throw new Error('Missing required parameters: partner_name, sheet_id, sheet_name');
+    }
     
     console.log('Processing import for partner:', partner_name);
     
