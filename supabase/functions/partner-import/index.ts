@@ -133,7 +133,7 @@ serve(async (req) => {
       const authHeader = req.headers.get('Authorization');
       const sheetsResponse = await supabase.functions.invoke('google-sheets-preview', {
         body: { 
-          sheet_id: importProfile.gsheet_id, 
+          gsheet_id: importProfile.gsheet_id, 
           sheet_name: importProfile.gsheet_sheet_name 
         },
         headers: {
