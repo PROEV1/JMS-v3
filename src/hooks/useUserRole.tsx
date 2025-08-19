@@ -20,6 +20,9 @@ export function useUserRole() {
         return;
       }
 
+      // Set loading to true when we have a user but need to fetch role
+      setLoading(true);
+
       try {
         console.log('useUserRole: Fetching role for user ID:', user.id);
         const { data, error } = await supabase

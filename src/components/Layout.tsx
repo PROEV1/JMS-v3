@@ -1,13 +1,12 @@
 
 import { useAuth } from '@/hooks/useAuth';
+import { useUserRole } from '@/hooks/useUserRole';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { LogOut } from 'lucide-react';
 import { ProEVLogo } from '@/components/ProEVLogo';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/AppSidebar';
-import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -15,52 +14,10 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const { user, loading, signOut } = useAuth();
+  const { role: userRole, loading: roleLoading } = useUserRole();
   const location = useLocation();
-  const navigate = useNavigate();
-  const [userRole, setUserRole] = useState<string | null>(null);
-  const [roleLoading, setRoleLoading] = useState(true);
 
-  useEffect(() => {
-    if (user) {
-      fetchUserRole();
-    } else {
-      setRoleLoading(false);
-    }
-  }, [user]);
-
-  const fetchUserRole = async () => {
-    try {
-      console.log('Layout: Fetching role for user:', user?.id);
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('role, status')
-        .eq('user_id', user?.id)
-        .maybeSingle();
-      
-      if (error) {
-        console.error('Layout: Database error fetching user role:', error);
-        setUserRole('client'); // Default to client on error
-        return;
-      }
-      
-      console.log('Layout: User profile data:', data);
-      
-      if (data && data.status === 'active') {
-        setUserRole(data.role);
-        console.log('Layout: Set user role to:', data.role);
-      } else {
-        console.log('Layout: No active profile found, defaulting to client');
-        setUserRole('client');
-      }
-    } catch (error) {
-      console.error('Layout: Error fetching user role:', error);
-      setUserRole('client'); // Default to client on error
-    } finally {
-      setRoleLoading(false);
-    }
-  };
-
-  if (loading) {
+  if (loading || roleLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
@@ -72,41 +29,29 @@ export default function Layout({ children }: LayoutProps) {
     return <Navigate to="/auth" replace />;
   }
 
-  // Show loading while we fetch the user role
-  if (roleLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
-  // Only do role-based protection after user role is fully loaded
+  // Role-based route protection
   const currentPath = location.pathname;
   console.log('Layout: Current path:', currentPath, 'User role:', userRole);
   
-  // Only apply route protection if userRole is set (not loading)
-  if (userRole) {
-    // Protect admin routes from non-admins
-    if (userRole !== 'admin' && (currentPath.startsWith('/admin') || currentPath === '/dashboard')) {
-      const redirectTo = userRole === 'engineer' ? '/engineer' : '/client';
-      console.log(`Layout: ${userRole} accessing admin route, redirecting to ${redirectTo}`);
-      return <Navigate to={redirectTo} replace />;
-    }
-    
-    // Protect client routes from non-clients
-    if (userRole !== 'client' && currentPath === '/client') {
-      const redirectTo = userRole === 'admin' ? '/dashboard' : '/engineer';
-      console.log(`Layout: ${userRole} accessing client route, redirecting to ${redirectTo}`);
-      return <Navigate to={redirectTo} replace />;
-    }
+  // Protect admin routes from non-admins
+  if (userRole !== 'admin' && (currentPath.startsWith('/admin') || currentPath === '/dashboard')) {
+    const redirectTo = userRole === 'engineer' ? '/engineer' : '/client';
+    console.log(`Layout: ${userRole} accessing admin route, redirecting to ${redirectTo}`);
+    return <Navigate to={redirectTo} replace />;
+  }
+  
+  // Protect client routes from non-clients
+  if (userRole !== 'client' && currentPath === '/client') {
+    const redirectTo = userRole === 'admin' ? '/dashboard' : '/engineer';
+    console.log(`Layout: ${userRole} accessing client route, redirecting to ${redirectTo}`);
+    return <Navigate to={redirectTo} replace />;
+  }
 
-    // Protect engineer routes from non-engineers
-    if (userRole !== 'engineer' && currentPath.startsWith('/engineer')) {
-      const redirectTo = userRole === 'admin' ? '/dashboard' : '/client';
-      console.log(`Layout: ${userRole} accessing engineer route, redirecting to ${redirectTo}`);
-      return <Navigate to={redirectTo} replace />;
-    }
+  // Protect engineer routes from non-engineers
+  if (userRole !== 'engineer' && currentPath.startsWith('/engineer')) {
+    const redirectTo = userRole === 'admin' ? '/dashboard' : '/client';
+    console.log(`Layout: ${userRole} accessing engineer route, redirecting to ${redirectTo}`);
+    return <Navigate to={redirectTo} replace />;
   }
 
   return (

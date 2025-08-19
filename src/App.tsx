@@ -45,6 +45,7 @@ import AdminClientUsers from '@/pages/AdminClientUsers';
 import ClientProfilePage from '@/pages/ClientProfilePage';
 import PublicQuoteView from '@/pages/PublicQuoteView';
 import ClientOfferView from '@/pages/ClientOfferView';
+import ClientOfferViewPublic from '@/pages/ClientOfferViewPublic';
 import EnhancedClientOrderView from '@/pages/EnhancedClientOrderView';
 import OrderDetail from '@/pages/OrderDetail';
 
@@ -61,7 +62,8 @@ function AppContent() {
   const { user, loading } = useAuth();
   const { role, loading: roleLoading } = useUserRole();
 
-  if (loading || roleLoading) {
+  // Only show loading for auth, not for public routes
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
@@ -75,9 +77,18 @@ function AppContent() {
         <Route path="/auth" element={<Auth />} />
         <Route path="/setup-password" element={<SetupPassword />} />
         <Route path="/quote/:shareToken" element={<PublicQuoteView />} />
-        <Route path="/offers/:clientToken" element={<ClientOfferView />} />
+        <Route path="/offers/:clientToken" element={<ClientOfferViewPublic />} />
         <Route path="*" element={<Navigate to="/auth" replace />} />
       </Routes>
+    );
+  }
+
+  // For authenticated users, wait for role loading before rendering protected routes
+  if (roleLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
+      </div>
     );
   }
 
@@ -146,7 +157,7 @@ function AppContent() {
 
         {/* Public Routes */}
         <Route path="/quote/:shareToken" element={<PublicQuoteView />} />
-        <Route path="/offers/:clientToken" element={<ClientOfferView />} />
+        <Route path="/offers/:clientToken" element={<ClientOfferViewPublic />} />
         
         {/* Catch-all */}
         <Route path="*" element={<NotFound />} />
