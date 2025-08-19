@@ -135,7 +135,7 @@ function AppContent() {
             <Route path="/admin/leads" element={<AdminLeads />} />
             <Route path="/admin/settings" element={<AdminSettings />} />
             <Route path="/admin/schedule" element={<AdminSchedule />} />
-            <Route path="/admin/schedule/status" element={<AdminScheduleStatus />} />
+            <Route path="/admin/schedule/status/:status" element={<AdminScheduleStatus />} />
             <Route path="/admin/partners" element={<AdminPartners />} />
             <Route path="/admin/partners/:partnerId/profiles" element={<AdminPartnerProfiles />} />
           </>
