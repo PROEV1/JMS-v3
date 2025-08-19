@@ -91,6 +91,7 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
   // Helper functions for status chips
   const getJobStatusChip = (order: Order) => {
     const status = order.status_enhanced;
+    console.log(`Order ${order.id} status_enhanced:`, status);
     let variant: "default" | "secondary" | "destructive" | "outline" = "secondary";
     let text = status;
 
