@@ -61,19 +61,11 @@ export function DeletePartnerJobsModal({ isOpen, onClose, partnerId, partnerName
   // Dry run mutation
   const dryRunMutation = useMutation({
     mutationFn: async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        throw new Error('No active session found');
-      }
-
       const { data, error } = await supabase.functions.invoke("admin-delete-partner-jobs", {
         body: {
           partner_id: partnerId,
           import_run_id: selectedRun === "all" ? undefined : selectedRun,
           dry_run: true
-        },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`
         }
       });
 
@@ -92,19 +84,11 @@ export function DeletePartnerJobsModal({ isOpen, onClose, partnerId, partnerName
   // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        throw new Error('No active session found');
-      }
-
       const { data, error } = await supabase.functions.invoke("admin-delete-partner-jobs", {
         body: {
           partner_id: partnerId,
           import_run_id: selectedRun === "all" ? undefined : selectedRun,
           dry_run: false
-        },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`
         }
       });
 
