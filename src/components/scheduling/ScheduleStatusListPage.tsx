@@ -748,34 +748,34 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                             const activeOffer = getActiveOfferForOrder(order.id);
                             const latestOffer = getLatestOfferForOrder(order.id);
                             
-                            if (title === 'Ready to Book') {
-                              return (
-                                <>
-                                  <Button
-                                    size="sm"
-                                    onClick={() => handleConfirmAndSchedule(order.id)}
-                                    className="text-xs px-3 py-1 h-7"
-                                  >
-                                    Confirm & Schedule
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handleCancelAndRestart(order.id)}
-                                    className="text-xs px-3 py-1 h-7"
-                                  >
-                                    Cancel
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => navigate(`/admin/order/${order.id}`)}
-                                    className="text-xs px-3 py-1 h-7"
-                                  >
-                                    View Job
-                                  </Button>
-                                </>
-                              );
+                             if (title === 'Ready to Book') {
+                               return (
+                                 <div className="flex gap-2">
+                                   <Button
+                                     size="sm"
+                                     onClick={() => handleConfirmAndSchedule(order.id)}
+                                     className="text-xs px-3 py-1 h-7"
+                                   >
+                                     Confirm & Schedule
+                                   </Button>
+                                   <Button
+                                     size="sm"
+                                     variant="outline"
+                                     onClick={() => handleCancelAndRestart(order.id)}
+                                     className="text-xs px-3 py-1 h-7"
+                                   >
+                                     Cancel
+                                   </Button>
+                                   <Button
+                                     size="sm"
+                                     variant="outline"
+                                     onClick={() => navigate(`/admin/order/${order.id}`)}
+                                     className="text-xs px-3 py-1 h-7"
+                                   >
+                                     View Job
+                                   </Button>
+                                 </div>
+                               );
                              } else if (activeOffer && title === 'Date Offered') {
                                const timeRemaining = getTimeRemaining(activeOffer.expires_at);
                                return (
@@ -812,7 +812,7 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                                );
                              } else if (title === 'Date Rejected') {
                                return (
-                                 <>
+                                 <div className="flex gap-2">
                                    <Button
                                      onClick={() => handleSmartAssign(order)}
                                      size="sm"
@@ -828,7 +828,7 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                                    >
                                      View Job
                                    </Button>
-                                 </>
+                                 </div>
                                );
                             } else if (order.status_enhanced === 'awaiting_install_booking') {
                               if (activeOffer) {
