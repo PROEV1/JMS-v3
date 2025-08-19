@@ -753,7 +753,7 @@ export type Database = {
           is_read: boolean | null
           project_id: string | null
           quote_id: string | null
-          sender_id: string
+          sender_id: string | null
           sender_role: Database["public"]["Enums"]["user_role"]
           status: Database["public"]["Enums"]["message_status"] | null
         }
@@ -765,7 +765,7 @@ export type Database = {
           is_read?: boolean | null
           project_id?: string | null
           quote_id?: string | null
-          sender_id: string
+          sender_id?: string | null
           sender_role: Database["public"]["Enums"]["user_role"]
           status?: Database["public"]["Enums"]["message_status"] | null
         }
@@ -777,7 +777,7 @@ export type Database = {
           is_read?: boolean | null
           project_id?: string | null
           quote_id?: string | null
-          sender_id?: string
+          sender_id?: string | null
           sender_role?: Database["public"]["Enums"]["user_role"]
           status?: Database["public"]["Enums"]["message_status"] | null
         }
