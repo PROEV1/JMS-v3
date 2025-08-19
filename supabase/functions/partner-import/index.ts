@@ -492,38 +492,76 @@ serve(async (req) => {
       // Insert batch data (only if not a dry run)
       try {
         if (!dry_run) {
+          // Insert clients first and track which ones were actually created
+          const actuallyCreatedClients = new Set();
+          
           if (batchClients.length > 0) {
-            const { error: clientsError } = await supabase
+            console.log(`Inserting ${batchClients.length} clients...`);
+            const { data: insertedClients, error: clientsError } = await supabase
               .from('clients')
-              .upsert(batchClients, { onConflict: 'email' });
+              .upsert(batchClients, { 
+                onConflict: 'email',
+                ignoreDuplicates: false 
+              })
+              .select('id, email');
             
             if (clientsError) {
               console.error('Batch clients insert error:', clientsError);
+              throw clientsError;
+            } else {
+              console.log(`Successfully processed ${insertedClients?.length || 0} clients`);
+              // Track which clients were actually processed
+              insertedClients?.forEach(client => {
+                actuallyCreatedClients.add(client.id);
+              });
             }
           }
 
-          if (batchQuotes.length > 0) {
+          // Only insert quotes and orders for clients that were successfully created/found
+          const validQuotes = batchQuotes.filter(quote => 
+            actuallyCreatedClients.has(quote.client_id) || existingClients.has(batchClients.find(c => c.id === quote.client_id)?.email?.toLowerCase())
+          );
+          
+          const validOrders = batchOrders.filter(order => 
+            actuallyCreatedClients.has(order.client_id) || existingClients.has(batchClients.find(c => c.id === order.client_id)?.email?.toLowerCase())
+          );
+
+          if (validQuotes.length > 0) {
+            console.log(`Inserting ${validQuotes.length} quotes...`);
             const { error: quotesError } = await supabase
               .from('quotes')
-              .insert(batchQuotes);
+              .insert(validQuotes);
             
             if (quotesError) {
               console.error('Batch quotes insert error:', quotesError);
+              throw quotesError;
             }
           }
 
-          if (batchOrders.length > 0) {
+          if (validOrders.length > 0) {
+            console.log(`Inserting ${validOrders.length} orders...`);
             const { data: insertedOrders, error: ordersError } = await supabase
               .from('orders')
-              .insert(batchOrders)
+              .insert(validOrders)
               .select('id');
             
             if (ordersError) {
               console.error('Batch orders insert error:', ordersError);
+              throw ordersError;
             } else {
               results.inserted_count += insertedOrders?.length || 0;
+              console.log(`Successfully inserted ${insertedOrders?.length || 0} orders`);
             }
           }
+
+          // Track any skipped items due to client creation failures
+          const skippedQuotes = batchQuotes.length - validQuotes.length;
+          const skippedOrders = batchOrders.length - validOrders.length;
+          if (skippedQuotes > 0 || skippedOrders > 0) {
+            console.log(`Skipped ${skippedQuotes} quotes and ${skippedOrders} orders due to client creation issues`);
+            results.skipped_count += skippedOrders;
+          }
+          
         } else {
           // Dry run - just count what would be inserted
           results.inserted_count += batchOrders.length;
