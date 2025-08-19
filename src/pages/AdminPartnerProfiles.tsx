@@ -325,13 +325,22 @@ export default function AdminPartnerProfiles() {
                 <Label htmlFor="is_active">Active Profile</Label>
               </div>
 
-              <div className="flex justify-end space-x-2 pt-4 border-t">
-                <Button type="button" variant="outline" onClick={() => { setShowCreateDialog(false); resetForm(); }}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={createProfileMutation.isPending || updateProfileMutation.isPending}>
-                  {editingProfile ? 'Update Profile' : 'Create Profile'}
-                </Button>
+              <div className="flex justify-between items-center pt-4 border-t">
+                <div className="text-sm text-muted-foreground">
+                  💡 Column mappings are saved when you click "{editingProfile ? 'Update Profile' : 'Create Profile'}"
+                </div>
+                <div className="flex space-x-2">
+                  <Button type="button" variant="outline" onClick={() => { setShowCreateDialog(false); resetForm(); }}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={createProfileMutation.isPending || updateProfileMutation.isPending} size="lg">
+                    {createProfileMutation.isPending || updateProfileMutation.isPending ? (
+                      editingProfile ? 'Updating...' : 'Creating...'
+                    ) : (
+                      editingProfile ? 'Update Profile & Save Mappings' : 'Create Profile & Save Mappings'
+                    )}
+                  </Button>
+                </div>
               </div>
             </form>
           </DialogContent>
