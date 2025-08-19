@@ -424,6 +424,33 @@ serve(async (req) => {
           const quoteId = crypto.randomUUID();
           const orderId = crypto.randomUUID();
 
+          // Parse date in DD/MM/YYYY format
+          let scheduledInstallDate = null;
+          if (mappedRow.scheduled_date && mappedRow.scheduled_date.trim()) {
+            try {
+              const dateStr = mappedRow.scheduled_date.trim();
+              // Check if it's in DD/MM/YYYY format
+              if (dateStr.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
+                const [day, month, year] = dateStr.split('/');
+                // Create date in ISO format (YYYY-MM-DD)
+                const isoDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+                scheduledInstallDate = new Date(isoDate).toISOString();
+              } else {
+                // Try parsing as-is for other formats
+                scheduledInstallDate = new Date(dateStr).toISOString();
+              }
+              
+              // Validate the date
+              if (isNaN(new Date(scheduledInstallDate).getTime())) {
+                console.warn(`Invalid date for row ${rowNumber}: ${dateStr}`);
+                scheduledInstallDate = null;
+              }
+            } catch (dateError) {
+              console.warn(`Date parsing error for row ${rowNumber}: ${mappedRow.scheduled_date}, error: ${dateError.message}`);
+              scheduledInstallDate = null;
+            }
+          }
+
           batchQuotes.push({
             id: quoteId,
             client_id: clientId,
@@ -442,7 +469,7 @@ serve(async (req) => {
             partner_external_id: externalId,
             is_partner_job: true,
             engineer_id: engineerId,
-            scheduled_install_date: mappedRow.scheduled_date ? new Date(mappedRow.scheduled_date).toISOString() : null,
+            scheduled_install_date: scheduledInstallDate,
             partner_metadata: {
               import_run_id: run_id,
               original_status: mappedRow.status,
