@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { MoreHorizontal, UserPlus, UserMinus, Calendar, ExternalLink, CheckCircle } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Database } from '@/integrations/supabase/types';
+import { getOrderEstimatedMinutes, isDefaultEstimatedHours } from '@/utils/schedulingUtils';
 
 type Order = Database['public']['Tables']['orders']['Row'] & {
   clients?: { name: string; email: string; phone: string; };
@@ -190,11 +191,16 @@ export function EnhancedJobCard({ order, onAssignEngineer, onUnassign, onSchedul
         )}
 
         <div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground">
-          <div>
+          <div className="flex items-center gap-1">
             Duration:{' '}
             <span className="font-medium text-foreground">
-              {order.estimated_duration_hours ? (order.estimated_duration_hours * 60) : 240} mins
+              {getOrderEstimatedMinutes(order)} mins
             </span>
+            {isDefaultEstimatedHours(order) && (
+              <Badge variant="outline" className="text-xs px-1 py-0" title="Using default duration estimate">
+                Default
+              </Badge>
+            )}
           </div>
           <div>
             {order.created_at && (

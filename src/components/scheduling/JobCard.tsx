@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Order, Engineer, getStatusColor } from '@/utils/schedulingUtils';
+import { Order, Engineer, getStatusColor, getOrderEstimatedHours, isDefaultEstimatedHours } from '@/utils/schedulingUtils';
 import { getLocationDisplayText } from '@/utils/postcodeUtils';
 import { MapPin, User, Calendar, Clock, Eye, Package, CalendarDays, Users } from 'lucide-react';
 
@@ -95,9 +95,23 @@ export function JobCard({
                 <p><strong>Total Amount:</strong> £{order.total_amount}</p>
                 <p><strong>Deposit:</strong> £{order.deposit_amount}</p>
                 <p><strong>Amount Paid:</strong> £{order.amount_paid}</p>
-                {order.estimated_duration_hours && (
-                  <p><strong>Duration:</strong> {order.estimated_duration_hours}h</p>
-                )}
+                <div className="flex items-center gap-2">
+                  <span><strong>Duration:</strong> {getOrderEstimatedHours(order)}h</span>
+                  {isDefaultEstimatedHours(order) && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Badge variant="outline" className="text-xs px-1.5 py-0.5">
+                            Default
+                          </Badge>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Using default duration estimate</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -249,12 +263,24 @@ export function JobCard({
                 </div>
               )}
 
-              {order.estimated_duration_hours && (
-                <div className="flex items-center gap-1">
-                  <Clock className="h-3 w-3" />
-                  <span>{order.estimated_duration_hours}h estimated</span>
-                </div>
-              )}
+              <div className="flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                <span>{getOrderEstimatedHours(order)}h estimated</span>
+                {isDefaultEstimatedHours(order) && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <Badge variant="outline" className="text-xs px-1 py-0">
+                          Default
+                        </Badge>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Using default duration estimate</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+              </div>
 
               {/* Price info for unassigned jobs */}
               {isDraggable && (

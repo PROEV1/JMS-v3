@@ -16,6 +16,10 @@ export const getOrderEstimatedMinutes = (order: Order): number => {
   return getOrderEstimatedHours(order) * 60;
 };
 
+export const isDefaultEstimatedHours = (order: Order): boolean => {
+  return !order.estimated_duration_hours || order.estimated_duration_hours <= 0;
+};
+
 // Legacy interfaces for backward compatibility
 export interface Order {
   id: string;
