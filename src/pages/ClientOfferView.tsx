@@ -55,9 +55,11 @@ export default function ClientOfferView() {
       if (!token) return;
 
       try {
-        const { data, error } = await supabase.functions.invoke('offer-lookup/' + token);
+        const { data, error } = await supabase.functions.invoke('offer-lookup', {
+          body: { token }
+        });
 
-        if (error || data.error) {
+        if (error || data?.error) {
           setError(data?.error || 'Failed to load offer details');
           if (data?.expired) {
             setError('This offer has expired');
