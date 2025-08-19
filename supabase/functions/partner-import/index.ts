@@ -279,7 +279,7 @@ Deno.serve(async (req) => {
         });
         
         const engineerIdentifier = rowData[engineerIdentifierColumn]?.trim();
-        if (engineerIdentifier) {
+        if (engineerIdentifier && engineerIdentifier !== '') {
           uniquePartnerEngineers.add(engineerIdentifier);
         }
       });
@@ -289,7 +289,10 @@ Deno.serve(async (req) => {
         engineerIdentifier => !engineerMappingLookup[engineerIdentifier]
       );
       
+      console.log(`Found ${unmappedEngineers.length} unmapped engineers:`, unmappedEngineers);
+      
       if (unmappedEngineers.length > 0) {
+        console.log('Blocking import due to unmapped engineers:', unmappedEngineers);
         return new Response(JSON.stringify({
           success: false,
           unmapped_engineers: unmappedEngineers,
@@ -334,7 +337,7 @@ Deno.serve(async (req) => {
 
         // Resolve engineer ID if engineer identifier is provided
         let resolvedEngineerId: string | null = null;
-        if (mappedData.engineer_identifier) {
+        if (mappedData.engineer_identifier && mappedData.engineer_identifier.trim() !== '') {
           const engineerIdentifier = mappedData.engineer_identifier.trim();
           resolvedEngineerId = engineerMappingLookup[engineerIdentifier] || null;
           
