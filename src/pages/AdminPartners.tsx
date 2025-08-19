@@ -19,6 +19,8 @@ interface Partner {
   slug: string | null;
   base_url: string | null;
   is_active: boolean;
+  client_payment_required: boolean;
+  client_agreement_required: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -33,7 +35,9 @@ export default function AdminPartners() {
     name: '',
     slug: '',
     base_url: '',
-    is_active: true
+    is_active: true,
+    client_payment_required: true,
+    client_agreement_required: true
   });
 
   const { data: partners, isLoading } = useQuery({
@@ -57,7 +61,9 @@ export default function AdminPartners() {
           name: data.name,
           slug: data.slug || null,
           base_url: data.base_url || null,
-          is_active: data.is_active
+          is_active: data.is_active,
+          client_payment_required: data.client_payment_required,
+          client_agreement_required: data.client_agreement_required
         }]);
       
       if (error) throw error;
@@ -81,7 +87,9 @@ export default function AdminPartners() {
           name: data.name,
           slug: data.slug || null,
           base_url: data.base_url || null,
-          is_active: data.is_active
+          is_active: data.is_active,
+          client_payment_required: data.client_payment_required,
+          client_agreement_required: data.client_agreement_required
         })
         .eq('id', data.id);
       
@@ -99,7 +107,14 @@ export default function AdminPartners() {
   });
 
   const resetForm = () => {
-    setFormData({ name: '', slug: '', base_url: '', is_active: true });
+    setFormData({ 
+      name: '', 
+      slug: '', 
+      base_url: '', 
+      is_active: true,
+      client_payment_required: true,
+      client_agreement_required: true
+    });
   };
 
   const handleEdit = (partner: Partner) => {
@@ -108,7 +123,9 @@ export default function AdminPartners() {
       name: partner.name,
       slug: partner.slug || '',
       base_url: partner.base_url || '',
-      is_active: partner.is_active
+      is_active: partner.is_active,
+      client_payment_required: partner.client_payment_required,
+      client_agreement_required: partner.client_agreement_required
     });
   };
 
@@ -168,6 +185,27 @@ export default function AdminPartners() {
                   placeholder="https://partner-jms.com"
                 />
               </div>
+              
+              <div className="space-y-3">
+                <h3 className="text-sm font-medium">Client Requirements</h3>
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="client_payment_required"
+                    checked={formData.client_payment_required}
+                    onCheckedChange={(checked) => setFormData({ ...formData, client_payment_required: checked })}
+                  />
+                  <Label htmlFor="client_payment_required">Client Payment Required</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="client_agreement_required"
+                    checked={formData.client_agreement_required}
+                    onCheckedChange={(checked) => setFormData({ ...formData, client_agreement_required: checked })}
+                  />
+                  <Label htmlFor="client_agreement_required">Client Agreement Required</Label>
+                </div>
+              </div>
+              
               <div className="flex items-center space-x-2">
                 <Switch
                   id="is_active"
@@ -210,6 +248,14 @@ export default function AdminPartners() {
                 {partner.base_url && (
                   <p className="text-sm text-muted-foreground">URL: {partner.base_url}</p>
                 )}
+                <div className="flex gap-2 mt-2">
+                  {!partner.client_payment_required && (
+                    <Badge variant="outline" className="text-xs">Payment Not Required</Badge>
+                  )}
+                  {!partner.client_agreement_required && (
+                    <Badge variant="outline" className="text-xs">Agreement Not Required</Badge>
+                  )}
+                </div>
               </div>
               <div className="flex space-x-2">
                 <Button
@@ -262,6 +308,27 @@ export default function AdminPartners() {
                           placeholder="https://partner-jms.com"
                         />
                       </div>
+                      
+                      <div className="space-y-3">
+                        <h3 className="text-sm font-medium">Client Requirements</h3>
+                        <div className="flex items-center space-x-2">
+                          <Switch
+                            id="edit-client_payment_required"
+                            checked={formData.client_payment_required}
+                            onCheckedChange={(checked) => setFormData({ ...formData, client_payment_required: checked })}
+                          />
+                          <Label htmlFor="edit-client_payment_required">Client Payment Required</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Switch
+                            id="edit-client_agreement_required"
+                            checked={formData.client_agreement_required}
+                            onCheckedChange={(checked) => setFormData({ ...formData, client_agreement_required: checked })}
+                          />
+                          <Label htmlFor="edit-client_agreement_required">Client Agreement Required</Label>
+                        </div>
+                      </div>
+                      
                       <div className="flex items-center space-x-2">
                         <Switch
                           id="edit-is_active"

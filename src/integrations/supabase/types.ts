@@ -1263,6 +1263,8 @@ export type Database = {
       partners: {
         Row: {
           base_url: string | null
+          client_agreement_required: boolean
+          client_payment_required: boolean
           created_at: string
           id: string
           is_active: boolean
@@ -1272,6 +1274,8 @@ export type Database = {
         }
         Insert: {
           base_url?: string | null
+          client_agreement_required?: boolean
+          client_payment_required?: boolean
           created_at?: string
           id?: string
           is_active?: boolean
@@ -1281,6 +1285,8 @@ export type Database = {
         }
         Update: {
           base_url?: string | null
+          client_agreement_required?: boolean
+          client_payment_required?: boolean
           created_at?: string
           id?: string
           is_active?: boolean

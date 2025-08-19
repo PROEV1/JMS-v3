@@ -1,122 +1,166 @@
-import React from 'react';
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
-import { AuthProvider } from '@/hooks/useAuth';
+import { Layout } from '@/components/Layout';
+import { useAuth } from '@/hooks/useAuth';
+import { useUserRole } from '@/hooks/useUserRole';
 
-// Existing pages
+// Import pages
+import Auth from '@/pages/Auth';
 import Dashboard from '@/pages/Dashboard';
+import ClientDashboard from '@/pages/ClientDashboard';
+import EngineerDashboard from '@/pages/EngineerDashboard';
 import Admin from '@/pages/Admin';
-import AdminClientUsers from '@/pages/AdminClientUsers';
 import AdminClients from '@/pages/AdminClients';
-import AdminEngineers from '@/pages/AdminEngineers';
-import AdminLeads from '@/pages/AdminLeads';
-import AdminMessages from '@/pages/AdminMessages';
 import AdminOrders from '@/pages/AdminOrders';
-import AdminProducts from '@/pages/AdminProducts';
-import AdminQuoteCreate from '@/pages/AdminQuoteCreate';
-import AdminQuoteDetail from '@/pages/AdminQuoteDetail';
-import AdminQuoteEdit from '@/pages/AdminQuoteEdit';
 import AdminQuotes from '@/pages/AdminQuotes';
+import AdminProducts from '@/pages/AdminProducts';
+import AdminEngineers from '@/pages/AdminEngineers';
+import AdminUsers from '@/pages/AdminUsers';
+import AdminMessages from '@/pages/AdminMessages';
+import AdminLeads from '@/pages/AdminLeads';
+import AdminSettings from '@/pages/AdminSettings';
 import AdminSchedule from '@/pages/AdminSchedule';
 import AdminScheduleStatus from '@/pages/AdminScheduleStatus';
-import AdminSettings from '@/pages/AdminSettings';
-import AdminUserDetail from '@/pages/AdminUserDetail';
-import AdminUserInvite from '@/pages/AdminUserInvite';
-import AdminUsers from '@/pages/AdminUsers';
-import Auth from '@/pages/Auth';
-import ClientDashboard from '@/pages/ClientDashboard';
-import ClientDateBlocking from '@/pages/ClientDateBlocking';
-import ClientDocuments from '@/pages/ClientDocuments';
-import ClientMessages from '@/pages/ClientMessages';
-import ClientOfferView from '@/pages/ClientOfferView';
-import ClientOrders from '@/pages/ClientOrders';
-import ClientPayments from '@/pages/ClientPayments';
-import ClientProfilePage from '@/pages/ClientProfilePage';
-import ClientProfileSelf from '@/pages/ClientProfileSelf';
-import ClientQuoteDetail from '@/pages/ClientQuoteDetail';
-import ClientQuotes from '@/pages/ClientQuotes';
-import EngineerAvailability from '@/pages/EngineerAvailability';
-import EngineerDashboard from '@/pages/EngineerDashboard';
-import EngineerJobDetail from '@/pages/EngineerJobDetail';
-import EngineerProfile from '@/pages/EngineerProfile';
-import EnhancedClientOrderView from '@/pages/EnhancedClientOrderView';
-import NotFound from '@/pages/NotFound';
-import OrderDetail from '@/pages/OrderDetail';
-import PublicQuoteView from '@/pages/PublicQuoteView';
-import SetupPassword from '@/pages/SetupPassword';
-
-// Layout component
-import Layout from '@/components/Layout';
-
-// New partner pages
 import AdminPartners from '@/pages/AdminPartners';
 import AdminPartnerProfiles from '@/pages/AdminPartnerProfiles';
+import ClientQuotes from '@/pages/ClientQuotes';
+import ClientOrders from '@/pages/ClientOrders';
+import ClientMessages from '@/pages/ClientMessages';
+import ClientDocuments from '@/pages/ClientDocuments';
+import ClientPayments from '@/pages/ClientPayments';
+import ClientDateBlocking from '@/pages/ClientDateBlocking';
+import ClientProfileSelf from '@/pages/ClientProfileSelf';
+import ClientQuoteDetail from '@/pages/ClientQuoteDetail';
+import AdminQuoteDetail from '@/pages/AdminQuoteDetail';
+import AdminQuoteEdit from '@/pages/AdminQuoteEdit';
+import AdminQuoteCreate from '@/pages/AdminQuoteCreate';
+import EngineerProfile from '@/pages/EngineerProfile';
+import EngineerAvailability from '@/pages/EngineerAvailability';
+import EngineerJobDetail from '@/pages/EngineerJobDetail';
+import NotFound from '@/pages/NotFound';
+import SetupPassword from '@/pages/SetupPassword';
+import AdminUserDetail from '@/pages/AdminUserDetail';
+import AdminUserInvite from '@/pages/AdminUserInvite';
+import AdminClientUsers from '@/pages/AdminClientUsers';
+import ClientProfilePage from '@/pages/ClientProfilePage';
+import PublicQuoteView from '@/pages/PublicQuoteView';
+import ClientOfferView from '@/pages/ClientOfferView';
+import EnhancedClientOrderView from '@/pages/EnhancedClientOrderView';
+import OrderDetail from '@/pages/OrderDetail';
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <Router>
-        <Routes>
-          {/* Public routes */}
-          <Route path="/auth" element={<Auth />} />
-          <Route path="/setup-password" element={<SetupPassword />} />
-          <Route path="/quote/:id" element={<PublicQuoteView />} />
-          
-          {/* Protected routes with layout */}
-          <Route path="/" element={<Layout><Dashboard /></Layout>} />
-          <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
-          <Route path="/admin" element={<Layout><Admin /></Layout>} />
-          <Route path="/admin/client-users" element={<Layout><AdminClientUsers /></Layout>} />
-          <Route path="/admin/clients" element={<Layout><AdminClients /></Layout>} />
-          <Route path="/admin/engineers" element={<Layout><AdminEngineers /></Layout>} />
-          <Route path="/admin/leads" element={<Layout><AdminLeads /></Layout>} />
-          <Route path="/admin/messages" element={<Layout><AdminMessages /></Layout>} />
-          <Route path="/admin/orders" element={<Layout><AdminOrders /></Layout>} />
-          <Route path="/admin/orders/:id" element={<Layout><OrderDetail /></Layout>} />
-          <Route path="/admin/products" element={<Layout><AdminProducts /></Layout>} />
-          <Route path="/admin/quotes" element={<Layout><AdminQuotes /></Layout>} />
-          <Route path="/admin/quotes/create" element={<Layout><AdminQuoteCreate /></Layout>} />
-          <Route path="/admin/quotes/:id" element={<Layout><AdminQuoteDetail /></Layout>} />
-          <Route path="/admin/quotes/:id/edit" element={<Layout><AdminQuoteEdit /></Layout>} />
-          <Route path="/admin/schedule" element={<Layout><AdminSchedule /></Layout>} />
-          <Route path="/admin/schedule/status" element={<Layout><AdminScheduleStatus /></Layout>} />
-          <Route path="/admin/settings" element={<Layout><AdminSettings /></Layout>} />
-          <Route path="/admin/users" element={<Layout><AdminUsers /></Layout>} />
-          <Route path="/admin/users/:id" element={<Layout><AdminUserDetail /></Layout>} />
-          <Route path="/admin/users/invite" element={<Layout><AdminUserInvite /></Layout>} />
-          
-          {/* Partner management routes */}
-          <Route path="/admin/partners" element={<Layout><AdminPartners /></Layout>} />
-          <Route path="/admin/partners/:partnerId/profiles" element={<Layout><AdminPartnerProfiles /></Layout>} />
-          
-          <Route path="/client/dashboard" element={<Layout><ClientDashboard /></Layout>} />
-          <Route path="/client/date-blocking" element={<Layout><ClientDateBlocking /></Layout>} />
-          <Route path="/client/documents" element={<Layout><ClientDocuments /></Layout>} />
-          <Route path="/client/messages" element={<Layout><ClientMessages /></Layout>} />
-          <Route path="/client/offer/:id" element={<Layout><ClientOfferView /></Layout>} />
-          <Route path="/client/orders" element={<Layout><ClientOrders /></Layout>} />
-          <Route path="/client/orders/:id" element={<Layout><EnhancedClientOrderView /></Layout>} />
-          <Route path="/client/payments" element={<Layout><ClientPayments /></Layout>} />
-          <Route path="/client/profile" element={<Layout><ClientProfileSelf /></Layout>} />
-          <Route path="/client/profile/:id" element={<Layout><ClientProfilePage /></Layout>} />
-          <Route path="/client/quotes" element={<Layout><ClientQuotes /></Layout>} />
-          <Route path="/client/quotes/:id" element={<Layout><ClientQuoteDetail /></Layout>} />
-          
-          <Route path="/engineer/availability" element={<Layout><EngineerAvailability /></Layout>} />
-          <Route path="/engineer/dashboard" element={<Layout><EngineerDashboard /></Layout>} />
-          <Route path="/engineer/jobs/:id" element={<Layout><EngineerJobDetail /></Layout>} />
-          <Route path="/engineer/profile" element={<Layout><EngineerProfile /></Layout>} />
-          
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-        </Router>
+      <Router>
+        <AppContent />
         <Toaster />
-      </AuthProvider>
+      </Router>
     </QueryClientProvider>
+  );
+}
+
+function AppContent() {
+  const { user, loading } = useAuth();
+  const { role, loading: roleLoading } = useUserRole();
+
+  if (loading || roleLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <Routes>
+        <Route path="/auth" element={<Auth />} />
+        <Route path="/setup-password" element={<SetupPassword />} />
+        <Route path="/quote/:shareToken" element={<PublicQuoteView />} />
+        <Route path="/offers/:clientToken" element={<ClientOfferView />} />
+        <Route path="*" element={<Navigate to="/auth" replace />} />
+      </Routes>
+    );
+  }
+
+  return (
+    <Layout>
+      <Routes>
+        {/* Dashboard Routes */}
+        <Route path="/" element={<Dashboard />} />
+        
+        {/* Client Routes */}
+        {role === 'client' && (
+          <>
+            <Route path="/dashboard" element={<ClientDashboard />} />
+            <Route path="/quotes" element={<ClientQuotes />} />
+            <Route path="/quotes/:id" element={<ClientQuoteDetail />} />
+            <Route path="/orders" element={<ClientOrders />} />
+            <Route path="/orders/:id" element={<EnhancedClientOrderView />} />
+            <Route path="/messages" element={<ClientMessages />} />
+            <Route path="/documents" element={<ClientDocuments />} />
+            <Route path="/payments" element={<ClientPayments />} />
+            <Route path="/date-blocking" element={<ClientDateBlocking />} />
+            <Route path="/profile" element={<ClientProfileSelf />} />
+          </>
+        )}
+
+        {/* Engineer Routes */}
+        {role === 'engineer' && (
+          <>
+            <Route path="/dashboard" element={<EngineerDashboard />} />
+            <Route path="/profile" element={<EngineerProfile />} />
+            <Route path="/availability" element={<EngineerAvailability />} />
+            <Route path="/jobs/:id" element={<EngineerJobDetail />} />
+          </>
+        )}
+
+        {/* Admin Routes */}
+        {(role === 'admin' || role === 'manager') && (
+          <>
+            <Route path="/admin" element={<Admin />} />
+            <Route path="/admin/clients" element={<AdminClients />} />
+            <Route path="/admin/clients/:id" element={<ClientProfilePage />} />
+            <Route path="/admin/client-users" element={<AdminClientUsers />} />
+            <Route path="/admin/orders" element={<AdminOrders />} />
+            <Route path="/admin/order/:id" element={<OrderDetail />} />
+            <Route path="/admin/quotes" element={<AdminQuotes />} />
+            <Route path="/admin/quotes/new" element={<AdminQuoteCreate />} />
+            <Route path="/admin/quotes/:id" element={<AdminQuoteDetail />} />
+            <Route path="/admin/quotes/:id/edit" element={<AdminQuoteEdit />} />
+            <Route path="/admin/products" element={<AdminProducts />} />
+            <Route path="/admin/engineers" element={<AdminEngineers />} />
+            <Route path="/admin/users" element={<AdminUsers />} />
+            <Route path="/admin/users/invite" element={<AdminUserInvite />} />
+            <Route path="/admin/users/:id" element={<AdminUserDetail />} />
+            <Route path="/admin/messages" element={<AdminMessages />} />
+            <Route path="/admin/leads" element={<AdminLeads />} />
+            <Route path="/admin/settings" element={<AdminSettings />} />
+            <Route path="/admin/schedule" element={<AdminSchedule />} />
+            <Route path="/admin/schedule/status" element={<AdminScheduleStatus />} />
+            <Route path="/admin/partners" element={<AdminPartners />} />
+            <Route path="/admin/partners/:partnerId/profiles" element={<AdminPartnerProfiles />} />
+          </>
+        )}
+
+        {/* Public Routes */}
+        <Route path="/quote/:shareToken" element={<PublicQuoteView />} />
+        <Route path="/offers/:clientToken" element={<ClientOfferView />} />
+        
+        {/* Catch-all */}
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </Layout>
   );
 }
 
