@@ -17,18 +17,31 @@ serve(async (req: Request) => {
   }
 
   try {
-    const url = new URL(req.url);
-    let token = url.pathname.split('/').pop();
+    let token;
 
-    // If no token in URL, try to get from JSON body for backward compatibility
-    if (!token && req.method === 'POST') {
+    // Try to get token from request body first (for supabase.functions.invoke calls)
+    if (req.method === 'POST') {
       try {
         const body = await req.json();
         token = body.token;
       } catch {
-        // Ignore JSON parse errors
+        // If JSON parsing fails, continue to try URL path
       }
     }
+
+    // If no token from body, try URL path (for direct URL calls)
+    if (!token) {
+      const url = new URL(req.url);
+      const pathSegments = url.pathname.split('/');
+      token = pathSegments[pathSegments.length - 1];
+      
+      // Don't use the function name as token
+      if (token === 'offer-lookup') {
+        token = undefined;
+      }
+    }
+
+    console.log('Token received:', token);
 
     if (!token) {
       return new Response(
