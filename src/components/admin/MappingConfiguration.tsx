@@ -70,6 +70,8 @@ export default function MappingConfiguration({
   const [newOverrideRule, setNewOverrideRule] = useState({ status: '', suppress: false });
   const [engineers, setEngineers] = useState<Array<{ id: string; name: string; email: string }>>([]);
   const [newEngineerMapping, setNewEngineerMapping] = useState({ partner: '', internal: '' });
+  const [sheetEngineers, setSheetEngineers] = useState<string[]>([]);
+  const [isLoadingSheetEngineers, setIsLoadingSheetEngineers] = useState(false);
 
   // Auto-load Google Sheet columns when component mounts if gsheetId is present
   useEffect(() => {
@@ -229,6 +231,95 @@ export default function MappingConfiguration({
     const newMappings = { ...engineerMappings };
     delete newMappings[partnerEngineer];
     onEngineerMappingsChange(newMappings);
+  };
+
+  const fetchSheetEngineers = async () => {
+    if (!gsheetId || !columnMappings.engineer_identifier) {
+      toast({
+        title: "Prerequisites Missing",
+        description: "Please configure Google Sheet and map the Engineer Identifier column first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoadingSheetEngineers(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('google-sheets-preview', {
+        body: {
+          gsheet_id: gsheetId,
+          sheet_name: gsheetSheetName || 'Sheet1',
+          preview_rows: 10000
+        }
+      });
+
+      if (error || !data.success) {
+        throw new Error(error?.message || data.error || 'Failed to fetch sheet data');
+      }
+
+      const engineerColumnIndex = data.headers.indexOf(columnMappings.engineer_identifier);
+      if (engineerColumnIndex === -1) {
+        throw new Error(`Column "${columnMappings.engineer_identifier}" not found in sheet`);
+      }
+
+      // Extract unique engineer identifiers, filtering out empty values  
+      const rowValues: string[] = data.rows
+        .map((row: unknown[]) => String((row as any[])[engineerColumnIndex] || ''))
+        .filter((value: string) => value && value.trim() !== '');
+      const uniqueEngineers = [...new Set(rowValues)].sort();
+
+      setSheetEngineers(uniqueEngineers);
+      toast({
+        title: "Success",
+        description: `Found ${uniqueEngineers.length} unique engineers in the sheet`,
+      });
+    } catch (error: any) {
+      console.error('Failed to fetch sheet engineers:', error);
+      toast({
+        title: "Error Loading Engineers",
+        description: error.message || 'Failed to load engineers from sheet',
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingSheetEngineers(false);
+    }
+  };
+
+  const autoMatchEngineer = (sheetEngineer: string) => {
+    // Try to find a matching engineer by name (case insensitive)
+    const potentialMatch = engineers.find(engineer => 
+      engineer.name.toLowerCase().includes(sheetEngineer.toLowerCase()) ||
+      sheetEngineer.toLowerCase().includes(engineer.name.toLowerCase())
+    );
+    return potentialMatch?.id || '';
+  };
+
+  const bulkAddEngineerMappings = () => {
+    const newMappings = { ...engineerMappings };
+    let addedCount = 0;
+
+    sheetEngineers.forEach(sheetEngineer => {
+      if (!newMappings[sheetEngineer]) {
+        const matchedEngineerId = autoMatchEngineer(sheetEngineer);
+        if (matchedEngineerId) {
+          newMappings[sheetEngineer] = matchedEngineerId;
+          addedCount++;
+        }
+      }
+    });
+
+    if (addedCount > 0) {
+      onEngineerMappingsChange(newMappings);
+      toast({
+        title: "Auto-matching Complete",
+        description: `Added ${addedCount} engineer mappings based on name matching`,
+      });
+    } else {
+      toast({
+        title: "No Matches Found",
+        description: "Could not auto-match any engineers. Please map them manually.",
+      });
+    }
   };
 
   return (
@@ -430,6 +521,94 @@ export default function MappingConfiguration({
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
+            {/* Load from Sheet Section */}
+            {sourceType === 'gsheet' && gsheetId && columnMappings.engineer_identifier && (
+              <div className="space-y-2 p-4 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-800">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-medium text-green-900 dark:text-green-100">Load Engineers from Sheet</h4>
+                  <div className="flex gap-2">
+                    <Button 
+                      onClick={fetchSheetEngineers} 
+                      disabled={isLoadingSheetEngineers}
+                      variant="outline"
+                      size="sm"
+                    >
+                      <FileSpreadsheet className="h-4 w-4 mr-2" />
+                      {isLoadingSheetEngineers ? 'Loading...' : 'Load from Sheet'}
+                    </Button>
+                    {sheetEngineers.length > 0 && (
+                      <Button 
+                        onClick={bulkAddEngineerMappings}
+                        variant="secondary"
+                        size="sm"
+                      >
+                        Auto-match
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                <div className="text-xs text-green-700 dark:text-green-300 space-y-1">
+                  <p>• This will load unique engineers from your "{columnMappings.engineer_identifier}" column</p>
+                  <p>• Use "Auto-match" to automatically map engineers based on name similarity</p>
+                  {sheetEngineers.length > 0 && (
+                    <p className="text-green-800 dark:text-green-200 font-medium">
+                      → Found {sheetEngineers.length} engineers in sheet. Map them below or use auto-match.
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Sheet Engineers Mapping List */}
+            {sheetEngineers.length > 0 && (
+              <div className="space-y-2 p-4 bg-gray-50 dark:bg-gray-950/50 rounded-lg border">
+                <h4 className="text-sm font-medium mb-3">Engineers from Sheet ({sheetEngineers.length})</h4>
+                <div className="grid gap-3">
+                  {sheetEngineers.map((sheetEngineer) => (
+                    <div key={sheetEngineer} className="flex items-center gap-3 p-3 bg-background rounded border">
+                      <div className="flex-1">
+                        <Badge variant="secondary" className="text-xs">
+                          {sheetEngineer}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground">→</span>
+                        <div className="min-w-48">
+                          <Select
+                            value={engineerMappings[sheetEngineer] || ''}
+                            onValueChange={(value) => {
+                              if (value) {
+                                onEngineerMappingsChange({
+                                  ...engineerMappings,
+                                  [sheetEngineer]: value
+                                });
+                              } else {
+                                const newMappings = { ...engineerMappings };
+                                delete newMappings[sheetEngineer];
+                                onEngineerMappingsChange(newMappings);
+                              }
+                            }}
+                          >
+                            <SelectTrigger className="h-8">
+                              <SelectValue placeholder="Select engineer" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="">-- Not mapped --</SelectItem>
+                              {engineers.map((engineer) => (
+                                <SelectItem key={engineer.id} value={engineer.id}>
+                                  {engineer.name} ({engineer.email})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Add new mapping */}
             <div className="flex items-end gap-2">
               <div className="flex-1">
