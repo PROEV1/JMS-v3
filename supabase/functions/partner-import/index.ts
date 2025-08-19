@@ -124,51 +124,170 @@ serve(async (req) => {
       );
       
     } else if ((importProfile.source_type === 'google_sheets' || importProfile.source_type === 'gsheet') && importProfile.gsheet_id && importProfile.gsheet_sheet_name) {
-      // Fetch from Google Sheets
-      console.log('=== CALLING GOOGLE SHEETS PREVIEW FROM PARTNER-IMPORT ===');
+      // Fetch from Google Sheets - INLINE IMPLEMENTATION
+      console.log('=== FETCHING GOOGLE SHEETS DATA INLINE ===');
       console.log('Sheet ID:', importProfile.gsheet_id);
       console.log('Sheet name:', importProfile.gsheet_sheet_name);
-      console.log('Auth header present:', !!req.headers.get('Authorization'));
 
-      const authHeader = req.headers.get('Authorization');
-      console.log('Calling google-sheets-preview with body:', { 
-        gsheet_id: importProfile.gsheet_id, 
-        sheet_name: importProfile.gsheet_sheet_name 
-      });
+      // Get Google Service Account credentials
+      const serviceAccountKey = Deno.env.get('GOOGLE_SERVICE_ACCOUNT_KEY');
+      console.log('Google Service Account Key configured:', !!serviceAccountKey);
       
-      const sheetsResponse = await supabase.functions.invoke('google-sheets-preview', {
-        body: { 
-          gsheet_id: importProfile.gsheet_id, 
-          sheet_name: importProfile.gsheet_sheet_name,
-          preview_rows: 100
-        },
-        headers: {
-          Authorization: authHeader || '',
-          'Content-Type': 'application/json'
+      if (!serviceAccountKey) {
+        throw new Error('Google Service Account credentials not configured. Please add the GOOGLE_SERVICE_ACCOUNT_KEY secret in Supabase.');
+      }
+
+      let credentials;
+      try {
+        credentials = JSON.parse(serviceAccountKey);
+        console.log('Google credentials parsed successfully, client_email:', credentials.client_email);
+        
+        // Validate required fields
+        const requiredFields = ['client_email', 'private_key', 'token_uri', 'project_id'];
+        const missingFields = requiredFields.filter(field => !credentials[field]);
+        
+        if (missingFields.length > 0) {
+          throw new Error(`Invalid Google Service Account credentials: missing ${missingFields.join(', ')}`);
         }
+      } catch (parseError) {
+        throw new Error(`Invalid Google Service Account credentials format: ${parseError.message}`);
+      }
+
+      // Generate JWT for Google API authentication
+      console.log('Generating JWT for Google API...');
+      
+      const header = { alg: 'RS256', typ: 'JWT' };
+      const now = Math.floor(Date.now() / 1000);
+      const payload = {
+        iss: credentials.client_email,
+        scope: 'https://www.googleapis.com/auth/spreadsheets.readonly',
+        aud: 'https://oauth2.googleapis.com/token',
+        iat: now,
+        exp: now + 3600
+      };
+
+      const encoder = new TextEncoder();
+      const headerB64 = btoa(JSON.stringify(header)).replace(/[+/=]/g, (match) => ({'+': '-', '/': '_', '=': ''}[match] || match));
+      const payloadB64 = btoa(JSON.stringify(payload)).replace(/[+/=]/g, (match) => ({'+': '-', '/': '_', '=': ''}[match] || match));
+      const signatureInput = `${headerB64}.${payloadB64}`;
+
+      // Import private key and sign JWT
+      let privateKey;
+      try {
+        console.log('Importing private key...');
+        privateKey = await crypto.subtle.importKey(
+          'pkcs8',
+          new Uint8Array(atob(credentials.private_key.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\n/g, '')).split('').map(c => c.charCodeAt(0))),
+          { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+          false,
+          ['sign']
+        );
+        console.log('Private key imported successfully');
+      } catch (keyError) {
+        throw new Error(`Failed to process Google Service Account private key: ${keyError.message}`);
+      }
+
+      const signature = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', privateKey, encoder.encode(signatureInput));
+      const signatureB64 = btoa(String.fromCharCode(...new Uint8Array(signature))).replace(/[+/=]/g, (match) => ({'+': '-', '/': '_', '=': ''}[match] || match));
+      const jwt = `${signatureInput}.${signatureB64}`;
+      console.log('JWT generated successfully');
+
+      // Get access token
+      console.log('Requesting access token from Google...');
+      const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`
       });
 
-      console.log('Sheets response status:', sheetsResponse.status);
-      console.log('Sheets response error:', sheetsResponse.error);
-      console.log('Sheets response data preview:', JSON.stringify(sheetsResponse.data).substring(0, 200));
+      const tokenData = await tokenResponse.json();
+      if (!tokenData.access_token) {
+        console.error('Failed to get access token:', tokenData);
+        throw new Error(`Failed to authenticate with Google API: ${tokenData.error || 'Unknown error'}`);
+      }
+      console.log('Access token obtained successfully');
+
+      // Get spreadsheet metadata
+      console.log('Getting spreadsheet metadata...');
+      const metadataUrl = `https://sheets.googleapis.com/v4/spreadsheets/${importProfile.gsheet_id}`;
+      const metadataResponse = await fetch(metadataUrl, {
+        headers: { 'Authorization': `Bearer ${tokenData.access_token}` }
+      });
+
+      if (!metadataResponse.ok) {
+        const metadataError = await metadataResponse.json();
+        console.error('Failed to get spreadsheet metadata:', metadataError);
+        if (metadataResponse.status === 404) {
+          throw new Error('Google Sheet not found. Please check the Sheet ID and ensure the sheet exists.');
+        } else if (metadataResponse.status === 403) {
+          throw new Error(`Access denied to Google Sheet. Please share the sheet with the service account email: ${credentials.client_email}`);
+        }
+        throw new Error('Failed to access spreadsheet metadata. Please check Sheet ID and permissions.');
+      }
+
+      const metadata = await metadataResponse.json();
+      console.log('Available sheets:', metadata.sheets?.map((s: any) => s.properties.title));
       
-      if (sheetsResponse.error) {
-        throw new Error(`Failed to fetch Google Sheets data: ${sheetsResponse.error.message}`);
+      // Find the correct sheet name (case-insensitive)
+      const availableSheets = metadata.sheets?.map((s: any) => s.properties.title) || [];
+      let actualSheetName = importProfile.gsheet_sheet_name;
+      
+      if (!availableSheets.includes(importProfile.gsheet_sheet_name)) {
+        // Try to find a case-insensitive match
+        const lowerSheetName = importProfile.gsheet_sheet_name.toLowerCase();
+        const matchedSheet = availableSheets.find((name: string) => name.toLowerCase() === lowerSheetName);
+        
+        if (matchedSheet) {
+          actualSheetName = matchedSheet;
+          console.log(`Sheet name corrected from "${importProfile.gsheet_sheet_name}" to "${actualSheetName}"`);
+        } else {
+          throw new Error(`Sheet "${importProfile.gsheet_sheet_name}" not found. Available sheets: ${availableSheets.join(', ')}`);
+        }
+      }
+
+      // Fetch sheet data
+      let range;
+      const previewRows = 1000; // Get more rows for import processing
+      if (actualSheetName.includes(' ') || actualSheetName.includes("'")) {
+        range = `'${actualSheetName.replace(/'/g, "''")}'!A1:ZZ${previewRows + 1}`;
+      } else {
+        range = `${actualSheetName}!A1:ZZ${previewRows + 1}`;
       }
       
-      if (!sheetsResponse.data) {
-        throw new Error('No data received from Google Sheets preview function');
+      console.log(`Fetching range: "${range}"`);
+      const sheetsUrl = `https://sheets.googleapis.com/v4/spreadsheets/${importProfile.gsheet_id}/values/${encodeURIComponent(range)}`;
+      
+      const sheetsResponse = await fetch(sheetsUrl, {
+        headers: { 'Authorization': `Bearer ${tokenData.access_token}` }
+      });
+
+      const sheetsData = await sheetsResponse.json();
+      console.log('Sheets API response status:', sheetsResponse.status);
+      
+      if (!sheetsResponse.ok) {
+        console.error('Sheets API error:', sheetsData);
+        
+        let errorMessage = 'Failed to fetch Google Sheets data';
+        if (sheetsResponse.status === 404) {
+          errorMessage = 'Google Sheet not found. Please check the Sheet ID and ensure the sheet exists.';
+        } else if (sheetsResponse.status === 403) {
+          errorMessage = `Access denied to Google Sheet. Please share the sheet with the service account email: ${credentials.client_email}`;
+        } else if (sheetsData.error?.message) {
+          errorMessage = sheetsData.error.message;
+        }
+        
+        throw new Error(errorMessage);
       }
 
-      const sheetsData = sheetsResponse.data;
-      console.log('Google Sheets response preview:', JSON.stringify(sheetsData).substring(0, 500) + '...[truncated]');
-
-      if (!sheetsData.success || !sheetsData.headers || !sheetsData.rows) {
-        throw new Error('Invalid Google Sheets response format');
+      const values = sheetsData.values || [];
+      console.log('Sheet data fetched successfully, rows:', values.length);
+      
+      if (values.length < 2) {
+        throw new Error('Google Sheet must have at least a header row and one data row');
       }
 
-      headers = sheetsData.headers;
-      rows = sheetsData.rows;
+      headers = values[0] || [];
+      rows = values.slice(1) || [];
       
     } else {
       throw new Error('No data source available - provide csv_data or configure Google Sheets in the profile');
