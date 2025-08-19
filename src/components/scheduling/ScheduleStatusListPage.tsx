@@ -36,12 +36,11 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
   const [showSmartAssign, setShowSmartAssign] = useState(false);
   const [showAutoScheduleModal, setShowAutoScheduleModal] = useState(false);
   
-  // New state for improved UI
+  // New state for improved UI  
   const [jobTypeFilter, setJobTypeFilter] = useState<string>('all');
   const [valueFilter, setValueFilter] = useState<string>('all');
   const [urgencyFilter, setUrgencyFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<string>('date');
-  const [compactView, setCompactView] = useState(false);
   
   // Fetch all job offers for the displayed orders
   const { offers, refetch: refetchOffers, releaseOffer, resendOffer } = useJobOffers();
@@ -478,16 +477,6 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
         </div>
         
         <div className="flex items-center gap-3">
-          {/* Compact View Toggle */}
-          <div className="flex items-center space-x-2">
-            <Switch
-              id="compact-mode"
-              checked={compactView}
-              onCheckedChange={setCompactView}
-            />
-            <Label htmlFor="compact-mode" className="text-sm">Compact</Label>
-          </div>
-          
           {showAutoSchedule && (
             <Button 
               onClick={() => setShowAutoScheduleModal(true)}
@@ -575,15 +564,13 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
       {/* Jobs List with Column Headers and Hybrid Table-Card Layout */}
       <div className="space-y-3">
         {/* Column Headers - Desktop Only */}
-        <div className="hidden lg:grid lg:grid-cols-12 gap-4 px-4 py-3 text-sm font-medium text-muted-foreground bg-muted/30 border-b rounded-t-lg">
+        <div className="hidden lg:grid lg:grid-cols-11 gap-4 px-4 py-3 text-sm font-medium text-muted-foreground bg-muted/30 border-b rounded-t-lg">
           <div className="col-span-2">Job ID</div>
           <div className="col-span-2">Client</div>
-          <div className="col-span-1">Postcode</div>
           <div className="col-span-1">Value</div>
           <div className="col-span-1">Engineer</div>
-          <div className="col-span-1">Status</div>
+          <div className="col-span-2">Status</div>
           <div className="col-span-1">Created</div>
-          <div className="col-span-1">Duration</div>
           <div className="col-span-2">Actions</div>
         </div>
 
@@ -610,11 +597,11 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                   key={order.id} 
                   className={`transition-all hover:shadow-lg border border-border/50 ${
                     isEven ? 'bg-background' : 'bg-muted/20'
-                  } ${compactView ? 'py-2' : 'py-3'}`}
+                  } py-2`}
                 >
                   <CardContent className="px-4 py-2">
                     {/* Desktop Layout - Table-like Grid */}
-                    <div className="hidden lg:grid lg:grid-cols-12 gap-4 items-center">
+                    <div className="hidden lg:grid lg:grid-cols-11 gap-4 items-center">
                       {/* Job ID */}
                       <div className="col-span-2">
                         <div className="font-semibold text-sm text-foreground">
@@ -624,18 +611,16 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                         </div>
                       </div>
 
-                      {/* Client */}
+                      {/* Client with Postcode and Duration */}
                       <div className="col-span-2">
-                        <span className="text-sm text-foreground">
-                          {order.client?.full_name || 'Unknown Client'}
-                        </span>
-                      </div>
-
-                      {/* Postcode */}
-                      <div className="col-span-1">
-                        <span className="text-sm text-muted-foreground">
-                          {getBestPostcode(order) || '—'}
-                        </span>
+                        <div className="space-y-1">
+                          <span className="text-sm font-bold text-foreground">
+                            {order.client?.full_name || 'Unknown Client'}
+                          </span>
+                          <div className="text-xs text-muted-foreground">
+                            {getBestPostcode(order) || 'No postcode'} • {getOrderEstimatedHours(order)}h{isDefaultEstimatedHours(order) && ' (Default)'}
+                          </div>
+                        </div>
                       </div>
 
                       {/* Value */}
@@ -649,16 +634,22 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                         )}
                       </div>
 
-                      {/* Engineer Status */}
+                      {/* Engineer Status Pill */}
                       <div className="col-span-1">
-                        <Badge variant={assignmentStatus.variant} className="text-xs px-2 py-1">
-                          {assignmentStatus.label}
-                        </Badge>
+                        {order.engineer_id ? (
+                          <Badge className="text-xs px-2 py-1 bg-green-100 text-green-700 border-green-300">
+                            {engineers.find(e => e.id === order.engineer_id)?.name || 'Assigned'}
+                          </Badge>
+                        ) : (
+                          <Badge variant="destructive" className="text-xs px-2 py-1">
+                            Unassigned
+                          </Badge>
+                        )}
                       </div>
 
-                      {/* Status */}
-                      <div className="col-span-1">
-                        <div className="flex flex-col gap-1">
+                      {/* Status - Horizontal Badges */}
+                      <div className="col-span-2">
+                        <div className="flex items-center gap-1 flex-wrap">
                           <Badge variant={jobStatus.variant} className="text-xs px-2 py-1">
                             {jobStatus.label}
                           </Badge>
@@ -675,32 +666,9 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                         </span>
                       </div>
 
-                      {/* Duration */}
-                      <div className="col-span-1">
-                        <div className="flex items-center gap-1">
-                          <span className="text-sm text-foreground">
-                            {getOrderEstimatedHours(order)}h
-                          </span>
-                          {isDefaultEstimatedHours(order) && (
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger>
-                                  <Badge variant="outline" className="text-xs px-1 py-0 text-muted-foreground">
-                                    Default
-                                  </Badge>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>Using default duration estimate</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Actions */}
+                      {/* Actions - Right Aligned */}
                       <div className="col-span-2">
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 justify-end">
                           {(() => {
                             const activeOffer = getActiveOfferForOrder(order.id);
                             const latestOffer = getLatestOfferForOrder(order.id);
@@ -711,7 +679,7 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                                   <Button
                                     size="sm"
                                     onClick={() => handleConfirmAndSchedule(order.id)}
-                                    className="text-xs px-3 py-1"
+                                    className="text-xs px-3 py-1 h-7"
                                   >
                                     Confirm & Schedule
                                   </Button>
@@ -719,7 +687,7 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                                     size="sm"
                                     variant="outline"
                                     onClick={() => handleCancelAndRestart(order.id)}
-                                    className="text-xs px-3 py-1"
+                                    className="text-xs px-3 py-1 h-7"
                                   >
                                     Cancel
                                   </Button>
@@ -731,7 +699,7 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                                   <Button
                                     size="sm"
                                     onClick={() => handleAcceptOffer(order.id)}
-                                    className="text-xs px-3 py-1 bg-green-600 hover:bg-green-700"
+                                    className="text-xs px-3 py-1 h-7 bg-green-600 hover:bg-green-700"
                                   >
                                     Accept
                                   </Button>
@@ -739,7 +707,7 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                                     size="sm"
                                     variant="destructive"
                                     onClick={() => handleRejectOffer(order.id)}
-                                    className="text-xs px-3 py-1"
+                                    className="text-xs px-3 py-1 h-7"
                                   >
                                     Reject
                                   </Button>
@@ -753,7 +721,7 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                                       size="sm"
                                       variant="outline"
                                       onClick={() => handleResendOffer(order.id)}
-                                      className="text-xs px-3 py-1"
+                                      className="text-xs px-3 py-1 h-7"
                                     >
                                       Resend
                                     </Button>
@@ -761,7 +729,7 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                                       size="sm"
                                       variant="outline"
                                       onClick={() => handleReleaseOffer(order.id)}
-                                      className="text-xs px-3 py-1"
+                                      className="text-xs px-3 py-1 h-7"
                                     >
                                       Release
                                     </Button>
@@ -773,7 +741,7 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                                     <Button
                                       onClick={() => handleSmartAssign(order)}
                                       size="sm"
-                                      className="text-xs px-3 py-1"
+                                      className="text-xs px-3 py-1 h-7"
                                     >
                                       Smart Assign
                                     </Button>
@@ -781,7 +749,7 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                                       variant="outline"
                                       size="sm"
                                       onClick={() => navigate(`/admin/order/${order.id}`)}
-                                      className="text-xs px-3 py-1"
+                                      className="text-xs px-3 py-1 h-7"
                                     >
                                       View Job
                                     </Button>
@@ -794,7 +762,7 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                                   size="sm"
                                   variant="outline"
                                   onClick={() => navigate(`/admin/order/${order.id}`)}
-                                  className="text-xs px-3 py-1"
+                                  className="text-xs px-3 py-1 h-7"
                                 >
                                   View Job
                                 </Button>
@@ -821,14 +789,25 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                       </div>
 
                       <div className="space-y-2 text-sm">
-                        <div className="flex items-center justify-between">
-                          <span className="text-foreground">
-                            {order.client?.full_name || 'Unknown Client'}
-                          </span>
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <span className="font-bold text-foreground">
+                              {order.client?.full_name || 'Unknown Client'}
+                            </span>
+                            <div className="text-xs text-muted-foreground">
+                              {getBestPostcode(order) || 'No postcode'} • {getOrderEstimatedHours(order)}h{isDefaultEstimatedHours(order) && ' (Default)'}
+                            </div>
+                          </div>
                           <div className="flex gap-1">
-                            <Badge variant={assignmentStatus.variant} className="text-xs px-2 py-1">
-                              {assignmentStatus.label}
-                            </Badge>
+                            {order.engineer_id ? (
+                              <Badge className="text-xs px-2 py-1 bg-green-100 text-green-700 border-green-300">
+                                {engineers.find(e => e.id === order.engineer_id)?.name || 'Assigned'}
+                              </Badge>
+                            ) : (
+                              <Badge variant="destructive" className="text-xs px-2 py-1">
+                                Unassigned
+                              </Badge>
+                            )}
                             <Badge variant={offersStatus.variant} className="text-xs px-2 py-1">
                               {offersStatus.label}
                             </Badge>
@@ -836,27 +815,15 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                         </div>
                         
                         <div className="flex items-center justify-between text-muted-foreground">
-                          <span>{getBestPostcode(order) || 'No postcode'}</span>
+                          <span>
+                            {order.created_at ? new Date(order.created_at).toLocaleDateString() : 'No date'}
+                          </span>
                           {order.total_amount && (
                             <span className="text-green-600 font-medium">£{order.total_amount}</span>
                           )}
                         </div>
 
-                        <div className="flex items-center justify-between text-muted-foreground">
-                          <span>
-                            {order.created_at ? new Date(order.created_at).toLocaleDateString() : 'No date'}
-                          </span>
-                          <div className="flex items-center gap-1">
-                            <span>Duration: {getOrderEstimatedHours(order)}h</span>
-                            {isDefaultEstimatedHours(order) && (
-                              <Badge variant="outline" className="text-xs px-1 py-0 text-muted-foreground">
-                                Default
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-
-                        {!compactView && order.job_address && (
+                        {order.job_address && (
                           <div className="text-xs text-muted-foreground">
                             {order.job_address}
                           </div>
@@ -873,7 +840,7 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                                 <Button
                                   size="sm"
                                   onClick={() => handleConfirmAndSchedule(order.id)}
-                                  className="flex-1 text-xs"
+                                  className="flex-1 text-xs h-7"
                                 >
                                   Confirm & Schedule
                                 </Button>
@@ -881,7 +848,7 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                                   size="sm"
                                   variant="outline"
                                   onClick={() => handleCancelAndRestart(order.id)}
-                                  className="flex-1 text-xs"
+                                  className="flex-1 text-xs h-7"
                                 >
                                   Cancel
                                 </Button>
@@ -893,7 +860,7 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                                 <Button
                                   size="sm"
                                   onClick={() => handleAcceptOffer(order.id)}
-                                  className="flex-1 text-xs bg-green-600 hover:bg-green-700"
+                                  className="flex-1 text-xs h-7 bg-green-600 hover:bg-green-700"
                                 >
                                   Accept
                                 </Button>
@@ -901,7 +868,7 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                                   size="sm"
                                   variant="destructive"
                                   onClick={() => handleRejectOffer(order.id)}
-                                  className="flex-1 text-xs"
+                                  className="flex-1 text-xs h-7"
                                 >
                                   Reject
                                 </Button>
@@ -915,7 +882,7 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                                     size="sm"
                                     variant="outline"
                                     onClick={() => handleResendOffer(order.id)}
-                                    className="flex-1 text-xs"
+                                    className="flex-1 text-xs h-7"
                                   >
                                     Resend
                                   </Button>
@@ -923,7 +890,7 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                                     size="sm"
                                     variant="outline"
                                     onClick={() => handleReleaseOffer(order.id)}
-                                    className="flex-1 text-xs"
+                                    className="flex-1 text-xs h-7"
                                   >
                                     Release
                                   </Button>
@@ -935,7 +902,7 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                                   <Button
                                     onClick={() => handleSmartAssign(order)}
                                     size="sm"
-                                    className="flex-1 text-xs"
+                                    className="flex-1 text-xs h-7"
                                   >
                                     Smart Assign
                                   </Button>
@@ -943,7 +910,7 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                                     variant="outline"
                                     size="sm"
                                     onClick={() => navigate(`/admin/order/${order.id}`)}
-                                    className="flex-1 text-xs"
+                                    className="flex-1 text-xs h-7"
                                   >
                                     View Job
                                   </Button>
@@ -956,7 +923,7 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                                 size="sm"
                                 variant="outline"
                                 onClick={() => navigate(`/admin/order/${order.id}`)}
-                                className="w-full text-xs"
+                                className="w-full text-xs h-7"
                               >
                                 View Job
                               </Button>
