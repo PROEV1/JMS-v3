@@ -8,10 +8,15 @@ interface Order {
   status_enhanced: OrderStatusEnhanced;
   manual_status_override: boolean;
   scheduled_install_date: string | null;
+  is_partner_job: boolean;
+  scheduling_suppressed: boolean;
   client: {
     full_name: string;
   };
   engineer?: {
+    name: string;
+  } | null;
+  partner?: {
     name: string;
   } | null;
 }
@@ -57,6 +62,22 @@ export function OrderStickyHeader({ order, isSticky }: OrderStickyHeaderProps) {
               <>
                 <span className="text-muted-foreground">|</span>
                 <span>Engineer: {order.engineer.name}</span>
+              </>
+            )}
+            {order.is_partner_job && order.partner && (
+              <>
+                <span className="text-muted-foreground">|</span>
+                <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700">
+                  Partner: {order.partner.name}
+                </Badge>
+              </>
+            )}
+            {order.scheduling_suppressed && (
+              <>
+                <span className="text-muted-foreground">|</span>
+                <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-700">
+                  Suppressed
+                </Badge>
               </>
             )}
           </div>

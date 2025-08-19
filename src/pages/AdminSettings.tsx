@@ -11,8 +11,9 @@ import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Save, Settings, CreditCard, Mail, MessageSquare, Bell, AlertTriangle, Calendar } from 'lucide-react';
+import { Save, Settings, CreditCard, Mail, MessageSquare, Bell, AlertTriangle, Calendar, Shield } from 'lucide-react';
 import { SchedulingSettingsPanel } from '@/components/admin/SchedulingSettingsPanel';
+import { useAdminCommsSetting } from '@/hooks/useAdminCommsSetting';
 
 interface AdminSettings {
   quote_defaults: QuoteDefaults;
@@ -195,6 +196,7 @@ export default function AdminSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState<AdminSettings>(defaultSettings);
+  const { settings: commsSettings, updateSettings: updateCommsSettings } = useAdminCommsSetting();
 
   useEffect(() => {
     fetchSettings();
@@ -319,7 +321,7 @@ export default function AdminSettings() {
           )}
 
           <Tabs defaultValue="quotes" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-7">
+            <TabsList className="grid w-full grid-cols-8">
               <TabsTrigger value="quotes" className="flex items-center space-x-2">
                 <Settings className="h-4 w-4" />
                 <span>Quotes</span>
@@ -343,6 +345,10 @@ export default function AdminSettings() {
               <TabsTrigger value="notifications" className="flex items-center space-x-2">
                 <Bell className="h-4 w-4" />
                 <span>Notifications</span>
+              </TabsTrigger>
+              <TabsTrigger value="comms" className="flex items-center space-x-2">
+                <Shield className="h-4 w-4" />
+                <span>Test Mode</span>
               </TabsTrigger>
               <TabsTrigger value="system" className="flex items-center space-x-2">
                 <Settings className="h-4 w-4" />
@@ -863,6 +869,103 @@ export default function AdminSettings() {
                           updateSettings('notification_settings', { auto_invoice_generation: checked })
                         }
                       />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Communications Suppression */}
+            <TabsContent value="comms" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <Shield className="h-5 w-5" />
+                    <span>Communication Suppression (Test Mode)</span>
+                  </CardTitle>
+                  <CardDescription>
+                    Temporarily suppress client communications while testing imports or configurations.
+                    When enabled, emails will be logged but not actually sent to clients.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {commsSettings.test_mode_active && (
+                    <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 flex items-center space-x-3">
+                      <AlertTriangle className="h-5 w-5 text-orange-600" />
+                      <div>
+                        <p className="text-orange-800 font-medium">Test Mode Active</p>
+                        <p className="text-orange-700 text-sm">Client communications are currently suppressed</p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label>Suppress All Client Emails</Label>
+                        <p className="text-sm text-muted-foreground">Block all outgoing emails to clients</p>
+                      </div>
+                      <Switch 
+                        checked={commsSettings.suppress_client_emails}
+                        onCheckedChange={(checked) => 
+                          updateCommsSettings({ suppress_client_emails: checked })
+                        }
+                      />
+                    </div>
+                    
+                    <Separator />
+                    
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label>Suppress Job Offer Emails</Label>
+                        <p className="text-sm text-muted-foreground">Block installation offer emails specifically</p>
+                      </div>
+                      <Switch 
+                        checked={commsSettings.suppress_offer_emails}
+                        onCheckedChange={(checked) => 
+                          updateCommsSettings({ suppress_offer_emails: checked })
+                        }
+                      />
+                    </div>
+
+                    <Separator />
+                    
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label>Suppress Status Update Emails</Label>
+                        <p className="text-sm text-muted-foreground">Block order status change notifications</p>
+                      </div>
+                      <Switch 
+                        checked={commsSettings.suppress_status_emails}
+                        onCheckedChange={(checked) => 
+                          updateCommsSettings({ suppress_status_emails: checked })
+                        }
+                      />
+                    </div>
+
+                    <Separator />
+                    
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label>Test Mode (All Communications)</Label>
+                        <p className="text-sm text-muted-foreground">Master switch - suppress all client communications</p>
+                      </div>
+                      <Switch 
+                        checked={commsSettings.test_mode_active}
+                        onCheckedChange={(checked) => 
+                          updateCommsSettings({ test_mode_active: checked })
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <h4 className="font-medium text-blue-900 mb-2">How It Works</h4>
+                    <div className="text-sm text-blue-800 space-y-1">
+                      <p>• Suppressed emails are logged but not delivered to clients</p>
+                      <p>• Edge functions will still return success responses</p>
+                      <p>• Use this during testing or partner data imports</p>
+                      <p>• Remember to disable when going live</p>
                     </div>
                   </div>
                 </CardContent>

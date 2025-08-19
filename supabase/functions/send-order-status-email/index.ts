@@ -1,138 +1,140 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { Resend } from "npm:resend@2.0.0";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.0';
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.52.1"
+import { Resend } from "npm:resend@2.0.0"
 
-const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+// Initialize Resend with API key from environment
+const resend = new Resend(Deno.env.get('RESEND_API_KEY'))
+
+// Initialize Supabase client with service role key for admin operations
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL') ?? '',
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-);
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+)
 
 interface EmailRequest {
-  orderId: string;
-  status: string;
-  clientEmail: string;
-  clientName: string;
-  orderNumber: string;
-  installDate?: string;
-  engineerName?: string;
+  orderId: string
+  status: string
+  clientEmail: string
+  clientName: string
+  orderNumber: string
+  totalAmount?: number
+  installDate?: string
+  engineerName?: string
+  productDetails?: string
 }
 
+// Email templates for different order statuses
 const emailTemplates = {
   quote_accepted: {
-    subject: "Thanks – we've received your order",
-    template: (data: EmailRequest) => `
-      <h1>Thank you for your order, ${data.clientName}!</h1>
-      <p>We've received your order <strong>${data.orderNumber}</strong> and we're excited to get started.</p>
-      <h2>What happens next?</h2>
-      <ul>
-        <li>Complete your payment to secure your installation slot</li>
-        <li>Review and sign the installation agreement</li>
-        <li>Choose your preferred installation dates</li>
-        <li>We'll schedule and complete your installation</li>
-      </ul>
-      <p><a href="${Deno.env.get('SUPABASE_URL')}/client" style="background: #e6004e; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">View Your Order</a></p>
-      <p>Best regards,<br>The Pro EV Team</p>
+    subject: 'Order Confirmed - Payment Required',
+    body: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #2563eb;">Order Confirmed!</h2>
+        <p>Dear {{clientName}},</p>
+        <p>Thank you for accepting your quote. Your order {{orderNumber}} has been confirmed.</p>
+        <div style="margin: 20px 0; padding: 20px; background-color: #f8fafc; border-radius: 8px;">
+          <p><strong>Order Number:</strong> {{orderNumber}}</p>
+          <p><strong>Total Amount:</strong> £{{totalAmount}}</p>
+        </div>
+        <p><strong>Next Steps:</strong> Please complete payment to proceed with installation scheduling.</p>
+        <p>Best regards,<br>Pro EV Team</p>
+      </div>
     `
   },
-  
   payment_received: {
-    subject: "Payment Received – Next Step: Sign Agreement",
-    template: (data: EmailRequest) => `
-      <h1>Payment Confirmed!</h1>
-      <p>Hi ${data.clientName},</p>
-      <p>We've received your payment for order <strong>${data.orderNumber}</strong>. Thank you!</p>
-      <h2>Next Step: Sign Your Agreement</h2>
-      <p>Please review and sign your installation agreement to move forward with scheduling.</p>
-      <p><a href="${Deno.env.get('SUPABASE_URL')}/client" style="background: #e6004e; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Sign Agreement</a></p>
-      <p>Best regards,<br>The Pro EV Team</p>
+    subject: 'Payment Received - Installation Scheduling',
+    body: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #10b981;">Payment Received!</h2>
+        <p>Dear {{clientName}},</p>
+        <p>We have successfully received your payment for order {{orderNumber}}.</p>
+        <div style="margin: 20px 0; padding: 20px; background-color: #f0fdf4; border-radius: 8px;">
+          <p><strong>Order Number:</strong> {{orderNumber}}</p>
+          <p><strong>Amount Paid:</strong> £{{totalAmount}}</p>
+          <p><strong>Payment Status:</strong> Confirmed</p>
+        </div>
+        <p><strong>Next Steps:</strong> Our team will contact you shortly to schedule your installation.</p>
+        <p>Best regards,<br>Pro EV Team</p>
+      </div>
     `
   },
-  
-  agreement_signed: {
-    subject: "Thanks – Final Step: Choose Install Date",
-    template: (data: EmailRequest) => `
-      <h1>Agreement Signed Successfully!</h1>
-      <p>Hi ${data.clientName},</p>
-      <p>Thank you for signing your installation agreement for order <strong>${data.orderNumber}</strong>.</p>
-      <h2>Final Step: Installation Preferences</h2>
-      <p>Please let us know your preferred installation dates and we'll schedule your appointment with one of our expert engineers.</p>
-      <p><a href="${Deno.env.get('SUPABASE_URL')}/client" style="background: #e6004e; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Submit Preferences</a></p>
-      <p>Best regards,<br>The Pro EV Team</p>
-    `
-  },
-  
   scheduled: {
-    subject: `Installation Confirmed for ${new Date().toLocaleDateString()}`,
-    template: (data: EmailRequest) => `
-      <h1>Your Installation is Confirmed! 🎉</h1>
-      <p>Hi ${data.clientName},</p>
-      <p>Great news! Your installation for order <strong>${data.orderNumber}</strong> has been scheduled.</p>
-      <h2>Installation Details:</h2>
-      <ul>
-        <li><strong>Date:</strong> ${data.installDate ? new Date(data.installDate).toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : 'TBC'}</li>
-        ${data.engineerName ? `<li><strong>Engineer:</strong> ${data.engineerName}</li>` : ''}
-        <li><strong>What to expect:</strong> Professional installation of your EV charging solution</li>
-      </ul>
-      <h2>Before Your Installation:</h2>
-      <ul>
-        <li>Ensure the installation area is clear and accessible</li>
-        <li>Provide access to your electrical consumer unit</li>
-        <li>Ensure adequate parking space for our engineer</li>
-      </ul>
-      <p><a href="${Deno.env.get('SUPABASE_URL')}/client" style="background: #e6004e; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">View Installation Details</a></p>
-      <p>Best regards,<br>The Pro EV Team</p>
+    subject: 'Installation Scheduled',
+    body: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #7c3aed;">Installation Scheduled!</h2>
+        <p>Dear {{clientName}},</p>
+        <p>Great news! Your installation has been scheduled.</p>
+        <div style="margin: 20px 0; padding: 20px; background-color: #faf5ff; border-radius: 8px;">
+          <p><strong>Order Number:</strong> {{orderNumber}}</p>
+          <p><strong>Installation Date:</strong> {{installDate}}</p>
+          <p><strong>Engineer:</strong> {{engineerName}}</p>
+        </div>
+        <p>Our engineer will contact you to confirm the exact time and any final details.</p>
+        <p>Best regards,<br>Pro EV Team</p>
+      </div>
     `
   },
-  
+  in_progress: {
+    subject: 'Installation In Progress',
+    body: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #f59e0b;">Installation Started!</h2>
+        <p>Dear {{clientName}},</p>
+        <p>Your installation is currently underway.</p>
+        <div style="margin: 20px 0; padding: 20px; background-color: #fffbeb; border-radius: 8px;">
+          <p><strong>Order Number:</strong> {{orderNumber}}</p>
+          <p><strong>Engineer:</strong> {{engineerName}}</p>
+          <p><strong>Status:</strong> Installation in progress</p>
+        </div>
+        <p>If you have any questions, please don't hesitate to contact your engineer.</p>
+        <p>Best regards,<br>Pro EV Team</p>
+      </div>
+    `
+  },
   completed: {
-    subject: "Your Installation is Complete 🎉",
-    template: (data: EmailRequest) => `
-      <h1>Installation Complete!</h1>
-      <p>Hi ${data.clientName},</p>
-      <p>Congratulations! Your EV charging installation for order <strong>${data.orderNumber}</strong> is now complete.</p>
-      <h2>Your Warranty is Now Active</h2>
-      <p>Your 5-year warranty period has begun. We're confident you'll love your new EV charging solution!</p>
-      <h2>Need Support?</h2>
-      <p>If you have any questions or need assistance, we're here to help:</p>
-      <ul>
-        <li>Email: support@proev.co.uk</li>
-        <li>Phone: 01234 567890</li>
-      </ul>
-      <h2>Leave a Review</h2>
-      <p>We'd love to hear about your experience! Please consider leaving us a review.</p>
-      <p><a href="${Deno.env.get('SUPABASE_URL')}/client" style="background: #e6004e; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">View Completed Order</a></p>
-      <p>Thank you for choosing Pro EV!</p>
-      <p>Best regards,<br>The Pro EV Team</p>
+    subject: 'Installation Complete!',
+    body: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #059669;">Installation Complete!</h2>
+        <p>Dear {{clientName}},</p>
+        <p>Congratulations! Your installation has been completed successfully.</p>
+        <div style="margin: 20px 0; padding: 20px; background-color: #ecfdf5; border-radius: 8px;">
+          <p><strong>Order Number:</strong> {{orderNumber}}</p>
+          <p><strong>Completed By:</strong> {{engineerName}}</p>
+          <p><strong>Status:</strong> Installation complete</p>
+        </div>
+        <p>Thank you for choosing Pro EV. We hope you enjoy your new installation!</p>
+        <p>Best regards,<br>Pro EV Team</p>
+      </div>
     `
   },
-  
-  revisit_required: {
-    subject: "We're Following Up on Your Installation",
-    template: (data: EmailRequest) => `
-      <h1>Installation Follow-Up Required</h1>
-      <p>Hi ${data.clientName},</p>
-      <p>We need to follow up on your installation for order <strong>${data.orderNumber}</strong>.</p>
-      <p>Our team will be in touch shortly to discuss the next steps and ensure everything meets our high standards.</p>
-      <p>If you have any immediate concerns, please don't hesitate to contact us:</p>
-      <ul>
-        <li>Email: support@proev.co.uk</li>
-        <li>Phone: 01234 567890</li>
-      </ul>
-      <p><a href="${Deno.env.get('SUPABASE_URL')}/client" style="background: #e6004e; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">View Your Order</a></p>
-      <p>Best regards,<br>The Pro EV Team</p>
+  awaiting_agreement: {
+    subject: 'Agreement Required - Next Steps',
+    body: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #dc2626;">Agreement Required</h2>
+        <p>Dear {{clientName}},</p>
+        <p>To proceed with your order {{orderNumber}}, we need you to review and sign the installation agreement.</p>
+        <div style="margin: 20px 0; padding: 20px; background-color: #fef2f2; border-radius: 8px;">
+          <p><strong>Order Number:</strong> {{orderNumber}}</p>
+          <p><strong>Status:</strong> Awaiting Agreement</p>
+        </div>
+        <p>Please check your client portal or contact us to complete this step.</p>
+        <p>Best regards,<br>Pro EV Team</p>
+      </div>
     `
   }
-};
+}
 
 const handler = async (req: Request): Promise<Response> => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders })
   }
 
   try {
@@ -198,44 +200,113 @@ const handler = async (req: Request): Promise<Response> => {
         day: 'numeric', 
         month: 'long' 
       });
-      subject = `Installation Confirmed for ${installDate}`;
+      subject = `Installation Scheduled for ${installDate}`;
     }
 
+    // Check if communications are suppressed
+    const checkSuppression = async () => {
+      try {
+        const { data, error } = await supabaseAdmin
+          .from('admin_settings')
+          .select('setting_value')
+          .eq('setting_key', 'communication_suppression')
+          .single();
+
+        if (error || !data) return false;
+        
+        const settings = data.setting_value as Record<string, unknown>;
+        return (
+          settings.test_mode_active === true || 
+          settings.suppress_status_emails === true ||
+          settings.suppress_client_emails === true
+        );
+      } catch (error) {
+        console.error('Error checking suppression settings:', error);
+        return false;
+      }
+    };
+
+    const isEmailSuppressed = await checkSuppression();
+
+    if (isEmailSuppressed) {
+      console.log('Status email sending is suppressed - logging email without sending');
+      
+      // Log the suppressed email for audit purposes
+      await supabaseAdmin.rpc('log_order_activity', {
+        p_order_id: emailData.orderId,
+        p_activity_type: 'email_suppressed',
+        p_description: `Status email suppressed - would have sent ${emailData.status} notification`,
+        p_details: {
+          status: emailData.status,
+          would_have_sent_to: emailData.clientEmail,
+          suppressed_at: new Date().toISOString(),
+          suppressed_reason: 'Test mode - communications suppressed'
+        }
+      });
+
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          suppressed: true, 
+          message: 'Email suppressed - test mode active' 
+        }),
+        {
+          status: 200,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders }
+        }
+      );
+    }
+
+    // Send the email if not suppressed
+    let emailBody = template.body;
+    
+    // Replace template variables
+    emailBody = emailBody.replace(/{{clientName}}/g, emailData.clientName);
+    emailBody = emailBody.replace(/{{orderNumber}}/g, emailData.orderNumber);
+    emailBody = emailBody.replace(/{{totalAmount}}/g, emailData.totalAmount?.toLocaleString() || '0');
+    emailBody = emailBody.replace(/{{installDate}}/g, emailData.installDate || 'TBC');
+    emailBody = emailBody.replace(/{{engineerName}}/g, emailData.engineerName || 'TBC');
+    emailBody = emailBody.replace(/{{productDetails}}/g, emailData.productDetails || '');
+
+    console.log('Sending email to:', emailData.clientEmail, 'Subject:', subject);
+
     const emailResponse = await resend.emails.send({
-      from: "Pro EV <orders@proev.co.uk>",
+      from: 'Pro EV <no-reply@proev.co.uk>',
       to: [emailData.clientEmail],
       subject: subject,
-      html: template.template(emailData),
+      html: emailBody,
     });
 
-    console.log("Email sent successfully:", emailResponse);
+    console.log('Email sent successfully:', emailResponse);
 
-    // Log the email sending in the order activity
-    await supabase.rpc('log_order_activity', {
+    // Log the email activity
+    await supabaseAdmin.rpc('log_order_activity', {
       p_order_id: emailData.orderId,
       p_activity_type: 'email_sent',
-      p_description: `Email sent: ${subject}`,
+      p_description: `Status email sent: ${emailData.status}`,
       p_details: {
-        email_type: emailData.status,
-        recipient: emailData.clientEmail,
+        status: emailData.status,
+        email_to: emailData.clientEmail,
+        resend_id: emailResponse.data?.id,
         subject: subject
       }
     });
 
-    return new Response(JSON.stringify(emailResponse), {
-      status: 200,
-      headers: {
-        "Content-Type": "application/json",
-        ...corsHeaders,
-      },
-    });
+    return new Response(
+      JSON.stringify({ success: true, message: 'Email sent successfully', messageId: emailResponse.data?.id }),
+      {
+        status: 200,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      }
+    );
+
   } catch (error: any) {
-    console.error("Error in send-order-status-email function:", error);
+    console.error('Error in send-order-status-email function:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
       {
         status: 500,
-        headers: { "Content-Type": "application/json", ...corsHeaders },
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
       }
     );
   }

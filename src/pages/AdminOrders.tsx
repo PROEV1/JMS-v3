@@ -25,6 +25,9 @@ interface Order {
   scheduled_install_date: string | null;
   agreement_signed_at: string | null;
   engineer_signed_off_at: string | null;
+  is_partner_job: boolean;
+  scheduling_suppressed: boolean;
+  scheduling_suppressed_reason?: string;
   // Optional field that might not exist in database
   engineer_status?: string;
   client: {
@@ -36,6 +39,10 @@ interface Order {
     id: string;
     name: string;
     email: string;
+  } | null;
+  partner?: {
+    id: string;
+    name: string;
   } | null;
 }
 
@@ -67,6 +74,10 @@ export default function AdminOrders() {
             id,
             name,
             email
+          ),
+          partner:partners(
+            id,
+            name
           )
         `)
         .order('created_at', { ascending: false });
@@ -350,12 +361,24 @@ export default function AdminOrders() {
                           <TableCell className="font-medium">
                             {order.order_number}
                           </TableCell>
-                          <TableCell>
-                            <div>
-                              <p className="font-medium">{order.client.full_name}</p>
-                              <p className="text-sm text-muted-foreground">{order.client.email}</p>
-                            </div>
-                          </TableCell>
+                           <TableCell>
+                             <div>
+                               <p className="font-medium">{order.client.full_name}</p>
+                               <p className="text-sm text-muted-foreground">{order.client.email}</p>
+                               <div className="flex gap-1 mt-1">
+                                 {order.is_partner_job && (
+                                   <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700">
+                                     Partner
+                                   </Badge>
+                                 )}
+                                 {order.scheduling_suppressed && (
+                                   <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-700">
+                                     Suppressed
+                                   </Badge>
+                                 )}
+                               </div>
+                             </div>
+                           </TableCell>
                           <TableCell>
                             <Badge className={getStatusColor(order.status_enhanced)}>
                               {order.status_enhanced === 'awaiting_payment' ? 'Awaiting Payment' : 

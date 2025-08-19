@@ -87,6 +87,8 @@ interface Order {
     description: string | null;
     uploaded_at: string;
   }>;
+  is_partner_job: boolean;
+  scheduling_suppressed: boolean;
 }
 
 interface PaymentConfig {

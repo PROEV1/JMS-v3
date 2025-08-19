@@ -267,66 +267,67 @@ serve(async (req: Request) => {
       messageContent = messageContent.replace(new RegExp(`{{${key}}}`, 'g'), value);
     });
 
-    // Send via email (primary channel)
-    if (delivery_channel === 'email' || offerConfig.auto_fallback_email) {
-      let emailSent = false;
-      let deliveryDetails = {
-        ...jobOffer.delivery_details,
-        sent_at: new Date().toISOString()
+    // Check if communications are suppressed
+    const checkSuppression = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('admin_settings')
+          .select('setting_value')
+          .eq('setting_key', 'communication_suppression')
+          .single();
+
+        if (error || !data) return false;
+        
+        const settings = data.setting_value as Record<string, unknown>;
+        return (
+          settings.test_mode_active === true || 
+          settings.suppress_offer_emails === true ||
+          settings.suppress_client_emails === true
+        );
+      } catch (error) {
+        console.error('Error checking suppression settings:', error);
+        return false;
+      }
+    };
+
+    const isEmailSuppressed = await checkSuppression();
+
+    let deliveryDetails = {
+      ...jobOffer.delivery_details,
+      sent_at: new Date().toISOString()
+    };
+
+    if (isEmailSuppressed) {
+      console.log('Email sending is suppressed - logging offer email without sending');
+      
+      // Log the suppressed email for audit purposes
+      deliveryDetails = {
+        ...deliveryDetails,
+        email_suppressed: true,
+        suppressed_at: new Date().toISOString(),
+        suppressed_reason: 'Test mode - communications suppressed',
+        would_have_sent_to: order.client.email
       };
 
-      // Try primary email address first
-      const primaryFromAddress = offerConfig.from_address || 'ProEV Scheduling <no-reply@proev.co.uk>';
-      
-      try {
-        console.log('Sending email offer to:', order.client.email, 'from:', primaryFromAddress, 'with URL:', offerUrl);
-        
-        const emailResponse = await resend.emails.send({
-          from: primaryFromAddress,
-          to: [order.client.email],
-          subject: `Installation Date Offered - ${order.order_number}`,
-          html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-              <h2 style="color: #2563eb;">Installation Slot Available</h2>
-              <p>Dear ${order.client.full_name},</p>
-              <p>${messageContent}</p>
-              <div style="margin: 20px 0; padding: 20px; background-color: #f8fafc; border-radius: 8px;">
-                <p><strong>Order:</strong> ${order.order_number}</p>
-                <p><strong>Proposed Date:</strong> ${templateData.offered_date}</p>
-                <p><strong>Engineer:</strong> ${engineer.name}</p>
-                <p><strong>Time Window:</strong> ${templateData.time_window}</p>
-              </div>
-              <div style="text-align: center; margin: 30px 0;">
-                <a href="${offerUrl}" style="background-color: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
-                  Accept or Reject Offer
-                </a>
-              </div>
-              <p style="color: #6b7280; font-size: 14px;">
-                This offer expires at ${expiresAt.toLocaleString('en-GB')}
-              </p>
-            </div>
-          `
-        });
+      // Update job offer with suppression details
+      await supabase
+        .from('job_offers')
+        .update({ delivery_details })
+        .eq('id', jobOffer.id);
 
-        console.log('Email sent successfully to:', order.client.email, 'Message ID:', emailResponse.data?.id);
-        emailSent = true;
-        
-        deliveryDetails = {
-          ...deliveryDetails,
-          email_sent: true,
-          resend_message_id: emailResponse.data?.id,
-          primary_sender: primaryFromAddress,
-          fallback_used: false
-        };
+    } else {
+      // Send via email (primary channel)
+      if (delivery_channel === 'email' || offerConfig.auto_fallback_email) {
+        let emailSent = false;
 
-      } catch (primaryError) {
-        console.error('Primary email send failed:', primaryError);
-        console.log('Attempting fallback with onboarding@resend.dev');
+        // Try primary email address first
+        const primaryFromAddress = offerConfig.from_address || 'ProEV Scheduling <no-reply@proev.co.uk>';
         
-        // Try fallback email address
         try {
-          const fallbackResponse = await resend.emails.send({
-            from: 'ProEV Scheduling <onboarding@resend.dev>',
+          console.log('Sending email offer to:', order.client.email, 'from:', primaryFromAddress, 'with URL:', offerUrl);
+          
+          const emailResponse = await resend.emails.send({
+            from: primaryFromAddress,
             to: [order.client.email],
             subject: `Installation Date Offered - ${order.order_number}`,
             html: `
@@ -352,44 +353,87 @@ serve(async (req: Request) => {
             `
           });
 
-          console.log('Fallback email sent successfully to:', order.client.email, 'Message ID:', fallbackResponse.data?.id);
+          console.log('Email sent successfully to:', order.client.email, 'Message ID:', emailResponse.data?.id);
           emailSent = true;
           
           deliveryDetails = {
             ...deliveryDetails,
             email_sent: true,
-            resend_message_id: fallbackResponse.data?.id,
+            resend_message_id: emailResponse.data?.id,
             primary_sender: primaryFromAddress,
-            primary_error: primaryError.message,
-            fallback_used: true,
-            fallback_sender: 'onboarding@resend.dev'
+            fallback_used: false
           };
 
-        } catch (fallbackError) {
-          console.error('Fallback email send also failed:', fallbackError);
+        } catch (primaryError) {
+          console.error('Primary email send failed:', primaryError);
+          console.log('Attempting fallback with onboarding@resend.dev');
           
-          deliveryDetails = {
-            ...deliveryDetails,
-            email_sent: false,
-            primary_sender: primaryFromAddress,
-            primary_error: primaryError.message,
-            fallback_used: true,
-            fallback_error: fallbackError.message
-          };
+          // Try fallback email address
+          try {
+            const fallbackResponse = await resend.emails.send({
+              from: 'ProEV Scheduling <onboarding@resend.dev>',
+              to: [order.client.email],
+              subject: `Installation Date Offered - ${order.order_number}`,
+              html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                  <h2 style="color: #2563eb;">Installation Slot Available</h2>
+                  <p>Dear ${order.client.full_name},</p>
+                  <p>${messageContent}</p>
+                  <div style="margin: 20px 0; padding: 20px; background-color: #f8fafc; border-radius: 8px;">
+                    <p><strong>Order:</strong> ${order.order_number}</p>
+                    <p><strong>Proposed Date:</strong> ${templateData.offered_date}</p>
+                    <p><strong>Engineer:</strong> ${engineer.name}</p>
+                    <p><strong>Time Window:</strong> ${templateData.time_window}</p>
+                  </div>
+                  <div style="text-align: center; margin: 30px 0;">
+                    <a href="${offerUrl}" style="background-color: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                      Accept or Reject Offer
+                    </a>
+                  </div>
+                  <p style="color: #6b7280; font-size: 14px;">
+                    This offer expires at ${expiresAt.toLocaleString('en-GB')}
+                  </p>
+                </div>
+              `
+            });
 
-          if (delivery_channel === 'email') {
-            throw new Error(`Failed to send email offer: Primary (${primaryError.message}), Fallback (${fallbackError.message})`);
+            console.log('Fallback email sent successfully to:', order.client.email, 'Message ID:', fallbackResponse.data?.id);
+            emailSent = true;
+            
+            deliveryDetails = {
+              ...deliveryDetails,
+              email_sent: true,
+              resend_message_id: fallbackResponse.data?.id,
+              primary_sender: primaryFromAddress,
+              primary_error: primaryError.message,
+              fallback_used: true,
+              fallback_sender: 'onboarding@resend.dev'
+            };
+
+          } catch (fallbackError) {
+            console.error('Fallback email send also failed:', fallbackError);
+            
+            deliveryDetails = {
+              ...deliveryDetails,
+              email_sent: false,
+              primary_sender: primaryFromAddress,
+              primary_error: primaryError.message,
+              fallback_used: true,
+              fallback_error: fallbackError.message
+            };
+
+            if (delivery_channel === 'email') {
+              throw new Error(`Failed to send email offer: Primary (${primaryError.message}), Fallback (${fallbackError.message})`);
+            }
           }
         }
-      }
 
-      // Update job offer with delivery details
-      await supabase
-        .from('job_offers')
-        .update({
-          delivery_details: deliveryDetails
-        })
-        .eq('id', jobOffer.id);
+        // Update job offer with delivery details
+        await supabase
+          .from('job_offers')
+          .update({ delivery_details })
+          .eq('id', jobOffer.id);
+      }
     }
 
     // Update order with engineer assignment and set status to date_offered
@@ -417,7 +461,8 @@ serve(async (req: Request) => {
         time_window,
         expires_at: expiresAt.toISOString(),
         delivery_channel,
-        client_token: clientToken
+        client_token: clientToken,
+        email_suppressed: isEmailSuppressed
       }
     });
 
@@ -426,7 +471,8 @@ serve(async (req: Request) => {
         success: true,
         job_offer_id: jobOffer.id,
         expires_at: expiresAt.toISOString(),
-        offer_url: offerUrl
+        offer_url: offerUrl,
+        email_suppressed: isEmailSuppressed
       }),
       {
         status: 200,
