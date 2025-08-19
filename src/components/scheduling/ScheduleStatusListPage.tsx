@@ -94,6 +94,11 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
     let variant: "default" | "secondary" | "destructive" | "outline" = "secondary";
     let text = status;
 
+    // Check if order has accepted offer to show "Ready to Book"
+    const acceptedOffer = offers.find(offer => 
+      offer.order_id === order.id && offer.status === 'accepted'
+    );
+
     switch (status) {
       case 'needs_quote_acceptance':
         variant = "outline";
@@ -110,7 +115,8 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
       case 'needs_scheduling':
       case 'awaiting_install_booking':
         variant = "destructive";
-        text = "Needs Scheduling";
+        // If there's an accepted offer, show "Ready to Book", otherwise "Needs Scheduling"
+        text = acceptedOffer ? "Ready to Book" : "Needs Scheduling";
         break;
       case 'date_offered':
         variant = "outline";
