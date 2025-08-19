@@ -84,6 +84,9 @@ function AppContent() {
   return (
     <Layout>
       <Routes>
+        {/* Redirect authenticated users away from auth page */}
+        <Route path="/auth" element={<Navigate to="/" replace />} />
+        
         {/* Dashboard Routes */}
         <Route path="/" element={<Dashboard />} />
         
