@@ -312,7 +312,7 @@ serve(async (req: Request) => {
       // Update job offer with suppression details
       await supabase
         .from('job_offers')
-        .update({ delivery_details })
+        .update({ delivery_details: deliveryDetails })
         .eq('id', jobOffer.id);
 
     } else {
@@ -431,7 +431,7 @@ serve(async (req: Request) => {
         // Update job offer with delivery details
         await supabase
           .from('job_offers')
-          .update({ delivery_details })
+          .update({ delivery_details: deliveryDetails })
           .eq('id', jobOffer.id);
       }
     }
