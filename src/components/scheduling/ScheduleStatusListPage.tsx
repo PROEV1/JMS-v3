@@ -643,17 +643,25 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                         )}
                       </div>
 
-                      {/* Status - Horizontal Badges */}
-                      <div className="col-span-2">
-                        <div className="flex items-center gap-1 flex-wrap">
-                          <Badge variant="secondary" className="text-xs px-2 py-1 bg-slate-100 text-slate-600 border-slate-200">
-                            Needs Scheduling
-                          </Badge>
-                          <Badge variant="outline" className="text-xs px-2 py-1 border-slate-300 text-slate-600">
-                            {offersStatus.label}
-                          </Badge>
-                        </div>
-                      </div>
+                       {/* Status - Horizontal Badges */}
+                       <div className="col-span-2">
+                         <div className="flex items-center gap-1 flex-wrap">
+                           <Badge 
+                             variant={getJobStatusChip(order).variant} 
+                             className="text-xs px-2 py-1 bg-slate-100 text-slate-600 border-slate-200"
+                           >
+                             {getJobStatusChip(order).label}
+                           </Badge>
+                           {order.is_partner_job && (
+                             <Badge variant="outline" className="text-xs px-1 py-0 border-blue-300 text-blue-600">
+                               Partner
+                             </Badge>
+                           )}
+                           <Badge variant="outline" className="text-xs px-2 py-1 border-slate-300 text-slate-600">
+                             {offersStatus.label}
+                           </Badge>
+                         </div>
+                       </div>
 
                       {/* Created */}
                       <div className="col-span-1">
@@ -780,11 +788,19 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                             {order.order_number}
                           </div>
                         </div>
-                        <div className="flex gap-1">
-                          <Badge variant="secondary" className="text-xs px-2 py-1 bg-slate-100 text-slate-600 border-slate-200">
-                            Needs Scheduling
-                          </Badge>
-                        </div>
+                         <div className="flex gap-1">
+                           <Badge 
+                             variant={getJobStatusChip(order).variant} 
+                             className="text-xs px-2 py-1 bg-slate-100 text-slate-600 border-slate-200"
+                           >
+                             {getJobStatusChip(order).label}
+                           </Badge>
+                           {order.is_partner_job && (
+                             <Badge variant="outline" className="text-xs px-1 py-0 border-blue-300 text-blue-600">
+                               Partner
+                             </Badge>
+                           )}
+                         </div>
                       </div>
 
                       <div className="space-y-2 text-sm">
@@ -797,14 +813,22 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                               {getBestPostcode(order) || 'No postcode'} • {getOrderEstimatedHours(order)}h{isDefaultEstimatedHours(order) && ' (Default)'}
                             </div>
                           </div>
-                          <div className="flex gap-1">
-                            <Badge variant="secondary" className="text-xs px-2 py-1 bg-slate-100 text-slate-600 border-slate-200">
-                              Needs Scheduling
-                            </Badge>
-                            <Badge variant="outline" className="text-xs px-2 py-1 border-slate-300 text-slate-600">
-                              {offersStatus.label}
-                            </Badge>
-                          </div>
+                           <div className="flex gap-1">
+                             <Badge 
+                               variant={getJobStatusChip(order).variant} 
+                               className="text-xs px-2 py-1 bg-slate-100 text-slate-600 border-slate-200"
+                             >
+                               {getJobStatusChip(order).label}
+                             </Badge>
+                             {order.is_partner_job && (
+                               <Badge variant="outline" className="text-xs px-1 py-0 border-blue-300 text-blue-600">
+                                 Partner
+                               </Badge>
+                             )}
+                             <Badge variant="outline" className="text-xs px-2 py-1 border-slate-300 text-slate-600">
+                               {offersStatus.label}
+                             </Badge>
+                           </div>
                         </div>
                         
                         <div className="flex items-center justify-between text-muted-foreground">
