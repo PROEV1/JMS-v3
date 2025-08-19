@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Search, Send, Wrench, User, Calendar as CalendarIcon, MapPin, RotateCcw, XCircle, Calendar, Check, X, Eye } from 'lucide-react';
-import { Order, Engineer } from '@/utils/schedulingUtils';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Search, Send, Wrench, User, Calendar as CalendarIcon, MapPin, RotateCcw, XCircle, Calendar, Check, X, Eye, Filter, ArrowUpDown, Clock } from 'lucide-react';
+import { Order, Engineer, getOrderEstimatedHours } from '@/utils/schedulingUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { SendOfferModal } from './SendOfferModal';
@@ -32,27 +34,110 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
   const [showSmartAssign, setShowSmartAssign] = useState(false);
   const [showAutoScheduleModal, setShowAutoScheduleModal] = useState(false);
   
+  // New state for improved UI
+  const [jobTypeFilter, setJobTypeFilter] = useState<string>('all');
+  const [valueFilter, setValueFilter] = useState<string>('all');
+  const [urgencyFilter, setUrgencyFilter] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<string>('date');
+  const [compactView, setCompactView] = useState(false);
+  
   // Fetch all job offers for the displayed orders
   const { offers, refetch: refetchOffers, releaseOffer, resendOffer } = useJobOffers();
 
-  const filteredOrders = orders.filter(order => 
-    order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    order.client?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    order.client?.email?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Enhanced filtering logic
+  const filteredAndSortedOrders = (() => {
+    let filtered = orders.filter(order => {
+      // Text search
+      const matchesSearch = order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        order.client?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        order.client?.email?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      // Job type filter
+      const matchesJobType = jobTypeFilter === 'all' || order.job_type === jobTypeFilter;
+      
+      // Value filter
+      const orderValue = order.total_amount || 0;
+      const matchesValue = valueFilter === 'all' || 
+        (valueFilter === 'high' && orderValue > 300) ||
+        (valueFilter === 'low' && orderValue <= 300);
+      
+      // Urgency filter (date within 3 days)
+      const isUrgent = order.scheduled_install_date && 
+        new Date(order.scheduled_install_date) <= new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+      const matchesUrgency = urgencyFilter === 'all' || 
+        (urgencyFilter === 'urgent' && isUrgent) ||
+        (urgencyFilter === 'normal' && !isUrgent);
+      
+      return matchesSearch && matchesJobType && matchesValue && matchesUrgency;
+    });
 
-  const getStatusColor = (status: string) => {
+    // Sorting
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case 'value':
+          return (b.total_amount || 0) - (a.total_amount || 0);
+        case 'postcode':
+          return (getBestPostcode(a) || '').localeCompare(getBestPostcode(b) || '');
+        case 'date':
+        default:
+          return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+      }
+    });
+
+    return filtered;
+  })();
+
+  // Helper functions for status chips
+  const getJobStatusChip = (order: Order) => {
+    const status = order.status_enhanced;
+    let variant: "default" | "secondary" | "destructive" | "outline" = "secondary";
+    let text = status;
+
     switch (status) {
       case 'awaiting_install_booking':
-        return 'destructive';
+        variant = "destructive";
+        text = "Needs Scheduling";
+        break;
       case 'scheduled':
-        return 'default';
+        variant = "default";
+        text = "Scheduled";
+        break;
       case 'in_progress':
-        return 'secondary';
+        variant = "secondary";
+        text = "In Progress";
+        break;
       case 'completed':
-        return 'default';
-      default:
-        return 'secondary';
+        variant = "default";
+        text = "Completed";
+        break;
+    }
+
+    return <Badge variant={variant} className="text-xs">{text}</Badge>;
+  };
+
+  const getAssignmentChip = (order: Order) => {
+    const hasEngineer = order.engineer_id;
+    return (
+      <Badge variant={hasEngineer ? "default" : "destructive"} className="text-xs">
+        {hasEngineer ? "Assigned" : "Unassigned"}
+      </Badge>
+    );
+  };
+
+  const getOffersChip = (orderId: string) => {
+    const activeOffers = offers.filter(offer => 
+      offer.order_id === orderId && 
+      offer.status === 'pending' && 
+      new Date(offer.expires_at) > new Date()
+    );
+    const totalOffers = offers.filter(offer => offer.order_id === orderId);
+    
+    if (activeOffers.length > 0) {
+      return <Badge variant="default" className="text-xs">{activeOffers.length} Active</Badge>;
+    } else if (totalOffers.length > 0) {
+      return <Badge variant="outline" className="text-xs">{totalOffers.length} Offer{totalOffers.length !== 1 ? 's' : ''}</Badge>;
+    } else {
+      return <Badge variant="secondary" className="text-xs">No Offers</Badge>;
     }
   };
 
@@ -385,24 +470,37 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
         <div>
           <h2 className="text-2xl font-bold">{title}</h2>
           <p className="text-muted-foreground">
-            {filteredOrders.length} job{filteredOrders.length !== 1 ? 's' : ''}
+            {filteredAndSortedOrders.length} job{filteredAndSortedOrders.length !== 1 ? 's' : ''}
           </p>
         </div>
         
-        {showAutoSchedule && (
-          <Button 
-            onClick={() => setShowAutoScheduleModal(true)}
-            className="flex items-center gap-2"
-          >
-            <CalendarIcon className="w-4 h-4" />
-            Auto-Schedule & Review
-          </Button>
-        )}
+        <div className="flex items-center gap-3">
+          {/* Compact View Toggle */}
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="compact-mode"
+              checked={compactView}
+              onCheckedChange={setCompactView}
+            />
+            <Label htmlFor="compact-mode" className="text-sm">Compact</Label>
+          </div>
+          
+          {showAutoSchedule && (
+            <Button 
+              onClick={() => setShowAutoScheduleModal(true)}
+              className="flex items-center gap-2"
+            >
+              <CalendarIcon className="w-4 h-4" />
+              Auto-Schedule & Review
+            </Button>
+          )}
+        </div>
       </div>
 
-      {/* Search */}
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1">
+      {/* Search and Filters */}
+      <div className="flex flex-col gap-4">
+        {/* Search Bar */}
+        <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
           <Input
             placeholder="Search by order number, client name, or email..."
@@ -411,309 +509,300 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
             className="pl-10"
           />
         </div>
+        
+        {/* Quick Filters */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-muted-foreground" />
+            <span className="text-sm font-medium">Filters:</span>
+          </div>
+          
+          <Select value={jobTypeFilter} onValueChange={setJobTypeFilter}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="installation">Installation</SelectItem>
+              <SelectItem value="service_call">Service Call</SelectItem>
+              <SelectItem value="assessment">Assessment</SelectItem>
+            </SelectContent>
+          </Select>
+          
+          <Select value={valueFilter} onValueChange={setValueFilter}>
+            <SelectTrigger className="w-[130px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Values</SelectItem>
+              <SelectItem value="high">High (£300+)</SelectItem>
+              <SelectItem value="low">Lower (£300-)</SelectItem>
+            </SelectContent>
+          </Select>
+          
+          <Select value={urgencyFilter} onValueChange={setUrgencyFilter}>
+            <SelectTrigger className="w-[120px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Jobs</SelectItem>
+              <SelectItem value="urgent">Urgent (3 days)</SelectItem>
+              <SelectItem value="normal">Normal</SelectItem>
+            </SelectContent>
+          </Select>
+          
+          <div className="flex items-center gap-2 ml-4">
+            <ArrowUpDown className="w-4 h-4 text-muted-foreground" />
+            <span className="text-sm font-medium">Sort:</span>
+          </div>
+          
+          <Select value={sortBy} onValueChange={setSortBy}>
+            <SelectTrigger className="w-[120px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="date">Date</SelectItem>
+              <SelectItem value="value">Value</SelectItem>
+              <SelectItem value="postcode">Postcode</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
-      {/* Orders Table */}
-      <Card>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Job ID</TableHead>
-              <TableHead>Client</TableHead>
-              <TableHead>Postcode</TableHead>
-              <TableHead>Value</TableHead>
-              <TableHead>Engineer</TableHead>
-              <TableHead>Offer Status</TableHead>
-              <TableHead>Created</TableHead>
-              <TableHead>Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredOrders.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={8} className="text-center py-12">
-                  <div className="flex flex-col items-center">
-                    <Calendar className="w-12 h-12 text-muted-foreground mb-4" />
-                    <h3 className="text-lg font-medium mb-2">No jobs found</h3>
-                    <p className="text-muted-foreground">
-                      {searchTerm ? 'Try adjusting your search criteria.' : 'No jobs match the current status.'}
-                    </p>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredOrders.map((order) => (
-                <TableRow key={order.id}>
-                  <TableCell className="font-medium">
-                    <div className="flex items-center gap-2">
-                      {order.order_number}
-                      {order.job_type && (
-                        <Badge variant="secondary" className="text-xs">
-                          {order.job_type.charAt(0).toUpperCase() + order.job_type.slice(1).replace('_', ' ')}
-                        </Badge>
+      {/* Jobs Grid */}
+      <div className="space-y-3">
+        {filteredAndSortedOrders.length === 0 ? (
+          <Card className="p-12">
+            <div className="flex flex-col items-center text-center">
+              <Calendar className="w-12 h-12 text-muted-foreground mb-4" />
+              <h3 className="text-lg font-medium mb-2">No jobs found</h3>
+              <p className="text-muted-foreground">
+                {searchTerm ? 'Try adjusting your search criteria.' : 'No jobs match the current filters.'}
+              </p>
+            </div>
+          </Card>
+        ) : (
+          filteredAndSortedOrders.map((order, index) => {
+            const isEven = index % 2 === 0;
+            return (
+              <Card 
+                key={order.id} 
+                className={`transition-all hover:shadow-md ${
+                  isEven ? 'bg-background' : 'bg-muted/30'
+                } ${compactView ? 'p-4' : 'p-6'}`}
+              >
+                <CardContent className={`${compactView ? 'p-0' : 'p-0'} space-y-4`}>
+                  {/* Header Row */}
+                  <div className="flex items-start justify-between">
+                    <div className="space-y-2">
+                      {/* Primary Title */}
+                      <h3 className="font-bold text-lg">
+                        {order.job_type && (
+                          <span className="capitalize">
+                            {order.job_type.replace('_', ' ')} –{' '}
+                          </span>
+                        )}
+                        {order.order_number}
+                      </h3>
+                      
+                      {/* Status Chips */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {getJobStatusChip(order)}
+                        {getAssignmentChip(order)}
+                        {getOffersChip(order.id)}
+                      </div>
+                      
+                      {/* Key Info Line */}
+                      <div className="text-sm text-muted-foreground flex items-center gap-3 flex-wrap">
+                        <span className="flex items-center gap-1">
+                          <User className="w-3 h-3" />
+                          {order.client?.full_name || 'Unknown Client'}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <MapPin className="w-3 h-3" />
+                          {getBestPostcode(order) || 'N/A'}
+                        </span>
+                        <span className="font-medium text-foreground">
+                          £{order.total_amount ? Number(order.total_amount).toLocaleString() : '0'}
+                        </span>
+                        {order.created_at && (
+                          <span>
+                            {new Date(order.created_at).toLocaleDateString('en-GB')}
+                          </span>
+                        )}
+                        <span className="flex items-center gap-1 font-medium text-foreground">
+                          <Clock className="w-3 h-3" />
+                          Duration: {getOrderEstimatedHours(order)}h
+                        </span>
+                      </div>
+                      
+                      {/* Secondary Info */}
+                      {!compactView && (
+                        <div className="text-xs text-muted-foreground space-y-1">
+                          {order.engineer_id && (
+                            <div>
+                              Assigned: {engineers.find(e => e.id === order.engineer_id)?.name || 'Unknown Engineer'}
+                              {order.scheduled_install_date && (
+                                <span className="ml-2">
+                                  • Scheduled: {new Date(order.scheduled_install_date).toLocaleDateString('en-GB')}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                          {(() => {
+                            const latestOffer = getLatestOfferForOrder(order.id);
+                            return latestOffer && (
+                              <div className="flex items-center gap-2">
+                                <span>Latest Offer:</span>
+                                <OfferStatusBadge offer={latestOffer} showTimeRemaining />
+                              </div>
+                            );
+                          })()}
+                        </div>
                       )}
-                      <Badge variant={getStatusColor(order.status_enhanced)} className="text-xs">
-                        {order.status_enhanced === 'awaiting_install_booking' ? 
-                          (order.engineer_id ? 
-                            `Needs scheduling — ${engineers.find(e => e.id === order.engineer_id)?.name || 'Assigned'}` : 
-                            'Needs scheduling — Unassigned'
-                          ) : 
-                          (order.engineer_id ? engineers.find(e => e.id === order.engineer_id)?.name || 'Assigned' : 'Unassigned')
-                        }
-                      </Badge>
                     </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <User className="w-4 h-4 text-muted-foreground" />
-                      {order.client?.full_name || 'Unknown Client'}
-                    </div>
-                  </TableCell>
-                   <TableCell>
-                     <div className="flex items-center gap-2">
-                       <MapPin className="w-4 h-4 text-muted-foreground" />
-                       {getBestPostcode(order) || 'N/A'}
-                     </div>
-                   </TableCell>
-                  <TableCell>
-                    <div className="font-medium">
-                      £{order.total_amount ? Number(order.total_amount).toLocaleString() : '0'}
-                    </div>
-                  </TableCell>
-                   <TableCell>
-                     {(() => {
-                       // For Ready to Book page - show accepted offer engineer and date
-                       if (title === 'Ready to Book') {
-                         const acceptedOffer = offers.find(offer => 
-                           offer.order_id === order.id && offer.status === 'accepted'
-                         );
-                         if (acceptedOffer && acceptedOffer.engineer) {
-                           return (
-                             <div className="flex flex-col">
-                               <span className="font-medium">{acceptedOffer.engineer.name}</span>
-                               <span className="text-xs text-muted-foreground">
-                                 {new Date(acceptedOffer.offered_date).toLocaleDateString('en-GB', {
-                                   day: '2-digit',
-                                   month: '2-digit',
-                                   year: 'numeric'
-                                 })}
-                               </span>
-                             </div>
-                           );
-                         } else {
-                           return <Badge variant="destructive" className="text-xs">No Engineer</Badge>;
-                         }
-                       }
-                       
-                       // For other pages - show active offer engineer or order engineer
-                       const activeOffer = getActiveOfferForOrder(order.id);
-                       if (activeOffer && activeOffer.engineer) {
-                         return (
-                           <div className="flex flex-col">
-                             <span className="font-medium">{activeOffer.engineer.name}</span>
-                             <span className="text-xs text-muted-foreground">
-                               {new Date(activeOffer.offered_date).toLocaleDateString('en-GB', {
-                                 day: '2-digit',
-                                 month: '2-digit',
-                                 year: 'numeric'
-                               })}
-                             </span>
-                           </div>
-                         );
-                       } else if (order.engineer_id) {
-                         return engineers.find(e => e.id === order.engineer_id)?.name || 'Unknown Engineer';
-                       } else {
-                         return <Badge variant="destructive" className="text-xs">Unassigned</Badge>;
-                       }
-                     })()}
-                   </TableCell>
-                  <TableCell>
-                    {(() => {
-                      const latestOffer = getLatestOfferForOrder(order.id);
-                      return latestOffer ? (
-                        <OfferStatusBadge offer={latestOffer} showTimeRemaining />
-                      ) : (
-                        <span className="text-xs text-muted-foreground">No offers</span>
-                      );
-                    })()}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-muted-foreground" />
-                      {(order as any).created_at ? 
-                        new Date((order as any).created_at).toLocaleDateString('en-GB', {
-                          day: '2-digit',
-                          month: '2-digit',
-                          year: 'numeric'
-                        }) : 'Recent'}
-                    </div>
-                  </TableCell>
-                   <TableCell>
-                     {(() => {
-                       const activeOffer = getActiveOfferForOrder(order.id);
-                       const latestOffer = getLatestOfferForOrder(order.id);
-                       
-                       if (title === 'Ready to Book') {
-                         // For Ready to Book page - show Confirm & Schedule and Cancel/Restart buttons
-                         return (
-                           <div className="flex gap-2">
-                             <Button
-                               size="sm"
-                               variant="destructive"
-                               onClick={() => handleConfirmAndSchedule(order.id)}
-                               className="text-xs"
-                             >
-                               <Check className="w-4 h-4 mr-1" />
-                               Confirm & Schedule
-                             </Button>
-                             <Button
-                               size="sm"
-                               variant="outline"
-                               onClick={() => handleCancelAndRestart(order.id)}
-                               className="text-xs"
-                             >
-                               <XCircle className="w-4 h-4 mr-1" />
-                               Cancel / Restart Scheduling
-                             </Button>
-                           </div>
-                         );
-                       } else if (activeOffer && title === 'Date Offered') {
-                         // For Date Offered page - show Accept/Reject buttons
-                         return (
-                           <div className="flex gap-2">
-                             <Button
-                               size="sm"
-                               variant="default"
-                               onClick={() => handleAcceptOffer(order.id)}
-                               className="text-xs bg-green-600 hover:bg-green-700"
-                             >
-                               <Check className="w-4 h-4 mr-1" />
-                               Accept
-                             </Button>
-                             <Button
-                               size="sm"
-                               variant="destructive"
-                               onClick={() => handleRejectOffer(order.id)}
-                               className="text-xs"
-                             >
-                               <X className="w-4 h-4 mr-1" />
-                               Reject
-                             </Button>
-                           </div>
-                         );
-                       } else if (order.status_enhanced === 'awaiting_install_booking') {
-                         if (activeOffer) {
-                           // Has active pending offer - show resend/release options
-                           return (
-                             <div className="flex gap-2">
-                               <Button
-                                 size="sm"
-                                 variant="outline"
-                                 onClick={() => handleResendOffer(order.id)}
-                                 className="text-xs"
-                               >
-                                 <RotateCcw className="w-4 h-4 mr-1" />
-                                 Resend
-                               </Button>
-                               <Button
-                                 size="sm"
-                                 variant="outline"
-                                 onClick={() => handleReleaseOffer(order.id)}
-                                 className="text-xs"
-                               >
-                                 <XCircle className="w-4 h-4 mr-1" />
-                                 Release
-                               </Button>
-                             </div>
-                           );
-                         } else {
-                           // No active offer - show normal actions
-                           return (
-                              <div className="flex gap-2">
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => navigate(`/admin/order/${order.id}`)}
-                                    className="text-xs"
-                                  >
-                                  <Eye className="w-4 h-4 mr-1" />
+                    
+                    {/* Action Buttons */}
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {(() => {
+                        const activeOffer = getActiveOfferForOrder(order.id);
+                        const latestOffer = getLatestOfferForOrder(order.id);
+                        
+                        if (title === 'Ready to Book') {
+                          return (
+                            <>
+                              <Button
+                                size="sm"
+                                onClick={() => handleConfirmAndSchedule(order.id)}
+                                className="flex items-center gap-1"
+                              >
+                                <Check className="w-4 h-4" />
+                                Confirm & Schedule
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleCancelAndRestart(order.id)}
+                                className="flex items-center gap-1"
+                              >
+                                <XCircle className="w-4 h-4" />
+                                Cancel
+                              </Button>
+                            </>
+                          );
+                        } else if (activeOffer && title === 'Date Offered') {
+                          return (
+                            <>
+                              <Button
+                                size="sm"
+                                onClick={() => handleAcceptOffer(order.id)}
+                                className="flex items-center gap-1 bg-green-600 hover:bg-green-700"
+                              >
+                                <Check className="w-4 h-4" />
+                                Accept
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => handleRejectOffer(order.id)}
+                                className="flex items-center gap-1"
+                              >
+                                <X className="w-4 h-4" />
+                                Reject
+                              </Button>
+                            </>
+                          );
+                        } else if (order.status_enhanced === 'awaiting_install_booking') {
+                          if (activeOffer) {
+                            return (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleResendOffer(order.id)}
+                                  className="flex items-center gap-1"
+                                >
+                                  <RotateCcw className="w-4 h-4" />
+                                  Resend
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleReleaseOffer(order.id)}
+                                  className="flex items-center gap-1"
+                                >
+                                  <XCircle className="w-4 h-4" />
+                                  Release
+                                </Button>
+                              </>
+                            );
+                          } else {
+                            return (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => navigate(`/admin/order/${order.id}`)}
+                                  className="flex items-center gap-1"
+                                >
+                                  <Eye className="w-4 h-4" />
                                   View Job
                                 </Button>
                                 <Button
                                   size="sm"
-                                  variant="outline"
                                   onClick={() => handleSmartAssign(order)}
-                                  className="text-xs"
+                                  className="flex items-center gap-1"
                                 >
-                                  <Wrench className="w-4 h-4 mr-1" />
+                                  <Wrench className="w-4 h-4" />
                                   Smart Assign
                                 </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleSendOffer(order)}
-                                  className="text-xs"
-                                >
-                                  <Send className="w-4 h-4 mr-1" />
-                                  {latestOffer ? 'Send New Offer' : 'Send Offer'}
-                                </Button>
-                              </div>
-                           );
-                         }
+                              </>
+                            );
+                          }
                         } else if (title === 'Date Rejected') {
-                          // For Date Rejected - always show Smart Assign and working View Job link
                           return (
-                            <div className="flex gap-2">
-                               <Button
-                                 size="sm"
-                                 variant="outline"
-                                 onClick={() => navigate(`/admin/order/${order.id}`)}
-                                 className="text-xs"
-                               >
-                                <Eye className="w-4 h-4 mr-1" />
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => navigate(`/admin/order/${order.id}`)}
+                                className="flex items-center gap-1"
+                              >
+                                <Eye className="w-4 h-4" />
                                 View Job
                               </Button>
                               <Button
                                 size="sm"
-                                variant="outline"
                                 onClick={() => handleSmartAssign(order)}
-                                className="text-xs"
+                                className="flex items-center gap-1"
                               >
-                                <Wrench className="w-4 h-4 mr-1" />
+                                <Wrench className="w-4 h-4" />
                                 Smart Assign
                               </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleSendOffer(order)}
-                                className="text-xs"
-                              >
-                                <Send className="w-4 h-4 mr-1" />
-                                Send Offer
-                              </Button>
-                            </div>
+                            </>
                           );
                         } else {
                           return (
-                             <Button 
-                               size="sm" 
-                               variant="outline" 
-                               className="text-xs"
-                               onClick={() => navigate(`/admin/order/${order.id}`)}
-                             >
-                              <Eye className="w-4 h-4 mr-1" />
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => navigate(`/admin/order/${order.id}`)}
+                              className="flex items-center gap-1"
+                            >
+                              <Eye className="w-4 h-4" />
                               View Job
                             </Button>
                           );
                         }
-                     })()}
-                   </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </Card>
+                      })()}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })
+        )}
+      </div>
 
       {/* Modals */}
       {selectedOrder && (
