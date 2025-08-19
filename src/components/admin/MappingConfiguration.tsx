@@ -34,8 +34,14 @@ const ORDER_FIELDS = [
   { key: 'client_name', label: 'Client Name', required: false },
   { key: 'client_email', label: 'Client Email', required: false },
   { key: 'client_phone', label: 'Client Phone', required: false },
+  { key: 'customer_address_line_1', label: 'Customer Address Line 1', required: false },
+  { key: 'customer_address_line_2', label: 'Customer Address Line 2', required: false },
+  { key: 'customer_address_city', label: 'Customer Address City', required: false },
+  { key: 'customer_address_post_code', label: 'Customer Address Post Code', required: false },
   { key: 'job_address', label: 'Job Address', required: false },
-  { key: 'postcode', label: 'Postcode', required: false }
+  { key: 'postcode', label: 'Postcode', required: false },
+  { key: 'type', label: 'Job Type', required: false },
+  { key: 'quote_amount', label: 'Quote Amount', required: false }
 ];
 
 const STATUS_OPTIONS = [

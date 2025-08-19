@@ -295,7 +295,44 @@ serve(async (req) => {
 
     console.log('Processing', rows.length, 'rows with headers:', headers);
 
-    // Pre-load all engineers for mapping
+    // Create header resolver function using column mappings
+    const resolveHeader = (logicalKey: string): string | null => {
+      // First try to use the column mapping from the import profile
+      if (importProfile.column_mappings?.[logicalKey]) {
+        const mappedHeader = importProfile.column_mappings[logicalKey];
+        console.log(`Resolved ${logicalKey} => '${mappedHeader}'`);
+        return mappedHeader;
+      }
+
+      // Fallback to normalized header matching for backwards compatibility
+      const fallbackMappings: Record<string, string[]> = {
+        'partner_external_id': ['Job ID', 'job_id'],
+        'partner_status': ['Status', 'status'],
+        'engineer_identifier': ['Assigned Engineers', 'assigned_engineers'],
+        'scheduled_date': ['Scheduled Date', 'scheduled_date'],
+        'client_name': ['Customer Name', 'customer_name'],
+        'client_email': ['Customer Email', 'customer_email'],
+        'client_phone': ['Customer Phone', 'customer_phone'],
+        'customer_address_line_1': ['Customer Address Line 1', 'customer_address_line_1'],
+        'customer_address_line_2': ['Customer Address Line 2', 'customer_address_line_2'],
+        'customer_address_city': ['Customer Address City', 'customer_address_city'],
+        'customer_address_post_code': ['Customer Address Post Code', 'customer_address_post_code'],
+        'type': ['Type', 'Installation Type', 'type'],
+        'quote_amount': ['Quote Amount', 'quote_amount']
+      };
+
+      const possibleHeaders = fallbackMappings[logicalKey] || [];
+      for (const possibleHeader of possibleHeaders) {
+        if (headers.includes(possibleHeader)) {
+          console.log(`Fallback resolved ${logicalKey} => '${possibleHeader}'`);
+          return possibleHeader;
+        }
+      }
+
+      return null;
+    };
+
+    // Load engineers for mapping
     const { data: engineers, error: engineersError } = await supabase
       .from('engineers')
       .select('id, name, email')
@@ -310,14 +347,17 @@ serve(async (req) => {
       engineerMap.set(eng.email.toLowerCase(), eng.id);
     });
 
-    // Check for unmapped engineers
+    // Check for unmapped engineers using resolved header
     const unmappedEngineers = new Set();
-    rows.forEach((row: string[]) => {
-      const engineerName = row[headers.indexOf('Assigned Engineers')]?.trim();
-      if (engineerName && !engineerMap.has(engineerName.toLowerCase())) {
-        unmappedEngineers.add(engineerName);
-      }
-    });
+    const engineerHeader = resolveHeader('engineer_identifier');
+    if (engineerHeader) {
+      rows.forEach((row: string[]) => {
+        const engineerName = row[headers.indexOf(engineerHeader)]?.trim();
+        if (engineerName && !engineerMap.has(engineerName.toLowerCase())) {
+          unmappedEngineers.add(engineerName);
+        }
+      });
+    }
 
     console.log('Found', unmappedEngineers.size, 'unmapped engineers:', Array.from(unmappedEngineers));
 
@@ -375,36 +415,37 @@ serve(async (req) => {
         const rowNumber = i + j + 1;
 
         try {
-          // Map row data
-          const mappedRow: ImportRow = {};
-          headers.forEach((header: string, index: number) => {
-            const key = header.toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
-            mappedRow[key as keyof ImportRow] = row[index]?.toString().trim() || '';
-          });
+          // Extract data using resolved headers
+          const getValue = (logicalKey: string): string => {
+            const header = resolveHeader(logicalKey);
+            if (!header) return '';
+            const headerIndex = headers.indexOf(header);
+            return headerIndex >= 0 ? (row[headerIndex]?.toString().trim() || '') : '';
+          };
 
-          const clientEmail = mappedRow.customer_email?.toLowerCase().trim();
+          const clientEmail = getValue('client_email').toLowerCase().trim();
           if (!clientEmail) {
-            results.errors.push({ row: rowNumber, error: 'Missing customer email', data: mappedRow });
+            results.errors.push({ row: rowNumber, error: 'Missing customer email', data: { resolved_email: clientEmail } });
             continue;
           }
 
           // Check for existing order
-          const externalId = mappedRow.job_id;
+          const externalId = getValue('partner_external_id');
           if (externalId && existingOrders.has(externalId)) {
             results.skipped_count++;
             continue;
           }
 
-          // Combine address fields into a single address
+          // Combine address fields into a single address (same logic as before)
           const addressParts = [
-            mappedRow.customer_address_line_1,
-            mappedRow.customer_address_line_2,
-            mappedRow.customer_address_city
+            getValue('customer_address_line_1'),
+            getValue('customer_address_line_2'),
+            getValue('customer_address_city')
           ].filter(Boolean);
           const combinedAddress = addressParts.join(', ') || null;
 
-          // Map job type from "Type" field
-          const rawJobType = mappedRow.type?.trim().toUpperCase();
+          // Map job type from resolved "Type" field
+          const rawJobType = getValue('type').trim().toUpperCase();
           let jobType = 'installation'; // default
           
           if (rawJobType === 'ASSESSMENT') {
@@ -422,10 +463,10 @@ serve(async (req) => {
             const clientData = {
               id: newClientId,
               email: clientEmail,
-              full_name: mappedRow.customer_name || 'Unknown',
-              phone: mappedRow.customer_phone || null,
+              full_name: getValue('client_name') || 'Unknown',
+              phone: getValue('client_phone') || null,
               address: combinedAddress,
-              postcode: mappedRow.customer_address_post_code || null,
+              postcode: getValue('customer_address_post_code') || null,
               user_id: null, // Partner clients don't have user accounts initially
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString()
@@ -437,21 +478,22 @@ serve(async (req) => {
 
           // Map engineer
           let engineerId = null;
-          const engineerName = mappedRow.assigned_engineers?.trim();
+          const engineerName = getValue('engineer_identifier').trim();
           if (engineerName) {
             engineerId = engineerMap.get(engineerName.toLowerCase()) || null;
           }
 
           // Prepare quote and order
-          const quoteAmount = parseFloat(mappedRow.quote_amount || '0') || 0;
+          const quoteAmount = parseFloat(getValue('quote_amount') || '0') || 0;
           const quoteId = crypto.randomUUID();
           const orderId = crypto.randomUUID();
 
           // Parse date in DD/MM/YYYY format
           let scheduledInstallDate = null;
-          if (mappedRow.scheduled_date && mappedRow.scheduled_date.trim()) {
+          const scheduledDateStr = getValue('scheduled_date');
+          if (scheduledDateStr && scheduledDateStr.trim()) {
             try {
-              const dateStr = mappedRow.scheduled_date.trim();
+              const dateStr = scheduledDateStr.trim();
               // Check if it's in DD/MM/YYYY format
               if (dateStr.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
                 const [day, month, year] = dateStr.split('/');
@@ -469,7 +511,7 @@ serve(async (req) => {
                 scheduledInstallDate = null;
               }
             } catch (dateError) {
-              console.warn(`Date parsing error for row ${rowNumber}: ${mappedRow.scheduled_date}, error: ${dateError.message}`);
+              console.warn(`Date parsing error for row ${rowNumber}: ${scheduledDateStr}, error: ${dateError.message}`);
               scheduledInstallDate = null;
             }
           }
@@ -494,13 +536,13 @@ serve(async (req) => {
             engineer_id: engineerId,
             scheduled_install_date: scheduledInstallDate,
             job_address: combinedAddress,
-            postcode: mappedRow.customer_address_post_code || null,
+            postcode: getValue('customer_address_post_code') || null,
             job_type: jobType,
             partner_metadata: {
               import_run_id: run_id,
-              original_status: mappedRow.status,
+              original_status: getValue('partner_status'),
               original_type: rawJobType,
-              sub_partner: mappedRow.partner_account
+              sub_partner: getValue('sub_partner')
             }
           });
 
