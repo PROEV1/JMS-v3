@@ -49,15 +49,24 @@ export function SmartAssignmentModal({
   const [loading, setLoading] = useState(false);
   const [processing, setProcessing] = useState(false);
 
-  // Reset state when modal closes
+  // Reset state when modal closes/opens
   useEffect(() => {
     if (!isOpen) {
+      // Reset all state when closing
+      setSelectedDate(undefined);
+      setSelectedEngineerId('');
+      setSuggestions([]);
+      setProcessing(false);
+      setLoading(false);
+    } else {
+      // Initialize state when opening
       setSelectedDate(order.scheduled_install_date ? new Date(order.scheduled_install_date) : undefined);
       setSelectedEngineerId(order.engineer_id || '');
       setSuggestions([]);
       setProcessing(false);
+      setLoading(false);
     }
-  }, [isOpen, order]);
+  }, [isOpen, order.id]);
 
   // Load smart suggestions when modal opens
   useEffect(() => {
@@ -93,22 +102,7 @@ export function SmartAssignmentModal({
 
     setProcessing(true);
     try {
-      const { data, error } = await supabase.functions.invoke('send-offer', {
-        body: {
-          order_id: order.id,
-          engineer_id: selectedEngineerId,
-          offered_date: selectedDate.toISOString(),
-          time_window: order.time_window || 'To be confirmed'
-        }
-      });
-
-      if (error || data?.error) {
-        throw new Error(data?.error || 'Failed to send offer');
-      }
-
-      toast.success('Offer sent to client successfully');
-      
-      // Call onAssign to refresh parent data
+      // Let parent handle the send-offer logic
       await onAssign(selectedEngineerId, selectedDate.toISOString(), 'send_offer');
       
       // Trigger refresh for status tiles

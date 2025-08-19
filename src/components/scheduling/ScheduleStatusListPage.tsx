@@ -333,6 +333,8 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
           }
         });
 
+        toast.success('Offer sent to client successfully');
+
       } else if (action === 'confirm_book') {
         // Direct booking - update order
         const { error: updateError } = await supabase
@@ -360,6 +362,8 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
             method: 'smart_assignment_direct'
           }
         });
+
+        toast.success('Installation booked successfully');
       }
 
       // Refresh the parent component
