@@ -1884,11 +1884,18 @@ export type Database = {
         Returns: string
       }
       log_user_action: {
-        Args: {
-          p_action_type: string
-          p_details?: Json
-          p_target_user_id: string
-        }
+        Args:
+          | {
+              p_action_type: string
+              p_details?: Json
+              p_performed_by?: string
+              p_target_user_id: string
+            }
+          | {
+              p_action_type: string
+              p_details?: Json
+              p_target_user_id: string
+            }
         Returns: string
       }
       user_can_view_client: {
