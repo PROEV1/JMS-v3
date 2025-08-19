@@ -61,20 +61,40 @@ Deno.serve(async (req) => {
     
     console.log('User authenticated successfully:', user.email)
 
-    // Check if user is admin
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('user_id', user.id)
-      .single()
+    // Create admin client for privilege checks
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    )
 
-    if (!profile || profile.role !== 'admin') {
-      console.error('Access denied: User is not admin')
+    // Check if user is admin using secure RPC function
+    const { data: isAdmin, error: adminCheckError } = await supabaseAdmin.rpc('is_admin', { 
+      user_uuid: user.id 
+    })
+
+    if (adminCheckError) {
+      console.error('Failed to check admin status:', adminCheckError)
+      return new Response(
+        JSON.stringify({ error: 'Failed to verify permissions' }),
+        { status: 500, headers: corsHeaders }
+      )
+    }
+
+    if (!isAdmin) {
+      console.error('Access denied: User is not admin. User ID:', user.id, 'Email:', user.email)
       return new Response(
         JSON.stringify({ error: 'Access denied: Admin role required' }),
         { status: 403, headers: corsHeaders }
       )
     }
+
+    console.log('Admin access verified for user:', user.email)
 
     const { partner_id, import_run_id, dry_run }: DeleteJobsRequest = await req.json()
 
@@ -86,18 +106,6 @@ Deno.serve(async (req) => {
     }
 
     console.log('Delete partner jobs request:', { partner_id, import_run_id, dry_run, user_id: user.id })
-
-    // Use service role client for deletions
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    )
 
     // Build filter conditions
     let orderQuery = supabaseAdmin
