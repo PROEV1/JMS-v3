@@ -109,6 +109,7 @@ export function DeletePartnerJobsModal({ isOpen, onClose, partnerId, partnerName
   });
 
   const handlePreview = () => {
+    console.log("Preview button clicked", { selectedRun, partnerId });
     dryRunMutation.mutate();
   };
 
