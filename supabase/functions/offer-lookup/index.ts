@@ -18,7 +18,17 @@ serve(async (req: Request) => {
 
   try {
     const url = new URL(req.url);
-    const token = url.pathname.split('/').pop();
+    let token = url.pathname.split('/').pop();
+
+    // If no token in URL, try to get from JSON body for backward compatibility
+    if (!token && req.method === 'POST') {
+      try {
+        const body = await req.json();
+        token = body.token;
+      } catch {
+        // Ignore JSON parse errors
+      }
+    }
 
     if (!token) {
       return new Response(

@@ -243,7 +243,7 @@ serve(async (req: Request) => {
 
     // Generate offer URL - use the app base URL from config or fallback to current domain
     const appBaseUrl = offerConfig.app_base_url || 'https://proev-installers.lovable.app';
-    const offerUrl = `${appBaseUrl}/offer/${clientToken}`;
+    const offerUrl = `${appBaseUrl}/offers/${clientToken}`;
 
     // Prepare message content
     const templateData = {

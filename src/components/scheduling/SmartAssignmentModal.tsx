@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Order, Engineer, getSmartEngineerRecommendations, getOrderEstimatedHours } from '@/utils/schedulingUtils';
 import { getBestPostcode } from '@/utils/postcodeUtils';
-import { MapPin, Clock, User, AlertTriangle, CheckCircle, Send, Calendar } from 'lucide-react';
+import { MapPin, Clock, User, AlertTriangle, CheckCircle, Send, Calendar, Copy, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -49,6 +49,8 @@ export function SmartAssignmentModal({
   const [suggestions, setSuggestions] = useState<EngineerSuggestion[]>([]);
   const [loading, setLoading] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const [offerSent, setOfferSent] = useState(false);
+  const [offerUrl, setOfferUrl] = useState('');
 
   // Load smart suggestions when modal opens
   useEffect(() => {
@@ -84,9 +86,22 @@ export function SmartAssignmentModal({
 
     setProcessing(true);
     try {
-      await onAssign(selectedEngineerId, selectedDate.toISOString(), 'send_offer');
+      const { data, error } = await supabase.functions.invoke('send-offer', {
+        body: {
+          order_id: order.id,
+          engineer_id: selectedEngineerId,
+          offered_date: selectedDate.toISOString(),
+          time_window: order.time_window || 'To be confirmed'
+        }
+      });
+
+      if (error || data?.error) {
+        throw new Error(data?.error || 'Failed to send offer');
+      }
+
       toast.success('Offer sent to client successfully');
-      onClose();
+      setOfferSent(true);
+      setOfferUrl(data.offer_url);
     } catch (error) {
       console.error('Error sending offer:', error);
       toast.error('Failed to send offer to client');
@@ -110,7 +125,20 @@ export function SmartAssignmentModal({
       console.error('Error booking installation:', error);
       toast.error('Failed to book installation');
     } finally {
-      setProcessing(false);
+    setProcessing(false);
+    }
+  };
+
+  const copyOfferUrl = () => {
+    if (offerUrl) {
+      navigator.clipboard.writeText(offerUrl);
+      toast.success('Offer URL copied to clipboard');
+    }
+  };
+
+  const openOfferUrl = () => {
+    if (offerUrl) {
+      window.open(offerUrl, '_blank');
     }
   };
 
@@ -234,32 +262,59 @@ export function SmartAssignmentModal({
           </Card>
 
           {/* Action Buttons */}
-          <div className="flex justify-between">
-            <Button variant="outline" onClick={onClose} disabled={processing}>
-              Cancel
-            </Button>
-            
-            <div className="flex gap-3">
-              <Button 
-                variant="outline"
-                onClick={handleSendToClient}
-                disabled={!selectedEngineerId || !selectedDate || processing}
-                className="flex items-center gap-2"
-              >
-                <Send className="w-4 h-4" />
-                {processing ? 'Sending...' : 'Send to Client'}
+          {offerSent ? (
+            <div className="space-y-4">
+              <div className="bg-success/10 border border-success/20 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <CheckCircle className="w-5 h-5 text-success" />
+                  <h4 className="font-medium text-success">Offer Sent Successfully</h4>
+                </div>
+                <p className="text-sm text-muted-foreground mb-3">
+                  The installation offer has been sent to the client.
+                </p>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={copyOfferUrl}>
+                    <Copy className="w-4 h-4 mr-2" />
+                    Copy Link
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={openOfferUrl}>
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    Open Link
+                  </Button>
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <Button onClick={onClose}>Close</Button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex justify-between">
+              <Button variant="outline" onClick={onClose} disabled={processing}>
+                Cancel
               </Button>
               
-              <Button 
-                onClick={handleConfirmAndBook}
-                disabled={!selectedEngineerId || !selectedDate || processing}
-                className="flex items-center gap-2"
-              >
-                <Calendar className="w-4 h-4" />
-                {processing ? 'Booking...' : 'Confirm & Book'}
-              </Button>
+              <div className="flex gap-3">
+                <Button 
+                  variant="outline"
+                  onClick={handleSendToClient}
+                  disabled={!selectedEngineerId || !selectedDate || processing}
+                  className="flex items-center gap-2"
+                >
+                  <Send className="w-4 h-4" />
+                  {processing ? 'Sending...' : 'Send to Client'}
+                </Button>
+                
+                <Button 
+                  onClick={handleConfirmAndBook}
+                  disabled={!selectedEngineerId || !selectedDate || processing}
+                  className="flex items-center gap-2"
+                >
+                  <Calendar className="w-4 h-4" />
+                  {processing ? 'Booking...' : 'Confirm & Book'}
+                </Button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>

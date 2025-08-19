@@ -5,9 +5,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Download, Mail, Flag, MoreVertical } from "lucide-react";
+import { Download, Mail, Flag, MoreVertical, Copy } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useState, useEffect } from "react";
 
 interface OrderActionBarProps {
   orderId: string;
@@ -16,6 +17,31 @@ interface OrderActionBarProps {
 
 export function OrderActionBar({ orderId, order }: OrderActionBarProps) {
   const { toast } = useToast();
+  const [activeOfferToken, setActiveOfferToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchActiveOffer();
+  }, [orderId]);
+
+  const fetchActiveOffer = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('job_offers')
+        .select('client_token')
+        .eq('order_id', orderId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        throw error;
+      }
+
+      setActiveOfferToken(data?.client_token || null);
+    } catch (error) {
+      console.error('Error fetching active offer:', error);
+    }
+  };
 
   const handleDownloadOrderSummary = async () => {
     try {
@@ -60,6 +86,17 @@ export function OrderActionBar({ orderId, order }: OrderActionBarProps) {
     });
   };
 
+  const handleCopyOfferLink = () => {
+    if (activeOfferToken) {
+      const offerUrl = `${window.location.origin}/offers/${activeOfferToken}`;
+      navigator.clipboard.writeText(offerUrl);
+      toast({
+        title: "Link Copied",
+        description: "Offer URL copied to clipboard",
+      });
+    }
+  };
+
   return (
     <div className="flex items-center gap-2">
       <Button
@@ -88,6 +125,12 @@ export function OrderActionBar({ orderId, order }: OrderActionBarProps) {
             <Mail className="h-4 w-4 mr-2" />
             Email Client
           </DropdownMenuItem>
+          {activeOfferToken && (
+            <DropdownMenuItem onClick={handleCopyOfferLink}>
+              <Copy className="h-4 w-4 mr-2" />
+              Copy Offer Link
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem onClick={handleFlagForReview}>
             <Flag className="h-4 w-4 mr-2" />
             Flag for Review

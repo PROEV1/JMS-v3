@@ -6,6 +6,7 @@ import { useUserRole } from '@/hooks/useUserRole';
 import { BrandPage, BrandContainer, BrandHeading1, BrandLoading } from '@/components/brand';
 import { OrderStickyHeader } from '@/components/admin/OrderStickyHeader';
 import { OrderActionBar } from '@/components/admin/OrderActionBar';
+import { OfferLinkWidget } from '@/components/admin/OfferLinkWidget';
 import { OrderSectionLayout } from '@/components/admin/OrderSectionLayout';
 import { ClientDetailsSection } from '@/components/admin/sections/ClientDetailsSection';
 import { ProductSummarySection } from '@/components/admin/sections/ProductSummarySection';
@@ -628,6 +629,9 @@ export default function OrderDetail() {
               order={order} 
               onUpdate={fetchOrder}
             />
+
+            {/* Offer Link Widget */}
+            <OfferLinkWidget orderId={orderId!} />
 
             {/* Job Status & Timeline */}
             <JobStatusTimelineSection 

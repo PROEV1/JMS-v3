@@ -36,7 +36,8 @@ interface OfferDetails {
 }
 
 export default function ClientOfferView() {
-  const { token } = useParams<{ token: string }>();
+  const { clientToken } = useParams<{ clientToken: string }>();
+  const token = clientToken;
   const navigate = useNavigate();
   const [offer, setOffer] = useState<OfferDetails | null>(null);
   const [loading, setLoading] = useState(true);
@@ -54,9 +55,7 @@ export default function ClientOfferView() {
       if (!token) return;
 
       try {
-        const { data, error } = await supabase.functions.invoke('offer-lookup', {
-          body: { token }
-        });
+        const { data, error } = await supabase.functions.invoke('offer-lookup/' + token);
 
         if (error || data.error) {
           setError(data?.error || 'Failed to load offer details');

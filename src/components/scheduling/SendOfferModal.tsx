@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { CalendarDays, Clock, User, Mail, MessageSquare, Send } from 'lucide-react';
+import { CalendarDays, Clock, User, Mail, MessageSquare, Send, CheckCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Order, getOrderEstimatedHours } from '@/utils/schedulingUtils';
@@ -43,6 +43,8 @@ export function SendOfferModal({
   const [deliveryChannel, setDeliveryChannel] = useState<'email' | 'sms' | 'whatsapp'>('email');
   const [customMessage, setCustomMessage] = useState('');
   const [sending, setSending] = useState(false);
+  const [offerSent, setOfferSent] = useState(false);
+  const [offerUrl, setOfferUrl] = useState('');
 
   const selectedEngineer = engineers.find(e => e.id === selectedEngineerId);
 
@@ -70,10 +72,11 @@ export function SendOfferModal({
       }
 
        toast.success('Installation offer sent successfully!');
+       setOfferSent(true);
+       setOfferUrl(data.offer_url);
        onOfferSent?.();
        // Trigger refresh for status tiles
        window.dispatchEvent(new CustomEvent('scheduling:refresh'));
-       onClose();
 
     } catch (err: any) {
       console.error('Error sending offer:', err);
@@ -92,8 +95,19 @@ export function SendOfferModal({
 
   const handleClose = () => {
     if (!sending) {
+      setOfferSent(false);
+      setOfferUrl('');
       onClose();
     }
+  };
+
+  const copyOfferUrl = () => {
+    navigator.clipboard.writeText(offerUrl);
+    toast.success('Offer URL copied to clipboard');
+  };
+
+  const openOfferUrl = () => {
+    window.open(offerUrl, '_blank');
   };
 
   return (
@@ -265,6 +279,32 @@ export function SendOfferModal({
           </Card>
         )}
 
+        {/* Success Panel */}
+        {offerSent && (
+          <Card className="bg-success/10 border-success">
+            <CardHeader>
+              <CardTitle className="text-success flex items-center gap-2">
+                <CheckCircle className="w-5 h-5" />
+                Offer Sent Successfully
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm">The installation offer has been sent to {order.client?.full_name}.</p>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={copyOfferUrl}>
+                  Copy Link
+                </Button>
+                <Button variant="outline" size="sm" onClick={openOfferUrl}>
+                  Open Link
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                You can share this link directly with the client if needed.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Actions */}
         <div className="flex justify-end gap-3 pt-4 border-t">
           <Button 
@@ -272,14 +312,16 @@ export function SendOfferModal({
             onClick={handleClose}
             disabled={sending}
           >
-            Cancel
+            {offerSent ? 'Close' : 'Cancel'}
           </Button>
-          <Button 
-            onClick={handleSendOffer}
-            disabled={!selectedEngineerId || !selectedDate || sending}
-          >
-            {sending ? 'Sending...' : 'Send Offer'}
-          </Button>
+          {!offerSent && (
+            <Button 
+              onClick={handleSendOffer}
+              disabled={!selectedEngineerId || !selectedDate || sending}
+            >
+              {sending ? 'Sending...' : 'Send Offer'}
+            </Button>
+          )}
         </div>
       </DialogContent>
     </Dialog>
