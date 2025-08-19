@@ -18,6 +18,7 @@ import { EngineerUploadsSection } from '@/components/admin/sections/EngineerUplo
 import { ClientBlockedDatesSection } from '@/components/admin/sections/ClientBlockedDatesSection';
 import { OrderStatusEnhanced } from '@/components/admin/EnhancedJobStatusBadge';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { ArrowLeft } from 'lucide-react';
 
 interface Order {
@@ -87,6 +88,9 @@ interface Order {
     description: string | null;
     uploaded_at: string;
   }>;
+  partner?: {
+    name: string;
+  } | null;
   is_partner_job: boolean;
   scheduling_suppressed: boolean;
 }
@@ -179,7 +183,8 @@ export default function OrderDetail() {
             upload_type,
             description,
             uploaded_at
-          )
+          ),
+          partner:partners(name)
         `)
         .eq('id', orderId)
         .single();
@@ -581,7 +586,14 @@ export default function OrderDetail() {
                   Back to Orders
                 </Button>
                 <div>
-                  <BrandHeading1>Order {order.order_number}</BrandHeading1>
+                  <div className="flex items-center gap-3">
+                    <BrandHeading1>Order {order.order_number}</BrandHeading1>
+                    {order.is_partner_job && order.partner && (
+                      <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+                        Partner: {order.partner.name}
+                      </Badge>
+                    )}
+                  </div>
                   <p className="text-muted-foreground">
                     Created on {new Date(order.created_at).toLocaleDateString()}
                   </p>
