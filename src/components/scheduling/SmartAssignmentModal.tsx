@@ -165,6 +165,9 @@ export function SmartAssignmentModal({
                   <strong>Address:</strong> {order.job_address || order.client?.address}
                 </div>
                 <div>
+                  <strong>Postcode:</strong> {getBestPostcode(order) || 'N/A'}
+                </div>
+                <div>
                   <strong>Duration:</strong> {getOrderEstimatedHours(order)} hours
                 </div>
                 {order.time_window && (

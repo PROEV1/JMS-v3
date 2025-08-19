@@ -14,6 +14,7 @@ import { SmartAssignmentModal } from './SmartAssignmentModal';
 import { AutoScheduleReviewModal } from './AutoScheduleReviewModal';
 import { OfferStatusBadge } from './OfferStatusBadge';
 import { useJobOffers } from '@/hooks/useJobOffers';
+import { getBestPostcode } from '@/utils/postcodeUtils';
 
 interface ScheduleStatusListPageProps {
   orders: Order[];
@@ -463,12 +464,12 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                       {order.client?.full_name || 'Unknown Client'}
                     </div>
                   </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <MapPin className="w-4 h-4 text-muted-foreground" />
-                      {order.postcode || 'N/A'}
-                    </div>
-                  </TableCell>
+                   <TableCell>
+                     <div className="flex items-center gap-2">
+                       <MapPin className="w-4 h-4 text-muted-foreground" />
+                       {getBestPostcode(order) || 'N/A'}
+                     </div>
+                   </TableCell>
                   <TableCell>
                     <div className="font-medium">
                       £{order.total_amount ? Number(order.total_amount).toLocaleString() : '0'}

@@ -11,6 +11,7 @@ import { CalendarDays, Clock, User, Mail, MessageSquare, Send, CheckCircle } fro
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Order, getOrderEstimatedHours } from '@/utils/schedulingUtils';
+import { getBestPostcode } from '@/utils/postcodeUtils';
 
 interface Engineer {
   id: string;
@@ -133,6 +134,10 @@ export function SendOfferModal({
               <div>
                 <Label className="text-sm font-medium text-muted-foreground">Address</Label>
                 <p className="text-sm">{order.job_address || 'Not specified'}</p>
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">Postcode</Label>
+                <p className="text-sm">{getBestPostcode(order) || 'N/A'}</p>
               </div>
               <div>
                 <Label className="text-sm font-medium text-muted-foreground">Estimated Duration</Label>
