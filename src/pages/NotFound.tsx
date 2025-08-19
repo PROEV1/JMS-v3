@@ -1,18 +1,39 @@
 
 import { useLocation } from "react-router-dom";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Home } from "lucide-react";
+import { useUserRole } from "@/hooks/useUserRole";
 
 const NotFound = () => {
   const location = useLocation();
+  const { loading: roleLoading } = useUserRole();
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    console.error(
-      "404 Error: User attempted to access non-existent route:",
-      location.pathname
-    );
-  }, [location.pathname]);
+    // Clear any existing timeout
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+
+    // Set a debounced warning that only logs after role loading is complete
+    timeoutRef.current = setTimeout(() => {
+      // Only log if role loading has finished (indicating this isn't a transient render)
+      if (!roleLoading) {
+        console.warn(
+          "404 Warning: User on non-existent route after auth resolution:",
+          location.pathname
+        );
+      }
+    }, 700);
+
+    // Cleanup timeout on unmount or path change
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, [location.pathname, roleLoading]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-brand-cream">
