@@ -174,12 +174,12 @@ Deno.serve(async (req) => {
         const email = row.email.trim().toLowerCase();
         console.log(`Processing engineer: ${email}`);
 
-        // Look up existing profile by email
+        // Look up existing profile by email (case-insensitive)
         let profile = null;
         const { data: existingProfiles, error: profileLookupError } = await supabaseAdmin
           .from('profiles')
           .select('user_id, full_name, email, role, status')
-          .eq('email', email)
+          .ilike('email', email) // Use case-insensitive search
           .limit(1);
 
         if (profileLookupError) {
@@ -195,6 +195,12 @@ Deno.serve(async (req) => {
         profile = existingProfiles?.[0] || null;
 
         console.log(`Profile lookup for ${email}:`, profile ? `Found existing profile with role: ${profile.role}` : 'No profile found');
+
+        // If profile exists but create_missing_users was enabled, we might have created a duplicate user
+        // Handle cleanup if needed
+        if (profile && create_missing_users) {
+          console.log(`Profile already exists for ${email}, will use existing profile and skip user creation`);
+        }
 
         // Create user if needed and requested
         if (!profile && create_missing_users) {
@@ -221,7 +227,7 @@ Deno.serve(async (req) => {
             result.summary.created_users++;
             console.log(`Successfully created user for: ${email}`);
 
-            // Create profile with engineer role
+            // Try to create profile with engineer role
             const { error: profileInsertError } = await supabaseAdmin
               .from('profiles')
               .insert({
@@ -234,12 +240,39 @@ Deno.serve(async (req) => {
 
             if (profileInsertError) {
               console.error('Error creating profile:', profileInsertError);
-              result.summary.errors.push({ 
-                row: rowNumber, 
-                error: 'Failed to create profile',
-                email 
-              });
-              continue;
+              
+              // Check if it's a duplicate email error
+              if (profileInsertError.message?.includes('duplicate') || profileInsertError.code === '23505') {
+                // Try to find the existing profile and delete the orphaned user
+                const { data: existingProfile } = await supabaseAdmin
+                  .from('profiles')
+                  .select('user_id, email, role')
+                  .ilike('email', email)
+                  .single();
+                
+                if (existingProfile) {
+                  // Delete the newly created user since profile exists
+                  await supabaseAdmin.auth.admin.deleteUser(newUser.user!.id);
+                  console.log(`Deleted orphaned user for ${email}, using existing profile`);
+                  
+                  profile = existingProfile;
+                  result.summary.created_users--; // Adjust count
+                } else {
+                  result.summary.errors.push({ 
+                    row: rowNumber, 
+                    error: 'Failed to create profile - email already exists',
+                    email 
+                  });
+                  continue;
+                }
+              } else {
+                result.summary.errors.push({ 
+                  row: rowNumber, 
+                  error: `Failed to create profile: ${profileInsertError.message}`,
+                  email 
+                });
+                continue;
+              }
             }
 
             profile = {
