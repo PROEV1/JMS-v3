@@ -1815,7 +1815,19 @@ export type Database = {
         Returns: string
       }
       calculate_order_status: {
-        Args: { order_row: Database["public"]["Tables"]["orders"]["Row"] }
+        Args:
+          | { order_row: Database["public"]["Tables"]["orders"]["Row"] }
+          | {
+              p_agreement_signed_at: string
+              p_amount_paid: number
+              p_engineer_signed_off: boolean
+              p_has_active_offers?: boolean
+              p_last_offer_expires_at?: string
+              p_last_offer_status?: string
+              p_quote_status: string
+              p_scheduled_install_date: string
+              p_total_amount: number
+            }
         Returns: Database["public"]["Enums"]["order_status_enhanced"]
       }
       detect_scheduling_conflicts: {

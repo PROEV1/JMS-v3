@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Order } from '@/utils/schedulingUtils';
-import { Clock, Calendar, CheckCircle, XCircle, AlertTriangle, Package, Ban } from 'lucide-react';
+import { Clock, Calendar, CheckCircle, XCircle, AlertTriangle, Package, Ban, Wrench } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface SchedulePipelineDashboardProps {
@@ -74,6 +74,14 @@ const statusTiles: StatusTile[] = [
     statusValues: ['on_hold_parts_docs'],
     colorClass: 'bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 hover:border-purple-300',
     route: '/admin/schedule/status/on-hold'
+  },
+  {
+    id: 'in_progress',
+    title: 'In Progress',
+    icon: Wrench,
+    statusValues: ['in_progress'],
+    colorClass: 'bg-gradient-to-br from-indigo-50 to-indigo-100 border-indigo-200 hover:border-indigo-300',
+    route: '/admin/schedule/status/in-progress'
   },
   {
     id: 'cancelled',
@@ -216,7 +224,7 @@ export function SchedulePipelineDashboard({ orders }: SchedulePipelineDashboardP
     ['needs_scheduling', 'awaiting_install_booking'].includes(o.status_enhanced)
   ).length;
   const inProgress = orders.filter(o => 
-    ['date_offered', 'date_accepted', 'scheduled'].includes(o.status_enhanced)
+    ['date_offered', 'date_accepted', 'scheduled', 'in_progress'].includes(o.status_enhanced)
   ).length;
   const issues = orders.filter(o => 
     ['date_rejected', 'offer_expired', 'on_hold_parts_docs'].includes(o.status_enhanced)

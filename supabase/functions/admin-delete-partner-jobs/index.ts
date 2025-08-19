@@ -141,12 +141,19 @@ serve(async (req) => {
         supabase.from('quotes').select('id', { count: 'exact', head: true }).in('client_id', clientIds)
       ])
 
-      // Count orphaned clients efficiently
-      const { count: orphanedClientsCount } = await supabase
-        .from('clients')
-        .select('id', { count: 'exact', head: true })
-        .in('id', clientIds)
-        .not('id', 'in', `(SELECT DISTINCT client_id FROM orders WHERE client_id IS NOT NULL AND id != ALL(ARRAY[${orderIds.map(() => '?').join(',')}]))`)
+      // Count orphaned clients using two-step approach
+      let orphanedClientsCount = 0;
+      if (clientIds.length > 0) {
+        // Step 1: Get clients that still have orders after deletion
+        const { data: remainingClients } = await supabase
+          .from('orders')
+          .select('client_id')
+          .in('client_id', clientIds)
+          .not('id', 'in', orderIds);
+        
+        const stillUsedClientIds = new Set(remainingClients?.map(r => r.client_id) || []);
+        orphanedClientsCount = clientIds.filter(id => !stillUsedClientIds.has(id)).length;
+      }
 
       stats = {
         orders: orderIds.length,
@@ -156,7 +163,7 @@ serve(async (req) => {
         engineer_uploads: uploadsCount.count || 0,
         order_payments: paymentsCount.count || 0,
         quotes: quotesCount.count || 0,
-        clients: orphanedClientsCount || 0
+        clients: orphanedClientsCount
       }
 
       console.log('Dry run complete:', stats)
@@ -233,21 +240,27 @@ serve(async (req) => {
 
       if (ordersResult.error) console.error('Orders deletion error:', ordersResult.error)
 
-      // Find and delete orphaned clients
-      const { data: orphanedClients } = await supabase
-        .from('clients')
-        .select('id')
-        .in('id', batchClientIds)
-        .not('id', 'in', `(SELECT DISTINCT client_id FROM orders WHERE client_id IS NOT NULL)`)
-
-      if (orphanedClients && orphanedClients.length > 0) {
-        const clientsResult = await supabase
-          .from('clients')
-          .delete()
-          .in('id', orphanedClients.map(c => c.id))
+      // Find and delete orphaned clients using proper two-step approach
+      if (batchClientIds.length > 0) {
+        // Step 1: Get clients that still have orders after deletion
+        const { data: remainingClients } = await supabase
+          .from('orders')
+          .select('client_id')
+          .in('client_id', batchClientIds);
         
-        if (clientsResult.error) console.error('Clients deletion error:', clientsResult.error)
-        totalStats.clients += orphanedClients.length
+        const stillUsedClientIds = new Set(remainingClients?.map(r => r.client_id) || []);
+        const orphanedClientIds = batchClientIds.filter(id => !stillUsedClientIds.has(id));
+        
+        if (orphanedClientIds.length > 0) {
+          const clientsResult = await supabase
+            .from('clients')
+            .delete()
+            .in('id', orphanedClientIds);
+          
+          if (clientsResult.error) console.error('Clients deletion error:', clientsResult.error);
+          totalStats.clients += orphanedClientIds.length;
+          console.log(`Deleted ${orphanedClientIds.length} orphaned clients in batch ${i + 1}`);
+        }
       }
 
       // Update stats (approximate counts since we don't get exact counts from delete)

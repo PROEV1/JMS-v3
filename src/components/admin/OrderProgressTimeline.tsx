@@ -39,8 +39,8 @@ export function OrderProgressTimeline({ order }: OrderProgressTimelineProps) {
     const paymentCompleted = order.amount_paid >= order.total_amount;
     const agreementSigned = !!order.agreement_signed_at;
     const installScheduled = !!order.scheduled_install_date && !!order.engineer;
-    const workInProgress = order.status_enhanced === 'work_in_progress';
-    const completed = order.status === 'completed' || order.status_enhanced === 'work_completed';
+    const workInProgress = order.status_enhanced === 'in_progress';
+    const completed = order.status === 'completed' || order.status_enhanced === 'install_completed_pending_qa';
 
     return [
       {
