@@ -10,6 +10,7 @@ interface Order {
   scheduled_install_date: string | null;
   is_partner_job: boolean;
   scheduling_suppressed: boolean;
+  job_type?: 'installation' | 'assessment' | 'service_call';
   client: {
     full_name: string;
   };
@@ -46,6 +47,13 @@ export function OrderStickyHeader({ order, isSticky }: OrderStickyHeaderProps) {
             <span className="font-semibold">{order.client.full_name}</span>
             <span className="text-muted-foreground">|</span>
             <span className="font-mono text-muted-foreground">{order.order_number}</span>
+            {order.job_type && (
+              <>
+                <Badge variant="secondary" className="text-xs bg-purple-100 text-purple-700">
+                  {order.job_type.charAt(0).toUpperCase() + order.job_type.slice(1).replace('_', ' ')}
+                </Badge>
+              </>
+            )}
             <span className="text-muted-foreground">|</span>
             <EnhancedJobStatusBadge 
               status={order.status_enhanced} 

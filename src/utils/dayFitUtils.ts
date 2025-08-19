@@ -137,7 +137,8 @@ export async function calculateDayFit(
         partner_metadata: null,
         partner_status_raw: null,
         scheduling_suppressed_reason: null,
-        sub_partner: null
+        sub_partner: null,
+        job_type: 'installation' as any // Default value for mock orders
       };
       allOrders.push(dbVirtualOrder);
     }
@@ -191,7 +192,8 @@ export async function calculateDayFit(
         partner_metadata: null,
         partner_status_raw: null,
         scheduling_suppressed_reason: null,
-        sub_partner: null
+        sub_partner: null,
+        job_type: (newOrder.job_type as any) || 'installation' // Preserve job_type if present
       };
       allOrders.push(dbOrder);
     }

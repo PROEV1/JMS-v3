@@ -986,6 +986,7 @@ export type Database = {
           internal_install_notes: string | null
           is_partner_job: boolean | null
           job_address: string | null
+          job_type: Database["public"]["Enums"]["order_job_type"]
           manual_status_notes: string | null
           manual_status_override: boolean | null
           order_number: string
@@ -1033,6 +1034,7 @@ export type Database = {
           internal_install_notes?: string | null
           is_partner_job?: boolean | null
           job_address?: string | null
+          job_type?: Database["public"]["Enums"]["order_job_type"]
           manual_status_notes?: string | null
           manual_status_override?: boolean | null
           order_number: string
@@ -1080,6 +1082,7 @@ export type Database = {
           internal_install_notes?: string | null
           is_partner_job?: boolean | null
           job_address?: string | null
+          job_type?: Database["public"]["Enums"]["order_job_type"]
           manual_status_notes?: string | null
           manual_status_override?: boolean | null
           order_number?: string
@@ -1942,6 +1945,7 @@ export type Database = {
     Enums: {
       message_status: "sending" | "sent" | "delivered" | "failed"
       offer_status: "pending" | "accepted" | "rejected" | "expired"
+      order_job_type: "installation" | "assessment" | "service_call"
       order_status_enhanced:
         | "quote_accepted"
         | "awaiting_payment"
@@ -2096,6 +2100,7 @@ export const Constants = {
     Enums: {
       message_status: ["sending", "sent", "delivered", "failed"],
       offer_status: ["pending", "accepted", "rejected", "expired"],
+      order_job_type: ["installation", "assessment", "service_call"],
       order_status_enhanced: [
         "quote_accepted",
         "awaiting_payment",

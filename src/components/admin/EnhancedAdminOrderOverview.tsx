@@ -27,6 +27,7 @@ interface Order {
   agreement_signed_at: string | null;
   scheduled_install_date: string | null;
   created_at: string;
+  job_type?: 'installation' | 'assessment' | 'service_call';
   client: {
     id: string;
     full_name: string;
@@ -169,7 +170,14 @@ export function EnhancedAdminOrderOverview({ order }: EnhancedAdminOrderOverview
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <span className="text-muted-foreground">Order Number:</span>
-                <p className="font-mono">{order.order_number}</p>
+                <div className="flex items-center gap-2">
+                  <p className="font-mono">{order.order_number}</p>
+                  {order.job_type && (
+                    <Badge variant="secondary" className="text-xs">
+                      {order.job_type.charAt(0).toUpperCase() + order.job_type.slice(1).replace('_', ' ')}
+                    </Badge>
+                  )}
+                </div>
               </div>
               <div>
                 <span className="text-muted-foreground">Quote Number:</span>

@@ -395,6 +395,26 @@ serve(async (req) => {
             continue;
           }
 
+          // Combine address fields into a single address
+          const addressParts = [
+            mappedRow.customer_address_line_1,
+            mappedRow.customer_address_line_2,
+            mappedRow.customer_address_city
+          ].filter(Boolean);
+          const combinedAddress = addressParts.join(', ') || null;
+
+          // Map job type from "Type" field
+          const rawJobType = mappedRow.type?.trim().toUpperCase();
+          let jobType = 'installation'; // default
+          
+          if (rawJobType === 'ASSESSMENT') {
+            jobType = 'assessment';
+          } else if (rawJobType === 'INSTALLATION') {
+            jobType = 'installation';
+          } else if (rawJobType === 'SERVICE_CALL') {
+            jobType = 'service_call';
+          }
+
           // Prepare client data
           let clientId = existingClients.get(clientEmail)?.id;
           if (!clientId) {
@@ -404,7 +424,7 @@ serve(async (req) => {
               email: clientEmail,
               full_name: mappedRow.customer_name || 'Unknown',
               phone: mappedRow.customer_phone || null,
-              address: mappedRow.customer_address_line_1 || null,
+              address: combinedAddress,
               postcode: mappedRow.customer_address_post_code || null,
               user_id: null, // Partner clients don't have user accounts initially
               created_at: new Date().toISOString(),
@@ -473,9 +493,13 @@ serve(async (req) => {
             is_partner_job: true,
             engineer_id: engineerId,
             scheduled_install_date: scheduledInstallDate,
+            job_address: combinedAddress,
+            postcode: mappedRow.customer_address_post_code || null,
+            job_type: jobType,
             partner_metadata: {
               import_run_id: run_id,
               original_status: mappedRow.status,
+              original_type: rawJobType,
               sub_partner: mappedRow.partner_account
             }
           });

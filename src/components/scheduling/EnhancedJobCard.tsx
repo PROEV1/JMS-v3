@@ -94,6 +94,11 @@ export function EnhancedJobCard({ order, onAssignEngineer, onUnassign, onSchedul
           <div className="space-y-1">
             <CardTitle className="text-base flex items-center gap-2">
               {order.order_number}
+              {order.job_type && (
+                <Badge variant="secondary" className="text-xs">
+                  {order.job_type.charAt(0).toUpperCase() + order.job_type.slice(1).replace('_', ' ')}
+                </Badge>
+              )}
               {order.is_partner_job && (
                 <Badge variant="outline" className="text-xs">
                   Partner

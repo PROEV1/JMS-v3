@@ -35,11 +35,13 @@ export interface Order {
   installation_notes?: string;
   scheduling_conflicts?: any; // Allow Json or any[]
   is_partner_job?: boolean;
+  job_type?: 'installation' | 'assessment' | 'service_call'; // Updated to match enum
   client?: {
     full_name: string;
     email: string;
     phone?: string;
     address?: string;
+    postcode?: string;
   };
   engineer?: {
     name: string;

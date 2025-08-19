@@ -447,6 +447,11 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                   <TableCell className="font-medium">
                     <div className="flex items-center gap-2">
                       {order.order_number}
+                      {order.job_type && (
+                        <Badge variant="secondary" className="text-xs">
+                          {order.job_type.charAt(0).toUpperCase() + order.job_type.slice(1).replace('_', ' ')}
+                        </Badge>
+                      )}
                       <Badge variant={getStatusColor(order.status_enhanced)} className="text-xs">
                         {order.status_enhanced === 'awaiting_install_booking' ? 
                           (order.engineer_id ? 
