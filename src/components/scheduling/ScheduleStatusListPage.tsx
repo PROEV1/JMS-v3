@@ -620,7 +620,14 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                             {order.client?.full_name || 'Unknown Client'}
                           </span>
                           <div className="text-xs text-muted-foreground">
-                            {getBestPostcode(order) || 'No postcode'} • {getOrderEstimatedHours(order)}h{isDefaultEstimatedHours(order) && ' (Default)'}
+                            {getBestPostcode(order) || 'No postcode'} • <span className={`${isDefaultEstimatedHours(order) ? 'text-amber-600' : 'text-green-600'}`}>
+                              {getOrderEstimatedHours(order)}h
+                            </span>
+                            {isDefaultEstimatedHours(order) && (
+                              <Badge variant="outline" className="ml-1 text-xs px-1 py-0 text-amber-600 border-amber-300">
+                                Default
+                              </Badge>
+                            )}
                           </div>
                         </div>
                       </div>

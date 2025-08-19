@@ -96,12 +96,15 @@ export function JobCard({
                 <p><strong>Deposit:</strong> £{order.deposit_amount}</p>
                 <p><strong>Amount Paid:</strong> £{order.amount_paid}</p>
                 <div className="flex items-center gap-2">
-                  <span><strong>Duration:</strong> {getOrderEstimatedHours(order)}h</span>
+                  <span><strong>Duration:</strong></span>
+                  <span className={`${isDefaultEstimatedHours(order) ? 'text-amber-600' : 'text-green-600'}`}>
+                    {getOrderEstimatedHours(order)}h
+                  </span>
                   {isDefaultEstimatedHours(order) && (
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger>
-                          <Badge variant="outline" className="text-xs px-1.5 py-0.5">
+                          <Badge variant="outline" className="text-xs px-1.5 py-0.5 text-amber-600 border-amber-300">
                             Default
                           </Badge>
                         </TooltipTrigger>
@@ -265,12 +268,14 @@ export function JobCard({
 
               <div className="flex items-center gap-1">
                 <Clock className="h-3 w-3" />
-                <span>{getOrderEstimatedHours(order)}h estimated</span>
+                <span className={`${isDefaultEstimatedHours(order) ? 'text-amber-600' : 'text-green-600'}`}>
+                  {getOrderEstimatedHours(order)}h estimated
+                </span>
                 {isDefaultEstimatedHours(order) && (
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger>
-                        <Badge variant="outline" className="text-xs px-1 py-0">
+                        <Badge variant="outline" className="text-xs px-1 py-0 text-amber-600 border-amber-300">
                           Default
                         </Badge>
                       </TooltipTrigger>

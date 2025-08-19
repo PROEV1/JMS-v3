@@ -29,6 +29,7 @@ const ORDER_FIELDS = [
   { key: 'partner_status', label: 'Partner Status', required: true },
   { key: 'engineer_identifier', label: 'Engineer Identifier', required: false },
   { key: 'scheduled_date', label: 'Scheduled Date', required: false },
+  { key: 'estimated_duration_hours', label: 'Estimated Duration (hours)', required: false },
   { key: 'sub_partner', label: 'Sub Partner', required: false },
   { key: 'partner_external_url', label: 'Partner External URL', required: false },
   { key: 'client_name', label: 'Client Name', required: false },

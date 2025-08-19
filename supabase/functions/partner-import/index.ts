@@ -310,6 +310,7 @@ serve(async (req) => {
         'partner_status': ['Status', 'status'],
         'engineer_identifier': ['Assigned Engineers', 'assigned_engineers'],
         'scheduled_date': ['Scheduled Date', 'scheduled_date'],
+        'estimated_duration_hours': ['Duration', 'Estimated Duration', 'Duration Hours', 'estimated_duration_hours'],
         'client_name': ['Customer Name', 'customer_name'],
         'client_email': ['Customer Email', 'customer_email'],
         'client_phone': ['Customer Phone', 'customer_phone'],
@@ -488,7 +489,31 @@ serve(async (req) => {
           const quoteId = crypto.randomUUID();
           const orderId = crypto.randomUUID();
 
-          // Parse date in DD/MM/YYYY format
+           // Parse duration with robust format handling
+           let estimatedDurationHours = null;
+           const durationStr = getValue('estimated_duration_hours').trim();
+           if (durationStr) {
+             try {
+               // Handle various formats: "4", "4h", "4 hours", "4.5", etc.
+               const cleanDuration = durationStr.toLowerCase()
+                 .replace(/[^\d.]/g, '') // Remove non-numeric chars except decimal
+                 .trim();
+               
+               if (cleanDuration) {
+                 const parsed = parseFloat(cleanDuration);
+                 if (!isNaN(parsed) && parsed > 0 && parsed <= 24) {
+                   estimatedDurationHours = parsed;
+                   console.log(`Parsed duration for row ${rowNumber}: ${durationStr} => ${estimatedDurationHours}h`);
+                 } else {
+                   console.warn(`Invalid duration value for row ${rowNumber}: ${durationStr}`);
+                 }
+               }
+             } catch (durationError) {
+               console.warn(`Duration parsing error for row ${rowNumber}: ${durationStr}, error: ${durationError.message}`);
+             }
+           }
+
+           // Parse date in DD/MM/YYYY format
           let scheduledInstallDate = null;
           const scheduledDateStr = getValue('scheduled_date');
           if (scheduledDateStr && scheduledDateStr.trim()) {
@@ -525,26 +550,27 @@ serve(async (req) => {
             status: 'accepted'
           });
 
-          batchOrders.push({
-            id: orderId,
-            client_id: clientId,
-            quote_id: quoteId,
-            total_amount: quoteAmount,
-            partner_id: partner.id,
-            partner_external_id: externalId,
-            is_partner_job: true,
-            engineer_id: engineerId,
-            scheduled_install_date: scheduledInstallDate,
-            job_address: combinedAddress,
-            postcode: getValue('customer_address_post_code') || null,
-            job_type: jobType,
-            partner_metadata: {
-              import_run_id: run_id,
-              original_status: getValue('partner_status'),
-              original_type: rawJobType,
-              sub_partner: getValue('sub_partner')
-            }
-          });
+           batchOrders.push({
+             id: orderId,
+             client_id: clientId,
+             quote_id: quoteId,
+             total_amount: quoteAmount,
+             partner_id: partner.id,
+             partner_external_id: externalId,
+             is_partner_job: true,
+             engineer_id: engineerId,
+             scheduled_install_date: scheduledInstallDate,
+             estimated_duration_hours: estimatedDurationHours,
+             job_address: combinedAddress,
+             postcode: getValue('customer_address_post_code') || null,
+             job_type: jobType,
+             partner_metadata: {
+               import_run_id: run_id,
+               original_status: getValue('partner_status'),
+               original_type: rawJobType,
+               sub_partner: getValue('sub_partner')
+             }
+           });
 
           results.processed++;
 
