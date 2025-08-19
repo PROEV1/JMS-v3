@@ -25,27 +25,32 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Validate JWT and check admin role
+    // Extract JWT token from Authorization header
     const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
-      console.error('Missing Authorization header')
+    if (!authHeader?.startsWith('Bearer ')) {
+      console.error('Missing or invalid Authorization header')
       return new Response(
-        JSON.stringify({ error: 'Missing Authorization header' }),
+        JSON.stringify({ error: 'Missing or invalid Authorization header' }),
         { status: 401, headers: corsHeaders }
       )
     }
 
+    const jwt = authHeader.replace('Bearer ', '')
+    console.log('JWT extracted successfully')
+
+    // Create Supabase client for server-side operations
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       {
-        global: {
-          headers: { Authorization: authHeader },
-        },
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+        }
       }
     )
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    const { data: { user }, error: userError } = await supabase.auth.getUser(jwt)
     if (userError || !user) {
       console.error('Authentication failed:', userError)
       return new Response(
@@ -53,6 +58,8 @@ Deno.serve(async (req) => {
         { status: 401, headers: corsHeaders }
       )
     }
+    
+    console.log('User authenticated successfully:', user.email)
 
     // Check if user is admin
     const { data: profile } = await supabase
