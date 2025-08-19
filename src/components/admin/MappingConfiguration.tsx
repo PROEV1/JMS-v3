@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -57,10 +57,28 @@ export default function MappingConfiguration({
   onStatusOverrideRulesChange
 }: MappingConfigurationProps) {
   const { toast } = useToast();
-  const [availableColumns, setAvailableColumns] = useState<string[]>([]);
+  // Seed availableColumns with existing mapped values to ensure they're always visible
+  const existingMappedColumns = Object.values(columnMappings).filter(Boolean);
+  const [availableColumns, setAvailableColumns] = useState<string[]>(existingMappedColumns);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [newStatusMapping, setNewStatusMapping] = useState({ partner: '', internal: '' });
   const [newOverrideRule, setNewOverrideRule] = useState({ status: '', suppress: false });
+
+  // Auto-load Google Sheet columns when component mounts if gsheetId is present
+  useEffect(() => {
+    if (sourceType === 'gsheet' && gsheetId && availableColumns.length === 0) {
+      fetchGoogleSheetsPreview();
+    }
+  }, [sourceType, gsheetId]);
+
+  // Update availableColumns when columnMappings change to ensure mapped values stay visible
+  useEffect(() => {
+    const mappedValues = Object.values(columnMappings).filter(Boolean);
+    setAvailableColumns(prev => {
+      const combined = [...new Set([...prev, ...mappedValues])];
+      return combined;
+    });
+  }, [columnMappings]);
 
   const fetchGoogleSheetsPreview = async () => {
     if (!gsheetId) {
@@ -88,7 +106,10 @@ export default function MappingConfiguration({
       }
       
       if (data.success && data.headers) {
-        setAvailableColumns(data.headers);
+        // Preserve existing mapped columns and add new ones from the sheet
+        const existingMappedColumns = Object.values(columnMappings).filter(Boolean);
+        const allColumns = [...new Set([...existingMappedColumns, ...data.headers])];
+        setAvailableColumns(allColumns);
         toast({
           title: "Success",
           description: `Loaded ${data.headers.length} columns from Google Sheet`,
@@ -215,18 +236,13 @@ export default function MappingConfiguration({
                       {field.required && <Badge variant="destructive" className="text-xs">Required</Badge>}
                     </Label>
                   </div>
-                  <div className="w-2/3">
+                  <div className="w-2/3 space-y-1">
                     <Select
                       value={columnMappings[field.key] || 'none'}
                       onValueChange={(value) => updateColumnMapping(field.key, value === 'none' ? '' : value)}
-                      disabled={sourceType === 'gsheet' && availableColumns.length === 0}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder={
-                          sourceType === 'gsheet' && availableColumns.length === 0
-                            ? "Load columns first..."
-                            : "Select source column"
-                        } />
+                        <SelectValue placeholder="Select source column" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="none">-- None --</SelectItem>
@@ -237,6 +253,11 @@ export default function MappingConfiguration({
                         ))}
                       </SelectContent>
                     </Select>
+                    {columnMappings[field.key] && (
+                      <div className="text-xs text-muted-foreground">
+                        Currently mapped to: <span className="font-medium">{columnMappings[field.key]}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
