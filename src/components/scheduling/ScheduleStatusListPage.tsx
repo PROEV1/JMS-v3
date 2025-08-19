@@ -766,6 +766,14 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                                   >
                                     Cancel
                                   </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => navigate(`/admin/order/${order.id}`)}
+                                    className="text-xs px-3 py-1 h-7"
+                                  >
+                                    View Job
+                                  </Button>
                                 </>
                               );
                              } else if (activeOffer && title === 'Date Offered') {
@@ -790,6 +798,14 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                                    >
                                      Reject
                                    </Button>
+                                   <Button
+                                     size="sm"
+                                     variant="outline"
+                                     onClick={() => navigate(`/admin/order/${order.id}`)}
+                                     className="text-xs px-3 py-1 h-7"
+                                   >
+                                     View Job
+                                   </Button>
                                  </>
                                );
                              } else if (title === 'Date Rejected') {
@@ -801,6 +817,14 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                                      className="text-xs px-3 py-1 h-7"
                                    >
                                      Smart Assign
+                                   </Button>
+                                   <Button
+                                     variant="outline"
+                                     size="sm"
+                                     onClick={() => navigate(`/admin/order/${order.id}`)}
+                                     className="text-xs px-3 py-1 h-7"
+                                   >
+                                     View Job
                                    </Button>
                                  </>
                                );
