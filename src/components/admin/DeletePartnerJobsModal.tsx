@@ -74,8 +74,27 @@ export function DeletePartnerJobsModal({ isOpen, onClose, partnerId, partnerName
       return data;
     },
     onSuccess: (data) => {
-      setPreviewStats(data.stats);
-      toast.success("Preview generated successfully");
+      console.log("Dry run response received:", data);
+      
+      // Handle case where response might be a string (parse it)
+      let parsedData = data;
+      if (typeof data === 'string') {
+        try {
+          parsedData = JSON.parse(data);
+        } catch (e) {
+          console.error("Failed to parse dry run response:", e);
+          toast.error("Invalid response format from server");
+          return;
+        }
+      }
+      
+      if (parsedData?.stats) {
+        setPreviewStats(parsedData.stats);
+        toast.success("Preview generated successfully");
+      } else {
+        console.error("Invalid dry run response format:", parsedData);
+        toast.error("Invalid response format - missing stats");
+      }
     },
     onError: (error: any) => {
       toast.error("Failed to generate preview: " + error.message);
@@ -97,11 +116,30 @@ export function DeletePartnerJobsModal({ isOpen, onClose, partnerId, partnerName
       return data;
     },
     onSuccess: (data) => {
-      toast.success(`Successfully deleted ${data.stats.orders} orders and related records`);
-      queryClient.invalidateQueries({ queryKey: ["partner-import-runs"] });
-      onClose();
-      setPreviewStats(null);
-      setConfirmationText("");
+      console.log("Delete response received:", data);
+      
+      // Handle case where response might be a string (parse it)
+      let parsedData = data;
+      if (typeof data === 'string') {
+        try {
+          parsedData = JSON.parse(data);
+        } catch (e) {
+          console.error("Failed to parse delete response:", e);
+          toast.error("Invalid response format from server");
+          return;
+        }
+      }
+      
+      if (parsedData?.stats) {
+        toast.success(`Successfully deleted ${parsedData.stats.orders} orders and related records`);
+        queryClient.invalidateQueries({ queryKey: ["partner-import-runs"] });
+        onClose();
+        setPreviewStats(null);
+        setConfirmationText("");
+      } else {
+        console.error("Invalid delete response format:", parsedData);
+        toast.error("Invalid response format - missing stats");
+      }
     },
     onError: (error: any) => {
       toast.error("Failed to delete jobs: " + error.message);

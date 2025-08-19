@@ -1,7 +1,10 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
 import { getCorsHeaders } from '../_shared/cors.ts'
 
-const corsHeaders = getCorsHeaders()
+const corsHeaders = {
+  ...getCorsHeaders(),
+  'Content-Type': 'application/json'
+}
 
 interface DeleteJobsRequest {
   partner_id: string
