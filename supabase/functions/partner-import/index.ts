@@ -495,33 +495,59 @@ serve(async (req) => {
       // Insert batch data (only if not a dry run)
       try {
         if (!dry_run) {
-          // Insert clients first and track which ones were actually created
+          // Insert clients first - check for duplicates and only insert new ones
           const validClientIds = new Set();
           
           if (batchClients.length > 0) {
-            console.log(`Inserting ${batchClients.length} clients...`);
-            const { data: insertedClients, error: clientsError } = await supabase
-              .from('clients')
-              .upsert(batchClients, { 
-                onConflict: 'email',
-                ignoreDuplicates: false 
-              })
-              .select('id, email');
+            console.log(`Processing ${batchClients.length} clients...`);
             
-            if (clientsError) {
-              console.error('Batch clients insert error:', clientsError);
-              throw clientsError;
+            // Get emails to check for existing clients
+            const emailsToCheck = batchClients.map(c => c.email);
+            const { data: existingClientsInBatch } = await supabase
+              .from('clients')
+              .select('id, email')
+              .in('email', emailsToCheck);
+            
+            // Track existing clients from this batch
+            const existingEmailMap = new Map();
+            existingClientsInBatch?.forEach(client => {
+              existingEmailMap.set(client.email, client.id);
+              validClientIds.add(client.id);
+            });
+            
+            // Only insert clients that don't already exist
+            const newClients = batchClients.filter(client => !existingEmailMap.has(client.email));
+            
+            if (newClients.length > 0) {
+              console.log(`Inserting ${newClients.length} new clients...`);
+              const { data: insertedClients, error: clientsError } = await supabase
+                .from('clients')
+                .insert(newClients)
+                .select('id, email');
+              
+              if (clientsError) {
+                console.error('Batch clients insert error:', clientsError);
+                throw clientsError;
+              } else {
+                console.log(`Successfully inserted ${insertedClients?.length || 0} clients`);
+                // Track newly inserted clients
+                insertedClients?.forEach(client => {
+                  validClientIds.add(client.id);
+                });
+              }
             } else {
-              console.log(`Successfully processed ${insertedClients?.length || 0} clients`);
-              // Track which clients were actually processed
-              insertedClients?.forEach(client => {
-                validClientIds.add(client.id);
-              });
-              // Also add existing client IDs that we're using
-              batchClients.forEach(client => {
-                validClientIds.add(client.id);
-              });
+              console.log('All clients already exist, skipping insert');
             }
+            
+            // Add all batch client IDs to valid set (existing + new)
+            batchClients.forEach(client => {
+              const existingId = existingEmailMap.get(client.email);
+              if (existingId) {
+                validClientIds.add(existingId);
+              } else {
+                validClientIds.add(client.id);
+              }
+            });
           }
 
           // Add any existing clients from the pre-loaded data that are used in this batch
