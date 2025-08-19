@@ -196,6 +196,34 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
     setShowSmartAssign(true);
   };
 
+  // Helper function to calculate time remaining until expiry (nearest hour)
+  const getTimeRemaining = (expiresAt: string) => {
+    const now = new Date();
+    const expiry = new Date(expiresAt);
+    const diffMs = expiry.getTime() - now.getTime();
+    
+    if (diffMs <= 0) {
+      return 'Expired';
+    }
+    
+    const diffHours = Math.ceil(diffMs / (1000 * 60 * 60));
+    
+    if (diffHours < 1) {
+      return '< 1h';
+    } else if (diffHours === 1) {
+      return '1 hour';
+    } else if (diffHours < 24) {
+      return `${diffHours} hours`;
+    } else {
+      const days = Math.floor(diffHours / 24);
+      const remainingHours = diffHours % 24;
+      if (remainingHours === 0) {
+        return `${days} day${days !== 1 ? 's' : ''}`;
+      }
+      return `${days}d ${remainingHours}h`;
+    }
+  };
+
   // Helper function to get active offer for an order
   const getActiveOfferForOrder = (orderId: string) => {
     return offers.find(offer => 
@@ -740,26 +768,42 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                                   </Button>
                                 </>
                               );
-                            } else if (activeOffer && title === 'Date Offered') {
-                              return (
-                                <>
-                                  <Button
-                                    size="sm"
-                                    onClick={() => handleAcceptOffer(order.id)}
-                                    className="text-xs px-3 py-1 h-7 bg-green-600 hover:bg-green-700"
-                                  >
-                                    Accept
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="destructive"
-                                    onClick={() => handleRejectOffer(order.id)}
-                                    className="text-xs px-3 py-1 h-7"
-                                  >
-                                    Reject
-                                  </Button>
-                                </>
-                              );
+                             } else if (activeOffer && title === 'Date Offered') {
+                               const timeRemaining = getTimeRemaining(activeOffer.expires_at);
+                               return (
+                                 <>
+                                   <div className="text-xs text-muted-foreground mb-1">
+                                     Expires: {timeRemaining}
+                                   </div>
+                                   <Button
+                                     size="sm"
+                                     onClick={() => handleAcceptOffer(order.id)}
+                                     className="text-xs px-3 py-1 h-7 bg-green-600 hover:bg-green-700"
+                                   >
+                                     Accept
+                                   </Button>
+                                   <Button
+                                     size="sm"
+                                     variant="destructive"
+                                     onClick={() => handleRejectOffer(order.id)}
+                                     className="text-xs px-3 py-1 h-7"
+                                   >
+                                     Reject
+                                   </Button>
+                                 </>
+                               );
+                             } else if (title === 'Date Rejected') {
+                               return (
+                                 <>
+                                   <Button
+                                     onClick={() => handleSmartAssign(order)}
+                                     size="sm"
+                                     className="text-xs px-3 py-1 h-7"
+                                   >
+                                     Smart Assign
+                                   </Button>
+                                 </>
+                               );
                             } else if (order.status_enhanced === 'awaiting_install_booking') {
                               if (activeOffer) {
                                 return (
@@ -922,34 +966,60 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                                  </Button>
                                </>
                              );
-                           } else if (activeOffer && title === 'Date Offered') {
-                             return (
-                               <>
-                                 <Button
-                                   size="sm"
-                                   onClick={() => handleAcceptOffer(order.id)}
-                                   className="flex-1 text-xs h-7 bg-green-600 hover:bg-green-700"
-                                 >
-                                   Accept
-                                 </Button>
-                                 <Button
-                                   size="sm"
-                                   variant="destructive"
-                                   onClick={() => handleRejectOffer(order.id)}
-                                   className="flex-1 text-xs h-7"
-                                 >
-                                   Reject
-                                 </Button>
-                                 <Button
-                                   size="sm"
-                                   variant="outline"
-                                   onClick={() => navigate(`/admin/order/${order.id}`)}
-                                   className="flex-1 text-xs h-7"
-                                 >
-                                   View Job
-                                 </Button>
-                               </>
-                             );
+                            } else if (activeOffer && title === 'Date Offered') {
+                              const timeRemaining = getTimeRemaining(activeOffer.expires_at);
+                              return (
+                                <>
+                                  <div className="w-full mb-2">
+                                    <div className="text-xs text-muted-foreground text-center">
+                                      Expires in: {timeRemaining}
+                                    </div>
+                                  </div>
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleAcceptOffer(order.id)}
+                                    className="flex-1 text-xs h-7 bg-green-600 hover:bg-green-700"
+                                  >
+                                    Accept
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    onClick={() => handleRejectOffer(order.id)}
+                                    className="flex-1 text-xs h-7"
+                                  >
+                                    Reject
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => navigate(`/admin/order/${order.id}`)}
+                                    className="flex-1 text-xs h-7"
+                                  >
+                                    View Job
+                                  </Button>
+                                </>
+                              );
+                            } else if (title === 'Date Rejected') {
+                              return (
+                                <>
+                                  <Button
+                                    onClick={() => handleSmartAssign(order)}
+                                    size="sm"
+                                    className="flex-1 text-xs h-7"
+                                  >
+                                    Smart Assign
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => navigate(`/admin/order/${order.id}`)}
+                                    className="flex-1 text-xs h-7"
+                                  >
+                                    View Job
+                                  </Button>
+                                </>
+                              );
                            } else if (order.status_enhanced === 'awaiting_install_booking') {
                              if (activeOffer) {
                                return (
