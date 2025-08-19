@@ -123,7 +123,7 @@ serve(async (req) => {
         line.split(',').map(cell => cell.trim().replace(/"/g, ''))
       );
       
-    } else if (importProfile.source_type === 'google_sheets' && importProfile.gsheet_id && importProfile.gsheet_sheet_name) {
+    } else if ((importProfile.source_type === 'google_sheets' || importProfile.source_type === 'gsheet') && importProfile.gsheet_id && importProfile.gsheet_sheet_name) {
       // Fetch from Google Sheets
       console.log('=== CALLING GOOGLE SHEETS PREVIEW FROM PARTNER-IMPORT ===');
       console.log('Sheet ID:', importProfile.gsheet_id);
