@@ -409,7 +409,7 @@ Deno.serve(async (req) => {
                     phone: mappedData.client_phone || null,
                     address: mappedData.job_address || null,
                     postcode: mappedData.postcode || null,
-                    user_id: '00000000-0000-0000-0000-000000000000' // Placeholder for partner clients
+                    user_id: null // Set to null for partner clients (no auth user)
                   })
                   .select('id')
                   .single();
