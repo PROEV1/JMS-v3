@@ -131,10 +131,16 @@ serve(async (req) => {
       console.log('Auth header present:', !!req.headers.get('Authorization'));
 
       const authHeader = req.headers.get('Authorization');
+      console.log('Calling google-sheets-preview with body:', { 
+        gsheet_id: importProfile.gsheet_id, 
+        sheet_name: importProfile.gsheet_sheet_name 
+      });
+      
       const sheetsResponse = await supabase.functions.invoke('google-sheets-preview', {
         body: { 
           gsheet_id: importProfile.gsheet_id, 
-          sheet_name: importProfile.gsheet_sheet_name 
+          sheet_name: importProfile.gsheet_sheet_name,
+          preview_rows: 100
         },
         headers: {
           Authorization: authHeader || '',
@@ -143,9 +149,15 @@ serve(async (req) => {
       });
 
       console.log('Sheets response status:', sheetsResponse.status);
+      console.log('Sheets response error:', sheetsResponse.error);
+      console.log('Sheets response data preview:', JSON.stringify(sheetsResponse.data).substring(0, 200));
       
       if (sheetsResponse.error) {
         throw new Error(`Failed to fetch Google Sheets data: ${sheetsResponse.error.message}`);
+      }
+      
+      if (!sheetsResponse.data) {
+        throw new Error('No data received from Google Sheets preview function');
       }
 
       const sheetsData = sheetsResponse.data;

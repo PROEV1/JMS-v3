@@ -85,12 +85,31 @@ Deno.serve(async (req) => {
     }
     console.log('Admin access confirmed');
 
-    const body: GoogleSheetsRequest = await req.json();
-    console.log('Request data:', { 
-      gsheet_id: body.gsheet_id?.substring(0, 10) + '...', 
-      sheet_name: body.sheet_name,
-      preview_rows: body.preview_rows 
-    });
+    let body: GoogleSheetsRequest;
+    try {
+      const text = await req.text();
+      console.log('Request body text length:', text.length);
+      
+      if (!text || text.trim() === '') {
+        throw new Error('Request body is empty');
+      }
+      
+      body = JSON.parse(text);
+      console.log('Request data:', { 
+        gsheet_id: body.gsheet_id?.substring(0, 10) + '...', 
+        sheet_name: body.sheet_name,
+        preview_rows: body.preview_rows 
+      });
+    } catch (parseError) {
+      console.error('JSON parsing error:', parseError);
+      return new Response(JSON.stringify({ 
+        success: false,
+        error: `Invalid JSON in request body: ${parseError.message}` 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
     
     const { gsheet_id, sheet_name = 'Sheet1', preview_rows = 10 } = body;
 
