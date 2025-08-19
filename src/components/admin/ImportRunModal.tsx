@@ -48,7 +48,7 @@ interface ImportResult {
 interface ImportRunModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onImport: (csvData?: string, dryRun?: boolean) => Promise<ImportResult | void>;
+  onImport: (csvData?: string, dryRun?: boolean, createMissingOrders?: boolean) => Promise<ImportResult | void>;
   sourceType: 'csv' | 'gsheet';
   gsheetId?: string;
   gsheetSheetName?: string;
@@ -64,6 +64,7 @@ export default function ImportRunModal({
 }: ImportRunModalProps) {
   const [csvData, setCsvData] = useState('');
   const [dryRun, setDryRun] = useState(true);
+  const [createMissingOrders, setCreateMissingOrders] = useState(true);
   const [isImporting, setIsImporting] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
 
@@ -71,7 +72,7 @@ export default function ImportRunModal({
     setIsImporting(true);
     setImportResult(null);
     try {
-      const result = await onImport(sourceType === 'csv' ? csvData : undefined, dryRun);
+      const result = await onImport(sourceType === 'csv' ? csvData : undefined, dryRun, createMissingOrders);
       if (result) {
         setImportResult(result);
       }
@@ -150,18 +151,44 @@ export default function ImportRunModal({
             </div>
           )}
 
-          <div className="flex items-center space-x-2">
-            <Switch
-              id="dry_run"
-              checked={dryRun}
-              onCheckedChange={setDryRun}
-            />
-            <Label htmlFor="dry_run" className="flex items-center gap-2">
-              Dry Run Mode
-              <Badge variant={dryRun ? 'default' : 'destructive'}>
-                {dryRun ? 'Safe Preview' : 'Live Import'}
-              </Badge>
-            </Label>
+          <div className="space-y-4">
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="dry_run"
+                checked={dryRun}
+                onCheckedChange={setDryRun}
+              />
+              <Label htmlFor="dry_run" className="flex items-center gap-2">
+                Dry Run Mode
+                <Badge variant={dryRun ? 'default' : 'destructive'}>
+                  {dryRun ? 'Safe Preview' : 'Live Import'}
+                </Badge>
+              </Label>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="create_missing_orders"
+                checked={createMissingOrders}
+                onCheckedChange={setCreateMissingOrders}
+              />
+              <Label htmlFor="create_missing_orders" className="flex items-center gap-2">
+                Create Missing Orders
+                <Badge variant={createMissingOrders ? 'default' : 'secondary'}>
+                  {createMissingOrders ? 'Enabled' : 'Disabled'}
+                </Badge>
+              </Label>
+            </div>
+
+            {createMissingOrders && (
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  <strong>Note:</strong> New orders will be created for rows that don't exist in the system.
+                  This requires client_name and client_email in your data.
+                </AlertDescription>
+              </Alert>
+            )}
           </div>
 
           {!dryRun && (
@@ -213,10 +240,14 @@ export default function ImportRunModal({
                 {/* Detailed Preview */}
                 {importResult.preview && (
                   <Tabs defaultValue="updates" className="w-full">
-                    <TabsList className="grid w-full grid-cols-3">
+                    <TabsList className="grid w-full grid-cols-4">
                       <TabsTrigger value="updates" className="flex items-center gap-2">
                         <CheckCircle2 className="h-4 w-4" />
                         Updates ({importResult.preview.updates.length})
+                      </TabsTrigger>
+                      <TabsTrigger value="inserts" className="flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4" />
+                        New ({importResult.preview.inserts?.length || 0})
                       </TabsTrigger>
                       <TabsTrigger value="skips" className="flex items-center gap-2">
                         <Clock className="h-4 w-4" />
@@ -277,6 +308,30 @@ export default function ImportRunModal({
                         ))
                       ) : (
                         <div className="text-center py-4 text-muted-foreground">No skips to preview</div>
+                      )}
+                    </TabsContent>
+                    
+                    <TabsContent value="inserts" className="space-y-2 max-h-64 overflow-y-auto">
+                      {importResult.preview.inserts && importResult.preview.inserts.length > 0 ? (
+                        importResult.preview.inserts.map((insert, index) => (
+                          <div key={index} className="border border-green-200 rounded-lg p-3 space-y-2 bg-green-50">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <div className="font-mono text-sm font-medium">{insert.external_id}</div>
+                                <div className="text-sm text-muted-foreground">Row {insert.row}</div>
+                              </div>
+                              <Badge variant="default" className="text-xs bg-green-600">New Order</Badge>
+                            </div>
+                            <div className="text-sm text-green-700">{insert.reason}</div>
+                            {insert.data?.partner_status && (
+                              <div className="text-xs text-green-600">
+                                Partner Status: {insert.data.partner_status}
+                              </div>
+                            )}
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center py-4 text-muted-foreground">No new orders to create</div>
                       )}
                     </TabsContent>
                     

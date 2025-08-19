@@ -48,6 +48,7 @@ interface ImportRequest {
   profile_id: string;
   csv_data?: string;
   dry_run?: boolean;
+  create_missing_orders?: boolean;
 }
 
 interface ImportResult {
@@ -144,7 +145,7 @@ Deno.serve(async (req) => {
     }
 
     const body: ImportRequest = await req.json();
-    const { profile_id, csv_data, dry_run = true } = body;
+    const { profile_id, csv_data, dry_run = true, create_missing_orders = true } = body;
 
     if (!profile_id) {
       return new Response(JSON.stringify({ error: 'profile_id is required' }), {
@@ -276,7 +277,7 @@ Deno.serve(async (req) => {
           }
         });
 
-        // Validate required fields
+        // Validate required fields for order creation
         if (!mappedData.partner_external_id) {
           result.summary.errors.push({
             row: rowNumber,
@@ -284,6 +285,26 @@ Deno.serve(async (req) => {
             data: mappedData
           });
           continue;
+        }
+
+        // Check if order already exists
+        const { data: existingOrder } = await supabaseAdmin
+          .from('orders')
+          .select('id, status_enhanced, partner_status')
+          .eq('partner_id', importProfile.partner_id)
+          .eq('partner_external_id', mappedData.partner_external_id)
+          .single();
+
+        // Validate required fields for order creation if order doesn't exist
+        if (!existingOrder && create_missing_orders) {
+          if (!mappedData.client_name || !mappedData.client_email) {
+            result.summary.errors.push({
+              row: rowNumber,
+              error: 'Missing required fields for order creation: client_name and client_email are required',
+              data: mappedData
+            });
+            continue;
+          }
         }
 
         // Apply status mapping
@@ -294,14 +315,6 @@ Deno.serve(async (req) => {
 
         // Check for status overrides (ON_HOLD, CANCELLATION_REQUESTED)
         const shouldSuppress = importProfile.status_override_rules[mappedData.partner_status] === true;
-
-        // Check if order already exists
-        const { data: existingOrder } = await supabaseAdmin
-          .from('orders')
-          .select('id, status_enhanced, partner_status')
-          .eq('partner_id', importProfile.partner_id)
-          .eq('partner_external_id', mappedData.partner_external_id)
-          .single();
 
         const orderData = {
           partner_id: importProfile.partner_id,
@@ -373,13 +386,108 @@ Deno.serve(async (req) => {
             } else {
               result.summary.updated_count++;
             }
+          } else if (create_missing_orders) {
+            // Create new order with client and quote
+            try {
+              // 1. Find or create client
+              let clientId: string;
+              const { data: existingClient } = await supabaseAdmin
+                .from('clients')
+                .select('id')
+                .eq('email', mappedData.client_email)
+                .single();
+
+              if (existingClient) {
+                clientId = existingClient.id;
+              } else {
+                // Create new client (no auth user needed for partner jobs)
+                const { data: newClient, error: clientError } = await supabaseAdmin
+                  .from('clients')
+                  .insert({
+                    full_name: mappedData.client_name,
+                    email: mappedData.client_email,
+                    phone: mappedData.client_phone || null,
+                    address: mappedData.job_address || null,
+                    postcode: mappedData.postcode || null,
+                    user_id: '00000000-0000-0000-0000-000000000000' // Placeholder for partner clients
+                  })
+                  .select('id')
+                  .single();
+
+                if (clientError) {
+                  result.summary.errors.push({
+                    row: rowNumber,
+                    error: `Failed to create client: ${clientError.message}`,
+                    data: mappedData
+                  });
+                  continue;
+                }
+                clientId = newClient.id;
+              }
+
+              // 2. Create quote
+              const { data: newQuote, error: quoteError } = await supabaseAdmin
+                .from('quotes')
+                .insert({
+                  client_id: clientId,
+                  product_details: `Partner Job: ${mappedData.sub_partner || 'Unknown'}`,
+                  total_cost: 0, // Partner jobs typically don't have cost data
+                  materials_cost: 0,
+                  install_cost: 0,
+                  extras_cost: 0,
+                  status: 'accepted'
+                })
+                .select('id')
+                .single();
+
+              if (quoteError) {
+                result.summary.errors.push({
+                  row: rowNumber,
+                  error: `Failed to create quote: ${quoteError.message}`,
+                  data: mappedData
+                });
+                continue;
+              }
+
+              // 3. Create order
+              const newOrderData = {
+                ...orderData,
+                client_id: clientId,
+                quote_id: newQuote.id,
+                total_amount: 0,
+                deposit_amount: 0,
+                amount_paid: 0,
+                status: 'awaiting_payment',
+                job_address: mappedData.job_address || null,
+                postcode: mappedData.postcode || null
+              };
+
+              const { error: orderError } = await supabaseAdmin
+                .from('orders')
+                .insert(newOrderData);
+
+              if (orderError) {
+                result.summary.errors.push({
+                  row: rowNumber,
+                  error: `Failed to create order: ${orderError.message}`,
+                  data: mappedData
+                });
+              } else {
+                result.summary.inserted_count++;
+              }
+            } catch (createError) {
+              result.summary.errors.push({
+                row: rowNumber,
+                error: `Order creation failed: ${createError.message}`,
+                data: mappedData
+              });
+            }
           } else {
-            // Create new order - would need client_id and quote_id
-            // For now, skip creation of completely new orders
+            // Skip creation of new orders
             result.summary.skipped_count++;
             result.summary.warnings.push({
               row: rowNumber,
-              warning: 'Cannot create new orders without client context',
+              warning: 'Order does not exist - skipped (create_missing_orders disabled)',
               data: mappedData
             });
           }
@@ -422,6 +530,23 @@ Deno.serve(async (req) => {
                 }
               });
             }
+          } else if (create_missing_orders) {
+            result.summary.inserted_count++;
+            
+            // Add to preview if we haven't hit the limit
+            if (result.preview && result.preview.inserts.length < previewLimit) {
+              result.preview.inserts.push({
+                row: rowNumber,
+                external_id: mappedData.partner_external_id,
+                status: orderData.status_enhanced || internalStatus,
+                reason: `Would create new order for ${mappedData.client_name} (${mappedData.client_email})`,
+                data: {
+                  partner_status: mappedData.partner_status,
+                  sub_partner: mappedData.sub_partner,
+                  scheduled_date: mappedData.scheduled_date
+                }
+              });
+            }
           } else {
             result.summary.skipped_count++;
             
@@ -430,7 +555,7 @@ Deno.serve(async (req) => {
               result.preview.skips.push({
                 row: rowNumber,
                 external_id: mappedData.partner_external_id,
-                reason: 'Order does not exist in system - cannot create new orders without client context',
+                reason: 'Order does not exist - would skip (create_missing_orders disabled)',
                 data: {
                   partner_status: mappedData.partner_status,
                   sub_partner: mappedData.sub_partner,

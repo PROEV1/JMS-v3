@@ -186,11 +186,12 @@ export default function AdminPartnerProfiles() {
     }
   };
 
-  const triggerImport = async (profileId: string, csvData?: string, dryRun: boolean = true) => {
+  const triggerImport = async (profileId: string, csvData?: string, dryRun: boolean = true, createMissingOrders: boolean = true) => {
     try {
       const body: any = {
         profile_id: profileId,
-        dry_run: dryRun
+        dry_run: dryRun,
+        create_missing_orders: createMissingOrders
       };
       
       if (csvData) {
@@ -393,7 +394,7 @@ export default function AdminPartnerProfiles() {
         <ImportRunModal
           isOpen={!!showImportDialog}
           onClose={() => setShowImportDialog(null)}
-          onImport={(csvData, dryRun) => triggerImport(showImportDialog, csvData, dryRun)}
+          onImport={(csvData, dryRun, createMissingOrders) => triggerImport(showImportDialog, csvData, dryRun, createMissingOrders)}
           sourceType={profiles?.find(p => p.id === showImportDialog)?.source_type || 'csv'}
           gsheetId={profiles?.find(p => p.id === showImportDialog)?.gsheet_id || undefined}
           gsheetSheetName={profiles?.find(p => p.id === showImportDialog)?.gsheet_sheet_name || undefined}
