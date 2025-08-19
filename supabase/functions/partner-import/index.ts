@@ -61,6 +61,7 @@ interface ImportResult {
     errors: Array<{ row: number; error: string; data?: any }>;
     warnings: Array<{ row: number; warning: string; data?: any }>;
   };
+  unmapped_engineers?: Array<string>; // Add this for blocking imports
   preview?: {
     updates: Array<{ 
       row: number; 
@@ -255,6 +256,60 @@ Deno.serve(async (req) => {
 
     // Generate unique run_id for this import
     const runId = `${importProfile.partners.slug || importProfile.partners.name}-${Date.now()}`;
+    
+    // Create engineer mapping lookup from the import profile
+    const engineerMappingLookup: Record<string, string> = {};
+    if (importProfile.engineer_mapping_rules) {
+      importProfile.engineer_mapping_rules.forEach((rule: any) => {
+        if (rule.partner_identifier && rule.engineer_id) {
+          engineerMappingLookup[rule.partner_identifier] = rule.engineer_id;
+        }
+      });
+    }
+    
+    // Preflight check: Collect all partner engineer identifiers and check for unmapped ones
+    const uniquePartnerEngineers = new Set<string>();
+    const engineerIdentifierColumn = importProfile.column_mappings['engineer_identifier'];
+    
+    if (engineerIdentifierColumn) {
+      dataRows.forEach((row, index) => {
+        const rowData: Record<string, string> = {};
+        headers.forEach((header, headerIndex) => {
+          rowData[header] = row[headerIndex] || '';
+        });
+        
+        const engineerIdentifier = rowData[engineerIdentifierColumn]?.trim();
+        if (engineerIdentifier) {
+          uniquePartnerEngineers.add(engineerIdentifier);
+        }
+      });
+      
+      // Check for unmapped engineers
+      const unmappedEngineers = Array.from(uniquePartnerEngineers).filter(
+        engineerIdentifier => !engineerMappingLookup[engineerIdentifier]
+      );
+      
+      if (unmappedEngineers.length > 0) {
+        return new Response(JSON.stringify({
+          success: false,
+          unmapped_engineers: unmappedEngineers,
+          summary: {
+            processed: 0,
+            inserted_count: 0,
+            updated_count: 0,
+            skipped_count: 0,
+            errors: [{
+              row: 0,
+              error: `Found ${unmappedEngineers.length} unmapped engineers: ${unmappedEngineers.join(', ')}. Please map these engineers before importing.`
+            }],
+            warnings: []
+          }
+        } as ImportResult), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
 
     for (let i = 0; i < dataRows.length; i++) {
       const row = dataRows[i];
@@ -276,6 +331,21 @@ Deno.serve(async (req) => {
             mappedData[ourField] = rowData[partnerField];
           }
         });
+
+        // Resolve engineer ID if engineer identifier is provided
+        let resolvedEngineerId: string | null = null;
+        if (mappedData.engineer_identifier) {
+          const engineerIdentifier = mappedData.engineer_identifier.trim();
+          resolvedEngineerId = engineerMappingLookup[engineerIdentifier] || null;
+          
+          if (!resolvedEngineerId && engineerIdentifier) {
+            result.summary.warnings.push({
+              row: rowNumber,
+              warning: `Engineer identifier "${engineerIdentifier}" not mapped to any internal engineer`,
+              data: mappedData
+            });
+          }
+        }
 
         // Validate required fields for order creation
         if (!mappedData.partner_external_id) {
@@ -342,12 +412,25 @@ Deno.serve(async (req) => {
             orderData.external_confirmation_source = 'partner_jms';
             orderData.scheduled_install_date = parsedDate.toISOString();
             orderData.status_enhanced = 'scheduled';
+            
+            // Assign engineer if we have one mapped
+            if (resolvedEngineerId) {
+              orderData.engineer_id = resolvedEngineerId;
+            }
           } else {
             result.summary.warnings.push({
               row: rowNumber,
               warning: `Invalid scheduled_date format: ${mappedData.scheduled_date}`,
               data: mappedData
             });
+          }
+        } else if (mappedData.scheduled_date && resolvedEngineerId) {
+          // Handle proposed scheduled date with engineer assignment (create job offer)
+          const parsedDate = parseDate(mappedData.scheduled_date);
+          if (parsedDate) {
+            orderData.scheduled_install_date = parsedDate.toISOString();
+            orderData.engineer_id = resolvedEngineerId;
+            orderData.status_enhanced = 'scheduled';
           }
         } else if (!shouldSuppress) {
           orderData.status_enhanced = internalStatus;

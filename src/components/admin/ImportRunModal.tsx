@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 
 interface ImportResult {
   success: boolean;
+  unmapped_engineers?: Array<string>; // Add this to handle blocking
   summary: {
     processed: number;
     inserted_count: number;
@@ -213,29 +214,74 @@ export default function ImportRunModal({
                   Import Results
                 </CardTitle>
                 <CardDescription>
-                  Processed {importResult.summary.processed} rows
+                  {importResult.unmapped_engineers ? (
+                    `Found ${importResult.unmapped_engineers.length} unmapped engineers - import blocked`
+                  ) : (
+                    `Processed ${importResult.summary.processed} rows`
+                  )}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Summary Statistics */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="text-center p-3 bg-blue-50 rounded-lg">
-                    <div className="text-2xl font-bold text-blue-600">{importResult.summary.updated_count}</div>
-                    <div className="text-sm text-blue-600">Updates</div>
+                {/* Unmapped Engineers Blocking UI */}
+                {importResult.unmapped_engineers && (
+                  <div className="space-y-4">
+                    <Alert>
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        <strong>Import Blocked:</strong> The following engineers from your data are not mapped to internal engineers. 
+                        Please go back to the Import Profile settings and map these engineers before running the import.
+                      </AlertDescription>
+                    </Alert>
+                    
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Unmapped Engineers:</Label>
+                      <div className="flex flex-wrap gap-2">
+                        {importResult.unmapped_engineers.map((engineer, index) => (
+                          <Badge key={index} variant="destructive" className="text-xs">
+                            {engineer}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    <Alert>
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        <strong>Next Steps:</strong>
+                        <ol className="mt-2 list-decimal list-inside space-y-1">
+                          <li>Close this dialog</li>
+                          <li>Edit the Import Profile</li>
+                          <li>Add engineer mappings in the "Engineer Mappings" section</li>
+                          <li>Map each partner engineer name to an internal engineer</li>
+                          <li>Save the profile and try importing again</li>
+                        </ol>
+                      </AlertDescription>
+                    </Alert>
                   </div>
-                  <div className="text-center p-3 bg-yellow-50 rounded-lg">
-                    <div className="text-2xl font-bold text-yellow-600">{importResult.summary.skipped_count}</div>
-                    <div className="text-sm text-yellow-600">Skipped</div>
-                  </div>
-                  <div className="text-center p-3 bg-green-50 rounded-lg">
-                    <div className="text-2xl font-bold text-green-600">{importResult.summary.inserted_count}</div>
-                    <div className="text-sm text-green-600">Inserted</div>
-                  </div>
-                  <div className="text-center p-3 bg-red-50 rounded-lg">
-                    <div className="text-2xl font-bold text-red-600">{importResult.summary.errors.length}</div>
-                    <div className="text-sm text-red-600">Errors</div>
-                  </div>
-                </div>
+                )}
+                
+                {/* Normal Import Results */}
+                {!importResult.unmapped_engineers && (
+                  <>
+                    {/* Summary Statistics */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="text-center p-3 bg-blue-50 rounded-lg">
+                        <div className="text-2xl font-bold text-blue-600">{importResult.summary.updated_count}</div>
+                        <div className="text-sm text-blue-600">Updates</div>
+                      </div>
+                      <div className="text-center p-3 bg-yellow-50 rounded-lg">
+                        <div className="text-2xl font-bold text-yellow-600">{importResult.summary.skipped_count}</div>
+                        <div className="text-sm text-yellow-600">Skipped</div>
+                      </div>
+                      <div className="text-center p-3 bg-green-50 rounded-lg">
+                        <div className="text-2xl font-bold text-green-600">{importResult.summary.inserted_count}</div>
+                        <div className="text-sm text-green-600">Inserted</div>
+                      </div>
+                      <div className="text-center p-3 bg-red-50 rounded-lg">
+                        <div className="text-2xl font-bold text-red-600">{importResult.summary.errors.length}</div>
+                        <div className="text-sm text-red-600">Errors</div>
+                      </div>
+                    </div>
 
                 {/* Detailed Preview */}
                 {importResult.preview && (
@@ -380,6 +426,8 @@ export default function ImportRunModal({
                     </AlertDescription>
                   </Alert>
                 )}
+                </>
+              )}
               </CardContent>
             </Card>
           )}
@@ -390,7 +438,7 @@ export default function ImportRunModal({
             </Button>
             <Button 
               onClick={handleImport} 
-              disabled={isImporting || (sourceType === 'csv' && !csvData.trim())}
+              disabled={isImporting || (sourceType === 'csv' && !csvData.trim()) || (importResult?.unmapped_engineers && importResult.unmapped_engineers.length > 0)}
             >
               {isImporting ? (
                 'Processing...'

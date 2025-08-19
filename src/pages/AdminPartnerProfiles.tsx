@@ -50,6 +50,7 @@ export default function AdminPartnerProfiles() {
     status_mappings: {} as Record<string, string>,
     engineer_mapping_rules: [] as Array<any>,
     status_override_rules: {} as Record<string, boolean>,
+    engineer_mappings: {} as Record<string, string>, // Add this for UI convenience
     is_active: true
   });
 
@@ -83,6 +84,12 @@ export default function AdminPartnerProfiles() {
 
   const createProfileMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
+      // Convert engineer_mappings Record to engineer_mapping_rules array
+      const engineerMappingRules = Object.entries(data.engineer_mappings).map(([partnerIdentifier, engineerId]) => ({
+        partner_identifier: partnerIdentifier,
+        engineer_id: engineerId
+      }));
+      
       const { error } = await supabase
         .from('partner_import_profiles')
         .insert([{
@@ -93,7 +100,7 @@ export default function AdminPartnerProfiles() {
           gsheet_sheet_name: data.gsheet_sheet_name || null,
           column_mappings: data.column_mappings,
           status_mappings: data.status_mappings,
-          engineer_mapping_rules: data.engineer_mapping_rules,
+          engineer_mapping_rules: engineerMappingRules,
           status_override_rules: data.status_override_rules,
           is_active: data.is_active
         }]);
@@ -116,6 +123,12 @@ export default function AdminPartnerProfiles() {
     mutationFn: async (data: typeof formData) => {
       if (!editingProfile) throw new Error('No profile selected for update');
       
+      // Convert engineer_mappings Record to engineer_mapping_rules array
+      const engineerMappingRules = Object.entries(data.engineer_mappings).map(([partnerIdentifier, engineerId]) => ({
+        partner_identifier: partnerIdentifier,
+        engineer_id: engineerId
+      }));
+      
       const { error } = await supabase
         .from('partner_import_profiles')
         .update({
@@ -125,7 +138,7 @@ export default function AdminPartnerProfiles() {
           gsheet_sheet_name: data.gsheet_sheet_name || null,
           column_mappings: data.column_mappings,
           status_mappings: data.status_mappings,
-          engineer_mapping_rules: data.engineer_mapping_rules,
+          engineer_mapping_rules: engineerMappingRules,
           status_override_rules: data.status_override_rules,
           is_active: data.is_active
         })
@@ -155,6 +168,7 @@ export default function AdminPartnerProfiles() {
       status_mappings: {},
       engineer_mapping_rules: [],
       status_override_rules: {},
+      engineer_mappings: {},
       is_active: true
     });
     setEditingProfile(null);
@@ -162,6 +176,17 @@ export default function AdminPartnerProfiles() {
 
   const handleEdit = (profile: ImportProfile) => {
     setEditingProfile(profile);
+    
+    // Convert engineer_mapping_rules array to simple Record<string, string>
+    const engineerMappings: Record<string, string> = {};
+    if (profile.engineer_mapping_rules) {
+      profile.engineer_mapping_rules.forEach((rule: any) => {
+        if (rule.partner_identifier && rule.engineer_id) {
+          engineerMappings[rule.partner_identifier] = rule.engineer_id;
+        }
+      });
+    }
+    
     setFormData({
       name: profile.name,
       source_type: profile.source_type,
@@ -171,6 +196,7 @@ export default function AdminPartnerProfiles() {
       status_mappings: profile.status_mappings,
       engineer_mapping_rules: profile.engineer_mapping_rules,
       status_override_rules: profile.status_override_rules,
+      engineer_mappings: engineerMappings,
       is_active: profile.is_active
     });
     setShowCreateDialog(true);
@@ -311,9 +337,11 @@ export default function AdminPartnerProfiles() {
                 columnMappings={formData.column_mappings}
                 statusMappings={formData.status_mappings}
                 statusOverrideRules={formData.status_override_rules}
+                engineerMappings={formData.engineer_mappings}
                 onColumnMappingsChange={(mappings) => setFormData({ ...formData, column_mappings: mappings })}
                 onStatusMappingsChange={(mappings) => setFormData({ ...formData, status_mappings: mappings })}
                 onStatusOverrideRulesChange={(rules) => setFormData({ ...formData, status_override_rules: rules })}
+                onEngineerMappingsChange={(mappings) => setFormData({ ...formData, engineer_mappings: mappings })}
               />
 
               <div className="flex items-center space-x-2">

@@ -17,14 +17,17 @@ interface MappingConfigurationProps {
   columnMappings: Record<string, string>;
   statusMappings: Record<string, string>;
   statusOverrideRules: Record<string, boolean>;
+  engineerMappings: Record<string, string>;
   onColumnMappingsChange: (mappings: Record<string, string>) => void;
   onStatusMappingsChange: (mappings: Record<string, string>) => void;
   onStatusOverrideRulesChange: (rules: Record<string, boolean>) => void;
+  onEngineerMappingsChange: (mappings: Record<string, string>) => void;
 }
 
 const ORDER_FIELDS = [
   { key: 'partner_external_id', label: 'Partner External ID', required: true },
   { key: 'partner_status', label: 'Partner Status', required: true },
+  { key: 'engineer_identifier', label: 'Engineer Identifier', required: false },
   { key: 'scheduled_date', label: 'Scheduled Date', required: false },
   { key: 'sub_partner', label: 'Sub Partner', required: false },
   { key: 'partner_external_url', label: 'Partner External URL', required: false },
@@ -52,9 +55,11 @@ export default function MappingConfiguration({
   columnMappings,
   statusMappings,
   statusOverrideRules,
+  engineerMappings,
   onColumnMappingsChange,
   onStatusMappingsChange,
-  onStatusOverrideRulesChange
+  onStatusOverrideRulesChange,
+  onEngineerMappingsChange
 }: MappingConfigurationProps) {
   const { toast } = useToast();
   // Seed availableColumns with existing mapped values to ensure they're always visible
@@ -63,6 +68,8 @@ export default function MappingConfiguration({
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [newStatusMapping, setNewStatusMapping] = useState({ partner: '', internal: '' });
   const [newOverrideRule, setNewOverrideRule] = useState({ status: '', suppress: false });
+  const [engineers, setEngineers] = useState<Array<{ id: string; name: string; email: string }>>([]);
+  const [newEngineerMapping, setNewEngineerMapping] = useState({ partner: '', internal: '' });
 
   // Auto-load Google Sheet columns when component mounts if gsheetId is present
   useEffect(() => {
@@ -70,6 +77,23 @@ export default function MappingConfiguration({
       fetchGoogleSheetsPreview();
     }
   }, [sourceType, gsheetId]);
+
+  // Load engineers on mount
+  useEffect(() => {
+    const loadEngineers = async () => {
+      const { data, error } = await supabase
+        .from('engineers')
+        .select('id, name, email')
+        .eq('availability', true)
+        .order('name');
+      
+      if (!error && data) {
+        setEngineers(data);
+      }
+    };
+    
+    loadEngineers();
+  }, []);
 
   // Update availableColumns when columnMappings change to ensure mapped values stay visible
   useEffect(() => {
@@ -189,6 +213,22 @@ export default function MappingConfiguration({
     const newRules = { ...statusOverrideRules };
     delete newRules[status];
     onStatusOverrideRulesChange(newRules);
+  };
+
+  const addEngineerMapping = () => {
+    if (!newEngineerMapping.partner || !newEngineerMapping.internal) return;
+    
+    onEngineerMappingsChange({
+      ...engineerMappings,
+      [newEngineerMapping.partner]: newEngineerMapping.internal
+    });
+    setNewEngineerMapping({ partner: '', internal: '' });
+  };
+
+  const removeEngineerMapping = (partnerEngineer: string) => {
+    const newMappings = { ...engineerMappings };
+    delete newMappings[partnerEngineer];
+    onEngineerMappingsChange(newMappings);
   };
 
   return (
@@ -378,6 +418,77 @@ export default function MappingConfiguration({
                   </Button>
                 </div>
               ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Engineer Mappings */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Engineer Mappings</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {/* Add new mapping */}
+            <div className="flex items-end gap-2">
+              <div className="flex-1">
+                <Label>Partner Engineer Name/ID</Label>
+                <Input
+                  value={newEngineerMapping.partner}
+                  onChange={(e) => setNewEngineerMapping({ ...newEngineerMapping, partner: e.target.value })}
+                  placeholder="e.g., John Smith, engineer_123"
+                />
+              </div>
+              <div className="flex-1">
+                <Label>Maps To Engineer</Label>
+                <Select
+                  value={newEngineerMapping.internal}
+                  onValueChange={(value) => setNewEngineerMapping({ ...newEngineerMapping, internal: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select internal engineer" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {engineers.map((engineer) => (
+                      <SelectItem key={engineer.id} value={engineer.id}>
+                        {engineer.name} ({engineer.email})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button onClick={addEngineerMapping} size="sm">
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Existing mappings */}
+            <div className="space-y-2">
+              {Object.entries(engineerMappings).map(([partnerEngineer, internalEngineerId]) => {
+                const engineer = engineers.find(e => e.id === internalEngineerId);
+                return (
+                  <div key={partnerEngineer} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                    <div className="flex items-center gap-4">
+                      <Badge variant="outline">{partnerEngineer}</Badge>
+                      <span>→</span>
+                      <Badge>{engineer ? `${engineer.name} (${engineer.email})` : internalEngineerId}</Badge>
+                    </div>
+                    <Button 
+                      onClick={() => removeEngineerMapping(partnerEngineer)} 
+                      variant="ghost" 
+                      size="sm"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                );
+              })}
+              {Object.keys(engineerMappings).length === 0 && (
+                <div className="text-center py-4 text-muted-foreground">
+                  No engineer mappings configured. Add mappings above to ensure partner engineers are correctly assigned.
+                </div>
+              )}
             </div>
           </div>
         </CardContent>
