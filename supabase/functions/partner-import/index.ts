@@ -406,9 +406,12 @@ serve(async (req) => {
               phone: mappedRow.customer_phone || null,
               address: mappedRow.customer_address_line_1 || null,
               postcode: mappedRow.customer_address_post_code || null,
+              user_id: null, // Partner clients don't have user accounts initially
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
             };
             batchClients.push(clientData);
-            existingClients.set(clientEmail, { id: newClientId, ...clientData });
+            existingClients.set(clientEmail, { id: newClientId, email: clientEmail, full_name: clientData.full_name });
             clientId = newClientId;
           }
 
@@ -493,7 +496,7 @@ serve(async (req) => {
       try {
         if (!dry_run) {
           // Insert clients first and track which ones were actually created
-          const actuallyCreatedClients = new Set();
+          const validClientIds = new Set();
           
           if (batchClients.length > 0) {
             console.log(`Inserting ${batchClients.length} clients...`);
@@ -512,19 +515,28 @@ serve(async (req) => {
               console.log(`Successfully processed ${insertedClients?.length || 0} clients`);
               // Track which clients were actually processed
               insertedClients?.forEach(client => {
-                actuallyCreatedClients.add(client.id);
+                validClientIds.add(client.id);
+              });
+              // Also add existing client IDs that we're using
+              batchClients.forEach(client => {
+                validClientIds.add(client.id);
               });
             }
           }
 
-          // Only insert quotes and orders for clients that were successfully created/found
-          const validQuotes = batchQuotes.filter(quote => 
-            actuallyCreatedClients.has(quote.client_id) || existingClients.has(batchClients.find(c => c.id === quote.client_id)?.email?.toLowerCase())
-          );
-          
-          const validOrders = batchOrders.filter(order => 
-            actuallyCreatedClients.has(order.client_id) || existingClients.has(batchClients.find(c => c.id === order.client_id)?.email?.toLowerCase())
-          );
+          // Add any existing clients from the pre-loaded data that are used in this batch
+          batchOrders.forEach(order => {
+            // Check if this client was already in our existing clients map
+            for (const [email, clientData] of existingClients.entries()) {
+              if (clientData.id === order.client_id) {
+                validClientIds.add(order.client_id);
+              }
+            }
+          });
+
+          // Only insert quotes and orders for clients that are valid
+          const validQuotes = batchQuotes.filter(quote => validClientIds.has(quote.client_id));
+          const validOrders = batchOrders.filter(order => validClientIds.has(order.client_id));
 
           if (validQuotes.length > 0) {
             console.log(`Inserting ${validQuotes.length} quotes...`);
