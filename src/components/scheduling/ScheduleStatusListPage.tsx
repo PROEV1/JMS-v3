@@ -890,106 +890,130 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                         )}
                       </div>
 
-                      <div className="flex gap-2 pt-2 border-t">
-                        {(() => {
-                          const activeOffer = getActiveOfferForOrder(order.id);
-                          
-                          if (title === 'Ready to Book') {
-                            return (
-                              <>
-                                <Button
-                                  size="sm"
-                                  onClick={() => handleConfirmAndSchedule(order.id)}
-                                  className="flex-1 text-xs h-7"
-                                >
-                                  Confirm & Schedule
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleCancelAndRestart(order.id)}
-                                  className="flex-1 text-xs h-7"
-                                >
-                                  Cancel
-                                </Button>
-                              </>
-                            );
-                          } else if (activeOffer && title === 'Date Offered') {
-                            return (
-                              <>
-                                <Button
-                                  size="sm"
-                                  onClick={() => handleAcceptOffer(order.id)}
-                                  className="flex-1 text-xs h-7 bg-green-600 hover:bg-green-700"
-                                >
-                                  Accept
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="destructive"
-                                  onClick={() => handleRejectOffer(order.id)}
-                                  className="flex-1 text-xs h-7"
-                                >
-                                  Reject
-                                </Button>
-                              </>
-                            );
-                          } else if (order.status_enhanced === 'awaiting_install_booking') {
-                            if (activeOffer) {
-                              return (
-                                <>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handleResendOffer(order.id)}
-                                    className="flex-1 text-xs h-7"
-                                  >
-                                    Resend
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handleReleaseOffer(order.id)}
-                                    className="flex-1 text-xs h-7"
-                                  >
-                                    Release
-                                  </Button>
-                                </>
-                              );
-                            } else {
-                              return (
-                                <>
-                                  <Button
-                                    onClick={() => handleSmartAssign(order)}
-                                    size="sm"
-                                    className="flex-1 text-xs h-7"
-                                  >
-                                    Smart Assign
-                                  </Button>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => navigate(`/admin/order/${order.id}`)}
-                                    className="flex-1 text-xs h-7"
-                                  >
-                                    View Job
-                                  </Button>
-                                </>
-                              );
-                            }
-                          } else {
-                            return (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => navigate(`/admin/order/${order.id}`)}
-                                className="w-full text-xs h-7"
-                              >
-                                View Job
-                              </Button>
-                            );
-                          }
-                        })()}
+                       <div className="flex gap-2 pt-2 border-t">
+                         {(() => {
+                           const activeOffer = getActiveOfferForOrder(order.id);
+                           
+                           if (title === 'Ready to Book') {
+                             return (
+                               <>
+                                 <Button
+                                   size="sm"
+                                   onClick={() => handleConfirmAndSchedule(order.id)}
+                                   className="flex-1 text-xs h-7"
+                                 >
+                                   Confirm & Schedule
+                                 </Button>
+                                 <Button
+                                   size="sm"
+                                   variant="outline"
+                                   onClick={() => handleCancelAndRestart(order.id)}
+                                   className="flex-1 text-xs h-7"
+                                 >
+                                   Cancel
+                                 </Button>
+                                 <Button
+                                   size="sm"
+                                   variant="outline"
+                                   onClick={() => navigate(`/admin/order/${order.id}`)}
+                                   className="flex-1 text-xs h-7"
+                                 >
+                                   View Job
+                                 </Button>
+                               </>
+                             );
+                           } else if (activeOffer && title === 'Date Offered') {
+                             return (
+                               <>
+                                 <Button
+                                   size="sm"
+                                   onClick={() => handleAcceptOffer(order.id)}
+                                   className="flex-1 text-xs h-7 bg-green-600 hover:bg-green-700"
+                                 >
+                                   Accept
+                                 </Button>
+                                 <Button
+                                   size="sm"
+                                   variant="destructive"
+                                   onClick={() => handleRejectOffer(order.id)}
+                                   className="flex-1 text-xs h-7"
+                                 >
+                                   Reject
+                                 </Button>
+                                 <Button
+                                   size="sm"
+                                   variant="outline"
+                                   onClick={() => navigate(`/admin/order/${order.id}`)}
+                                   className="flex-1 text-xs h-7"
+                                 >
+                                   View Job
+                                 </Button>
+                               </>
+                             );
+                           } else if (order.status_enhanced === 'awaiting_install_booking') {
+                             if (activeOffer) {
+                               return (
+                                 <>
+                                   <Button
+                                     size="sm"
+                                     variant="outline"
+                                     onClick={() => handleResendOffer(order.id)}
+                                     className="flex-1 text-xs h-7"
+                                   >
+                                     Resend
+                                   </Button>
+                                   <Button
+                                     size="sm"
+                                     variant="outline"
+                                     onClick={() => handleReleaseOffer(order.id)}
+                                     className="flex-1 text-xs h-7"
+                                   >
+                                     Release
+                                   </Button>
+                                   <Button
+                                     size="sm"
+                                     variant="outline"
+                                     onClick={() => navigate(`/admin/order/${order.id}`)}
+                                     className="flex-1 text-xs h-7"
+                                   >
+                                     View Job
+                                   </Button>
+                                 </>
+                               );
+                             } else {
+                               return (
+                                 <>
+                                   <Button
+                                     onClick={() => handleSmartAssign(order)}
+                                     size="sm"
+                                     className="flex-1 text-xs h-7"
+                                   >
+                                     Smart Assign
+                                   </Button>
+                                   <Button
+                                     variant="outline"
+                                     size="sm"
+                                     onClick={() => navigate(`/admin/order/${order.id}`)}
+                                     className="flex-1 text-xs h-7"
+                                   >
+                                     View Job
+                                   </Button>
+                                 </>
+                               );
+                             }
+                           } else {
+                             return (
+                               <Button
+                                 size="sm"
+                                 variant="outline"
+                                 onClick={() => navigate(`/admin/order/${order.id}`)}
+                                 className="w-full text-xs h-7"
+                               >
+                                 View Job
+                               </Button>
+                             );
+                           }
+                         })()}
                       </div>
                     </div>
                   </CardContent>
