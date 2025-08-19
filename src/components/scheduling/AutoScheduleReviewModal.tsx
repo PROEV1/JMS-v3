@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -81,18 +81,35 @@ export function AutoScheduleReviewModal({
   const [progressTotal, setProgressTotal] = useState(0);
   // Cache for workload lookups to speed up generation
   const [workloadCache, setWorkloadCache] = useState<Map<string, number>>(new Map());
+  // Ref to prevent concurrent generation runs
+  const isGeneratingRef = useRef(false);
+  // Snapshot of orders when generation starts (to prevent flickering from prop changes)
+  const ordersSnapshotRef = useRef<Order[]>([]);
 
   useEffect(() => {
-    if (isOpen && orders.length > 0 && !generated) {
+    if (isOpen && orders.length > 0 && !generated && !isGeneratingRef.current) {
       generateProposals();
     }
   }, [isOpen, orders, generated]);
 
   const generateProposals = async () => {
+    // Prevent concurrent runs
+    if (isGeneratingRef.current) {
+      console.log('⚠️ Generation already in progress, ignoring new request');
+      return;
+    }
+    
+    isGeneratingRef.current = true;
     setLoading(true);
+    setGenerated(true); // Set early to prevent new triggers
+    
+    // Capture orders snapshot to prevent flickering from prop changes
+    const ordersSnapshot = [...orders];
+    ordersSnapshotRef.current = ordersSnapshot;
+    
     setProgressCurrent(0);
-    setProgressTotal(orders.length);
-    console.log('Starting intelligent batch scheduling for', orders.length, 'orders with virtual capacity tracking');
+    setProgressTotal(ordersSnapshot.length);
+    console.log('Starting intelligent batch scheduling for', ordersSnapshot.length, 'orders with virtual capacity tracking');
     
     try {
       const settings = await getSchedulingSettings();
@@ -105,12 +122,12 @@ export function AutoScheduleReviewModal({
       
       console.log('Loaded', allEngineers.length, 'engineers and settings:', settings);
       
-      for (let orderIndex = 0; orderIndex < orders.length; orderIndex++) {
-        const order = orders[orderIndex];
+      for (let orderIndex = 0; orderIndex < ordersSnapshot.length; orderIndex++) {
+        const order = ordersSnapshot[orderIndex];
         setProgressCurrent(orderIndex + 1);
         
         try {
-          console.log(`\n🔄 Processing order ${order.order_number} (${orderIndex + 1}/${orders.length})`);
+          console.log(`\n🔄 Processing order ${order.order_number} (${orderIndex + 1}/${ordersSnapshot.length})`);
           
           // Get all recommendations for this order
           const recommendations = await getSmartEngineerRecommendations(order, order.postcode, {
@@ -287,7 +304,7 @@ export function AutoScheduleReviewModal({
         }
       }
 
-      console.log(`\n🎯 Batch scheduling complete: ${proposals.length}/${orders.length} orders scheduled`);
+      console.log(`\n🎯 Batch scheduling complete: ${proposals.length}/${ordersSnapshot.length} orders scheduled`);
       console.log('Virtual capacity reservations:', Array.from(ledger.values()));
       console.log('Workload cache hits:', cache.size, 'unique engineer-date combinations cached');
 
@@ -296,15 +313,16 @@ export function AutoScheduleReviewModal({
       setProposedAssignments(proposals);
       setUnscheduledOrders(unscheduled);
       setWorkloadCache(cache);
-      setGenerated(true);
       
     } catch (error) {
       console.error('Error in intelligent batch scheduling:', error);
       toast.error('Failed to generate intelligent scheduling proposals');
+      setGenerated(false); // Reset on error to allow retry
     } finally {
       setLoading(false);
       setProgressCurrent(0);
       setProgressTotal(0);
+      isGeneratingRef.current = false; // Always reset the guard
     }
   };
 
