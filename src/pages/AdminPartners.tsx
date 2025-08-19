@@ -11,6 +11,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Edit, Trash2, FileSpreadsheet, Settings } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 
 interface Partner {
@@ -30,7 +31,7 @@ export default function AdminPartners() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [editingPartner, setEditingPartner] = useState<Partner | null>(null);
-  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showDialog, setShowDialog] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     slug: '',
@@ -70,7 +71,7 @@ export default function AdminPartners() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['partners'] });
-      setShowCreateDialog(false);
+      setShowDialog(false);
       resetForm();
       toast({ title: 'Partner created successfully' });
     },
@@ -98,6 +99,7 @@ export default function AdminPartners() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['partners'] });
       setEditingPartner(null);
+      setShowDialog(false);
       resetForm();
       toast({ title: 'Partner updated successfully' });
     },
@@ -127,7 +129,32 @@ export default function AdminPartners() {
       client_payment_required: partner.client_payment_required,
       client_agreement_required: partner.client_agreement_required
     });
+    setShowDialog(true);
   };
+
+  const handleCreate = () => {
+    resetForm();
+    setEditingPartner(null);
+    setShowDialog(true);
+  };
+
+  const deletePartnerMutation = useMutation({
+    mutationFn: async (partnerId: string) => {
+      const { error } = await supabase
+        .from('partners')
+        .delete()
+        .eq('id', partnerId);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['partners'] });
+      toast({ title: 'Partner deleted successfully' });
+    },
+    onError: (error) => {
+      toast({ title: 'Error deleting partner', description: error.message, variant: 'destructive' });
+    }
+  });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -138,6 +165,10 @@ export default function AdminPartners() {
     }
   };
 
+  const handleDelete = (partnerId: string) => {
+    deletePartnerMutation.mutate(partnerId);
+  };
+
   if (isLoading) {
     return <div className="p-6">Loading partners...</div>;
   }
@@ -146,13 +177,12 @@ export default function AdminPartners() {
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Partner Management</h1>
-        <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-          <DialogTrigger asChild>
-            <Button onClick={() => { resetForm(); setEditingPartner(null); }}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Partner
-            </Button>
-          </DialogTrigger>
+        <Button onClick={handleCreate}>
+          <Plus className="h-4 w-4 mr-2" />
+          Add Partner
+        </Button>
+        
+        <Dialog open={showDialog} onOpenChange={setShowDialog}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>{editingPartner ? 'Edit Partner' : 'Create Partner'}</DialogTitle>
@@ -218,7 +248,7 @@ export default function AdminPartners() {
                 <Button 
                   type="button" 
                   variant="outline" 
-                  onClick={() => editingPartner ? setEditingPartner(null) : setShowCreateDialog(false)}
+                  onClick={() => setShowDialog(false)}
                 >
                   Cancel
                 </Button>
@@ -266,86 +296,37 @@ export default function AdminPartners() {
                   <Settings className="h-4 w-4 mr-1" />
                   Profiles
                 </Button>
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleEdit(partner)}
-                    >
-                      <Edit className="h-4 w-4" />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleEdit(partner)}
+                >
+                  <Edit className="h-4 w-4" />
+                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      <Trash2 className="h-4 w-4" />
                     </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Edit Partner</DialogTitle>
-                    </DialogHeader>
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                      <div>
-                        <Label htmlFor="edit-name">Partner Name</Label>
-                        <Input
-                          id="edit-name"
-                          value={formData.name}
-                          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                          required
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="edit-slug">Slug (optional)</Label>
-                        <Input
-                          id="edit-slug"
-                          value={formData.slug}
-                          onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
-                          placeholder="partner-name"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="edit-base_url">Base URL (optional)</Label>
-                        <Input
-                          id="edit-base_url"
-                          value={formData.base_url}
-                          onChange={(e) => setFormData({ ...formData, base_url: e.target.value })}
-                          placeholder="https://partner-jms.com"
-                        />
-                      </div>
-                      
-                      <div className="space-y-3">
-                        <h3 className="text-sm font-medium">Client Requirements</h3>
-                        <div className="flex items-center space-x-2">
-                          <Switch
-                            id="edit-client_payment_required"
-                            checked={formData.client_payment_required}
-                            onCheckedChange={(checked) => setFormData({ ...formData, client_payment_required: checked })}
-                          />
-                          <Label htmlFor="edit-client_payment_required">Client Payment Required</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Switch
-                            id="edit-client_agreement_required"
-                            checked={formData.client_agreement_required}
-                            onCheckedChange={(checked) => setFormData({ ...formData, client_agreement_required: checked })}
-                          />
-                          <Label htmlFor="edit-client_agreement_required">Client Agreement Required</Label>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          id="edit-is_active"
-                          checked={formData.is_active}
-                          onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
-                        />
-                        <Label htmlFor="edit-is_active">Active</Label>
-                      </div>
-                      <div className="flex justify-end space-x-2">
-                        <Button type="button" variant="outline" onClick={() => setEditingPartner(null)}>
-                          Cancel
-                        </Button>
-                        <Button type="submit">Update</Button>
-                      </div>
-                    </form>
-                  </DialogContent>
-                </Dialog>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete Partner</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Are you sure you want to delete "{partner.name}"? This action cannot be undone and will remove all associated data.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction 
+                        onClick={() => handleDelete(partner.id)}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        Delete
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </div>
             </CardHeader>
           </Card>
