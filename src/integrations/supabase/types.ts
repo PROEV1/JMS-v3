@@ -1833,6 +1833,10 @@ export type Database = {
             }
         Returns: Database["public"]["Enums"]["order_status_enhanced"]
       }
+      calculate_order_status_with_offers: {
+        Args: { order_row: Database["public"]["Tables"]["orders"]["Row"] }
+        Returns: Database["public"]["Enums"]["order_status_enhanced"]
+      }
       detect_scheduling_conflicts: {
         Args: { p_order_id: string }
         Returns: Json
