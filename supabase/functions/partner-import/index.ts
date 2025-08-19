@@ -508,7 +508,7 @@ Deno.serve(async (req) => {
                 clientId = newClient.id;
               }
 
-              // 2. Create quote
+              // 2. Create quote (tagged as partner import)
               const { data: newQuote, error: quoteError } = await supabaseAdmin
                 .from('quotes')
                 .insert({
@@ -518,7 +518,9 @@ Deno.serve(async (req) => {
                   materials_cost: 0,
                   install_cost: 0,
                   extras_cost: 0,
-                  status: 'accepted'
+                  status: 'accepted',
+                  quote_template: 'partner_import',
+                  notes: `Auto-generated placeholder quote for partner import. Partner: ${importProfile.partner_id}, Run: ${runId}`
                 })
                 .select('id')
                 .single();

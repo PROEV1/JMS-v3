@@ -48,6 +48,7 @@ export default function AdminQuotes() {
             email
           )
         `)
+        .neq('quote_template', 'partner_import') // Hide partner import placeholder quotes
         .order('created_at', { ascending: false });
 
       if (error) throw error;

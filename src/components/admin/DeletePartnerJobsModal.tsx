@@ -25,6 +25,8 @@ interface DeleteStats {
   order_completion_checklist: number;
   engineer_uploads: number;
   order_payments: number;
+  quotes: number;
+  clients: number;
 }
 
 interface ImportRun {
@@ -245,7 +247,7 @@ export function DeletePartnerJobsModal({ isOpen, onClose, partnerId, partnerName
                 </AlertDescription>
               </Alert>
 
-              <div className="grid grid-cols-2 gap-4 text-sm">
+               <div className="grid grid-cols-3 gap-4 text-sm">
                 <div className="space-y-2">
                   <div className="flex justify-between">
                     <span>Orders:</span>
@@ -272,6 +274,16 @@ export function DeletePartnerJobsModal({ isOpen, onClose, partnerId, partnerName
                   <div className="flex justify-between">
                     <span>Payments:</span>
                     <span>{previewStats.order_payments}</span>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span>Placeholder Quotes:</span>
+                    <span>{previewStats.quotes || 0}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Orphaned Clients:</span>
+                    <span>{previewStats.clients || 0}</span>
                   </div>
                 </div>
               </div>

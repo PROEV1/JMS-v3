@@ -65,7 +65,7 @@ export default function ImportRunModal({
 }: ImportRunModalProps) {
   const [csvData, setCsvData] = useState('');
   const [dryRun, setDryRun] = useState(true);
-  const [createMissingOrders, setCreateMissingOrders] = useState(true);
+  const [createMissingOrders, setCreateMissingOrders] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
 

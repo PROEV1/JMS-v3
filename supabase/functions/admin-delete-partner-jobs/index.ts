@@ -19,6 +19,8 @@ interface DeleteStats {
   order_completion_checklist: number
   engineer_uploads: number
   order_payments: number
+  quotes: number
+  clients: number
 }
 
 Deno.serve(async (req) => {
@@ -113,7 +115,7 @@ Deno.serve(async (req) => {
     // Build filter conditions
     let orderQuery = supabaseAdmin
       .from('orders')
-      .select('id')
+        .select('id, quote_id')
       .eq('is_partner_job', true)
       .eq('partner_id', partner_id)
 
@@ -136,39 +138,67 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           message: 'No matching orders found',
-          stats: { orders: 0, job_offers: 0, order_activity: 0, order_completion_checklist: 0, engineer_uploads: 0, order_payments: 0 }
+          stats: { orders: 0, job_offers: 0, order_activity: 0, order_completion_checklist: 0, engineer_uploads: 0, order_payments: 0, quotes: 0, clients: 0 }
         }),
         { status: 200, headers: corsHeaders }
       )
     }
 
     const orderIds = targetOrders.map(o => o.id)
-    console.log(`Found ${orderIds.length} matching orders`)
+    console.log(`Found ${targetOrders.length} orders to process`)
 
-    // Count related records
-    const stats: DeleteStats = {
-      orders: orderIds.length,
-      job_offers: 0,
-      order_activity: 0,
-      order_completion_checklist: 0,
-      engineer_uploads: 0,
-      order_payments: 0
+    // Get quote IDs for partner import quotes to delete
+    const { data: partnerQuotes } = await supabaseAdmin
+      .from('quotes')
+      .select('id, client_id')
+      .eq('quote_template', 'partner_import')
+      .in('id', targetOrders.map(o => o.quote_id).filter(Boolean))
+
+    const quoteIds = partnerQuotes?.map(q => q.id) || []
+    const clientIdsFromQuotes = partnerQuotes?.map(q => q.client_id) || []
+
+    // Find orphaned clients (user_id is null and no remaining orders/quotes/payments)
+    const { data: potentialOrphanClients } = await supabaseAdmin
+      .from('clients')
+      .select('id')
+      .is('user_id', null)
+      .in('id', clientIdsFromQuotes)
+
+    let orphanedClients: string[] = []
+    if (potentialOrphanClients) {
+      for (const client of potentialOrphanClients) {
+        // Check if client will have any remaining orders after deletion
+        const [remainingOrders, remainingQuotes, remainingPayments] = await Promise.all([
+          supabaseAdmin.from('orders').select('id', { count: 'exact', head: true }).eq('client_id', client.id).not('id', 'in', `(${orderIds.join(',')})`),
+          supabaseAdmin.from('quotes').select('id', { count: 'exact', head: true }).eq('client_id', client.id).not('id', 'in', `(${quoteIds.join(',')})`),
+          supabaseAdmin.from('payments').select('id', { count: 'exact', head: true }).eq('client_id', client.id)
+        ])
+        
+        if ((remainingOrders.count || 0) === 0 && (remainingQuotes.count || 0) === 0 && (remainingPayments.count || 0) === 0) {
+          orphanedClients.push(client.id)
+        }
+      }
     }
 
-    // Count related records
+    // Count related records for stats
     const [offersCount, activityCount, checklistCount, uploadsCount, paymentsCount] = await Promise.all([
       supabaseAdmin.from('job_offers').select('id', { count: 'exact', head: true }).in('order_id', orderIds),
       supabaseAdmin.from('order_activity').select('id', { count: 'exact', head: true }).in('order_id', orderIds),
       supabaseAdmin.from('order_completion_checklist').select('id', { count: 'exact', head: true }).in('order_id', orderIds),
       supabaseAdmin.from('engineer_uploads').select('id', { count: 'exact', head: true }).in('order_id', orderIds),
-      supabaseAdmin.from('order_payments').select('id', { count: 'exact', head: true }).in('order_id', orderIds),
+      supabaseAdmin.from('order_payments').select('id', { count: 'exact', head: true }).in('order_id', orderIds)
     ])
 
-    stats.job_offers = offersCount.count || 0
-    stats.order_activity = activityCount.count || 0
-    stats.order_completion_checklist = checklistCount.count || 0
-    stats.engineer_uploads = uploadsCount.count || 0
-    stats.order_payments = paymentsCount.count || 0
+    const stats: DeleteStats = {
+      orders: targetOrders.length,
+      job_offers: offersCount.count || 0,
+      order_activity: activityCount.count || 0,
+      order_completion_checklist: checklistCount.count || 0,
+      engineer_uploads: uploadsCount.count || 0,
+      order_payments: paymentsCount.count || 0,
+      quotes: quoteIds.length,
+      clients: orphanedClients.length
+    }
 
     if (dry_run) {
       console.log('Dry run complete:', stats)
@@ -193,7 +223,9 @@ Deno.serve(async (req) => {
       order_activity: 0,
       order_completion_checklist: 0,
       engineer_uploads: 0,
-      order_payments: 0
+      order_payments: 0,
+      quotes: 0,
+      clients: 0
     }
 
     for (let i = 0; i < orderIds.length; i += BATCH_SIZE) {
@@ -233,6 +265,40 @@ Deno.serve(async (req) => {
           { status: 500, headers: corsHeaders }
         )
       }
+    }
+
+    // Delete partner import quotes
+    if (quoteIds.length > 0) {
+      const { error: quotesError } = await supabaseAdmin
+        .from('quotes')
+        .delete()
+        .in('id', quoteIds)
+      
+      if (quotesError) {
+        console.error('Error deleting quotes:', quotesError)
+        return new Response(
+          JSON.stringify({ error: 'Failed to delete quotes', details: quotesError.message }),
+          { status: 500, headers: corsHeaders }
+        )
+      }
+      deletedStats.quotes = quoteIds.length
+    }
+
+    // Delete orphaned clients
+    if (orphanedClients.length > 0) {
+      const { error: clientsError } = await supabaseAdmin
+        .from('clients')
+        .delete()
+        .in('id', orphanedClients)
+      
+      if (clientsError) {
+        console.error('Error deleting clients:', clientsError)
+        return new Response(
+          JSON.stringify({ error: 'Failed to delete clients', details: clientsError.message }),
+          { status: 500, headers: corsHeaders }
+        )
+      }
+      deletedStats.clients = orphanedClients.length
     }
 
     // Log the action
