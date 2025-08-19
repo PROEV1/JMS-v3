@@ -95,9 +95,38 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
     let text = status;
 
     switch (status) {
+      case 'needs_quote_acceptance':
+        variant = "outline";
+        text = "Needs Quote Acceptance";
+        break;
+      case 'awaiting_payment':
+        variant = "destructive";
+        text = "Awaiting Payment";
+        break;
+      case 'awaiting_agreement':
+        variant = "destructive";
+        text = "Awaiting Agreement";
+        break;
+      case 'needs_scheduling':
       case 'awaiting_install_booking':
         variant = "destructive";
         text = "Needs Scheduling";
+        break;
+      case 'date_offered':
+        variant = "outline";
+        text = "Date Offered";
+        break;
+      case 'date_accepted':
+        variant = "default";
+        text = "Ready to Book";
+        break;
+      case 'date_rejected':
+        variant = "destructive";
+        text = "Date Rejected";
+        break;
+      case 'offer_expired':
+        variant = "destructive";
+        text = "Offer Expired";
         break;
       case 'scheduled':
         variant = "default";
@@ -107,9 +136,17 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
         variant = "secondary";
         text = "In Progress";
         break;
+      case 'install_completed_pending_qa':
+        variant = "outline";
+        text = "Pending QA";
+        break;
       case 'completed':
         variant = "default";
         text = "Completed";
+        break;
+      default:
+        variant = "secondary";
+        text = status || "Unknown";
         break;
     }
 
