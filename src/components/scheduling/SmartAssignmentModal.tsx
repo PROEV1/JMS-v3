@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -11,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Order, Engineer, getSmartEngineerRecommendations, getOrderEstimatedHours } from '@/utils/schedulingUtils';
 import { getBestPostcode } from '@/utils/postcodeUtils';
-import { MapPin, Clock, User, AlertTriangle, CheckCircle, Send, Calendar, Copy, ExternalLink } from 'lucide-react';
+import { MapPin, Clock, User, CheckCircle, Send, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -49,8 +48,16 @@ export function SmartAssignmentModal({
   const [suggestions, setSuggestions] = useState<EngineerSuggestion[]>([]);
   const [loading, setLoading] = useState(false);
   const [processing, setProcessing] = useState(false);
-  const [offerSent, setOfferSent] = useState(false);
-  const [offerUrl, setOfferUrl] = useState('');
+
+  // Reset state when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      setSelectedDate(order.scheduled_install_date ? new Date(order.scheduled_install_date) : undefined);
+      setSelectedEngineerId(order.engineer_id || '');
+      setSuggestions([]);
+      setProcessing(false);
+    }
+  }, [isOpen, order]);
 
   // Load smart suggestions when modal opens
   useEffect(() => {
@@ -100,8 +107,18 @@ export function SmartAssignmentModal({
       }
 
       toast.success('Offer sent to client successfully');
-      setOfferSent(true);
-      setOfferUrl(data.offer_url);
+      
+      // Call onAssign to refresh parent data
+      await onAssign(selectedEngineerId, selectedDate.toISOString(), 'send_offer');
+      
+      // Trigger refresh for status tiles
+      window.dispatchEvent(new CustomEvent('scheduling:refresh'));
+      
+      // Close modal after successful send
+      setTimeout(() => {
+        onClose();
+      }, 300);
+      
     } catch (error) {
       console.error('Error sending offer:', error);
       toast.error('Failed to send offer to client');
@@ -125,20 +142,7 @@ export function SmartAssignmentModal({
       console.error('Error booking installation:', error);
       toast.error('Failed to book installation');
     } finally {
-    setProcessing(false);
-    }
-  };
-
-  const copyOfferUrl = () => {
-    if (offerUrl) {
-      navigator.clipboard.writeText(offerUrl);
-      toast.success('Offer URL copied to clipboard');
-    }
-  };
-
-  const openOfferUrl = () => {
-    if (offerUrl) {
-      window.open(offerUrl, '_blank');
+      setProcessing(false);
     }
   };
 
@@ -262,59 +266,32 @@ export function SmartAssignmentModal({
           </Card>
 
           {/* Action Buttons */}
-          {offerSent ? (
-            <div className="space-y-4">
-              <div className="bg-success/10 border border-success/20 rounded-lg p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <CheckCircle className="w-5 h-5 text-success" />
-                  <h4 className="font-medium text-success">Offer Sent Successfully</h4>
-                </div>
-                <p className="text-sm text-muted-foreground mb-3">
-                  The installation offer has been sent to the client.
-                </p>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={copyOfferUrl}>
-                    <Copy className="w-4 h-4 mr-2" />
-                    Copy Link
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={openOfferUrl}>
-                    <ExternalLink className="w-4 h-4 mr-2" />
-                    Open Link
-                  </Button>
-                </div>
-              </div>
-              <div className="flex justify-end">
-                <Button onClick={onClose}>Close</Button>
-              </div>
-            </div>
-          ) : (
-            <div className="flex justify-between">
-              <Button variant="outline" onClick={onClose} disabled={processing}>
-                Cancel
+          <div className="flex justify-between">
+            <Button variant="outline" onClick={onClose} disabled={processing}>
+              Cancel
+            </Button>
+            
+            <div className="flex gap-3">
+              <Button 
+                variant="outline"
+                onClick={handleSendToClient}
+                disabled={!selectedEngineerId || !selectedDate || processing}
+                className="flex items-center gap-2"
+              >
+                <Send className="w-4 h-4" />
+                {processing ? 'Sending...' : 'Send to Client'}
               </Button>
               
-              <div className="flex gap-3">
-                <Button 
-                  variant="outline"
-                  onClick={handleSendToClient}
-                  disabled={!selectedEngineerId || !selectedDate || processing}
-                  className="flex items-center gap-2"
-                >
-                  <Send className="w-4 h-4" />
-                  {processing ? 'Sending...' : 'Send to Client'}
-                </Button>
-                
-                <Button 
-                  onClick={handleConfirmAndBook}
-                  disabled={!selectedEngineerId || !selectedDate || processing}
-                  className="flex items-center gap-2"
-                >
-                  <Calendar className="w-4 h-4" />
-                  {processing ? 'Booking...' : 'Confirm & Book'}
-                </Button>
-              </div>
+              <Button 
+                onClick={handleConfirmAndBook}
+                disabled={!selectedEngineerId || !selectedDate || processing}
+                className="flex items-center gap-2"
+              >
+                <Calendar className="w-4 h-4" />
+                {processing ? 'Booking...' : 'Confirm & Book'}
+              </Button>
             </div>
-          )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>
