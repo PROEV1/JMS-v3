@@ -25,7 +25,7 @@ interface UserProfile {
 }
 
 export default function AdminUserDetail() {
-  const { userId } = useParams<{ userId: string }>();
+  const { id: userId } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { canManageUsers, loading: permissionsLoading } = usePermissions();
   const [user, setUser] = useState<UserProfile | null>(null);

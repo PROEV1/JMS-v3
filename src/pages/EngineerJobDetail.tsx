@@ -66,7 +66,7 @@ interface EngineerUpload {
 }
 
 export default function EngineerJobDetail() {
-  const { jobId } = useParams();
+  const { id: jobId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();

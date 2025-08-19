@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -23,6 +24,7 @@ interface ScheduleStatusListPageProps {
 }
 
 export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, showAutoSchedule = false }: ScheduleStatusListPageProps) {
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showSendOffer, setShowSendOffer] = useState(false);
@@ -618,12 +620,12 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                            // No active offer - show normal actions
                            return (
                               <div className="flex gap-2">
-                                 <Button
-                                   size="sm"
-                                   variant="outline"
-                                   onClick={() => window.open(`/admin/order/${order.id}`, '_blank')}
-                                   className="text-xs"
-                                 >
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => navigate(`/admin/order/${order.id}`)}
+                                    className="text-xs"
+                                  >
                                   <Eye className="w-4 h-4 mr-1" />
                                   View Job
                                 </Button>
@@ -652,12 +654,12 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                           // For Date Rejected - always show Smart Assign and working View Job link
                           return (
                             <div className="flex gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => window.open(`/admin/order/${order.id}`, '_blank')}
-                                className="text-xs"
-                              >
+                               <Button
+                                 size="sm"
+                                 variant="outline"
+                                 onClick={() => navigate(`/admin/order/${order.id}`)}
+                                 className="text-xs"
+                               >
                                 <Eye className="w-4 h-4 mr-1" />
                                 View Job
                               </Button>
@@ -683,12 +685,12 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                           );
                         } else {
                           return (
-                            <Button 
-                              size="sm" 
-                              variant="outline" 
-                              className="text-xs"
-                              onClick={() => window.open(`/admin/order/${order.id}`, '_blank')}
-                            >
+                             <Button 
+                               size="sm" 
+                               variant="outline" 
+                               className="text-xs"
+                               onClick={() => navigate(`/admin/order/${order.id}`)}
+                             >
                               <Eye className="w-4 h-4 mr-1" />
                               View Job
                             </Button>

@@ -72,7 +72,7 @@ interface ClientOrder {
 }
 
 export default function EnhancedClientOrderView() {
-  const { orderId } = useParams();
+  const { id: orderId } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [order, setOrder] = useState<ClientOrder | null>(null);

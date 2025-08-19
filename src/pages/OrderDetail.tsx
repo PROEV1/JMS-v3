@@ -97,7 +97,7 @@ interface PaymentConfig {
 }
 
 export default function OrderDetail() {
-  const { orderId } = useParams();
+  const { id: orderId } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { role: userRole, loading: roleLoading } = useUserRole();

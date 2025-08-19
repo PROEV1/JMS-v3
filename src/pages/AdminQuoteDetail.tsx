@@ -40,7 +40,7 @@ interface Quote {
 }
 
 export default function AdminQuoteDetail() {
-  const { quoteId } = useParams<{ quoteId: string }>();
+  const { id: quoteId } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [quote, setQuote] = useState<Quote | null>(null);
   const [loading, setLoading] = useState(true);

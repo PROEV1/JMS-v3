@@ -15,7 +15,7 @@ interface Client {
 }
 
 export default function ClientProfilePage() {
-  const { clientId } = useParams<{ clientId: string }>();
+  const { id: clientId } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [client, setClient] = useState<Client | null>(null);
