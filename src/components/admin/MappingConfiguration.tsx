@@ -575,9 +575,9 @@ export default function MappingConfiguration({
                         <span className="text-muted-foreground">→</span>
                         <div className="min-w-48">
                           <Select
-                            value={engineerMappings[sheetEngineer] || ''}
+                            value={engineerMappings[sheetEngineer] || "__none__"}
                             onValueChange={(value) => {
-                              if (value) {
+                              if (value && value !== "__none__") {
                                 onEngineerMappingsChange({
                                   ...engineerMappings,
                                   [sheetEngineer]: value
@@ -593,7 +593,7 @@ export default function MappingConfiguration({
                               <SelectValue placeholder="Select engineer" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="">-- Not mapped --</SelectItem>
+                              <SelectItem value="__none__">-- Not mapped --</SelectItem>
                               {engineers.map((engineer) => (
                                 <SelectItem key={engineer.id} value={engineer.id}>
                                   {engineer.name} ({engineer.email})
