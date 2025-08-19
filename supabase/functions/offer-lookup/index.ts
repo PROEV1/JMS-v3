@@ -19,31 +19,39 @@ serve(async (req: Request) => {
   try {
     let token;
 
-    // Try to get token from request body first (for supabase.functions.invoke calls)
+    console.log('Offer lookup called with method:', req.method);
+    console.log('Request URL:', req.url);
+
+    // Handle both POST (from supabase.functions.invoke) and GET (direct URL access)
     if (req.method === 'POST') {
       try {
         const body = await req.json();
         token = body.token;
-      } catch {
-        // If JSON parsing fails, continue to try URL path
+        console.log('Token from POST body:', token);
+      } catch (e) {
+        console.log('No JSON body or parse error:', e);
       }
     }
 
-    // If no token from body, try URL path (for direct URL calls)
+    // If no token from body or if GET request, try URL path
     if (!token) {
       const url = new URL(req.url);
-      const pathSegments = url.pathname.split('/');
-      token = pathSegments[pathSegments.length - 1];
+      const pathSegments = url.pathname.split('/').filter(Boolean);
+      console.log('Path segments:', pathSegments);
       
-      // Don't use the function name as token
-      if (token === 'offer-lookup') {
-        token = undefined;
+      // Look for token in the path - it should be the last segment
+      if (pathSegments.length > 0) {
+        token = pathSegments[pathSegments.length - 1];
+        // Don't use the function name as token
+        if (token === 'offer-lookup') {
+          token = undefined;
+        }
       }
+      console.log('Token from URL path:', token);
     }
 
-    console.log('Token received:', token);
-
     if (!token) {
+      console.log('No token found in request');
       return new Response(
         JSON.stringify({ error: 'Token required' }),
         {
@@ -52,6 +60,8 @@ serve(async (req: Request) => {
         }
       );
     }
+
+    console.log('Looking up offer with token:', token);
 
     // Look up the offer by client token
     const { data: jobOffer, error: offerError } = await supabase
@@ -68,7 +78,10 @@ serve(async (req: Request) => {
       .eq('client_token', token)
       .single();
 
+    console.log('Offer lookup result:', { jobOffer, offerError });
+
     if (offerError || !jobOffer) {
+      console.log('Offer not found, error:', offerError);
       return new Response(
         JSON.stringify({ 
           error: 'Offer not found or expired',
