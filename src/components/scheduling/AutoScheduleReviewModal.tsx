@@ -48,6 +48,12 @@ interface BatchCapacityInfo {
   reservedInBatch: number;
 }
 
+interface UnscheduledOrder {
+  order: Order;
+  reason: string;
+  details?: string;
+}
+
 interface AutoScheduleReviewModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -64,6 +70,7 @@ export function AutoScheduleReviewModal({
   onOffersSubmitted
 }: AutoScheduleReviewModalProps) {
   const [proposedAssignments, setProposedAssignments] = useState<ProposedAssignment[]>([]);
+  const [unscheduledOrders, setUnscheduledOrders] = useState<UnscheduledOrder[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [generated, setGenerated] = useState(false);
@@ -91,6 +98,7 @@ export function AutoScheduleReviewModal({
       const settings = await getSchedulingSettings();
       const allEngineers = await getAllEngineersForScheduling();
       const proposals: ProposedAssignment[] = [];
+      const unscheduled: UnscheduledOrder[] = [];
       const ledger = new Map<string, VirtualLedgerEntry>();
       const capacityInfo: BatchCapacityInfo[] = [];
       const cache = new Map<string, number>(); // Cache for workload lookups
@@ -113,6 +121,11 @@ export function AutoScheduleReviewModal({
 
           if (!recommendations.recommendations || recommendations.recommendations.length === 0) {
             console.log('❌ No recommendations found for order:', order.order_number);
+            unscheduled.push({
+              order,
+              reason: 'No available engineers',
+              details: 'No engineers found that can serve this postcode or have availability'
+            });
             continue;
           }
 
@@ -235,6 +248,38 @@ export function AutoScheduleReviewModal({
             });
           } else {
             console.log(`❌ No suitable candidate found for order ${order.order_number} after virtual capacity check`);
+            
+            // Determine the most specific reason why this order couldn't be scheduled
+            let reason = 'No capacity available';
+            let details = '';
+            
+            if (candidatesToCheck.length === 0) {
+              reason = 'No engineer candidates';
+              details = 'No engineers found with availability for this order';
+            } else {
+              // Check what was the most common issue
+              const hasCapacityIssues = alternatives.some(alt => {
+                const ledgerKey = `${alt.engineer.id}_${alt.availableDate}`;
+                const virtualEntry = ledger.get(ledgerKey);
+                const cacheKey = `${alt.engineer.id}_${alt.availableDate}`;
+                const currentWorkload = cache.get(cacheKey) || 0;
+                return (currentWorkload + (virtualEntry?.jobCount || 0)) >= settings.max_jobs_per_day;
+              });
+              
+              if (hasCapacityIssues) {
+                reason = 'All engineers at capacity';
+                details = `All available engineers have reached their daily job limit of ${settings.max_jobs_per_day}`;
+              } else {
+                reason = 'Duration/scheduling conflicts';
+                details = 'Engineers available but order duration doesn\'t fit available time slots';
+              }
+            }
+            
+            unscheduled.push({
+              order,
+              reason,
+              details
+            });
           }
           
         } catch (error) {
@@ -249,6 +294,7 @@ export function AutoScheduleReviewModal({
       setVirtualLedger(ledger);
       setBatchCapacityInfo(capacityInfo);
       setProposedAssignments(proposals);
+      setUnscheduledOrders(unscheduled);
       setWorkloadCache(cache);
       setGenerated(true);
       
@@ -517,13 +563,18 @@ export function AutoScheduleReviewModal({
   };
 
   const handleClose = () => {
-    if (!loading && !submitting) {
-      setGenerated(false);
-      setProposedAssignments([]);
-      setVirtualLedger(new Map());
-      setBatchCapacityInfo([]);
-      onClose();
-    }
+    setProposedAssignments([]);
+    setUnscheduledOrders([]);
+    setLoading(false);
+    setSubmitting(false);
+    setGenerated(false);
+    setVirtualLedger(new Map());
+    setBatchCapacityInfo([]);
+    setPreflightChecking(false);
+    setProgressCurrent(0);
+    setProgressTotal(0);
+    setWorkloadCache(new Map());
+    onClose();
   };
 
   return (
@@ -580,30 +631,26 @@ export function AutoScheduleReviewModal({
                       <CardTitle className="text-base">Batch Summary</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        <div className="text-center p-2 bg-blue-50 rounded">
-                          <div className="text-lg font-bold text-blue-700">{proposedAssignments.length}</div>
-                          <div className="text-xs text-blue-600">Jobs Scheduled</div>
-                        </div>
-                        <div className="text-center p-2 bg-green-50 rounded">
-                          <div className="text-lg font-bold text-green-700">
-                            {proposedAssignments.filter(p => p.status === 'ready').length}
-                          </div>
-                          <div className="text-xs text-green-600">Ready to Send</div>
-                        </div>
-                        <div className="text-center p-2 bg-orange-50 rounded">
-                          <div className="text-lg font-bold text-orange-700">
-                            {proposedAssignments.filter(p => p.conflicts.length > 0).length}
-                          </div>
-                          <div className="text-xs text-orange-600">With Conflicts</div>
-                        </div>
-                        <div className="text-center p-2 bg-purple-50 rounded">
-                          <div className="text-lg font-bold text-purple-700">
-                            {new Set(proposedAssignments.map(p => p.selectedCandidate?.engineer.id)).size}
-                          </div>
-                          <div className="text-xs text-purple-600">Engineers Used</div>
-                        </div>
-                      </div>
+                       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                         <div className="text-center p-2 bg-blue-50 rounded">
+                           <div className="text-lg font-bold text-blue-700">{orders.length}</div>
+                           <div className="text-xs text-blue-600">Total Selected</div>
+                         </div>
+                         <div className="text-center p-2 bg-green-50 rounded">
+                           <div className="text-lg font-bold text-green-700">{proposedAssignments.length}</div>
+                           <div className="text-xs text-green-600">Scheduled</div>
+                         </div>
+                         <div className="text-center p-2 bg-orange-50 rounded">
+                           <div className="text-lg font-bold text-orange-700">{unscheduledOrders.length}</div>
+                           <div className="text-xs text-orange-600">Unscheduled</div>
+                         </div>
+                         <div className="text-center p-2 bg-purple-50 rounded">
+                           <div className="text-lg font-bold text-purple-700">
+                             {orders.length > 0 ? Math.round((proposedAssignments.length / orders.length) * 100) : 0}%
+                           </div>
+                           <div className="text-xs text-purple-600">Success Rate</div>
+                         </div>
+                       </div>
                     </CardContent>
                   </Card>
 
@@ -639,7 +686,54 @@ export function AutoScheduleReviewModal({
                     </Alert>
                   )}
 
-                  {/* Individual Proposals */}
+                   {/* Unscheduled Orders */}
+                   {unscheduledOrders.length > 0 && (
+                     <Card className="border-amber-300 bg-amber-50">
+                       <CardHeader>
+                         <CardTitle className="text-lg flex items-center gap-2">
+                           <AlertTriangle className="w-5 h-5 text-amber-600" />
+                           Unscheduled Orders ({unscheduledOrders.length})
+                         </CardTitle>
+                       </CardHeader>
+                       <CardContent>
+                         <div className="space-y-3">
+                           {unscheduledOrders.map((unscheduled, index) => (
+                             <div key={index} className="flex items-start justify-between p-3 bg-white border border-amber-200 rounded-lg">
+                               <div className="flex-1">
+                                 <div className="flex items-center gap-2 mb-1">
+                                   <span className="font-medium">{unscheduled.order.order_number}</span>
+                                   <Badge variant="outline" className="text-amber-700 border-amber-300">
+                                     {unscheduled.reason}
+                                   </Badge>
+                                 </div>
+                                 <div className="text-sm text-muted-foreground mb-1 flex items-center gap-1">
+                                   {unscheduled.order.client?.full_name} • <MapPin className="w-3 h-3" /> {getLocationDisplayText(unscheduled.order)}
+                                 </div>
+                                 {unscheduled.details && (
+                                   <div className="text-xs text-amber-700 bg-amber-100 px-2 py-1 rounded mt-1">
+                                     {unscheduled.details}
+                                   </div>
+                                 )}
+                               </div>
+                               <div className="ml-4 flex gap-2">
+                                 <Button 
+                                   size="sm" 
+                                   variant="outline"
+                                   onClick={() => {
+                                     toast.info('Manual assignment feature coming soon');
+                                   }}
+                                 >
+                                   Manual Assign
+                                 </Button>
+                               </div>
+                             </div>
+                           ))}
+                         </div>
+                       </CardContent>
+                     </Card>
+                   )}
+
+                   {/* Individual Proposals */}
                   <div className="space-y-3">
                     {proposedAssignments.map((proposal, index) => (
                       <Card key={proposal.order.id} className={`${
