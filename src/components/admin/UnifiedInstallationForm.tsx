@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { Calendar, User, Clock, MapPin, FileText, Save, AlertTriangle, Check, Trash2, X } from "lucide-react";
+import { DEFAULT_JOB_DURATION_HOURS } from "@/utils/schedulingUtils";
 
 interface Engineer {
   id: string;
@@ -58,7 +59,7 @@ export function UnifiedInstallationForm({
     engineer_id: currentEngineerId || '',
     scheduled_install_date: currentInstallDate ? currentInstallDate.split('T')[0] : '',
     time_window: timeWindow || '',
-    estimated_duration_hours: estimatedDuration || 4,
+    estimated_duration_hours: estimatedDuration || null,
     internal_install_notes: internalNotes || '',
     job_address: jobAddress || ''
   });
@@ -73,7 +74,7 @@ export function UnifiedInstallationForm({
       engineer_id: currentEngineerId || '',
       scheduled_install_date: currentInstallDate ? currentInstallDate.split('T')[0] : '',
       time_window: timeWindow || '',
-      estimated_duration_hours: estimatedDuration || 4,
+      estimated_duration_hours: estimatedDuration || null,
       internal_install_notes: internalNotes || '',
       job_address: jobAddress || ''
     });
@@ -201,7 +202,7 @@ export function UnifiedInstallationForm({
       }
       
       updateData.time_window = formData.time_window === 'none' ? null : formData.time_window || null;
-      updateData.estimated_duration_hours = formData.estimated_duration_hours || null;
+      updateData.estimated_duration_hours = formData.estimated_duration_hours;
       updateData.internal_install_notes = formData.internal_install_notes || null;
       updateData.job_address = formData.job_address || null;
 
@@ -516,22 +517,28 @@ export function UnifiedInstallationForm({
           <div className="space-y-2">
             <Label htmlFor="duration" className="flex items-center gap-2">
               <Clock className="h-4 w-4" />
-              Estimated Duration (hours)
+              Estimated Duration
             </Label>
             <Select 
-              value={formData.estimated_duration_hours?.toString() || ''} 
-              onValueChange={(value) => setFormData(prev => ({ ...prev, estimated_duration_hours: parseInt(value) || 4 }))}
+              value={formData.estimated_duration_hours?.toString() || 'default'} 
+              onValueChange={(value) => setFormData(prev => ({ 
+                ...prev, 
+                estimated_duration_hours: value === 'default' ? null : parseInt(value)
+              }))}
               disabled={!canEdit}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select duration" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="default">Use default ({DEFAULT_JOB_DURATION_HOURS}h)</SelectItem>
+                <SelectItem value="1">1 hour</SelectItem>
                 <SelectItem value="2">2 hours</SelectItem>
                 <SelectItem value="3">3 hours</SelectItem>
                 <SelectItem value="4">4 hours</SelectItem>
+                <SelectItem value="5">5 hours</SelectItem>
                 <SelectItem value="6">6 hours</SelectItem>
-                <SelectItem value="8">8 hours (full day)</SelectItem>
+                <SelectItem value="8">8 hours</SelectItem>
               </SelectContent>
             </Select>
           </div>

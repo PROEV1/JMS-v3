@@ -24,6 +24,7 @@ import {
   Mail,
   AlertTriangle
 } from "lucide-react";
+import { DEFAULT_JOB_DURATION_HOURS } from "@/utils/schedulingUtils";
 
 interface Engineer {
   id: string;
@@ -71,7 +72,7 @@ export function StreamlinedInstallationSummary({
     engineer_id: currentEngineerId || '',
     scheduled_install_date: currentInstallDate ? currentInstallDate.split('T')[0] : '',
     time_window: timeWindow || '',
-    estimated_duration_hours: estimatedDuration || 4,
+    estimated_duration_hours: estimatedDuration || DEFAULT_JOB_DURATION_HOURS,
     internal_install_notes: internalNotes || '',
     job_address: jobAddress || ''
   });
@@ -261,7 +262,7 @@ export function StreamlinedInstallationSummary({
       engineerId: currentEngineerId || '',
       installDate: currentInstallDate ? new Date(currentInstallDate).toISOString().split('T')[0] : '',
       timeWindow: timeWindow || '',
-      duration: estimatedDuration?.toString() || '',
+      duration: estimatedDuration?.toString() || DEFAULT_JOB_DURATION_HOURS.toString(),
       notes: internalNotes || ''
     });
     setEditingField(null);

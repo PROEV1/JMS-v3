@@ -19,6 +19,7 @@ import {
   CheckCircle,
   Save
 } from "lucide-react";
+import { DEFAULT_JOB_DURATION_HOURS } from "@/utils/schedulingUtils";
 
 interface Engineer {
   id: string;
@@ -58,7 +59,7 @@ export function EnhancedInstallManagement({
     currentInstallDate ? new Date(currentInstallDate).toISOString().split('T')[0] : ''
   );
   const [selectedTimeWindow, setSelectedTimeWindow] = useState(timeWindow || '');
-  const [duration, setDuration] = useState(estimatedDuration?.toString() || '');
+  const [duration, setDuration] = useState(estimatedDuration?.toString() || DEFAULT_JOB_DURATION_HOURS.toString());
   const [notes, setNotes] = useState(internalNotes || '');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -219,7 +220,7 @@ export function EnhancedInstallManagement({
     selectedEngineerId !== (currentEngineerId || 'unassigned') ||
     installDate !== (currentInstallDate ? new Date(currentInstallDate).toISOString().split('T')[0] : '') ||
     selectedTimeWindow !== (timeWindow || '') ||
-    duration !== (estimatedDuration?.toString() || '') ||
+    duration !== (estimatedDuration?.toString() || DEFAULT_JOB_DURATION_HOURS.toString()) ||
     notes !== (internalNotes || '');
 
   return (
