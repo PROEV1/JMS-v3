@@ -78,6 +78,7 @@ function App() {
                     <Route path="/admin/users/invite" element={<AdminUserInvite />} />
                     <Route path="/admin/users/:id" element={<AdminUserDetail />} />
                     <Route path="/admin/clients" element={<AdminClients />} />
+                    <Route path="/admin/clients/:id" element={<ClientProfilePage />} />
                     <Route path="/admin/client-users" element={<AdminClientUsers />} />
                     <Route path="/admin/leads" element={<AdminLeads />} />
                     <Route path="/admin/quotes" element={<AdminQuotes />} />
@@ -89,9 +90,11 @@ function App() {
                     <Route path="/admin/messages" element={<AdminMessages />} />
                     <Route path="/admin/settings" element={<AdminSettings />} />
                     <Route path="/admin/partners" element={<AdminPartners />} />
+                    <Route path="/admin/partners/:id/profiles" element={<AdminPartnerProfiles />} />
                     <Route path="/admin/partner-profiles" element={<AdminPartnerProfiles />} />
                     <Route path="/admin/engineers" element={<AdminEngineers />} />
                     <Route path="/admin/schedule" element={<AdminSchedule />} />
+                    <Route path="/admin/schedule/status/:status" element={<AdminScheduleStatus />} />
                     <Route path="/admin/schedule-status" element={<AdminScheduleStatus />} />
                     <Route path="/admin/inventory" element={<AdminInventory />} />
                     
