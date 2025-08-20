@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
-import { Calendar, TrendingUp, TrendingDown, Users } from 'lucide-react';
+import { Calendar, TrendingUp, TrendingDown, Users, ChevronDown, ChevronUp } from 'lucide-react';
 import { format, addDays, startOfDay } from 'date-fns';
 
 interface DayCapacity {
@@ -15,9 +17,18 @@ interface DayCapacity {
   remainingCapacity: number;
   utilizationPercentage: number;
   isAtRisk: boolean;
+  engineerBreakdown?: Array<{
+    engineerId: string;
+    engineerName: string;
+    engineerRegion: string;
+    scheduledJobs: number;
+    maxCapacity: number;
+  }>;
 }
 
 export function WeeklyCapacityView() {
+  const [isExpanded, setIsExpanded] = useState(false);
+  
   const { data: capacityData, isLoading } = useQuery({
     queryKey: ['weekly-capacity'],
     queryFn: async () => {
@@ -36,6 +47,7 @@ export function WeeklyCapacityView() {
           .select(`
             id,
             name,
+            region,
             availability,
             max_installs_per_day,
             engineer_availability(day_of_week, is_available),
@@ -47,6 +59,13 @@ export function WeeklyCapacityView() {
 
         // Calculate total capacity for this day
         let totalCapacity = 0;
+        const engineerBreakdown: Array<{
+          engineerId: string;
+          engineerName: string;
+          engineerRegion: string;
+          scheduledJobs: number;
+          maxCapacity: number;
+        }> = [];
         
         for (const engineer of engineers || []) {
           // Check if engineer is available on this day of week
@@ -65,7 +84,26 @@ export function WeeklyCapacityView() {
 
           // If engineer is available for this day and not on time off, add their capacity
           if (dayAvailability && !hasTimeOff) {
-            totalCapacity += engineer.max_installs_per_day || 2;
+            const maxCapacity = engineer.max_installs_per_day || 2;
+            totalCapacity += maxCapacity;
+            
+            // Get scheduled jobs for this engineer on this day
+            const { data: scheduledJobs } = await supabase
+              .from('orders')
+              .select('id')
+              .eq('job_type', 'installation')
+              .eq('engineer_id', engineer.id)
+              .gte('scheduled_install_date', dateStr)
+              .lt('scheduled_install_date', format(addDays(targetDate, 1), 'yyyy-MM-dd'))
+              .not('status_enhanced', 'in', '(completed)');
+
+            engineerBreakdown.push({
+              engineerId: engineer.id,
+              engineerName: engineer.name,
+              engineerRegion: engineer.region || 'Unknown',
+              scheduledJobs: scheduledJobs?.length || 0,
+              maxCapacity
+            });
           }
         }
 
@@ -92,7 +130,8 @@ export function WeeklyCapacityView() {
           scheduledInstalls,
           remainingCapacity,
           utilizationPercentage,
-          isAtRisk
+          isAtRisk,
+          engineerBreakdown
         });
       }
 
@@ -103,7 +142,7 @@ export function WeeklyCapacityView() {
 
   if (isLoading) {
     return (
-      <Card>
+      <Card className="w-full">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Calendar className="h-5 w-5" />
@@ -126,79 +165,155 @@ export function WeeklyCapacityView() {
   const atRiskDays = capacityData?.filter(day => day.isAtRisk).length || 0;
 
   return (
-    <Card>
+    <Card className="w-full">
       <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
             <Calendar className="h-5 w-5" />
             7-Day Installation Capacity
-          </div>
-          <div className="flex gap-2">
-            <Badge variant="outline" className="text-xs">
-              {totalWeekScheduled}/{totalWeekCapacity} Weekly
-            </Badge>
-            {atRiskDays > 0 && (
-              <Badge variant="destructive" className="text-xs">
-                {atRiskDays} At Risk
+          </CardTitle>
+          <div className="flex items-center gap-3">
+            <div className="flex gap-2">
+              <Badge variant="outline" className="text-xs">
+                {totalWeekScheduled}/{totalWeekCapacity} Weekly
               </Badge>
-            )}
+              {atRiskDays > 0 && (
+                <Badge variant="destructive" className="text-xs">
+                  {atRiskDays} At Risk
+                </Badge>
+              )}
+            </div>
+            <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
+              <CollapsibleTrigger asChild>
+                <Button variant="outline" size="sm">
+                  {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  {isExpanded ? 'Less Detail' : 'More Detail'}
+                </Button>
+              </CollapsibleTrigger>
+            </Collapsible>
           </div>
-        </CardTitle>
+        </div>
       </CardHeader>
-      <CardContent className="space-y-3">
-        {capacityData?.map((day, index) => (
-          <div key={day.date} className="space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="text-sm font-medium w-8">
+      <CardContent className="space-y-4">
+        {/* Daily Overview Grid */}
+        <div className="grid grid-cols-7 gap-3">
+          {capacityData?.map((day) => {
+            const isWeekend = new Date(day.date).getDay() === 0 || new Date(day.date).getDay() === 6;
+            const isToday = day.date === format(new Date(), 'yyyy-MM-dd');
+            
+            return (
+              <div 
+                key={day.date} 
+                className={`
+                  p-3 rounded-lg border text-center space-y-2
+                  ${isWeekend ? 'bg-muted/50' : 'bg-background'}
+                  ${isToday ? 'ring-2 ring-primary' : ''}
+                  ${day.isAtRisk ? 'border-orange-300 bg-orange-50/50' : ''}
+                `}
+              >
+                <div className="text-sm font-medium">
                   {day.dayName}
                 </div>
                 <div className="text-xs text-muted-foreground">
                   {format(new Date(day.date), 'MMM d')}
                 </div>
-              </div>
-              
-              <div className="flex items-center gap-4">
-                <div className="text-right">
-                  <div className="text-sm font-medium">
-                    {day.scheduledInstalls}/{day.totalCapacity}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {day.remainingCapacity} remaining
-                  </div>
-                </div>
                 
-                <div className="flex items-center gap-1">
-                  {day.isAtRisk ? (
-                    <TrendingDown className="h-4 w-4 text-orange-500" />
-                  ) : day.utilizationPercentage > 80 ? (
-                    <TrendingUp className="h-4 w-4 text-red-500" />
-                  ) : (
-                    <Users className="h-4 w-4 text-green-500" />
+                <div className="space-y-1">
+                  <div className="text-lg font-bold">{day.scheduledInstalls}</div>
+                  <div className="text-xs text-muted-foreground">
+                    of {day.totalCapacity} slots
+                  </div>
+                  
+                  <Badge 
+                    variant={day.utilizationPercentage > 90 ? 'destructive' : day.utilizationPercentage > 70 ? 'secondary' : 'default'}
+                    className="text-xs"
+                  >
+                    {day.utilizationPercentage}%
+                  </Badge>
+                  
+                  {day.remainingCapacity > 0 && (
+                    <div className="text-xs text-green-600 font-medium">
+                      +{day.remainingCapacity} available
+                    </div>
+                  )}
+                  
+                  {day.isAtRisk && (
+                    <div className="flex items-center justify-center">
+                      <TrendingDown className="h-3 w-3 text-orange-500" />
+                    </div>
                   )}
                 </div>
               </div>
-            </div>
-            
-            <div className="flex items-center gap-3">
-              <Progress 
-                value={day.utilizationPercentage} 
-                className="flex-1 h-2" 
-              />
-              <div className="text-xs text-muted-foreground w-12 text-right">
-                {day.utilizationPercentage}%
-              </div>
-            </div>
-            
-            {day.isAtRisk && (
-              <div className="text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded">
-                ⚠️ Limited capacity - may waste engineer time
-              </div>
-            )}
-          </div>
-        ))}
+            );
+          })}
+        </div>
         
-        <div className="pt-2 mt-4 border-t text-xs text-muted-foreground">
+        {/* Expandable Engineer Breakdown */}
+        <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
+          <CollapsibleContent className="space-y-4">
+            <div className="pt-4 border-t">
+              <h4 className="text-sm font-medium mb-3">Engineer Breakdown</h4>
+              <div className="space-y-3">
+                {capacityData?.flatMap(day => day.engineerBreakdown || [])
+                  .reduce((uniqueEngineers, engineer) => {
+                    if (!uniqueEngineers.find(e => e.engineerId === engineer.engineerId)) {
+                      uniqueEngineers.push(engineer);
+                    }
+                    return uniqueEngineers;
+                  }, [] as any[])
+                  .map((engineer) => {
+                    const weeklyScheduled = capacityData?.reduce((total, day) => {
+                      const engineerData = day.engineerBreakdown?.find(e => e.engineerId === engineer.engineerId);
+                      return total + (engineerData?.scheduledJobs || 0);
+                    }, 0) || 0;
+                    
+                    const weeklyCapacity = engineer.maxCapacity * 7;
+                    const weeklyUtilization = Math.round((weeklyScheduled / weeklyCapacity) * 100);
+                    
+                    return (
+                      <div key={engineer.engineerId} className="flex items-center justify-between p-3 rounded border bg-background">
+                        <div className="flex flex-col">
+                          <span className="text-sm font-medium">{engineer.engineerName}</span>
+                          <span className="text-xs text-muted-foreground">{engineer.engineerRegion}</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="text-sm">
+                            {weeklyScheduled}/{weeklyCapacity} weekly slots
+                          </div>
+                          <Badge 
+                            variant={weeklyUtilization > 90 ? 'destructive' : weeklyUtilization > 70 ? 'secondary' : 'default'}
+                            className="text-xs"
+                          >
+                            {weeklyUtilization}%
+                          </Badge>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+        
+        {/* Summary */}
+        <div className="pt-4 border-t">
+          <div className="grid grid-cols-3 gap-4 text-center">
+            <div>
+              <div className="text-2xl font-bold text-primary">{totalWeekCapacity}</div>
+              <div className="text-sm text-muted-foreground">Total Capacity</div>
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-blue-600">{totalWeekScheduled}</div>
+              <div className="text-sm text-muted-foreground">Scheduled</div>
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-green-600">{totalWeekCapacity - totalWeekScheduled}</div>
+              <div className="text-sm text-muted-foreground">Available</div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="text-xs text-muted-foreground text-center">
           💡 Capacity based on available engineers × max installs per day
         </div>
       </CardContent>

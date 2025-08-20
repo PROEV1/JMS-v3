@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
-import { SchedulePipelineDashboard } from './SchedulePipelineDashboard';
+import { WeekViewCalendar } from './WeekViewCalendar';
 import { KpiCard } from './KpiCard';
 import { AlertsPanel } from './AlertsPanel';
 import { WeekAtAGlance } from './WeekAtAGlance';
@@ -93,12 +93,25 @@ export function SchedulingHub({}: SchedulingHubProps) {
           return { count: count || 0 };
         })(),
         
-        // Ready to book installations (awaiting_install_booking status)
-        supabase
-          .from('orders')
-          .select('*', { count: 'exact', head: true })
-          .eq('status_enhanced', 'awaiting_install_booking')
-          .eq('job_type', 'installation'),
+        // Ready to book installations - orders that have accepted offers but need engineer assignment
+        (async () => {
+          const { data: acceptedOffers } = await supabase
+            .from('job_offers')
+            .select('order_id')
+            .eq('status', 'accepted');
+          
+          if (!acceptedOffers?.length) return { count: 0 };
+          
+          const orderIds = acceptedOffers.map(o => o.order_id);
+          const { count } = await supabase
+            .from('orders')
+            .select('*', { count: 'exact', head: true })
+            .eq('job_type', 'installation')
+            .in('id', orderIds)
+            .is('engineer_id', null);
+            
+          return { count: count || 0 };
+        })(),
         
         // Scheduled installations for today
         supabase
@@ -173,9 +186,9 @@ export function SchedulingHub({}: SchedulingHubProps) {
     refetchInterval: 30000 // Refresh every 30 seconds
   });
 
-  // Fetch orders for pipeline dashboard
+  // Fetch orders and engineers for calendar
   const { data: orders = [], isLoading: ordersLoading } = useQuery({
-    queryKey: ['scheduling-orders'],
+    queryKey: ['orders-for-calendar'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('orders')
@@ -185,7 +198,22 @@ export function SchedulingHub({}: SchedulingHubProps) {
           engineer:engineers(name, email)
         `)
         .eq('job_type', 'installation')
-        .order('created_at', { ascending: false });
+        .not('scheduled_install_date', 'is', null)
+        .order('scheduled_install_date', { ascending: true });
+
+      if (error) throw error;
+      return data || [];
+    }
+  });
+
+  const { data: engineers = [], isLoading: engineersLoading } = useQuery({
+    queryKey: ['engineers-for-calendar'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('engineers')
+        .select('*')
+        .eq('availability', true)
+        .order('name');
 
       if (error) throw error;
       return data || [];
@@ -208,7 +236,7 @@ export function SchedulingHub({}: SchedulingHubProps) {
     navigate('/admin/schedule', { state: { tab: 'week-view' } });
   };
 
-  if (kpiLoading || ordersLoading) {
+  if (kpiLoading || ordersLoading || engineersLoading) {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -301,16 +329,24 @@ export function SchedulingHub({}: SchedulingHubProps) {
         </CardContent>
       </Card>
 
+      {/* Full Width Capacity View */}
+      <WeeklyCapacityView />
+
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left: Pipeline Dashboard */}
+        {/* Left: Week View Calendar */}
         <div className="lg:col-span-2">
-          <SchedulePipelineDashboard orders={orders} />
+          <WeekViewCalendar 
+            orders={orders} 
+            engineers={engineers}
+            onOrderClick={(order) => navigate(`/admin/order/${order.id}`)}
+            currentDate={new Date()}
+            onDateChange={() => {}}
+          />
         </div>
 
-        {/* Right: Week at a Glance + Recent Activity + Capacity View */}
+        {/* Right: Week at a Glance + Recent Activity */}
         <div className="space-y-6">
-          <WeeklyCapacityView />
           <WeekAtAGlance />
           <RecentActivity />
         </div>
