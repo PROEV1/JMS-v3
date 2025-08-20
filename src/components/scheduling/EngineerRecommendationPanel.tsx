@@ -47,7 +47,7 @@ export function EngineerRecommendationPanel({
     setDebugInfo(`Job: ${order.order_number} | Checking postcode sources...`);
     
     try {
-      const result = await getSmartEngineerRecommendations(order, getBestPostcode(order));
+      const result = await getSmartEngineerRecommendations(order, getBestPostcode(order), { fastMode: true });
       setSuggestions(result.recommendations);
       setSettings(result.settings);
       

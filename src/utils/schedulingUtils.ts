@@ -201,6 +201,10 @@ export const getSmartEngineerRecommendations = async (
 
     console.log('Using postcode for recommendations:', finalPostcode);
 
+    // Extract postcode prefix (first 2 characters)
+    const postcodePrefix = finalPostcode.substring(0, 2).toUpperCase();
+    console.log('Postcode prefix:', postcodePrefix);
+
     // Use preloaded client blocked dates or fetch them
     let blockedDateStrings: Set<string>;
     if (options.clientBlockedDatesMap?.has(order.client_id)) {
@@ -223,14 +227,26 @@ export const getSmartEngineerRecommendations = async (
     }
 
     // Use preloaded engineers or fetch them
-    const allEngineers = options.preloadedEngineers || await getAllEngineersForScheduling();
+    let allEngineers = options.preloadedEngineers || await getAllEngineersForScheduling();
     
     if (allEngineers.length === 0) {
       console.log('No available engineers found');
       return { recommendations: [], featured: [], all: [], settings };
     }
 
-    console.log(`Found ${allEngineers.length} engineers to evaluate`);
+    // PRIORITY: Check for engineers with exact postcode prefix match
+    const prefixMatchEngineers = allEngineers.filter(engineer => {
+      return engineer.service_areas?.some(area => 
+        area.postcode_area && area.postcode_area.toUpperCase() === postcodePrefix
+      );
+    });
+
+    if (prefixMatchEngineers.length > 0) {
+      console.log(`🎯 Found ${prefixMatchEngineers.length} engineers with exact prefix match for ${postcodePrefix}, filtering to these only`);
+      allEngineers = prefixMatchEngineers;
+    }
+
+    console.log(`Found ${allEngineers.length} engineers to evaluate (after prefix filtering)`);
 
     // FAST MODE: Two-phase evaluation for better performance
     if (options.fastMode) {
@@ -240,7 +256,8 @@ export const getSmartEngineerRecommendations = async (
         allEngineers, 
         settings, 
         blockedDateStrings, 
-        options
+        options,
+        postcodePrefix
       );
     }
     
@@ -278,11 +295,21 @@ export const getSmartEngineerRecommendations = async (
             return null;
           }
 
-          // Get live distance and travel time from Mapbox (skip if unbounded)
+          // Check if this engineer has exact postcode prefix match
+          const hasExactPrefixMatch = engineer.service_areas?.some(area => 
+            area.postcode_area && area.postcode_area.toUpperCase() === postcodePrefix
+          );
+
+          // Get live distance and travel time from Mapbox (skip if exact prefix match or unbounded)
           let distance = 0;
           let travelTime = hasServiceAreaMatch ? (serviceCheck.travelTime || 60) : 80; // Default higher if no service area match
           
-           if (engineer.starting_postcode && !isUnbounded) {
+          if (hasExactPrefixMatch) {
+            // Use nominal values for exact prefix matches to avoid Mapbox calls
+            distance = 15; // Nominal 15 miles for local area
+            travelTime = 30; // Nominal 30 minutes for local travel
+            console.log(`🎯 Using nominal distance/time for ${engineer.name} (exact prefix match): ${distance}mi, ${travelTime}min`);
+          } else if (engineer.starting_postcode && !isUnbounded) {
              try {
                const distanceResult = await getLiveDistance(engineer.starting_postcode, finalPostcode);
                distance = distanceResult.distance;
@@ -527,13 +554,17 @@ async function getSmartEngineerRecommendationsFast(
   options: {
     startDate?: Date;
     workloadLookup?: (engineerId: string, date: string) => number;
-  }
+  },
+  postcodePrefix?: string
 ) {
   console.log('🚀 Fast mode: Starting optimized engineer evaluation');
   
   const exclusionReasons: Record<string, string[]> = {};
   const now = new Date();
   const minimumDate = options.startDate || new Date(now.getTime() + (settings.minimum_advance_hours * 60 * 60 * 1000));
+  
+  // Extract postcode prefix if not provided
+  const finalPostcodePrefix = postcodePrefix || postcode.substring(0, 2).toUpperCase();
 
   // PHASE 1: Light filtering - exclude engineers based on basic criteria
   const lightFilteredEngineers = allEngineers.filter(engineer => {
@@ -574,26 +605,36 @@ async function getSmartEngineerRecommendationsFast(
     };
   }
 
-  // PHASE 2: Batch distance calculation
-  const engineerPostcodes = lightFilteredEngineers
-    .map(e => e.starting_postcode)
-    .filter(Boolean) as string[];
+  // PHASE 2: Batch distance lookups for remaining engineers (skip for exact prefix matches)
+  const exactPrefixMatches = lightFilteredEngineers.filter(engineer => 
+    engineer.service_areas?.some(area => 
+      area.postcode_area && area.postcode_area.toUpperCase() === finalPostcodePrefix
+    )
+  );
+  
+  const engineersNeedingDistance = lightFilteredEngineers.filter(eng => 
+    eng.starting_postcode && !exactPrefixMatches.includes(eng)
+  );
 
   let distanceResults = new Map<string, { distance: number; duration: number }>();
   
-  if (engineerPostcodes.length > 0) {
+  if (exactPrefixMatches.length > 0) {
+    console.log(`🎯 Found ${exactPrefixMatches.length} exact prefix matches, skipping Mapbox for these`);
+  }
+  
+  if (engineersNeedingDistance.length > 0) {
     try {
-      console.log(`📍 Phase 2: Getting batch distances for ${engineerPostcodes.length} engineers`);
+      console.log(`📍 Phase 2: Getting batch distances for ${engineersNeedingDistance.length} engineers (excluding prefix matches)`);
       
       // Add timeout wrapper for Mapbox calls
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => reject(new Error('Mapbox timeout after 20s')), 20000);
       });
       
-      const distancePromise = getBatchDistancesForOrder(lightFilteredEngineers, postcode);
+      const distancePromise = getBatchDistancesForOrder(engineersNeedingDistance, postcode);
       distanceResults = await Promise.race([distancePromise, timeoutPromise]);
       
-      console.log(`✅ Batch distances received: ${distanceResults.size}/${engineerPostcodes.length}`);
+      console.log(`✅ Batch distances received: ${distanceResults.size}/${engineersNeedingDistance.length}`);
     } catch (error) {
       console.error('⚠️ Batch distance call failed, falling back to service area estimates:', error);
       // Continue with service area estimates
@@ -606,6 +647,11 @@ async function getSmartEngineerRecommendationsFast(
   const recommendations = await Promise.all(
     lightFilteredEngineers.map(async (engineer) => {
       try {
+        // Check if this engineer has exact postcode prefix match
+        const hasExactPrefixMatch = engineer.service_areas?.some(area => 
+          area.postcode_area && area.postcode_area.toUpperCase() === finalPostcodePrefix
+        );
+
         // Get distance and travel time
         let distance = 0;
         let travelTime = 60; // Default
@@ -613,7 +659,12 @@ async function getSmartEngineerRecommendationsFast(
         const serviceCheck = canEngineerServePostcode(engineer, postcode);
         const hasServiceAreaMatch = serviceCheck.canServe;
         
-        if (engineer.starting_postcode && distanceResults.has(engineer.starting_postcode)) {
+        if (hasExactPrefixMatch) {
+          // Use nominal values for exact prefix matches
+          distance = 15; // Nominal 15 miles for local area
+          travelTime = 30; // Nominal 30 minutes for local travel
+          console.log(`🎯 Using nominal distance/time for ${engineer.name} (exact prefix match): ${distance}mi, ${travelTime}min`);
+        } else if (engineer.starting_postcode && distanceResults.has(engineer.starting_postcode)) {
           const mapboxResult = distanceResults.get(engineer.starting_postcode)!;
           distance = mapboxResult.distance;
           travelTime = mapboxResult.duration;
