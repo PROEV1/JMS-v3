@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -59,7 +60,7 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({
   const createRequest = useCreateStockRequest();
 
   const form = useForm<StockRequestFormData>({
-    resolver: zodResolver(stockRequestSchema) as any,
+    resolver: zodResolver(stockRequestSchema),
     defaultValues: {
       destination_location_id: '',
       order_id: orderId || '',
@@ -75,8 +76,8 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({
     name: 'lines'
   });
 
-  // Get van locations for engineer - simplified without generic types
-  const { data: locations } = useQuery({
+  // Get van locations for engineer - using simple fetch approach
+  const locationsQuery = useQuery({
     queryKey: ['engineer-locations', engineerId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -91,8 +92,8 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({
     }
   });
 
-  // Get inventory items - simplified without generic types
-  const { data: items } = useQuery({
+  // Get inventory items - using simple fetch approach
+  const itemsQuery = useQuery({
     queryKey: ['inventory-items-active'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -105,6 +106,9 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({
       return data as ItemData[];
     }
   });
+
+  const locations = locationsQuery.data;
+  const items = itemsQuery.data;
 
   const uploadPhoto = async (file: File): Promise<string | null> => {
     try {
