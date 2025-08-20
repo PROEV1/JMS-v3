@@ -253,22 +253,18 @@ export const getSmartEngineerRecommendations = async (
       return { recommendations: [], featured: [], all: [], settings };
     }
 
-    // PRIORITY: Check for engineers with exact area letter match
-    const areaMatchEngineers = allEngineers.filter(engineer => {
-      return engineer.service_areas?.some(area => 
-        area.postcode_area && area.postcode_area.toUpperCase() === jobAreaLetters
-      );
-    });
+    // PRIORITY: Check for engineers with exact area letter match using token parsing
+    const areaMatchEngineers = allEngineers.filter(engineer => 
+      hasExactAreaTokenMatch(engineer, jobAreaLetters)
+    );
 
     // Debug logging for service area filtering
     if (jobAreaLetters) {
       console.log(`📍 Service area filtering for area "${jobAreaLetters}":`);
       allEngineers.forEach(engineer => {
-        const matchingAreas = engineer.service_areas?.filter(area => 
-          area.postcode_area && area.postcode_area.toUpperCase() === jobAreaLetters
-        );
-        const hasMatch = matchingAreas && matchingAreas.length > 0;
-        console.log(`  ${engineer.name}: ${hasMatch ? '✅ MATCH' : '❌ NO MATCH'} (areas: ${engineer.service_areas?.map(a => a.postcode_area).join(', ') || 'none'})`);
+        const tokens = engineer.service_areas?.flatMap(area => parseServiceAreaTokens(area.postcode_area)) || [];
+        const hasMatch = hasExactAreaTokenMatch(engineer, jobAreaLetters);
+        console.log(`  ${engineer.name}: areas [${tokens.join(', ')}] -> ${hasMatch ? '✅ MATCH' : '❌ no match'}`);
       });
     }
 
@@ -339,10 +335,8 @@ export const getSmartEngineerRecommendations = async (
             return null;
           }
 
-          // Check if this engineer has exact area match
-          const hasExactAreaMatch = engineer.service_areas?.some(area => 
-            area.postcode_area && area.postcode_area.toUpperCase() === jobAreaLetters
-          );
+          // Check if this engineer has exact area match using token parsing
+          const hasExactAreaMatch = hasExactAreaTokenMatch(engineer, jobAreaLetters);
 
           // Get live distance and travel time from Mapbox (skip if exact prefix match or unbounded)
           let distance = 0;
@@ -587,6 +581,30 @@ export const getSmartEngineerRecommendations = async (
 };
 
 /**
+ * Parse service area tokens from comma-separated string
+ * E.g., "SL, EN, CR" -> ["SL", "EN", "CR"]
+ */
+function parseServiceAreaTokens(postcodeArea: string): string[] {
+  if (!postcodeArea) return [];
+  return postcodeArea
+    .split(',')
+    .map(token => token.trim().toUpperCase())
+    .filter(token => token.length > 0);
+}
+
+/**
+ * Check if engineer has exact area match using token parsing
+ */
+function hasExactAreaTokenMatch(engineer: EngineerSettings, targetAreaLetters: string): boolean {
+  if (!engineer.service_areas) return false;
+  
+  return engineer.service_areas.some(area => {
+    const tokens = parseServiceAreaTokens(area.postcode_area);
+    return tokens.includes(targetAreaLetters);
+  });
+}
+
+/**
  * Fast mode implementation with optimized two-phase evaluation
  */
 async function getSmartEngineerRecommendationsFast(
@@ -655,10 +673,15 @@ async function getSmartEngineerRecommendationsFast(
 
   // STRICT AREA FILTERING: If we have exact area matches, ONLY use those engineers
   const exactAreaMatches = lightFilteredEngineers.filter(engineer => 
-    engineer.service_areas?.some(area => 
-      area.postcode_area && area.postcode_area.toUpperCase() === finalAreaLetters
-    )
+    hasExactAreaTokenMatch(engineer, finalAreaLetters)
   );
+  
+  console.log(`🔍 Area matching for ${finalAreaLetters}:`);
+  lightFilteredEngineers.forEach(engineer => {
+    const tokens = engineer.service_areas?.flatMap(area => parseServiceAreaTokens(area.postcode_area)) || [];
+    const hasMatch = hasExactAreaTokenMatch(engineer, finalAreaLetters);
+    console.log(`  ${engineer.name}: areas [${tokens.join(', ')}] -> ${hasMatch ? '✅ MATCH' : '❌ no match'}`);
+  });
   
   let engineersToEvaluate = lightFilteredEngineers;
   
@@ -682,16 +705,13 @@ async function getSmartEngineerRecommendationsFast(
     console.log(`⚠️ FAST: No engineers found with exact area match for ${finalAreaLetters}, using all ${lightFilteredEngineers.length} engineers (non-strict mode)`);
   }
 
-  // PHASE 2: Batch distance lookups for remaining engineers (skip for exact area matches)
-  const engineersNeedingDistance = engineersToEvaluate.filter(eng => 
-    eng.starting_postcode && !exactAreaMatches.includes(eng)
-  );
+  // PHASE 2: Batch distance lookups for remaining engineers
+  // For exact area matches, we still want real distances, not nominal values
+  const engineersNeedingDistance = engineersToEvaluate.filter(eng => eng.starting_postcode);
 
   let distanceResults = new Map<string, { distance: number; duration: number }>();
   
-  if (exactAreaMatches.length > 0) {
-    console.log(`🎯 Found ${exactAreaMatches.length} exact area matches, skipping Mapbox for these`);
-  }
+  console.log(`📍 Getting real distances for ${engineersNeedingDistance.length} engineers (including exact matches)`);
   
   if (engineersNeedingDistance.length > 0) {
     try {
@@ -718,31 +738,24 @@ async function getSmartEngineerRecommendationsFast(
   const recommendations = await Promise.all(
     engineersToEvaluate.map(async (engineer) => {
       try {
-        // Check if this engineer has exact area match
-        const hasExactAreaMatch = engineer.service_areas?.some(area => 
-          area.postcode_area && area.postcode_area.toUpperCase() === finalAreaLetters
-        );
+        // Check if this engineer has exact area match using token parsing
+        const hasExactAreaMatch = hasExactAreaTokenMatch(engineer, finalAreaLetters);
 
-        // Get distance and travel time
-        let distance = 0;
-        let travelTime = 60; // Default
-        
+        // Use real distance data from Mapbox for all engineers
         const serviceCheck = canEngineerServePostcode(engineer, postcode);
         const hasServiceAreaMatch = serviceCheck.canServe;
         
-        if (hasExactAreaMatch) {
-          // Use nominal values for exact area matches
-          distance = 15; // Nominal 15 miles for local area
-          travelTime = 30; // Nominal 30 minutes for local travel
-          console.log(`🎯 Using nominal distance/time for ${engineer.name} (exact area match): ${distance}mi, ${travelTime}min`);
-        } else if (engineer.starting_postcode && distanceResults.has(engineer.id)) {
-          const mapboxResult = distanceResults.get(engineer.id)!;
-          distance = mapboxResult.distance;
-          travelTime = mapboxResult.duration;
+        let distance = 0;
+        let travelTime = 0;
+
+        if (distanceResults.has(engineer.id)) {
+          const result = distanceResults.get(engineer.id)!;
+          distance = result.distance;
+          travelTime = result.duration;
         } else {
-          // Fallback to service area estimates
-          distance = serviceCheck.travelTime ? Math.round(serviceCheck.travelTime / 2) : 25;
-          travelTime = hasServiceAreaMatch ? (serviceCheck.travelTime || 60) : 80;
+          console.log(`⚠️ No distance data available for ${engineer.name}, using defaults`);
+          distance = 20;
+          travelTime = 45;
         }
 
         // Check travel time limits
@@ -1510,44 +1523,48 @@ export function canEngineerServePostcode(
     return { canServe: false };
   }
 
+  // Extract job area letters for matching (e.g., "CR" from "CR7")
+  const jobAreaLetters = jobOutwardCode.replace(/\d+[A-Z]?$/, '');
+
   // Check if engineer serves this postcode area with flexible matching
   for (const area of engineer.service_areas) {
-    const configuredArea = area.postcode_area.toUpperCase().trim();
+    // Parse comma-separated service area tokens
+    const areaTokens = parseServiceAreaTokens(area.postcode_area);
     
-    // Handle letter-only areas (e.g., "MK", "LU", "SG")
-    if (/^[A-Z]{1,2}$/.test(configuredArea)) {
-      const jobAreaLetters = jobOutwardCode.replace(/\d+[A-Z]?$/, ''); // Extract letters only
-      if (jobAreaLetters === configuredArea) {
+    for (const token of areaTokens) {
+      // Handle letter-only areas (e.g., "MK", "LU", "SG", "CR")
+      if (/^[A-Z]{1,2}$/.test(token)) {
+        if (jobAreaLetters === token) {
+          return { 
+            canServe: true, 
+            travelTime: area.max_travel_minutes,
+            matchType: 'area'
+          };
+        }
+      }
+      
+      // Extract outward code from configured area for traditional matching
+      const areaOutwardCode = getOutwardCode(token);
+      
+      // Exact match (e.g., "DA5" matches "DA5")
+      if (areaOutwardCode === jobOutwardCode) {
         return { 
           canServe: true, 
           travelTime: area.max_travel_minutes,
-          matchType: 'area'
+          matchType: 'exact'
         };
       }
-    }
-    
-    // Extract outward code from configured area for traditional matching
-    const areaOutwardCode = getOutwardCode(configuredArea);
-    
-    // Exact match (e.g., "DA5" matches "DA5")
-    if (areaOutwardCode === jobOutwardCode) {
-      return { 
-        canServe: true, 
-        travelTime: area.max_travel_minutes,
-        matchType: 'exact'
-      };
-    }
-    
-    // Partial match for same area prefix (e.g., "DA1" covers other "DA" areas)
-    const jobAreaPrefix = jobOutwardCode.replace(/\d+[A-Z]?$/, ''); // Remove digits and optional letter
-    const areaPrefix = areaOutwardCode.replace(/\d+[A-Z]?$/, '');
-    
-    if (jobAreaPrefix === areaPrefix && jobAreaPrefix.length >= 1) {
-      return { 
-        canServe: true, 
-        travelTime: area.max_travel_minutes,
-        matchType: 'prefix'
-      };
+      
+      // Partial match for same area prefix (e.g., "DA1" covers other "DA" areas)
+      const areaPrefix = areaOutwardCode.replace(/\d+[A-Z]?$/, '');
+      
+      if (jobAreaLetters === areaPrefix && areaPrefix.length >= 1) {
+        return { 
+          canServe: true, 
+          travelTime: area.max_travel_minutes,
+          matchType: 'prefix'
+        };
+      }
     }
   }
 
