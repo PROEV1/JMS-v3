@@ -248,48 +248,93 @@ export function WeeklyCapacityView() {
           })}
         </div>
         
-        {/* Expandable Engineer Breakdown */}
+        {/* Expandable Engineer Breakdown - Per Day */}
         <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
           <CollapsibleContent className="space-y-4">
             <div className="pt-4 border-t">
-              <h4 className="text-sm font-medium mb-3">Engineer Breakdown</h4>
-              <div className="space-y-3">
-                {capacityData?.flatMap(day => day.engineerBreakdown || [])
-                  .reduce((uniqueEngineers, engineer) => {
-                    if (!uniqueEngineers.find(e => e.engineerId === engineer.engineerId)) {
-                      uniqueEngineers.push(engineer);
-                    }
-                    return uniqueEngineers;
-                  }, [] as any[])
-                  .map((engineer) => {
-                    const weeklyScheduled = capacityData?.reduce((total, day) => {
-                      const engineerData = day.engineerBreakdown?.find(e => e.engineerId === engineer.engineerId);
-                      return total + (engineerData?.scheduledJobs || 0);
-                    }, 0) || 0;
+              <h4 className="text-sm font-medium mb-3">Engineers with Spare Capacity</h4>
+              <div className="space-y-4">
+                {capacityData?.map((day) => {
+                  // Get engineers with spare capacity for this day
+                  const engineersWithSpareCapacity = day.engineerBreakdown
+                    ?.filter(engineer => engineer.scheduledJobs < engineer.maxCapacity)
+                    .sort((a, b) => (b.maxCapacity - b.scheduledJobs) - (a.maxCapacity - a.scheduledJobs)) || [];
                     
-                    const weeklyCapacity = engineer.maxCapacity * 7;
-                    const weeklyUtilization = Math.round((weeklyScheduled / weeklyCapacity) * 100);
-                    
-                    return (
-                      <div key={engineer.engineerId} className="flex items-center justify-between p-3 rounded border bg-background">
-                        <div className="flex flex-col">
-                          <span className="text-sm font-medium">{engineer.engineerName}</span>
-                          <span className="text-xs text-muted-foreground">{engineer.engineerRegion}</span>
+                  if (engineersWithSpareCapacity.length === 0) return null;
+                  
+                  const isWeekend = new Date(day.date).getDay() === 0 || new Date(day.date).getDay() === 6;
+                  const isToday = day.date === format(new Date(), 'yyyy-MM-dd');
+                  
+                  return (
+                    <div key={day.date} className="border rounded-lg overflow-hidden">
+                      <div className={`
+                        px-4 py-2 border-b flex items-center justify-between
+                        ${isWeekend ? 'bg-muted/30' : 'bg-background'}
+                        ${isToday ? 'bg-primary/5 border-primary/20' : ''}
+                      `}>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-sm">
+                            {day.dayName}, {format(new Date(day.date), 'MMM d')}
+                          </span>
+                          {isToday && (
+                            <Badge variant="outline" className="text-xs">Today</Badge>
+                          )}
                         </div>
-                        <div className="flex items-center gap-3">
-                          <div className="text-sm">
-                            {weeklyScheduled}/{weeklyCapacity} weekly slots
-                          </div>
-                          <Badge 
-                            variant={weeklyUtilization > 90 ? 'destructive' : weeklyUtilization > 70 ? 'secondary' : 'default'}
-                            className="text-xs"
-                          >
-                            {weeklyUtilization}%
-                          </Badge>
-                        </div>
+                        <Badge variant="secondary" className="text-xs">
+                          {engineersWithSpareCapacity.length} Available
+                        </Badge>
                       </div>
-                    );
-                  })}
+                      
+                      <div className="p-3 space-y-2">
+                        {engineersWithSpareCapacity.map((engineer) => {
+                          const remainingCapacity = engineer.maxCapacity - engineer.scheduledJobs;
+                          const utilization = Math.round((engineer.scheduledJobs / engineer.maxCapacity) * 100);
+                          
+                          return (
+                            <div key={engineer.engineerId} className="flex items-center justify-between py-2 px-3 rounded-lg border bg-background/50">
+                              <div className="flex flex-col gap-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-medium">{engineer.engineerName}</span>
+                                  <Badge 
+                                    variant={remainingCapacity > 1 ? 'default' : 'secondary'}
+                                    className="text-xs"
+                                  >
+                                    +{remainingCapacity} slots
+                                  </Badge>
+                                </div>
+                                <span className="text-xs text-muted-foreground">{engineer.engineerRegion}</span>
+                              </div>
+                              
+                              <div className="flex items-center gap-3 min-w-0 flex-1 max-w-xs">
+                                <div className="text-xs text-muted-foreground text-right">
+                                  {engineer.scheduledJobs}/{engineer.maxCapacity}
+                                </div>
+                                <div className="flex-1">
+                                  <Progress 
+                                    value={utilization} 
+                                    className="h-2" 
+                                  />
+                                </div>
+                                <div className="text-xs font-medium text-right min-w-[3rem]">
+                                  {utilization}%
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+                
+                {capacityData?.every(day => 
+                  !day.engineerBreakdown?.some(engineer => engineer.scheduledJobs < engineer.maxCapacity)
+                ) && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">All engineers are at full capacity this week</p>
+                  </div>
+                )}
               </div>
             </div>
           </CollapsibleContent>
