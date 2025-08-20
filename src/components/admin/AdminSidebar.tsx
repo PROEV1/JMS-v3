@@ -5,6 +5,7 @@ import {
   Settings,
   Building2,
   HelpCircle,
+  Package,
 } from 'lucide-react'
 
 import { NavLink } from 'react-router-dom'
@@ -26,6 +27,11 @@ export function AdminSidebar() {
       title: 'Scheduling',
       url: '/admin/schedule',
       icon: Calendar,
+    },
+    {
+      title: 'Inventory',
+      url: '/admin/inventory',
+      icon: Package,
     },
     {
       title: 'Settings',

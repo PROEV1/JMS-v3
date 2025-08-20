@@ -23,6 +23,7 @@ import AdminSchedule from '@/pages/AdminSchedule';
 import AdminScheduleStatus from '@/pages/AdminScheduleStatus';
 import AdminPartners from '@/pages/AdminPartners';
 import AdminPartnerProfiles from '@/pages/AdminPartnerProfiles';
+import AdminInventory from '@/pages/AdminInventory';
 import ClientQuotes from '@/pages/ClientQuotes';
 import ClientOrders from '@/pages/ClientOrders';
 import ClientMessages from '@/pages/ClientMessages';
@@ -177,6 +178,7 @@ function AppContent() {
             <Route path="/admin/settings" element={<AdminSettings />} />
             <Route path="/admin/schedule" element={<AdminSchedule />} />
             <Route path="/admin/schedule/status/:status" element={<AdminScheduleStatus />} />
+            <Route path="/admin/inventory" element={<AdminInventory />} />
             <Route path="/admin/partners" element={<AdminPartners />} />
             <Route path="/admin/partners/:partnerId/profiles" element={<AdminPartnerProfiles />} />
           </>
