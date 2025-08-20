@@ -187,9 +187,9 @@ export default function EnhancedClientOrderView() {
     }
   };
 
-  const fetchOrder = async () => {
+  const fetchOrder = async (retryCount = 0) => {
     try {
-      console.log('Fetching order data for ID:', orderId);
+      console.log('Fetching order data for ID:', orderId, 'retry:', retryCount);
       
       const { data, error } = await supabase
         .from('orders')
@@ -231,22 +231,52 @@ export default function EnhancedClientOrderView() {
           setActiveStep(newActiveStep);
         }
       } else {
-        console.error('No order found for ID:', orderId);
+        console.error('No order found for ID:', orderId, 'retry:', retryCount);
+        
+        // If this is a newly created order (coming from quote acceptance), retry a few times
+        if (retryCount < 3) {
+          console.log('Retrying order fetch in 2 seconds...');
+          setTimeout(() => fetchOrder(retryCount + 1), 2000);
+          return;
+        }
+        
+        // After retries, check if user needs to log in again
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          toast({
+            title: "Session Expired",
+            description: "Please log in again to view your order.",
+            variant: "destructive",
+          });
+          navigate('/auth');
+          return;
+        }
+        
         toast({
           title: "Order Not Found",
-          description: "The requested order could not be found.",
+          description: "The requested order could not be found. If you just accepted a quote, please wait a moment and refresh the page.",
           variant: "destructive",
         });
       }
     } catch (error) {
       console.error('Error fetching order:', error);
+      
+      // Retry on network errors
+      if (retryCount < 2 && (error as any)?.message?.includes('network')) {
+        console.log('Network error, retrying in 1 second...');
+        setTimeout(() => fetchOrder(retryCount + 1), 1000);
+        return;
+      }
+      
       toast({
         title: "Error",
-        description: "Failed to load order details",
+        description: "Failed to load order details. Please try refreshing the page.",
         variant: "destructive",
       });
     } finally {
-      setLoading(false);
+      if (retryCount === 0) {
+        setLoading(false);
+      }
     }
   };
 
