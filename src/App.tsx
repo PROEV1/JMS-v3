@@ -114,7 +114,10 @@ function AppContent() {
             <Route path="/orders" element={<ClientOrders />} />
             <Route path="/client/orders" element={<Navigate to="/orders" replace />} />
             <Route path="/orders/:id" element={<EnhancedClientOrderView />} />
-            <Route path="/client/orders/:id" element={<Navigate to="/orders/:id" replace />} />
+            <Route 
+              path="/client/orders/:id" 
+              element={<EnhancedClientOrderView />} 
+            />
             <Route path="/messages" element={<ClientMessages />} />
             <Route path="/client/messages" element={<Navigate to="/messages" replace />} />
             <Route path="/documents" element={<ClientDocuments />} />
