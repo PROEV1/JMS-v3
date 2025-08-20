@@ -2026,29 +2026,7 @@ export type Database = {
       }
     }
     Views: {
-      vw_item_location_balances: {
-        Row: {
-          item_id: string | null
-          location_id: string | null
-          on_hand: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "inventory_txns_item_id_fkey"
-            columns: ["item_id"]
-            isOneToOne: false
-            referencedRelation: "inventory_items"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "inventory_txns_location_id_fkey"
-            columns: ["location_id"]
-            isOneToOne: false
-            referencedRelation: "inventory_locations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
+      [_ in never]: never
     }
     Functions: {
       archive_engineer_work: {
@@ -2107,6 +2085,14 @@ export type Database = {
       get_engineer_soft_holds: {
         Args: { p_date: string; p_engineer_id: string }
         Returns: number
+      }
+      get_item_location_balances: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          item_id: string
+          location_id: string
+          on_hand: number
+        }[]
       }
       get_user_role: {
         Args: { user_id: string }
