@@ -105,8 +105,9 @@ export function SmartAssignmentModal({
 
     setProcessing(true);
     try {
-      // Let parent handle the send-offer logic
-      await onAssign(selectedEngineerId, selectedDate.toISOString(), 'send_offer');
+      // Let parent handle the send-offer logic - send as date string to avoid timezone issues
+      const dateString = selectedDate.toISOString().split('T')[0]; // YYYY-MM-DD format
+      await onAssign(selectedEngineerId, dateString, 'send_offer');
       
       // Trigger refresh for status tiles
       window.dispatchEvent(new CustomEvent('scheduling:refresh'));
@@ -132,7 +133,9 @@ export function SmartAssignmentModal({
 
     setProcessing(true);
     try {
-      await onAssign(selectedEngineerId, selectedDate.toISOString(), 'confirm_book');
+      // Send as date string to avoid timezone issues
+      const dateString = selectedDate.toISOString().split('T')[0]; // YYYY-MM-DD format
+      await onAssign(selectedEngineerId, dateString, 'confirm_book');
       toast.success('Installation booked successfully');
       onClose();
     } catch (error) {

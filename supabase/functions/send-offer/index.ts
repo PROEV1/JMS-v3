@@ -130,8 +130,11 @@ serve(async (req: Request) => {
     }
 
     // Check engineer availability on offered date
-    const offerDate = new Date(offered_date)
+    // Parse the date as local date to avoid timezone issues
+    const offerDate = new Date(offered_date + (offered_date.includes('T') ? '' : 'T00:00:00'))
     const dayOfWeek = offerDate.getDay()
+    
+    console.log(`Checking availability for engineer ${engineer_id} on date ${offered_date}, parsed as ${offerDate.toISOString()}, day of week: ${dayOfWeek}`)
     
     const workingHour = engineer.engineer_availability?.find(
       (wh: any) => wh.day_of_week === dayOfWeek && wh.is_available
