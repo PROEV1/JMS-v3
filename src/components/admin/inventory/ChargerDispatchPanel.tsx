@@ -7,82 +7,80 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Package, Calendar, User, MapPin, Truck, ExternalLink } from "lucide-react";
-import { format } from "date-fns";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { Calendar, Package, Truck, User } from "lucide-react";
 
+// Local interfaces to work around missing Supabase types
 interface ChargerDispatch {
   id: string;
   order_id: string;
   item_id: string;
   qty: number;
-  method: string;
-  status: string;
-  tracking_number: string | null;
-  fulfilment_partner: string | null;
-  external_id: string | null;
-  notes: string | null;
+  method: 'to_van' | 'direct_to_consumer';
+  status: 'not_required' | 'not_sent' | 'pending_dispatch' | 'sent' | 'delivered' | 'returned' | 'cancelled';
+  tracking_number?: string;
+  fulfilment_partner?: string;
+  external_id?: string;
+  from_location_id?: string;
+  to_location_id?: string;
+  engineer_id?: string;
+  notes?: string;
   created_at: string;
-  orders: {
+  updated_at: string;
+  orders?: {
     order_number: string;
-    scheduled_install_date: string | null;
-    client_id: string;
-    engineer_id: string | null;
-    clients: {
+    scheduled_install_date?: string;
+    clients?: {
       full_name: string;
-      postcode: string | null;
     };
-    engineers: {
-      name: string;
-    } | null;
   };
-  inventory_items: {
+  inventory_items?: {
     name: string;
     sku: string;
   };
+  engineers?: {
+    name: string;
+  };
 }
 
-export function ChargerDispatchPanel() {
+interface ChargerDispatchPanelProps {
+  onSwitchTab: (tab: string) => void;
+}
+
+export function ChargerDispatchPanel({ onSwitchTab }: ChargerDispatchPanelProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [filters, setFilters] = React.useState({
-    status: 'all',
-    method: 'all',
-    search: ''
-  });
+  const [statusFilter, setStatusFilter] = React.useState<string>('all');
+  const [editingDispatch, setEditingDispatch] = React.useState<ChargerDispatch | null>(null);
 
-  // Fetch charger dispatches with related data
-  const { data: dispatches = [], isLoading } = useQuery({
-    queryKey: ['charger-dispatches', filters],
+  const { data: dispatches = [] } = useQuery({
+    queryKey: ['charger-dispatches', statusFilter],
     queryFn: async () => {
       let query = supabase
-        .from('charger_dispatches')
+        .from('charger_dispatches' as any)
         .select(`
           *,
-          orders!inner(
+          orders!inner (
             order_number,
             scheduled_install_date,
-            client_id,
-            engineer_id,
-            clients!inner(full_name, postcode),
-            engineers(name)
+            clients (
+              full_name
+            )
           ),
-          inventory_items!inner(name, sku)
+          inventory_items (
+            name,
+            sku
+          ),
+          engineers (
+            name
+          )
         `)
         .order('created_at', { ascending: false });
 
-      if (filters.status !== 'all') {
-        query = query.eq('status', filters.status);
-      }
-      
-      if (filters.method !== 'all') {
-        query = query.eq('method', filters.method);
-      }
-
-      if (filters.search) {
-        query = query.or(`orders.order_number.ilike.%${filters.search}%,orders.clients.full_name.ilike.%${filters.search}%`);
+      if (statusFilter !== 'all') {
+        query = query.eq('status', statusFilter);
       }
 
       const { data, error } = await query;
@@ -91,11 +89,31 @@ export function ChargerDispatchPanel() {
     }
   });
 
-  // Update dispatch status
-  const updateDispatchMutation = useMutation({
-    mutationFn: async ({ id, updates }: { id: string, updates: any }) => {
+  const { data: orders = [] } = useQuery({
+    queryKey: ['scheduled-orders-for-dispatch'],
+    queryFn: async () => {
       const { data, error } = await supabase
-        .from('charger_dispatches')
+        .from('orders' as any)
+        .select(`
+          id,
+          order_number,
+          scheduled_install_date,
+          clients (
+            full_name
+          )
+        `)
+        .not('scheduled_install_date', 'is', null)
+        .order('scheduled_install_date');
+
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  const updateDispatchMutation = useMutation({
+    mutationFn: async ({ id, updates }: { id: string, updates: Partial<ChargerDispatch> }) => {
+      const { data, error } = await supabase
+        .from('charger_dispatches' as any)
         .update(updates)
         .eq('id', id)
         .select()
@@ -105,11 +123,12 @@ export function ChargerDispatchPanel() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['charger-dispatches'] });
       toast({
         title: "Success",
         description: "Dispatch updated successfully",
       });
+      queryClient.invalidateQueries({ queryKey: ["charger-dispatches"] });
+      setEditingDispatch(null);
     },
     onError: (error: any) => {
       toast({
@@ -133,94 +152,35 @@ export function ChargerDispatchPanel() {
     }
   };
 
-  const getMethodColor = (method: string) => {
-    switch (method) {
-      case 'to_van': return 'bg-green-100 text-green-800';
-      case 'direct_to_consumer': return 'bg-blue-100 text-blue-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
+  const getMethodIcon = (method: string) => {
+    return method === 'to_van' ? <Truck className="w-4 h-4" /> : <Package className="w-4 h-4" />;
   };
-
-  const formatStatus = (status: string) => {
-    return status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-  };
-
-  const formatMethod = (method: string) => {
-    return method.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-  };
-
-  if (isLoading) {
-    return <div className="text-center py-8">Loading dispatches...</div>;
-  }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Charger Dispatch Management</h3>
+        <div>
+          <h2 className="text-2xl font-bold">Charger Dispatch</h2>
+          <p className="text-muted-foreground">
+            Manage charger dispatches for scheduled installations
+          </p>
+        </div>
+        <div className="flex items-center space-x-2">
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Dispatches</SelectItem>
+              <SelectItem value="not_sent">Not Sent</SelectItem>
+              <SelectItem value="pending_dispatch">Pending Dispatch</SelectItem>
+              <SelectItem value="sent">Sent</SelectItem>
+              <SelectItem value="delivered">Delivered</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
-      {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Filters</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="space-y-2">
-              <Label>Search</Label>
-              <Input
-                placeholder="Order number, client name..."
-                value={filters.search}
-                onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label>Status</Label>
-              <Select value={filters.status} onValueChange={(value) => setFilters(prev => ({ ...prev, status: value }))}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="not_required">Not Required</SelectItem>
-                  <SelectItem value="not_sent">Not Sent</SelectItem>
-                  <SelectItem value="pending_dispatch">Pending Dispatch</SelectItem>
-                  <SelectItem value="sent">Sent</SelectItem>
-                  <SelectItem value="delivered">Delivered</SelectItem>
-                  <SelectItem value="returned">Returned</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Method</Label>
-              <Select value={filters.method} onValueChange={(value) => setFilters(prev => ({ ...prev, method: value }))}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Methods</SelectItem>
-                  <SelectItem value="to_van">To Van</SelectItem>
-                  <SelectItem value="direct_to_consumer">Direct to Consumer</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex items-end">
-              <Button 
-                variant="outline" 
-                onClick={() => setFilters({ status: 'all', method: 'all', search: '' })}
-              >
-                Clear Filters
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Dispatches List */}
       <div className="grid gap-4">
         {dispatches.map((dispatch) => (
           <Card key={dispatch.id} className="relative">
@@ -228,77 +188,67 @@ export function ChargerDispatchPanel() {
               <div className="flex items-start justify-between">
                 <div className="space-y-1">
                   <div className="flex items-center space-x-2">
-                    <Package className="w-4 h-4" />
-                    <span className="font-medium">{dispatch.orders.order_number}</span>
-                    {dispatch.external_id && (
-                      <ExternalLink className="w-3 h-3 text-muted-foreground" />
-                    )}
+                    <CardTitle className="text-base">
+                      {dispatch.orders?.order_number}
+                    </CardTitle>
+                    <Badge className={getStatusColor(dispatch.status)}>
+                      {dispatch.status.replace('_', ' ')}
+                    </Badge>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    {dispatch.inventory_items.name} ({dispatch.inventory_items.sku}) × {dispatch.qty}
+                    {dispatch.orders?.clients?.full_name}
                   </p>
+                  {dispatch.orders?.scheduled_install_date && (
+                    <div className="flex items-center space-x-1 text-sm text-muted-foreground">
+                      <Calendar className="w-4 h-4" />
+                      <span>
+                        {new Date(dispatch.orders.scheduled_install_date).toLocaleDateString()}
+                      </span>
+                    </div>
+                  )}
                 </div>
-                <div className="flex space-x-2">
-                  <Badge className={getStatusColor(dispatch.status)}>
-                    {formatStatus(dispatch.status)}
-                  </Badge>
-                  <Badge className={getMethodColor(dispatch.method)}>
-                    {formatMethod(dispatch.method)}
-                  </Badge>
+                <div className="flex items-center space-x-2">
+                  {getMethodIcon(dispatch.method)}
+                  <span className="text-sm">
+                    {dispatch.method === 'to_van' ? 'To Van' : 'Direct'}
+                  </span>
                 </div>
               </div>
             </CardHeader>
             
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                <div className="space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <User className="w-4 h-4 text-muted-foreground" />
-                    <span>{dispatch.orders.clients.full_name}</span>
+            <CardContent className="space-y-3">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-muted-foreground">Item: </span>
+                  <span>{dispatch.inventory_items?.name}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">SKU: </span>
+                  <span>{dispatch.inventory_items?.sku}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Quantity: </span>
+                  <span>{dispatch.qty}</span>
+                </div>
+                {dispatch.engineers && (
+                  <div>
+                    <span className="text-muted-foreground">Engineer: </span>
+                    <span>{dispatch.engineers.name}</span>
                   </div>
-                  {dispatch.orders.clients.postcode && (
-                    <div className="flex items-center space-x-2">
-                      <MapPin className="w-4 h-4 text-muted-foreground" />
-                      <span>{dispatch.orders.clients.postcode}</span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  {dispatch.orders.scheduled_install_date && (
-                    <div className="flex items-center space-x-2">
-                      <Calendar className="w-4 h-4 text-muted-foreground" />
-                      <span>{format(new Date(dispatch.orders.scheduled_install_date), 'dd/MM/yyyy')}</span>
-                    </div>
-                  )}
-                  {dispatch.orders.engineers && (
-                    <div className="flex items-center space-x-2">
-                      <Truck className="w-4 h-4 text-muted-foreground" />
-                      <span>{dispatch.orders.engineers.name}</span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  {dispatch.tracking_number && (
-                    <div className="text-xs">
-                      <span className="text-muted-foreground">Tracking: </span>
-                      <span className="font-mono">{dispatch.tracking_number}</span>
-                    </div>
-                  )}
-                  {dispatch.fulfilment_partner && (
-                    <div className="text-xs">
-                      <span className="text-muted-foreground">Partner: </span>
-                      <span>{dispatch.fulfilment_partner}</span>
-                    </div>
-                  )}
-                </div>
+                )}
               </div>
 
+              {dispatch.tracking_number && (
+                <div className="text-sm">
+                  <span className="text-muted-foreground">Tracking: </span>
+                  <span className="font-mono">{dispatch.tracking_number}</span>
+                </div>
+              )}
+
               {dispatch.notes && (
-                <div className="p-3 bg-gray-50 rounded text-sm">
+                <div className="text-sm">
                   <span className="text-muted-foreground">Notes: </span>
-                  {dispatch.notes}
+                  <span>{dispatch.notes}</span>
                 </div>
               )}
 
@@ -306,38 +256,10 @@ export function ChargerDispatchPanel() {
                 <Button 
                   variant="outline" 
                   size="sm"
-                  onClick={() => {
-                    // TODO: Open edit dispatch modal
-                  }}
+                  onClick={() => setEditingDispatch(dispatch)}
                 >
-                  Edit
+                  Update Status
                 </Button>
-                
-                {dispatch.status === 'not_sent' && (
-                  <Button 
-                    size="sm"
-                    onClick={() => updateDispatchMutation.mutate({
-                      id: dispatch.id,
-                      updates: { status: 'pending_dispatch' }
-                    })}
-                    disabled={updateDispatchMutation.isPending}
-                  >
-                    Mark Pending
-                  </Button>
-                )}
-                
-                {dispatch.status === 'pending_dispatch' && (
-                  <Button 
-                    size="sm"
-                    onClick={() => updateDispatchMutation.mutate({
-                      id: dispatch.id,
-                      updates: { status: 'sent' }
-                    })}
-                    disabled={updateDispatchMutation.isPending}
-                  >
-                    Mark Sent
-                  </Button>
-                )}
               </div>
             </CardContent>
           </Card>
@@ -346,7 +268,86 @@ export function ChargerDispatchPanel() {
 
       {dispatches.length === 0 && (
         <div className="text-center py-8 text-muted-foreground">
-          No charger dispatches found matching the current filters.
+          No charger dispatches found.
+        </div>
+      )}
+
+      {/* Quick Status Update Modal */}
+      {editingDispatch && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-md mx-4">
+            <CardHeader>
+              <CardTitle>Update Dispatch Status</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label>Status</Label>
+                <Select 
+                  value={editingDispatch.status} 
+                  onValueChange={(value) => setEditingDispatch(prev => 
+                    prev ? { ...prev, status: value as any } : null
+                  )}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="not_sent">Not Sent</SelectItem>
+                    <SelectItem value="pending_dispatch">Pending Dispatch</SelectItem>
+                    <SelectItem value="sent">Sent</SelectItem>
+                    <SelectItem value="delivered">Delivered</SelectItem>
+                    <SelectItem value="returned">Returned</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label>Tracking Number</Label>
+                <Input
+                  value={editingDispatch.tracking_number || ''}
+                  onChange={(e) => setEditingDispatch(prev => 
+                    prev ? { ...prev, tracking_number: e.target.value } : null
+                  )}
+                  placeholder="Enter tracking number"
+                />
+              </div>
+
+              <div>
+                <Label>Notes</Label>
+                <Textarea
+                  value={editingDispatch.notes || ''}
+                  onChange={(e) => setEditingDispatch(prev => 
+                    prev ? { ...prev, notes: e.target.value } : null
+                  )}
+                  placeholder="Add notes..."
+                  className="min-h-[80px]"
+                />
+              </div>
+
+              <div className="flex justify-end space-x-2">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setEditingDispatch(null)}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={() => updateDispatchMutation.mutate({
+                    id: editingDispatch.id,
+                    updates: {
+                      status: editingDispatch.status,
+                      tracking_number: editingDispatch.tracking_number,
+                      notes: editingDispatch.notes
+                    }
+                  })}
+                  disabled={updateDispatchMutation.isPending}
+                >
+                  {updateDispatchMutation.isPending ? "Updating..." : "Update"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
     </div>

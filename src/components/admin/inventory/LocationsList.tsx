@@ -35,7 +35,7 @@ export function LocationsList() {
       
       return data.map(location => ({
         ...location,
-        engineer_name: location.engineers?.name
+        engineer_name: (location.engineers as any)?.name
       })) as Location[];
     }
   });

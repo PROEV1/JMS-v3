@@ -1,67 +1,59 @@
-import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+import React from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Package, MapPin, FileText, Truck, ShoppingCart, AlertTriangle, Building } from "lucide-react";
-import { InventoryItemsSimple } from "@/components/admin/inventory/InventoryItemsSimple";
+import { Button } from "@/components/ui/button";
+import { Plus } from "lucide-react";
 import { SimpleInventoryDashboard } from "@/components/admin/inventory/SimpleInventoryDashboard";
+import { InventoryItemsSimple } from "@/components/admin/inventory/InventoryItemsSimple";
 import { LocationsList } from "@/components/admin/inventory/LocationsList";
-import { SuppliersList } from "@/components/admin/inventory/SuppliersList";
-import { TransactionsList } from "@/components/admin/inventory/TransactionsList";
-import { StockTransferPanel } from "@/components/admin/inventory/StockTransferPanel";
-import { QuickReceivePanel } from "@/components/admin/inventory/QuickReceivePanel";
+import { AddItemModal } from "@/components/admin/inventory/AddItemModal";
+import { AddLocationModal } from "@/components/admin/inventory/AddLocationModal";
+import { ChargerDispatchPanel } from "@/components/admin/inventory/ChargerDispatchPanel";
 
 export default function AdminInventory() {
-  const [activeTab, setActiveTab] = useState("dashboard");
+  const [activeTab, setActiveTab] = React.useState("overview");
+  const [addItemOpen, setAddItemOpen] = React.useState(false);
+  const [addLocationOpen, setAddLocationOpen] = React.useState(false);
 
-  const switchToTab = (tab: string) => {
+  const handleSwitchTab = (tab: string) => {
     setActiveTab(tab);
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="container mx-auto p-6">
+      <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-3xl font-bold">Inventory Management</h1>
           <p className="text-muted-foreground">
-            Manage stock, locations, and materials
+            Manage your inventory items, locations, and charger dispatches
           </p>
+        </div>
+        <div className="flex space-x-2">
+          {activeTab === "items" && (
+            <Button onClick={() => setAddItemOpen(true)}>
+              <Plus className="w-4 h-4 mr-2" />
+              Add Item
+            </Button>
+          )}
+          {activeTab === "locations" && (
+            <Button onClick={() => setAddLocationOpen(true)}>
+              <Plus className="w-4 h-4 mr-2" />
+              Add Location
+            </Button>
+          )}
         </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-7">
-          <TabsTrigger value="dashboard" className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4" />
-            Dashboard
-          </TabsTrigger>
-          <TabsTrigger value="items" className="flex items-center gap-2">
-            <Package className="h-4 w-4" />
-            Items
-          </TabsTrigger>
-          <TabsTrigger value="locations" className="flex items-center gap-2">
-            <MapPin className="h-4 w-4" />
-            Locations
-          </TabsTrigger>
-          <TabsTrigger value="suppliers" className="flex items-center gap-2">
-            <Building className="h-4 w-4" />
-            Suppliers
-          </TabsTrigger>
-          <TabsTrigger value="transactions" className="flex items-center gap-2">
-            <FileText className="h-4 w-4" />
-            Transactions
-          </TabsTrigger>
-          <TabsTrigger value="requests" className="flex items-center gap-2">
-            <Truck className="h-4 w-4" />
-            Requests
-          </TabsTrigger>
-          <TabsTrigger value="purchases" className="flex items-center gap-2">
-            <ShoppingCart className="h-4 w-4" />
-            Purchases
-          </TabsTrigger>
+        <TabsList>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="items">Items</TabsTrigger>
+          <TabsTrigger value="locations">Locations</TabsTrigger>
+          <TabsTrigger value="charger-dispatch">Charger Dispatch</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="dashboard">
-          <SimpleInventoryDashboard onSwitchTab={switchToTab} />
+        <TabsContent value="overview">
+          <SimpleInventoryDashboard onSwitchTab={handleSwitchTab} />
         </TabsContent>
 
         <TabsContent value="items">
@@ -72,22 +64,20 @@ export default function AdminInventory() {
           <LocationsList />
         </TabsContent>
 
-        <TabsContent value="suppliers">
-          <SuppliersList />
-        </TabsContent>
-
-        <TabsContent value="transactions">
-          <TransactionsList />
-        </TabsContent>
-
-        <TabsContent value="requests">
-          <StockTransferPanel />
-        </TabsContent>
-
-        <TabsContent value="purchases">
-          <QuickReceivePanel />
+        <TabsContent value="charger-dispatch">
+          <ChargerDispatchPanel onSwitchTab={handleSwitchTab} />
         </TabsContent>
       </Tabs>
+
+      <AddItemModal 
+        open={addItemOpen} 
+        onOpenChange={setAddItemOpen}
+      />
+
+      <AddLocationModal 
+        open={addLocationOpen} 
+        onOpenChange={setAddLocationOpen}
+      />
     </div>
   );
 }

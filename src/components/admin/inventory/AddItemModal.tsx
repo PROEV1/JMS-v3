@@ -27,6 +27,11 @@ interface InventoryItem {
   supplier_id: string | null;
 }
 
+interface Supplier {
+  id: string;
+  name: string;
+}
+
 interface AddItemModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -87,18 +92,18 @@ export function AddItemModal({ open, onOpenChange, editItem }: AddItemModalProps
     }
   }, [open, editItem]);
 
-  // Fetch suppliers
+  // Fetch suppliers - using type assertion since inventory_suppliers might not be in types yet
   const { data: suppliers = [] } = useQuery({
     queryKey: ['inventory-suppliers'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('inventory_suppliers')
+        .from('inventory_suppliers' as any)
         .select('id, name')
         .eq('is_active', true)
         .order('name');
       
       if (error) throw error;
-      return data;
+      return data as Supplier[];
     }
   });
 
