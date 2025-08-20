@@ -341,17 +341,20 @@ export const getSmartEngineerRecommendations = async (
           // Get live distance and travel time from Mapbox (skip if exact prefix match or unbounded)
           let distance = 0;
           let travelTime = hasServiceAreaMatch ? (serviceCheck.travelTime || 60) : 80; // Default higher if no service area match
+          let travelSource: 'mapbox' | 'service-area-estimate' | 'fallback-default' = 'fallback-default';
           
           if (hasExactAreaMatch) {
             // Use nominal values for exact area matches to avoid Mapbox calls
             distance = 15; // Nominal 15 miles for local area
             travelTime = 30; // Nominal 30 minutes for local travel
+            travelSource = 'service-area-estimate';
             console.log(`🎯 Using nominal distance/time for ${engineer.name} (exact area match): ${distance}mi, ${travelTime}min`);
           } else if (engineer.starting_postcode && !isUnbounded) {
              try {
                const distanceResult = await getLiveDistance(engineer.starting_postcode, finalPostcode);
                distance = distanceResult.distance;
                travelTime = distanceResult.duration;
+               travelSource = 'mapbox';
                
                 // Final check: respect engineer's travel time limits based on actual Mapbox data
                 // Use service area limit if matched, otherwise use global fallback
@@ -366,12 +369,14 @@ export const getSmartEngineerRecommendations = async (
                // Fallback to estimated travel time from service area
                distance = serviceCheck.travelTime ? Math.round(serviceCheck.travelTime / 2) : 25; // Rough estimate
                travelTime = serviceCheck.travelTime || 60;
+               travelSource = 'service-area-estimate';
              }
            } else if (isUnbounded) {
              // For unbounded areas, use minimal travel time/distance
              console.log(`Engineer ${engineer.name} has unbounded coverage for ${finalPostcode}`);
              distance = 15; // Nominal distance
              travelTime = 30; // Nominal time
+             travelSource = 'service-area-estimate';
            }
 
           // Check distance limits
@@ -501,7 +506,8 @@ export const getSmartEngineerRecommendations = async (
             score,
             reasons,
             availableDate: availableDate.toISOString().split('T')[0],
-            dailyWorkloadThatDay
+            dailyWorkloadThatDay,
+            travelSource
           };
         } catch (error) {
           exclusionReasons[engineer.name].push(`Evaluation error: ${error}`);
@@ -747,28 +753,42 @@ async function getSmartEngineerRecommendationsFast(
         
         let distance = 0;
         let travelTime = 0;
+        let travelSource: 'mapbox' | 'service-area-estimate' | 'fallback-default' = 'fallback-default';
 
-        // Prioritize exact area matches with better defaults
-        if (hasExactAreaMatch) {
-          if (distanceResults.has(engineer.id)) {
-            const result = distanceResults.get(engineer.id)!;
-            distance = result.distance;
-            travelTime = result.duration;
-            console.log(`📍 ${engineer.name}: Using Mapbox data for exact match - ${distance}mi, ${travelTime}min`);
-          } else {
-            // Use favorable defaults for exact area matches
-            distance = 8;  // Very close for same area
-            travelTime = 20; // Short travel time for local area
-            console.log(`🎯 ${engineer.name}: Using optimized defaults for exact area match - ${distance}mi, ${travelTime}min`);
-          }
-        } else if (distanceResults.has(engineer.id)) {
+        // Always prioritize Mapbox data when available
+        if (distanceResults.has(engineer.id)) {
           const result = distanceResults.get(engineer.id)!;
           distance = result.distance;
           travelTime = result.duration;
+          travelSource = 'mapbox';
+          console.log(`📍 ${engineer.name}: Using live Mapbox data - ${distance}mi, ${travelTime}min`);
+        } else if (hasServiceAreaMatch) {
+          // Use service area estimates based on match type
+          const matchType = serviceCheck.matchType || 'area';
+          let estimatedDistance: number;
+          let estimatedTime: number;
+          
+          if (matchType === 'exact') {
+            estimatedDistance = 8; // Very close for exact matches
+            estimatedTime = 20;
+          } else if (matchType === 'prefix') {
+            estimatedDistance = 12; // Moderate distance for prefix matches
+            estimatedTime = 25;
+          } else {
+            estimatedDistance = 15; // Wider area matches
+            estimatedTime = 30;
+          }
+          
+          distance = estimatedDistance;
+          travelTime = serviceCheck.travelTime || estimatedTime;
+          travelSource = 'service-area-estimate';
+          console.log(`🗺️ ${engineer.name}: Using service area estimate - ${distance}mi, ${travelTime}min (${matchType} match)`);
         } else {
-          console.log(`⚠️ No distance data available for ${engineer.name}, using defaults`);
-          distance = 20;
-          travelTime = 45;
+          // Final fallback only when no other data is available
+          distance = 25;
+          travelTime = 60;
+          travelSource = 'fallback-default';
+          console.log(`⚠️ ${engineer.name}: Using fallback defaults - ${distance}mi, ${travelTime}min (no service area match)`);
         }
 
         // Check travel time limits with generous leniency for exact area matches
@@ -863,7 +883,8 @@ async function getSmartEngineerRecommendationsFast(
           score,
           reasons,
           availableDate: availableDate.toISOString().split('T')[0],
-          dailyWorkloadThatDay
+          dailyWorkloadThatDay,
+          travelSource
         };
 
       } catch (error) {

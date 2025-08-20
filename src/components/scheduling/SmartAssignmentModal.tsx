@@ -30,6 +30,7 @@ interface EngineerSuggestion {
   score: number;
   reasons: string[];
   dailyWorkloadThatDay?: number;
+  travelSource: 'mapbox' | 'service-area-estimate' | 'fallback-default';
 }
 
 export function SmartAssignmentModal({ 
@@ -248,6 +249,15 @@ export function SmartAssignmentModal({
                               <Clock className="h-3 w-3" />
                               <span>{suggestion.travelTime}min travel</span>
                             </div>
+                          </div>
+                          <div className="flex justify-start mt-1">
+                            <Badge 
+                              variant={suggestion.travelSource === 'mapbox' ? 'default' : 'secondary'} 
+                              className="text-xs"
+                            >
+                              {suggestion.travelSource === 'mapbox' ? 'Live Distance' : 
+                               suggestion.travelSource === 'service-area-estimate' ? 'Estimated' : 'Default'}
+                            </Badge>
                           </div>
 
                           <div className="text-xs text-muted-foreground">
