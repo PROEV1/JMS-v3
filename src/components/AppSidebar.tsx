@@ -45,7 +45,7 @@ export function AppSidebar({ userRole }: AppSidebarProps) {
 
   // Define navigation items based on user role - keeping exact same functionality as original Layout
   const adminMenuItems = [
-    { icon: FileText, label: 'Dashboard', href: '/dashboard', action: () => navigate('/dashboard') },
+    { icon: Home, label: 'Dashboard', href: '/admin', action: () => navigate('/admin') },
     { icon: FileText, label: 'Quotes', href: '/admin/quotes', action: () => navigate('/admin/quotes') },
     { icon: ShoppingCart, label: 'Orders', href: '/admin/orders', action: () => navigate('/admin/orders') },
     { icon: Calendar, label: 'Schedule', href: '/admin/schedule', action: () => navigate('/admin/schedule') },

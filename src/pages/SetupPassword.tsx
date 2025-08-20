@@ -148,7 +148,7 @@ export default function SetupPassword() {
 
       // Small delay before redirect
       setTimeout(() => {
-        navigate('/dashboard', { replace: true });
+        navigate('/', { replace: true });
       }, 1500);
 
     } catch (error: any) {

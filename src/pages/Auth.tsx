@@ -24,10 +24,10 @@ export default function Auth() {
   useEffect(() => {
     if (user && !authLoading) {
       console.log('Auth: User authenticated, preparing redirect', { userId: user.id, email: user.email });
-      // Redirect authenticated users to dashboard for role-based routing
+      // Redirect authenticated users to root for role-based routing
       setTimeout(() => {
-        console.log('Auth: Executing redirect to dashboard');
-        navigate('/dashboard', { replace: true });
+        console.log('Auth: Executing redirect to root');
+        navigate('/', { replace: true });
       }, 500);
     }
   }, [user, authLoading, navigate]);
@@ -45,7 +45,7 @@ export default function Auth() {
     setLoading(true);
 
     try {
-      const redirectUrl = `${window.location.origin}/dashboard`;
+      const redirectUrl = `${window.location.origin}/`;
       
       const { error } = await supabase.auth.signUp({
         email,
@@ -147,8 +147,8 @@ export default function Auth() {
         // Force navigation after successful login
         console.log('Auth: Login successful, user data:', data.user);
         setTimeout(() => {
-          console.log('Auth: Forcing navigation to dashboard');
-          navigate('/dashboard', { replace: true });
+          console.log('Auth: Forcing navigation to root');
+          navigate('/', { replace: true });
         }, 300);
       }
     } catch (error) {

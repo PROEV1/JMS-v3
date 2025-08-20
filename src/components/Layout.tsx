@@ -43,7 +43,7 @@ export default function Layout({ children }: LayoutProps) {
   // Protect client routes from non-clients
   if (userRole !== 'client' && (currentPath.startsWith('/client') || 
       (userRole === 'admin' && ['/quotes', '/orders', '/messages', '/documents', '/payments', '/date-blocking', '/profile'].includes(currentPath)))) {
-    const redirectTo = userRole === 'admin' ? '/dashboard' : '/engineer';
+    const redirectTo = userRole === 'admin' ? '/admin' : '/engineer';
     console.log(`Layout: ${userRole} accessing client route, redirecting to ${redirectTo}`);
     return <Navigate to={redirectTo} replace />;
   }
@@ -52,7 +52,7 @@ export default function Layout({ children }: LayoutProps) {
   if (userRole !== 'engineer' && (currentPath.startsWith('/engineer') ||
       (userRole === 'admin' && ['/availability', '/profile'].includes(currentPath)) ||
       (userRole === 'client' && ['/availability', '/profile'].includes(currentPath)))) {
-    const redirectTo = userRole === 'admin' ? '/dashboard' : '/client';
+    const redirectTo = userRole === 'admin' ? '/admin' : '/client';
     console.log(`Layout: ${userRole} accessing engineer route, redirecting to ${redirectTo}`);
     return <Navigate to={redirectTo} replace />;
   }
