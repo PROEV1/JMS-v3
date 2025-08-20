@@ -182,24 +182,77 @@ export function SchedulePipelineDashboard({ orders }: SchedulePipelineDashboardP
   useEffect(() => {
     const fetchOfferCounts = async () => {
       try {
+        // Filter job offers by installation job type only
         const [pendingResult, acceptedResult, rejectedResult, expiredResult] = await Promise.all([
-          supabase
-            .from('job_offers')
-            .select('*', { count: 'exact', head: true })
-            .eq('status', 'pending')
-            .gt('expires_at', new Date().toISOString()),
-          supabase
-            .from('job_offers')
-            .select('*', { count: 'exact', head: true })
-            .eq('status', 'accepted'),
-          supabase
-            .from('job_offers')
-            .select('*', { count: 'exact', head: true })
-            .eq('status', 'rejected'),
-          supabase
-            .from('job_offers')
-            .select('*', { count: 'exact', head: true })
-            .eq('status', 'expired')
+          (async () => {
+            const { data: offers } = await supabase
+              .from('job_offers')
+              .select('order_id')
+              .eq('status', 'pending')
+              .gt('expires_at', new Date().toISOString());
+            
+            if (!offers?.length) return { count: 0 };
+            
+            const orderIds = offers.map(o => o.order_id);
+            const { count } = await supabase
+              .from('orders')
+              .select('*', { count: 'exact', head: true })
+              .eq('job_type', 'installation')
+              .in('id', orderIds);
+              
+            return { count: count || 0 };
+          })(),
+          (async () => {
+            const { data: offers } = await supabase
+              .from('job_offers')
+              .select('order_id')
+              .eq('status', 'accepted');
+            
+            if (!offers?.length) return { count: 0 };
+            
+            const orderIds = offers.map(o => o.order_id);
+            const { count } = await supabase
+              .from('orders')
+              .select('*', { count: 'exact', head: true })
+              .eq('job_type', 'installation')
+              .in('id', orderIds);
+              
+            return { count: count || 0 };
+          })(),
+          (async () => {
+            const { data: offers } = await supabase
+              .from('job_offers')
+              .select('order_id')
+              .eq('status', 'rejected');
+            
+            if (!offers?.length) return { count: 0 };
+            
+            const orderIds = offers.map(o => o.order_id);
+            const { count } = await supabase
+              .from('orders')
+              .select('*', { count: 'exact', head: true })
+              .eq('job_type', 'installation')
+              .in('id', orderIds);
+              
+            return { count: count || 0 };
+          })(),
+          (async () => {
+            const { data: offers } = await supabase
+              .from('job_offers')
+              .select('order_id')
+              .eq('status', 'expired');
+            
+            if (!offers?.length) return { count: 0 };
+            
+            const orderIds = offers.map(o => o.order_id);
+            const { count } = await supabase
+              .from('orders')
+              .select('*', { count: 'exact', head: true })
+              .eq('job_type', 'installation')
+              .in('id', orderIds);
+              
+            return { count: count || 0 };
+          })()
         ]);
 
         setOfferCounts({
@@ -218,28 +271,29 @@ export function SchedulePipelineDashboard({ orders }: SchedulePipelineDashboardP
     fetchOfferCounts();
   }, []);
 
-  // Stats calculation for summary badges
-  const totalJobs = orders.length;
-  const needsScheduling = orders.filter(o => 
+  // Stats calculation for summary badges (installations only)
+  const installationOrders = orders.filter(o => o.job_type === 'installation');
+  const totalJobs = installationOrders.length;
+  const needsScheduling = installationOrders.filter(o => 
     ['needs_scheduling', 'awaiting_install_booking'].includes(o.status_enhanced)
   ).length;
-  const inProgress = orders.filter(o => 
+  const inProgress = installationOrders.filter(o => 
     ['date_offered', 'date_accepted', 'scheduled', 'in_progress'].includes(o.status_enhanced)
   ).length;
-  const issues = orders.filter(o => 
+  const issues = installationOrders.filter(o => 
     ['date_rejected', 'offer_expired', 'on_hold_parts_docs'].includes(o.status_enhanced)
   ).length;
-  const completed = orders.filter(o => o.status_enhanced === 'completed').length;
+  const completed = installationOrders.filter(o => o.status_enhanced === 'completed').length;
 
   return (
     <div className="space-y-6">
       {/* Header with Summary Pills */}
       <div>
         <h2 className="text-2xl font-bold mb-4">Scheduling Pipeline</h2>
-        <div className="flex flex-wrap gap-3">
-          <Badge variant="outline" className="px-3 py-1">
-            {totalJobs} Total Jobs
-          </Badge>
+          <div className="flex flex-wrap gap-3">
+            <Badge variant="outline" className="px-3 py-1">
+              {totalJobs} Total Installations
+            </Badge>
           <Badge variant="secondary" className="px-3 py-1">
             {needsScheduling} Need Scheduling
           </Badge>
@@ -263,7 +317,7 @@ export function SchedulePipelineDashboard({ orders }: SchedulePipelineDashboardP
           <StatusTile
             key={tile.id}
             tile={tile}
-            orders={orders}
+            orders={installationOrders}
             totalJobs={totalJobs}
             navigate={navigate}
             offerCounts={offerCounts}

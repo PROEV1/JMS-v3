@@ -11,6 +11,7 @@ import { KpiCard } from './KpiCard';
 import { AlertsPanel } from './AlertsPanel';
 import { WeekAtAGlance } from './WeekAtAGlance';
 import { RecentActivity } from './RecentActivity';
+import { WeeklyCapacityView } from './WeeklyCapacityView';
 import { 
   Calendar, 
   Zap, 
@@ -20,7 +21,8 @@ import {
   Clock,
   CheckCircle,
   AlertTriangle,
-  Users
+  Users,
+  BookOpen
 } from 'lucide-react';
 
 interface SchedulingHubProps {}
@@ -45,12 +47,13 @@ export function SchedulingHub({}: SchedulingHubProps) {
         scheduledTodayResult,
         unavailableEngineersResult
       ] = await Promise.all([
-        // Unassigned jobs that need scheduling (no engineer and no active offers)
+        // Unassigned installation jobs that need scheduling (no engineer and no active offers)
         (async () => {
           const { data: ordersData, error: ordersError } = await supabase
             .from('orders')
             .select('id')
             .eq('status_enhanced', 'awaiting_install_booking')
+            .eq('job_type', 'installation')
             .is('engineer_id', null);
 
           if (ordersError) throw ordersError;
@@ -70,40 +73,99 @@ export function SchedulingHub({}: SchedulingHubProps) {
           return { count: needsSchedulingOrders.length };
         })(),
         
-        // Pending offers
-        supabase
-          .from('job_offers')
-          .select('*', { count: 'exact', head: true })
-          .eq('status', 'pending')
-          .gt('expires_at', now.toISOString()),
+        // Pending offers for installations
+        (async () => {
+          const { data: offers } = await supabase
+            .from('job_offers')
+            .select('order_id')
+            .eq('status', 'pending')
+            .gt('expires_at', now.toISOString());
+          
+          if (!offers?.length) return { count: 0 };
+          
+          const orderIds = offers.map(o => o.order_id);
+          const { count } = await supabase
+            .from('orders')
+            .select('*', { count: 'exact', head: true })
+            .eq('job_type', 'installation')
+            .in('id', orderIds);
+            
+          return { count: count || 0 };
+        })(),
         
-        // Expiring offers (within 24 hours)
+        // Ready to book installations (awaiting_install_booking status)
         supabase
-          .from('job_offers')
+          .from('orders')
           .select('*', { count: 'exact', head: true })
-          .eq('status', 'pending')
-          .gt('expires_at', now.toISOString())
-          .lt('expires_at', tomorrow.toISOString()),
+          .eq('status_enhanced', 'awaiting_install_booking')
+          .eq('job_type', 'installation'),
         
-        // Scheduled for today
+        // Scheduled installations for today
         supabase
           .from('orders')
           .select('*', { count: 'exact', head: true })
           .eq('status_enhanced', 'scheduled')
+          .eq('job_type', 'installation')
           .gte('scheduled_install_date', now.toISOString().split('T')[0])
           .lt('scheduled_install_date', tomorrow.toISOString().split('T')[0]),
         
-        // Unavailable engineers (simplified count)
-        supabase
-          .from('engineers')
-          .select('*', { count: 'exact', head: true })
-          .eq('availability', false)
+        // Unavailable engineers (improved calculation)
+        (async () => {
+          const todayDayOfWeek = now.getDay();
+          const todayStr = now.toISOString().split('T')[0];
+          
+          const { data: engineers } = await supabase
+            .from('engineers')
+            .select(`
+              id,
+              availability,
+              engineer_availability(day_of_week, is_available),
+              engineer_time_off(start_date, end_date, status)
+            `);
+          
+          if (!engineers) return { count: 0 };
+          
+          let unavailableCount = 0;
+          
+          for (const engineer of engineers) {
+            // Check global availability
+            if (!engineer.availability) {
+              unavailableCount++;
+              continue;
+            }
+            
+            // Check day-of-week availability
+            const dayAvailability = engineer.engineer_availability?.find(
+              (avail: any) => avail.day_of_week === todayDayOfWeek
+            );
+            if (dayAvailability && !dayAvailability.is_available) {
+              unavailableCount++;
+              continue;
+            }
+            
+            // Check approved time off for today
+            const hasTimeOffToday = engineer.engineer_time_off?.some((timeOff: any) => {
+              const startDate = new Date(timeOff.start_date);
+              const endDate = new Date(timeOff.end_date);
+              const today = new Date(todayStr);
+              return timeOff.status === 'approved' && 
+                     today >= startDate && 
+                     today <= endDate;
+            });
+            
+            if (hasTimeOffToday) {
+              unavailableCount++;
+            }
+          }
+          
+          return { count: unavailableCount };
+        })()
       ]);
 
       return {
         unassigned: unassignedResult.count || 0,
         pendingOffers: pendingOffersResult.count || 0,
-        expiringOffers: expiringOffersResult.count || 0,
+        readyToBook: expiringOffersResult.count || 0,
         scheduledToday: scheduledTodayResult.count || 0,
         unavailableEngineers: unavailableEngineersResult.count || 0
       };
@@ -122,6 +184,7 @@ export function SchedulingHub({}: SchedulingHubProps) {
           client:clients(full_name, email, postcode),
           engineer:engineers(name, email)
         `)
+        .eq('job_type', 'installation')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -186,11 +249,11 @@ export function SchedulingHub({}: SchedulingHubProps) {
           onClick={() => navigate('/admin/schedule/status/date-offered')}
         />
         <KpiCard
-          title="Expiring Soon"
-          value={kpiData?.expiringOffers || 0}
-          icon={AlertTriangle}
-          variant="danger"
-          onClick={() => navigate('/admin/schedule/status/date-offered')}
+          title="Ready to Book"
+          value={kpiData?.readyToBook || 0}
+          icon={BookOpen}
+          variant="success"
+          onClick={() => navigate('/admin/schedule/status/ready-to-book')}
         />
         <KpiCard
           title="Scheduled Today"
@@ -208,7 +271,7 @@ export function SchedulingHub({}: SchedulingHubProps) {
 
       {/* Alerts Panel */}
       <AlertsPanel 
-        expiringOffers={kpiData?.expiringOffers || 0}
+        expiringOffers={0} // Expiring offers now handled separately in alerts logic
         unassignedJobs={kpiData?.unassigned || 0}
       />
 
@@ -245,8 +308,9 @@ export function SchedulingHub({}: SchedulingHubProps) {
           <SchedulePipelineDashboard orders={orders} />
         </div>
 
-        {/* Right: Week at a Glance + Recent Activity */}
+        {/* Right: Week at a Glance + Recent Activity + Capacity View */}
         <div className="space-y-6">
+          <WeeklyCapacityView />
           <WeekAtAGlance />
           <RecentActivity />
         </div>
