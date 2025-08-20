@@ -93,25 +93,12 @@ export function SchedulingHub({}: SchedulingHubProps) {
           return { count: count || 0 };
         })(),
         
-        // Ready to book installations - orders that have accepted offers but need engineer assignment
-        (async () => {
-          const { data: acceptedOffers } = await supabase
-            .from('job_offers')
-            .select('order_id')
-            .eq('status', 'accepted');
-          
-          if (!acceptedOffers?.length) return { count: 0 };
-          
-          const orderIds = acceptedOffers.map(o => o.order_id);
-          const { count } = await supabase
-            .from('orders')
-            .select('*', { count: 'exact', head: true })
-            .eq('job_type', 'installation')
-            .in('id', orderIds)
-            .is('engineer_id', null);
-            
-          return { count: count || 0 };
-        })(),
+        // Ready to book installations (awaiting_install_booking status)
+        supabase
+          .from('orders')
+          .select('*', { count: 'exact', head: true })
+          .eq('status_enhanced', 'awaiting_install_booking')
+          .eq('job_type', 'installation'),
         
         // Scheduled installations for today
         supabase
