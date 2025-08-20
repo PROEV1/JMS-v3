@@ -38,6 +38,63 @@ export type Database = {
         }
         Relationships: []
       }
+      charger_dispatches: {
+        Row: {
+          charger_item_id: string
+          created_at: string
+          delivered_at: string | null
+          dispatched_at: string | null
+          id: string
+          notes: string | null
+          order_id: string
+          serial_number: string | null
+          status: string
+          tracking_number: string | null
+          updated_at: string
+        }
+        Insert: {
+          charger_item_id: string
+          created_at?: string
+          delivered_at?: string | null
+          dispatched_at?: string | null
+          id?: string
+          notes?: string | null
+          order_id: string
+          serial_number?: string | null
+          status?: string
+          tracking_number?: string | null
+          updated_at?: string
+        }
+        Update: {
+          charger_item_id?: string
+          created_at?: string
+          delivered_at?: string | null
+          dispatched_at?: string | null
+          id?: string
+          notes?: string | null
+          order_id?: string
+          serial_number?: string | null
+          status?: string
+          tracking_number?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "charger_dispatches_charger_item_id_fkey"
+            columns: ["charger_item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "charger_dispatches_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_blocked_dates: {
         Row: {
           blocked_date: string
@@ -1936,6 +1993,115 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stock_request_lines: {
+        Row: {
+          created_at: string
+          id: string
+          item_id: string
+          notes: string | null
+          qty: number
+          request_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          item_id: string
+          notes?: string | null
+          qty: number
+          request_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          item_id?: string
+          notes?: string | null
+          qty?: number
+          request_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_request_lines_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_request_lines_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "stock_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stock_requests: {
+        Row: {
+          created_at: string
+          destination_location_id: string
+          engineer_id: string
+          id: string
+          idempotency_key: string | null
+          needed_by: string | null
+          notes: string | null
+          order_id: string | null
+          photo_url: string | null
+          priority: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          destination_location_id: string
+          engineer_id: string
+          id?: string
+          idempotency_key?: string | null
+          needed_by?: string | null
+          notes?: string | null
+          order_id?: string | null
+          photo_url?: string | null
+          priority?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          destination_location_id?: string
+          engineer_id?: string
+          id?: string
+          idempotency_key?: string | null
+          needed_by?: string | null
+          notes?: string | null
+          order_id?: string | null
+          photo_url?: string | null
+          priority?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_requests_destination_location_id_fkey"
+            columns: ["destination_location_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_requests_engineer_id_fkey"
+            columns: ["engineer_id"]
+            isOneToOne: false
+            referencedRelation: "engineers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_requests_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
             referencedColumns: ["id"]
           },
         ]
