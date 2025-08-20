@@ -143,6 +143,7 @@ function AppContent() {
             <Route path="/engineer/availability" element={<Navigate to="/availability" replace />} />
             <Route path="/jobs/:id" element={<EngineerJobDetail />} />
             <Route path="/engineer/jobs/:id" element={<Navigate to="/jobs/:id" replace />} />
+            <Route path="/engineer/job/:id" element={<EngineerJobDetail />} />
           </>
         )}
 
