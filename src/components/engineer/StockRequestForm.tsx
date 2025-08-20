@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -76,10 +75,10 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({
     name: 'lines'
   });
 
-  // Get van locations for engineer
-  const { data: locations } = useQuery<LocationData[]>({
+  // Get van locations for engineer - simplified without generic types
+  const { data: locations } = useQuery({
     queryKey: ['engineer-locations', engineerId],
-    queryFn: async (): Promise<LocationData[]> => {
+    queryFn: async () => {
       const { data, error } = await supabase
         .from('inventory_locations')
         .select('id, name, code')
@@ -88,14 +87,14 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({
         .eq('is_active', true);
       
       if (error) throw error;
-      return data || [];
+      return data as LocationData[];
     }
   });
 
-  // Get inventory items
-  const { data: items } = useQuery<ItemData[]>({
+  // Get inventory items - simplified without generic types
+  const { data: items } = useQuery({
     queryKey: ['inventory-items-active'],
-    queryFn: async (): Promise<ItemData[]> => {
+    queryFn: async () => {
       const { data, error } = await supabase
         .from('inventory_items')
         .select('id, name, sku, unit')
@@ -103,7 +102,7 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({
         .order('name');
       
       if (error) throw error;
-      return data || [];
+      return data as ItemData[];
     }
   });
 
