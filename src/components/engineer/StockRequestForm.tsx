@@ -37,6 +37,19 @@ interface StockRequestFormProps {
   prefilledItems?: Array<{ item_id: string; qty: number; notes?: string }>;
 }
 
+interface LocationData {
+  id: string;
+  name: string;
+  code: string | null;
+}
+
+interface ItemData {
+  id: string;
+  name: string;
+  sku: string;
+  unit: string;
+}
+
 export const StockRequestForm: React.FC<StockRequestFormProps> = ({
   engineerId,
   orderId,
@@ -47,7 +60,7 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({
   const createRequest = useCreateStockRequest();
 
   const form = useForm<StockRequestFormData>({
-    resolver: zodResolver(stockRequestSchema) as any, // Cast to bypass TS error
+    resolver: zodResolver(stockRequestSchema) as any,
     defaultValues: {
       destination_location_id: '',
       order_id: orderId || '',
@@ -64,9 +77,9 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({
   });
 
   // Get van locations for engineer
-  const { data: locations } = useQuery({
+  const { data: locations } = useQuery<LocationData[]>({
     queryKey: ['engineer-locations', engineerId],
-    queryFn: async () => {
+    queryFn: async (): Promise<LocationData[]> => {
       const { data, error } = await supabase
         .from('inventory_locations')
         .select('id, name, code')
@@ -80,9 +93,9 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({
   });
 
   // Get inventory items
-  const { data: items } = useQuery({
+  const { data: items } = useQuery<ItemData[]>({
     queryKey: ['inventory-items-active'],
-    queryFn: async () => {
+    queryFn: async (): Promise<ItemData[]> => {
       const { data, error } = await supabase
         .from('inventory_items')
         .select('id, name, sku, unit')
@@ -123,20 +136,23 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({
         photoUrl = await uploadPhoto(photoFile) || undefined;
       }
 
-      // Ensure quantities are numbers
-      const validLines = data.lines.map(line => ({
-        item_id: line.item_id,
-        qty: Number(line.qty) || 1,
-        notes: line.notes
-      }));
+      // Ensure all required fields are present and properly typed
+      const requestData = {
+        destination_location_id: data.destination_location_id,
+        order_id: data.order_id,
+        needed_by: data.needed_by,
+        priority: data.priority,
+        notes: data.notes,
+        photo_url: photoUrl,
+        lines: data.lines.map(line => ({
+          item_id: line.item_id,
+          qty: Number(line.qty) || 1,
+          notes: line.notes
+        })),
+        engineer_id: engineerId
+      };
 
-      await createRequest.mutateAsync({
-        ...data,
-        lines: validLines,
-        engineer_id: engineerId,
-        photo_url: photoUrl
-      });
-
+      await createRequest.mutateAsync(requestData);
       onClose();
     } catch (error) {
       console.error('Failed to create stock request:', error);
