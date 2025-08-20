@@ -241,9 +241,23 @@ export const getSmartEngineerRecommendations = async (
       );
     });
 
+    // Debug logging for service area filtering
+    if (postcodePrefix) {
+      console.log(`📍 Service area filtering for prefix "${postcodePrefix}":`);
+      allEngineers.forEach(engineer => {
+        const matchingAreas = engineer.service_areas?.filter(area => 
+          area.postcode_area && area.postcode_area.toUpperCase() === postcodePrefix
+        );
+        const hasMatch = matchingAreas && matchingAreas.length > 0;
+        console.log(`  ${engineer.name}: ${hasMatch ? '✅ MATCH' : '❌ NO MATCH'} (areas: ${engineer.service_areas?.map(a => a.postcode_area).join(', ') || 'none'})`);
+      });
+    }
+
     if (prefixMatchEngineers.length > 0) {
       console.log(`🎯 Found ${prefixMatchEngineers.length} engineers with exact prefix match for ${postcodePrefix}, filtering to these only`);
       allEngineers = prefixMatchEngineers;
+    } else {
+      console.log(`⚠️ No engineers found with exact prefix match for ${postcodePrefix}, using all ${allEngineers.length} engineers`);
     }
 
     console.log(`Found ${allEngineers.length} engineers to evaluate (after prefix filtering)`);

@@ -75,7 +75,9 @@ export function SmartAssignmentModal({
     const loadSuggestions = async () => {
       setLoading(true);
       try {
-        const result = await getSmartEngineerRecommendations(order, getBestPostcode(order));
+        const result = await getSmartEngineerRecommendations(order, getBestPostcode(order), {
+          fastMode: true
+        });
         setSuggestions(result.recommendations);
         
         // Auto-select the first available date if no date is selected
