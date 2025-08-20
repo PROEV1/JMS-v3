@@ -45,6 +45,7 @@ export function AddLocationModal({ open, onOpenChange }: AddLocationModalProps) 
         title: "Success",
         description: "Location added successfully",
       });
+      queryClient.invalidateQueries({ queryKey: ["inventory-locations"] });
       queryClient.invalidateQueries({ queryKey: ["inventory-stats"] });
       onOpenChange(false);
       resetForm();
