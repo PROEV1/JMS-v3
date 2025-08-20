@@ -741,14 +741,27 @@ async function getSmartEngineerRecommendationsFast(
         // Check if this engineer has exact area match using token parsing
         const hasExactAreaMatch = hasExactAreaTokenMatch(engineer, finalAreaLetters);
 
-        // Use real distance data from Mapbox for all engineers
+        // Use distance data with fallbacks optimized for exact area matches
         const serviceCheck = canEngineerServePostcode(engineer, postcode);
         const hasServiceAreaMatch = serviceCheck.canServe;
         
         let distance = 0;
         let travelTime = 0;
 
-        if (distanceResults.has(engineer.id)) {
+        // Prioritize exact area matches with better defaults
+        if (hasExactAreaMatch) {
+          if (distanceResults.has(engineer.id)) {
+            const result = distanceResults.get(engineer.id)!;
+            distance = result.distance;
+            travelTime = result.duration;
+            console.log(`📍 ${engineer.name}: Using Mapbox data for exact match - ${distance}mi, ${travelTime}min`);
+          } else {
+            // Use favorable defaults for exact area matches
+            distance = 8;  // Very close for same area
+            travelTime = 20; // Short travel time for local area
+            console.log(`🎯 ${engineer.name}: Using optimized defaults for exact area match - ${distance}mi, ${travelTime}min`);
+          }
+        } else if (distanceResults.has(engineer.id)) {
           const result = distanceResults.get(engineer.id)!;
           distance = result.distance;
           travelTime = result.duration;
@@ -758,16 +771,25 @@ async function getSmartEngineerRecommendationsFast(
           travelTime = 45;
         }
 
-        // Check travel time limits
-        const maxTravelMinutes = hasServiceAreaMatch ? (serviceCheck.travelTime || 80) : (settings.max_travel_minutes_fallback || 120);
+        // Check travel time limits with leniency for exact area matches
+        let maxTravelMinutes;
+        if (hasExactAreaMatch) {
+          maxTravelMinutes = Math.max(60, serviceCheck.travelTime || 60); // At least 60 min for exact matches
+        } else {
+          maxTravelMinutes = hasServiceAreaMatch ? (serviceCheck.travelTime || 80) : (settings.max_travel_minutes_fallback || 120);
+        }
+        
         if (travelTime > maxTravelMinutes) {
           exclusionReasons[engineer.name].push(`Travel time ${travelTime}min exceeds limit ${maxTravelMinutes}min`);
+          console.log(`❌ ${engineer.name}: Travel time ${travelTime}min > ${maxTravelMinutes}min limit`);
           return null;
         }
 
-        // Check distance limits
-        if (distance > settings.max_distance_miles) {
-          exclusionReasons[engineer.name].push(`Too far: ${distance} miles > ${settings.max_distance_miles} limit`);
+        // Check distance limits with leniency for exact area matches  
+        const maxDistanceMiles = hasExactAreaMatch ? Math.max(25, settings.max_distance_miles) : settings.max_distance_miles;
+        if (distance > maxDistanceMiles) {
+          exclusionReasons[engineer.name].push(`Too far: ${distance} miles > ${maxDistanceMiles} limit`);
+          console.log(`❌ ${engineer.name}: Distance ${distance}mi > ${maxDistanceMiles}mi limit`);
           return null;
         }
 
