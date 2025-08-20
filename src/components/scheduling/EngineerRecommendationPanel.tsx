@@ -51,9 +51,9 @@ export function EngineerRecommendationPanel({
       setSuggestions(result.recommendations);
       setSettings(result.settings);
       
-      if (result.error) {
+      if ('error' in result && result.error) {
         setDebugInfo(`Job: ${order.order_number} | Error: ${result.error}`);
-      } else {
+      } else if ('diagnostics' in result) {
         let diagnostics = result.diagnostics ? 
           ` | Excluded: ${result.diagnostics.excludedEngineers}/${result.diagnostics.totalEngineers}` : '';
         
@@ -68,6 +68,8 @@ export function EngineerRecommendationPanel({
         }
         
         setDebugInfo(`Job: ${order.order_number} | Postcode: ${displayPostcode} | Found ${result.recommendations.length} recommendations${diagnostics}`);
+      } else {
+        setDebugInfo(`Job: ${order.order_number} | Postcode: ${displayPostcode} | Found ${result.recommendations.length} recommendations`);
       }
     } catch (error) {
       console.error('Error loading smart recommendations:', error);

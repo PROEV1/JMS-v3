@@ -169,10 +169,11 @@ export const getSmartEngineerRecommendations = async (
     preloadedEngineers?: EngineerSettings[];
     workloadLookup?: (engineerId: string, date: string) => number;
     clientBlockedDatesMap?: Map<string, Set<string>>;
+    fastMode?: boolean;
   } = {}
 ) => {
   try {
-    console.log('Getting smart engineer recommendations for order:', order.order_number);
+    console.log('Getting smart engineer recommendations for order:', order.order_number, options.fastMode ? '(FAST MODE)' : '');
     
     // Get scheduling settings
     const settings = await getSchedulingSettings();
@@ -199,24 +200,29 @@ export const getSmartEngineerRecommendations = async (
 
     console.log('Using postcode for recommendations:', finalPostcode);
 
-    // Get client blocked dates to exclude from recommendations
-    const { data: blockedDates, error: blockedDatesError } = await supabase
-      .from('client_blocked_dates')
-      .select('blocked_date')
-      .eq('client_id', order.client_id);
+    // Use preloaded client blocked dates or fetch them
+    let blockedDateStrings: Set<string>;
+    if (options.clientBlockedDatesMap?.has(order.client_id)) {
+      blockedDateStrings = options.clientBlockedDatesMap.get(order.client_id)!;
+      console.log(`Using preloaded blocked dates: ${blockedDateStrings.size} dates`);
+    } else {
+      const { data: blockedDates, error: blockedDatesError } = await supabase
+        .from('client_blocked_dates')
+        .select('blocked_date')
+        .eq('client_id', order.client_id);
+        
+      if (blockedDatesError) {
+        console.warn('Failed to fetch client blocked dates:', blockedDatesError);
+      }
       
-    if (blockedDatesError) {
-      console.warn('Failed to fetch client blocked dates:', blockedDatesError);
+      blockedDateStrings = new Set(
+        (blockedDates || []).map(bd => bd.blocked_date)
+      );
+      console.log(`Client has ${blockedDateStrings.size} blocked dates`);
     }
-    
-    const blockedDateStrings = new Set(
-      (blockedDates || []).map(bd => bd.blocked_date)
-    );
-    
-    console.log(`Client has ${blockedDateStrings.size} blocked dates`);
 
-    // Get all engineers with complete settings
-    const allEngineers = await getAllEngineersForScheduling();
+    // Use preloaded engineers or fetch them
+    const allEngineers = options.preloadedEngineers || await getAllEngineersForScheduling();
     
     if (allEngineers.length === 0) {
       console.log('No available engineers found');
@@ -224,6 +230,18 @@ export const getSmartEngineerRecommendations = async (
     }
 
     console.log(`Found ${allEngineers.length} engineers to evaluate`);
+
+    // FAST MODE: Two-phase evaluation for better performance
+    if (options.fastMode) {
+      return await getSmartEngineerRecommendationsFast(
+        order, 
+        finalPostcode, 
+        allEngineers, 
+        settings, 
+        blockedDateStrings, 
+        options
+      );
+    }
     
     // Track exclusion reasons for diagnostics
     const exclusionReasons: Record<string, string[]> = {};
@@ -318,8 +336,10 @@ export const getSmartEngineerRecommendations = async (
                  continue;
                }
 
-                // Check daily workload
-                const dailyWorkload = await getEngineerDailyWorkload(engineer.id, checkDate.toISOString().split('T')[0]);
+                // Check daily workload - use preloaded lookup if available
+                const dailyWorkload = options.workloadLookup 
+                  ? options.workloadLookup(engineer.id, checkDate.toISOString().split('T')[0])
+                  : await getEngineerDailyWorkload(engineer.id, checkDate.toISOString().split('T')[0]);
                 if (dailyWorkload >= settings.max_jobs_per_day) {
                   checkDate.setDate(checkDate.getDate() + 1);
                   daysChecked++;
@@ -365,7 +385,9 @@ export const getSmartEngineerRecommendations = async (
                   continue;
                 }
 
-                 const dailyWorkload = await getEngineerDailyWorkload(engineer.id, checkDate.toISOString().split('T')[0]);
+                 const dailyWorkload = options.workloadLookup 
+                   ? options.workloadLookup(engineer.id, checkDate.toISOString().split('T')[0])
+                   : await getEngineerDailyWorkload(engineer.id, checkDate.toISOString().split('T')[0]);
                  if (dailyWorkload >= settings.max_jobs_per_day) {
                    checkDate.setDate(checkDate.getDate() + 1);
                    daysChecked++;
@@ -481,6 +503,239 @@ export const getSmartEngineerRecommendations = async (
     };
   }
 };
+
+/**
+ * Fast mode implementation with optimized two-phase evaluation
+ */
+async function getSmartEngineerRecommendationsFast(
+  order: Order,
+  postcode: string,
+  allEngineers: EngineerSettings[],
+  settings: any,
+  blockedDateStrings: Set<string>,
+  options: {
+    startDate?: Date;
+    workloadLookup?: (engineerId: string, date: string) => number;
+  }
+) {
+  console.log('🚀 Fast mode: Starting optimized engineer evaluation');
+  
+  const exclusionReasons: Record<string, string[]> = {};
+  const now = new Date();
+  const minimumDate = options.startDate || new Date(now.getTime() + (settings.minimum_advance_hours * 60 * 60 * 1000));
+
+  // PHASE 1: Light filtering - exclude engineers based on basic criteria
+  const lightFilteredEngineers = allEngineers.filter(engineer => {
+    exclusionReasons[engineer.name] = [];
+    
+    // Validate engineer setup
+    const setupValidation = validateEngineerSetup(engineer);
+    if (!setupValidation.isComplete) {
+      exclusionReasons[engineer.name] = setupValidation.missingItems.map(item => `Missing: ${item}`);
+      return false;
+    }
+
+    // Service area check
+    const serviceCheck = canEngineerServePostcode(engineer, postcode);
+    const hasServiceAreaMatch = serviceCheck.canServe;
+    
+    if (settings.require_service_area_match && !hasServiceAreaMatch) {
+      exclusionReasons[engineer.name].push(`No service area coverage for ${postcode} (strict mode)`);
+      return false;
+    }
+
+    return true;
+  });
+
+  console.log(`🔍 Phase 1: ${lightFilteredEngineers.length}/${allEngineers.length} engineers passed light filtering`);
+
+  if (lightFilteredEngineers.length === 0) {
+    return {
+      recommendations: [],
+      featured: [],
+      all: [],
+      settings,
+      diagnostics: {
+        totalEngineers: allEngineers.length,
+        excludedEngineers: allEngineers.length,
+        exclusionReasons: Object.fromEntries(Object.entries(exclusionReasons).filter(([_, reasons]) => reasons.length > 0))
+      }
+    };
+  }
+
+  // PHASE 2: Batch distance calculation
+  const engineerPostcodes = lightFilteredEngineers
+    .map(e => e.starting_postcode)
+    .filter(Boolean) as string[];
+
+  let distanceResults = new Map<string, { distance: number; duration: number }>();
+  
+  if (engineerPostcodes.length > 0) {
+    try {
+      console.log(`📍 Phase 2: Getting batch distances for ${engineerPostcodes.length} engineers`);
+      
+      // Add timeout wrapper for Mapbox calls
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Mapbox timeout after 20s')), 20000);
+      });
+      
+      const distancePromise = getBatchDistancesForOrder(engineerPostcodes, postcode);
+      distanceResults = await Promise.race([distancePromise, timeoutPromise]);
+      
+      console.log(`✅ Batch distances received: ${distanceResults.size}/${engineerPostcodes.length}`);
+    } catch (error) {
+      console.error('⚠️ Batch distance call failed, falling back to service area estimates:', error);
+      // Continue with service area estimates
+    }
+  }
+
+  // PHASE 3: Heavy evaluation on remaining candidates
+  console.log(`🔬 Phase 3: Heavy evaluation on ${lightFilteredEngineers.length} candidates`);
+  
+  const recommendations = await Promise.all(
+    lightFilteredEngineers.map(async (engineer) => {
+      try {
+        // Get distance and travel time
+        let distance = 0;
+        let travelTime = 60; // Default
+        
+        const serviceCheck = canEngineerServePostcode(engineer, postcode);
+        const hasServiceAreaMatch = serviceCheck.canServe;
+        
+        if (engineer.starting_postcode && distanceResults.has(engineer.starting_postcode)) {
+          const mapboxResult = distanceResults.get(engineer.starting_postcode)!;
+          distance = mapboxResult.distance;
+          travelTime = mapboxResult.duration;
+        } else {
+          // Fallback to service area estimates
+          distance = serviceCheck.travelTime ? Math.round(serviceCheck.travelTime / 2) : 25;
+          travelTime = hasServiceAreaMatch ? (serviceCheck.travelTime || 60) : 80;
+        }
+
+        // Check travel time limits
+        const maxTravelMinutes = hasServiceAreaMatch ? (serviceCheck.travelTime || 80) : (settings.max_travel_minutes_fallback || 120);
+        if (travelTime > maxTravelMinutes) {
+          exclusionReasons[engineer.name].push(`Travel time ${travelTime}min exceeds limit ${maxTravelMinutes}min`);
+          return null;
+        }
+
+        // Check distance limits
+        if (distance > settings.max_distance_miles) {
+          exclusionReasons[engineer.name].push(`Too far: ${distance} miles > ${settings.max_distance_miles} limit`);
+          return null;
+        }
+
+        // Find next available date
+        let availableDate: Date | null = null;
+        let dailyWorkloadThatDay = 0;
+        let checkDate = new Date(minimumDate);
+        const maxCheckDays = Math.min(settings.recommendation_search_horizon_days || 30, 30); // Limit to 30 days in fast mode
+        let daysChecked = 0;
+
+        while (!availableDate && daysChecked < maxCheckDays) {
+          const checkDateString = checkDate.toISOString().split('T')[0];
+          
+          // Skip blocked dates
+          if (blockedDateStrings.has(checkDateString)) {
+            checkDate.setDate(checkDate.getDate() + 1);
+            daysChecked++;
+            continue;
+          }
+          
+          // Check engineer availability
+          if (isEngineerAvailableOnDate(engineer, checkDate)) {
+            // Weekend check
+            const isWeekend = checkDate.getDay() === 0 || checkDate.getDay() === 6;
+            if (isWeekend && !settings.allow_weekend_bookings) {
+              checkDate.setDate(checkDate.getDate() + 1);
+              daysChecked++;
+              continue;
+            }
+
+            // Check workload using preloaded lookup if available
+            const dailyWorkload = options.workloadLookup 
+              ? options.workloadLookup(engineer.id, checkDateString)
+              : await getEngineerDailyWorkload(engineer.id, checkDateString);
+              
+            if (dailyWorkload >= settings.max_jobs_per_day) {
+              checkDate.setDate(checkDate.getDate() + 1);
+              daysChecked++;
+              continue;
+            }
+
+            // Simplified capacity check for fast mode
+            const dayFit = await calculateDayFit(engineer, checkDate, order, settings.day_lenience_minutes);
+            if (dayFit.canFit) {
+              availableDate = new Date(checkDate);
+              dailyWorkloadThatDay = dailyWorkload;
+              break;
+            }
+          }
+          
+          checkDate.setDate(checkDate.getDate() + 1);
+          daysChecked++;
+        }
+
+        if (!availableDate) {
+          exclusionReasons[engineer.name].push(`No availability within ${maxCheckDays} days`);
+          return null;
+        }
+
+        // Calculate score and reasons
+        const score = calculateEngineerScore(engineer, distance, travelTime, availableDate, dailyWorkloadThatDay);
+        const reasons = generateRecommendationReasons(engineer, distance, travelTime, availableDate, minimumDate, dailyWorkloadThatDay, hasServiceAreaMatch);
+
+        return {
+          engineer: engineer as Engineer,
+          distance,
+          travelTime,
+          score,
+          reasons,
+          availableDate: availableDate.toISOString().split('T')[0],
+          dailyWorkloadThatDay
+        };
+
+      } catch (error) {
+        exclusionReasons[engineer.name].push(`Evaluation error: ${error}`);
+        console.error(`Error evaluating engineer ${engineer.name}:`, error);
+        return null;
+      }
+    })
+  );
+
+  // Sort and return results
+  const validRecommendations = recommendations
+    .filter(rec => rec !== null)
+    .sort((a, b) => {
+      const dateA = new Date(a!.availableDate).getTime();
+      const dateB = new Date(b!.availableDate).getTime();
+      if (dateA !== dateB) return dateA - dateB;
+      if (a!.travelTime !== b!.travelTime) return a!.travelTime - b!.travelTime;
+      if (a!.dailyWorkloadThatDay !== b!.dailyWorkloadThatDay) return a!.dailyWorkloadThatDay - b!.dailyWorkloadThatDay;
+      if (a!.distance !== b!.distance) return a!.distance - b!.distance;
+      return b!.score - a!.score;
+    });
+
+  console.log(`🎯 Fast mode complete: ${validRecommendations.length} valid recommendations`);
+
+  const topCount = settings.top_recommendations_count || 3;
+  const featured = validRecommendations.slice(0, topCount);
+  
+  const excludedEngineers = Object.entries(exclusionReasons)
+    .filter(([name, reasons]) => reasons.length > 0);
+
+  return {
+    recommendations: validRecommendations,
+    featured,
+    all: validRecommendations,
+    settings,
+    diagnostics: {
+      totalEngineers: allEngineers.length,
+      excludedEngineers: excludedEngineers.length,
+      exclusionReasons: Object.fromEntries(excludedEngineers)
+    }
+  };
+}
 
 // Distance cache for Mapbox API calls
 let distanceCache = new Map<string, { distance: number; duration: number; timestamp: number }>();

@@ -191,7 +191,8 @@ export function AutoScheduleReviewModal({
               startDate: new Date(),
               preloadedEngineers: allEngineers, // 🚀 USE PRELOADED
               workloadLookup, // 🚀 USE PRECOMPUTED WORKLOAD
-              clientBlockedDatesMap // 🚀 USE PRELOADED BLOCKED DATES
+              clientBlockedDatesMap, // 🚀 USE PRELOADED BLOCKED DATES
+              fastMode: true // 🚀 ENABLE FAST MODE FOR BATCH PROCESSING
             });
 
             console.log(`Found ${recommendations.recommendations?.length || 0} candidates for order ${order.order_number}`);
