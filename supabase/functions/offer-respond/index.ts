@@ -48,14 +48,10 @@ serve(async (req: Request) => {
     let jobOffer;
 
     if (token) {
-      // External access via token (from email links)
+      // External access via token (from email links) - using separate queries to avoid ambiguous embeds
       const { data, error } = await supabase
         .from('job_offers')
-        .select(`
-          *,
-          order:orders!inner(*),
-          engineer:engineers(*)
-        `)
+        .select('*')
         .eq('client_token', token)
         .single();
 
@@ -69,7 +65,27 @@ serve(async (req: Request) => {
         );
       }
       
-      jobOffer = data;
+      // Get order and engineer details separately
+      const [orderResult, engineerResult] = await Promise.all([
+        supabase.from('orders').select('*').eq('id', data.order_id).single(),
+        supabase.from('engineers').select('*').eq('id', data.engineer_id).single()
+      ]);
+
+      if (orderResult.error || engineerResult.error) {
+        return new Response(
+          JSON.stringify({ error: 'Failed to load offer details' }),
+          {
+            status: 500,
+            headers: { 'Content-Type': 'application/json', ...corsHeaders }
+          }
+        );
+      }
+
+      jobOffer = {
+        ...data,
+        order: orderResult.data,
+        engineer: engineerResult.data
+      };
     } else if (offer_id) {
       // Authenticated client access via offer ID
       // For authenticated access, we need to verify the client owns this order
@@ -84,17 +100,10 @@ serve(async (req: Request) => {
         );
       }
 
-      // Verify client access
+      // Verify client access - using separate queries to avoid ambiguous embeds
       const { data, error } = await supabase
         .from('job_offers')
-        .select(`
-          *,
-          order:orders!inner(
-            *,
-            client:clients!inner(user_id)
-          ),
-          engineer:engineers(*)
-        `)
+        .select('*')
         .eq('id', offer_id)
         .single();
 
@@ -108,7 +117,27 @@ serve(async (req: Request) => {
         );
       }
 
-      jobOffer = data;
+      // Get order, client, and engineer details separately
+      const [orderResult, engineerResult] = await Promise.all([
+        supabase.from('orders').select('*, client:clients(user_id)').eq('id', data.order_id).single(),
+        supabase.from('engineers').select('*').eq('id', data.engineer_id).single()
+      ]);
+
+      if (orderResult.error || engineerResult.error) {
+        return new Response(
+          JSON.stringify({ error: 'Failed to load offer details' }),
+          {
+            status: 500,
+            headers: { 'Content-Type': 'application/json', ...corsHeaders }
+          }
+        );
+      }
+
+      jobOffer = {
+        ...data,
+        order: orderResult.data,
+        engineer: engineerResult.data
+      };
     }
 
     // Check if offer has expired

@@ -28,8 +28,7 @@ serve(async (req: Request) => {
         order_id,
         engineer_id,
         offered_date,
-        expires_at,
-        order:orders!inner(order_number)
+        expires_at
       `)
       .eq('status', 'pending')
       .lt('expires_at', now.toISOString());
@@ -67,9 +66,20 @@ serve(async (req: Request) => {
       throw new Error('Failed to update expired offers: ' + updateError.message);
     }
 
+    // Get order numbers for logging (separate query to avoid embeds)
+    const orderIds = [...new Set(expiredOffers.map(offer => offer.order_id))];
+    const { data: orders } = await supabase
+      .from('orders')
+      .select('id, order_number')
+      .in('id', orderIds);
+    
+    const orderNumberMap = new Map(orders?.map(order => [order.id, order.order_number]) || []);
+
     // Log activities for each expired offer
     for (const offer of expiredOffers) {
       try {
+        const orderNumber = orderNumberMap.get(offer.order_id) || 'Unknown';
+        
         await supabase.rpc('log_order_activity', {
           p_order_id: offer.order_id,
           p_activity_type: 'offer_expired',
@@ -83,7 +93,7 @@ serve(async (req: Request) => {
           }
         });
 
-        console.log(`Logged expiry for order ${offer.order.order_number}`);
+        console.log(`Logged expiry for order ${orderNumber}`);
       } catch (logError) {
         console.error(`Failed to log activity for offer ${offer.id}:`, logError);
       }
@@ -98,7 +108,7 @@ serve(async (req: Request) => {
         expired_count: expiredOffers.length,
         expired_offers: expiredOffers.map(offer => ({
           id: offer.id,
-          order_number: offer.order.order_number,
+          order_number: orderNumberMap.get(offer.order_id) || 'Unknown',
           offered_date: offer.offered_date
         }))
       }),

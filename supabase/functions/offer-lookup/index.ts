@@ -63,22 +63,12 @@ serve(async (req: Request) => {
 
     console.log('Looking up offer with token:', token);
 
-    // Look up the offer by client token
+    // Look up the offer by client token (using separate queries to avoid ambiguous embeds)
     const { data: jobOffer, error: offerError } = await supabase
       .from('job_offers')
-      .select(`
-        *,
-        order:orders!inner(
-          *,
-          client:clients(*),
-          quote:quotes(*)
-        ),
-        engineer:engineers(*)
-      `)
+      .select('*')
       .eq('client_token', token)
       .single();
-
-    console.log('Offer lookup result:', { jobOffer, offerError });
 
     if (offerError || !jobOffer) {
       console.log('Offer not found, error:', offerError);
@@ -93,6 +83,50 @@ serve(async (req: Request) => {
         }
       );
     }
+
+    // Get the order details
+    const { data: order, error: orderError } = await supabase
+      .from('orders')
+      .select('*, client:clients(*), quote:quotes(*)')
+      .eq('id', jobOffer.order_id)
+      .single();
+
+    if (orderError || !order) {
+      console.log('Order not found for offer:', orderError);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Order not found',
+          expired: true
+        }),
+        {
+          status: 404,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders }
+        }
+      );
+    }
+
+    // Get the engineer details
+    const { data: engineer, error: engineerError } = await supabase
+      .from('engineers')
+      .select('*')
+      .eq('id', jobOffer.engineer_id)
+      .single();
+
+    if (engineerError || !engineer) {
+      console.log('Engineer not found for offer:', engineerError);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Engineer not found',
+          expired: true
+        }),
+        {
+          status: 404,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders }
+        }
+      );
+    }
+
+    console.log('Offer lookup successful:', { offerId: jobOffer.id, orderId: order.id, engineerId: engineer.id });
 
     // Check if offer has expired
     const now = new Date();
@@ -143,15 +177,15 @@ serve(async (req: Request) => {
         time_window: jobOffer.time_window,
         expires_at: jobOffer.expires_at,
         order: {
-          order_number: jobOffer.order.order_number,
+          order_number: order.order_number,
           client: {
-            full_name: jobOffer.order.client.full_name,
-            email: jobOffer.order.client.email
+            full_name: order.client.full_name,
+            email: order.client.email
           },
-          is_partner_job: jobOffer.order.is_partner_job
+          is_partner_job: order.is_partner_job
         },
         engineer: {
-          name: jobOffer.engineer.name
+          name: engineer.name
         }
       }),
       {
