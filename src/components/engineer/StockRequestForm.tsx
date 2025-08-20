@@ -37,6 +37,20 @@ interface StockRequestFormProps {
   prefilledItems?: Array<{ item_id: string; qty: number; notes?: string }>;
 }
 
+// Define simple types for the queries
+interface LocationData {
+  id: string;
+  name: string;
+  code?: string;
+}
+
+interface ItemData {
+  id: string;
+  name: string;
+  sku: string;
+  unit: string;
+}
+
 export const StockRequestForm: React.FC<StockRequestFormProps> = ({
   engineerId,
   orderId,
@@ -63,34 +77,34 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({
     name: 'lines'
   });
 
-  // Get van locations for engineer
+  // Get van locations for engineer with simplified typing
   const { data: locations } = useQuery({
     queryKey: ['engineer-locations', engineerId],
-    queryFn: async () => {
-      const { data, error } = await supabase
+    queryFn: async (): Promise<LocationData[]> => {
+      const { data, error } = await (supabase as any)
         .from('inventory_locations')
-        .select('*')
+        .select('id, name, code')
         .eq('type', 'van')
         .eq('engineer_id', engineerId)
         .eq('is_active', true);
       
       if (error) throw error;
-      return data as Array<{ id: string; name: string; code?: string }>;
+      return data || [];
     }
   });
 
-  // Get inventory items
+  // Get inventory items with simplified typing
   const { data: items } = useQuery({
     queryKey: ['inventory-items-active'],
-    queryFn: async () => {
-      const { data, error } = await supabase
+    queryFn: async (): Promise<ItemData[]> => {
+      const { data, error } = await (supabase as any)
         .from('inventory_items')
         .select('id, name, sku, unit')
         .eq('is_active', true)
         .order('name');
       
       if (error) throw error;
-      return data as Array<{ id: string; name: string; sku: string; unit: string }>;
+      return data || [];
     }
   });
 
@@ -129,12 +143,14 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({
         photoUrl = await uploadPhoto(photoFile) || undefined;
       }
 
-      // Filter out lines with missing required data and ensure proper typing
+      // Filter and validate lines with proper typing
       const validLines = data.lines
-        .filter(line => line.item_id && line.qty > 0)
+        .filter((line): line is { item_id: string; qty: number; notes?: string } => 
+          Boolean(line.item_id) && Boolean(line.qty) && line.qty > 0
+        )
         .map(line => ({
-          item_id: line.item_id!,
-          qty: line.qty!,
+          item_id: line.item_id,
+          qty: line.qty,
           notes: line.notes
         }));
 
