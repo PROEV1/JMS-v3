@@ -202,7 +202,7 @@ export default function AdminQuoteDetail() {
       // Redirect to order details page if new order was created
       if (!existingOrder && order) {
         setTimeout(() => {
-          navigate(`/admin/order/${order.id}`);
+          navigate(`/orders/${order.id}`);
         }, 1500);
       }
 

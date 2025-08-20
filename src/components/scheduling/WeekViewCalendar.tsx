@@ -296,11 +296,11 @@ export function WeekViewCalendar({
                               <div
                                 key={offer.id}
                                 className="bg-amber-50 border border-dashed border-amber-300 rounded-md p-2 min-h-[50px] flex flex-col justify-between cursor-pointer hover:shadow-md transition-all duration-200 hover:border-amber-400"
-                                onClick={() => offer.order_id && navigate(`/admin/order/${offer.order_id}`)}
+                                onClick={() => offer.order_id && navigate(`/orders/${offer.order_id}`)}
                                 onKeyDown={(e) => {
                                   if ((e.key === 'Enter' || e.key === ' ') && offer.order_id) {
                                     e.preventDefault();
-                                    navigate(`/admin/order/${offer.order_id}`);
+                                    navigate(`/orders/${offer.order_id}`);
                                   }
                                 }}
                                 role="button"
@@ -338,7 +338,7 @@ export function WeekViewCalendar({
                                  borderLeftColor: getStatusColor(order.status_enhanced),
                                  borderLeftWidth: '3px'
                                }}
-                               onClick={() => navigate(`/admin/order/${order.id}`)}
+                               onClick={() => navigate(`/orders/${order.id}`)}
                              >
                                <div className="space-y-1">
                                  <div className="flex items-center gap-1 text-xs font-medium text-primary">

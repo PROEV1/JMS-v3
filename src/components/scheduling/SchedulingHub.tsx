@@ -186,7 +186,7 @@ export function SchedulingHub({}: SchedulingHubProps) {
         <WeekViewCalendar 
           orders={orders} 
           engineers={engineers}
-          onOrderClick={(order) => navigate(`/admin/order/${order.id}`)}
+          onOrderClick={(order) => navigate(`/orders/${order.id}`)}
           currentDate={new Date()}
           onDateChange={() => {}}
         />

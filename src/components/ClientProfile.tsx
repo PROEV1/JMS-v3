@@ -417,7 +417,7 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => navigate(`/admin/order/${order.id}`)}
+                        onClick={() => navigate(`/orders/${order.id}`)}
                       >
                         View
                       </Button>

@@ -769,7 +769,7 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                                    <Button
                                      size="sm"
                                      variant="outline"
-                                     onClick={() => navigate(`/admin/order/${order.id}`)}
+                                      onClick={() => navigate(`/orders/${order.id}`)}
                                      className="text-xs px-3 py-1 h-7"
                                    >
                                      View Job
@@ -802,7 +802,7 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                                      <Button
                                        size="sm"
                                        variant="outline"
-                                       onClick={() => navigate(`/admin/order/${order.id}`)}
+                                        onClick={() => navigate(`/orders/${order.id}`)}
                                        className="text-xs px-3 py-1 h-7"
                                      >
                                        View Job
@@ -823,7 +823,7 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                                    <Button
                                      variant="outline"
                                      size="sm"
-                                     onClick={() => navigate(`/admin/order/${order.id}`)}
+                                      onClick={() => navigate(`/orders/${order.id}`)}
                                      className="text-xs px-3 py-1 h-7"
                                    >
                                      View Job
@@ -865,7 +865,7 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                                     <Button
                                       variant="outline"
                                       size="sm"
-                                      onClick={() => navigate(`/admin/order/${order.id}`)}
+                                       onClick={() => navigate(`/orders/${order.id}`)}
                                       className="text-xs px-3 py-1 h-7"
                                     >
                                       View Job
@@ -878,7 +878,7 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  onClick={() => navigate(`/admin/order/${order.id}`)}
+                                   onClick={() => navigate(`/orders/${order.id}`)}
                                   className="text-xs px-3 py-1 h-7"
                                 >
                                   View Job
@@ -985,7 +985,7 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                                  <Button
                                    size="sm"
                                    variant="outline"
-                                   onClick={() => navigate(`/admin/order/${order.id}`)}
+                                    onClick={() => navigate(`/orders/${order.id}`)}
                                    className="flex-1 text-xs h-7"
                                  >
                                    View Job
@@ -1019,7 +1019,7 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    onClick={() => navigate(`/admin/order/${order.id}`)}
+                                     onClick={() => navigate(`/orders/${order.id}`)}
                                     className="flex-1 text-xs h-7"
                                   >
                                     View Job
@@ -1039,7 +1039,7 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                                   <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => navigate(`/admin/order/${order.id}`)}
+                                     onClick={() => navigate(`/orders/${order.id}`)}
                                     className="flex-1 text-xs h-7"
                                   >
                                     View Job
@@ -1069,7 +1069,7 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                                    <Button
                                      size="sm"
                                      variant="outline"
-                                     onClick={() => navigate(`/admin/order/${order.id}`)}
+                                      onClick={() => navigate(`/orders/${order.id}`)}
                                      className="flex-1 text-xs h-7"
                                    >
                                      View Job
@@ -1089,7 +1089,7 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                                    <Button
                                      variant="outline"
                                      size="sm"
-                                     onClick={() => navigate(`/admin/order/${order.id}`)}
+                                      onClick={() => navigate(`/orders/${order.id}`)}
                                      className="flex-1 text-xs h-7"
                                    >
                                      View Job
@@ -1102,7 +1102,7 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                                <Button
                                  size="sm"
                                  variant="outline"
-                                 onClick={() => navigate(`/admin/order/${order.id}`)}
+                                 onClick={() => navigate(`/orders/${order.id}`)}
                                  className="w-full text-xs h-7"
                                >
                                  View Job
