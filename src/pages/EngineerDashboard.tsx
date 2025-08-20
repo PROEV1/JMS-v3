@@ -1,525 +1,271 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
-import { useToast } from '@/hooks/use-toast';
-import { BrandPage, BrandContainer, BrandHeading1, BrandLoading } from '@/components/brand';
+import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { JobStatusCard } from '@/components/engineer/JobStatusCard';
-type OrderStatusEnhanced = 
-  | 'quote_accepted'
-  | 'awaiting_payment'
-  | 'payment_received'
-  | 'awaiting_agreement'
-  | 'agreement_signed'
-  | 'awaiting_install_booking'
-  | 'scheduled'
-  | 'in_progress'
-  | 'install_completed_pending_qa'
-  | 'completed'
-  | 'revisit_required';
-import { isToday, isThisWeek, isWithinLastDays } from '@/utils/dateUtils';
-import { Calendar, MapPin, Package, User, AlertTriangle, Clock, CheckCircle, Upload } from 'lucide-react';
+import { Calendar, Clock, MapPin, Package, User, Plus } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';  
+import { StockRequestButton } from '@/components/engineer/StockRequestButton';
+import { StockRequestHistory } from '@/components/engineer/StockRequestHistory';
 
-interface EngineerJob {
+interface Job {
   id: string;
   order_number: string;
-  client_name: string;
+  client_id: string;
   job_address: string;
-  scheduled_install_date: string | null;
-  status_enhanced: OrderStatusEnhanced;
-  product_details: string;
-  client_phone: string;
-  total_amount: number;
-  engineer_signed_off_at: string | null;
-  upload_count?: number;
+  installation_date: string;
+  time_window: string;
+  status: string;
 }
 
+const getStatusColor = (status: string) => {
+  switch (status) {
+    case 'scheduled': return 'bg-blue-100 text-blue-800';
+    case 'in_progress': return 'bg-yellow-100 text-yellow-800';
+    case 'completed': return 'bg-green-100 text-green-800';
+    case 'cancelled': return 'bg-red-100 text-red-800';
+    default: return 'bg-gray-100 text-gray-800';
+  }
+};
+
+const formatDate = (dateString: string): string => {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+};
+
+const formatTime = (timeString: string): string => {
+  const date = new Date(`1970-01-01T${timeString}`);
+  return date.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+};
+
 export default function EngineerDashboard() {
-  const [jobs, setJobs] = useState<EngineerJob[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [engineerInfo, setEngineerInfo] = useState<any>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState('today');
-  const { user, loading: authLoading } = useAuth();
-  const { toast } = useToast();
-  const navigate = useNavigate();
+  const { user } = useAuth();
 
-  // COMPLETELY NEW APPROACH - Direct fetch without complex conditions
-  useEffect(() => {
-    console.log('🔥 DIRECT FETCH: Component mounted or user changed');
-    if (user?.id) {
-      console.log('🔥 DIRECT FETCH: User ID exists, executing immediate fetch');
-      directFetchEngineerJobs();
-    }
-  }, [user]);
-
-  // Simple, direct data fetching function
-  const directFetchEngineerJobs = async () => {
-    setLoading(true);
-    setErrorMessage(null);
-
-    try {
-      // Step 1: Get engineer ID first
-      const { data: engineer, error: engineerError } = await supabase
-        .from('engineers')
-        .select('*')
-        .eq('user_id', user?.id)
-        .single();
-
-      if (engineerError || !engineer) {
-        setErrorMessage('Engineer profile not found');
-        return;
-      }
-
-      setEngineerInfo(engineer);
-
-      // Step 2: Get jobs for this engineer with upload counts
-      const { data: jobs, error: jobsError } = await supabase
-        .from('orders')
-        .select(`
-          id,
-          order_number,
-          status_enhanced,
-          job_address,
-          scheduled_install_date,
-          total_amount,
-          engineer_signed_off_at,
-          quote_id,
-          client_id,
-          clients (
-            full_name,
-            phone
-          ),
-          quotes (
-            product_details
-          )
-        `)
-        .eq('engineer_id', engineer.id);
-
-      if (jobsError) {
-        console.error('Error fetching jobs:', jobsError);
-        setErrorMessage('Failed to load engineer jobs');
-        setJobs([]);
-        return;
-      }
-
-      // Get upload counts for each job
-      let uploadCounts: Record<string, number> = {};
-      if (jobs && jobs.length > 0) {
-        const { data: uploads } = await supabase
-          .from('engineer_uploads')
-          .select('order_id')
-          .in('order_id', jobs.map(j => j.id));
-        
-        if (uploads) {
-          uploadCounts = uploads.reduce((acc, upload) => {
-            acc[upload.order_id] = (acc[upload.order_id] || 0) + 1;
-            return acc;
-          }, {} as Record<string, number>);
-        }
-      }
-
-      if (!jobs || jobs.length === 0) {
-        setJobs([]);
-        return;
-      }
-
-      // Step 3: Format jobs with upload counts
-      const formattedJobs = jobs.map(job => ({
-        id: job.id,
-        order_number: job.order_number,
-        client_name: job.clients?.full_name || 'Unknown Client',
-        client_phone: job.clients?.phone || 'No phone',
-        job_address: job.job_address || 'Address not specified',
-        scheduled_install_date: job.scheduled_install_date,
-        status_enhanced: job.status_enhanced as OrderStatusEnhanced,
-        product_details: job.quotes?.product_details || 'No product details',
-        total_amount: job.total_amount,
-        engineer_signed_off_at: job.engineer_signed_off_at,
-        upload_count: uploadCounts[job.id] || 0
-      }));
-
-      setJobs(formattedJobs);
-
-    } catch (error: any) {
-      setErrorMessage(`Unexpected error: ${error.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchEngineerData = async () => {
-    try {
-      console.log('🚀 FORCE STARTING engineer data fetch for user:', user?.id);
-      console.log('🚀 User email:', user?.email);
-      console.log('🚀 Auth loading state:', authLoading);
-      console.log('🚀 Current timestamp:', new Date().toISOString());
+  // Get engineer profile
+  const { data: engineer } = useQuery({
+    queryKey: ['engineer-profile', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
       
-      // Force loading state and clear previous state
-      setLoading(true);
-      setErrorMessage(null);
-      setJobs([]);
-      setEngineerInfo(null);
-      console.log('🚀 Set loading=true, cleared all previous state');
-
-      // Step 1: Get engineer info - force fresh query
-      console.log('📋 Step 1: FORCE Fetching engineer info for user_id:', user?.id);
-      const { data: engineer, error: engineerError } = await supabase
+      const { data, error } = await supabase
         .from('engineers')
         .select('*')
-        .eq('user_id', user?.id)
-        .maybeSingle();
+        .eq('user_id', user.id)
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user?.id
+  });
 
-      console.log('🔍 Engineer query result:', { engineer, engineerError });
+  // Get today's jobs
+  const { data: todaysJobs } = useQuery({
+    queryKey: ['todays-jobs', engineer?.id],
+    queryFn: async () => {
+      if (!engineer?.id) return [];
 
-      if (engineerError) {
-        console.error('❌ Engineer query error:', engineerError);
-        throw new Error(`Engineer lookup failed: ${engineerError.message}`);
-      }
+      const today = new Date().toISOString().split('T')[0];
 
-      if (!engineer) {
-        console.error('❌ No engineer record found for user:', user?.id);
-        console.log('📋 Available engineers check - querying all engineers...');
-        const { data: allEngineers } = await supabase.from('engineers').select('*');
-        console.log('📋 All engineers in system:', allEngineers);
-        throw new Error('No engineer profile found for your account. Please contact admin.');
-      }
-
-      console.log('✅ Engineer found:', engineer);
-      setEngineerInfo(engineer);
-
-      // Step 2: Get jobs for this engineer - force fresh query
-      console.log('📋 Step 2: Fetching jobs for engineer ID:', engineer.id);
-      console.log('📋 Step 2: Engineer name:', engineer.name);
-      const { data: orders, error: ordersError } = await supabase
+      const { data, error } = await supabase
         .from('orders')
-        .select(`
-          id,
-          order_number,
-          status_enhanced,
-          job_address,
-          scheduled_install_date,
-          total_amount,
-          engineer_signed_off_at,
-          quote_id,
-          client_id
-        `)
+        .select('*')
         .eq('engineer_id', engineer.id)
-        .order('scheduled_install_date', { ascending: true });
+        .eq('installation_date', today)
+        .limit(5);
 
-      console.log('🔍 Orders query result:', { orders, ordersError, count: orders?.length });
+      if (error) throw error;
+      return data as Job[];
+    },
+    enabled: !!engineer?.id,
+  });
 
-      if (ordersError) {
-        console.error('❌ Orders query error:', ordersError);
-        throw new Error(`Failed to load jobs: ${ordersError.message}`);
-      }
+  // Get upcoming jobs
+  const { data: upcomingJobs } = useQuery({
+    queryKey: ['upcoming-jobs', engineer?.id],
+    queryFn: async () => {
+      if (!engineer?.id) return [];
 
-      console.log('✅ Raw orders found:', orders?.length || 0);
-      if (orders && orders.length > 0) {
-        console.log('✅ First order sample:', orders[0]);
-      }
+      const today = new Date().toISOString().split('T')[0];
 
-      if (!orders || orders.length === 0) {
-        console.log('ℹ️ No orders found for engineer ID:', engineer.id);
-        console.log('📋 DEBUG: Checking all orders in system...');
-        const { data: allOrders } = await supabase.from('orders').select('id, order_number, engineer_id');
-        console.log('📋 All orders in system:', allOrders);
-        setJobs([]);
-        toast({
-          title: "No Jobs Found",
-          description: "You don't have any assigned jobs at the moment.",
-        });
-        return;
-      }
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('engineer_id', engineer.id)
+        .gt('installation_date', today)
+        .order('installation_date', { ascending: true })
+        .limit(5);
 
-      // Step 3: Get related data
-      console.log('📋 Step 3: Fetching quotes and clients for', orders.length, 'orders');
-      const quoteIds = orders.map(order => order.quote_id);
-      const clientIds = orders.map(order => order.client_id);
+      if (error) throw error;
+      return data as Job[];
+    },
+    enabled: !!engineer?.id,
+  });
 
-      const [quotesResult, clientsResult] = await Promise.all([
-        supabase
-          .from('quotes')
-          .select('id, product_details')
-          .in('id', quoteIds),
-        supabase
-          .from('clients')
-          .select('id, full_name, phone')
-          .in('id', clientIds)
-      ]);
-
-      if (quotesResult.error) {
-        console.error('❌ Quotes query error:', quotesResult.error);
-        throw new Error(`Failed to load quote details: ${quotesResult.error.message}`);
-      }
-
-      if (clientsResult.error) {
-        console.error('❌ Clients query error:', clientsResult.error);
-        throw new Error(`Failed to load client details: ${clientsResult.error.message}`);
-      }
-
-      console.log('✅ Quotes:', quotesResult.data);
-      console.log('✅ Clients:', clientsResult.data);
-
-      // This function is kept for backward compatibility but not used
-      toast({
-        title: "Jobs Loaded Successfully", 
-        description: "Dashboard refreshed",
-      });
-    } catch (error: any) {
-      setErrorMessage(error.message || 'An unexpected error occurred');
-      toast({
-        title: "Error Loading Dashboard",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Force refresh function
-  const forceRefresh = () => {
-    console.log('🔄 FORCE REFRESH: Manual refresh triggered');
-    setJobs([]);
-    setEngineerInfo(null);
-    setErrorMessage(null);
-    directFetchEngineerJobs();
-  };
-
-  // Filter jobs based on active tab
-  const getFilteredJobs = () => {
-    switch (activeTab) {
-      case 'today':
-        return jobs.filter(job => isToday(job.scheduled_install_date));
-      case 'week':
-        return jobs.filter(job => isThisWeek(job.scheduled_install_date));
-      case 'all':
-      default:
-        return jobs;
-    }
-  };
-
-  // Calculate dashboard stats
-  const todaysJobs = jobs.filter(job => isToday(job.scheduled_install_date));
-  const thisWeekJobs = jobs.filter(job => isThisWeek(job.scheduled_install_date));
-  const completedLast7Days = jobs.filter(job => 
-    job.engineer_signed_off_at && isWithinLastDays(job.engineer_signed_off_at, 7)
-  );
-  const jobsAwaitingUpload = jobs.filter(job => 
-    job.engineer_signed_off_at && (job.upload_count || 0) === 0
-  );
-
-  // Handle job actions
-  const handleJobAction = (jobId: string, action: 'start' | 'continue' | 'upload' | 'view') => {
-    navigate(`/engineer/job/${jobId}`);
-  };
-
-  const filteredJobs = getFilteredJobs();
-
-  if (loading) return <BrandLoading />;
-
-  if (errorMessage) {
+  if (!engineer) {
     return (
-      <BrandPage>
-        <BrandContainer>
-          <div className="text-center py-12">
-            <div className="bg-destructive/10 text-destructive p-6 rounded-lg max-w-md mx-auto">
-              <h2 className="text-lg font-semibold mb-2">Unable to Load Dashboard</h2>
-              <p className="text-sm mb-4">{errorMessage}</p>
-              <div className="space-x-2">
-                <Button onClick={forceRefresh} variant="outline">
-                  Try Again
-                </Button>
-              </div>
-            </div>
-          </div>
-        </BrandContainer>
-      </BrandPage>
+      <div className="p-6">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">Engineer Dashboard</h1>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
     );
   }
 
   return (
-    <BrandPage>
-      <BrandContainer>
-        {/* Header */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <BrandHeading1>Field Dashboard</BrandHeading1>
-              {engineerInfo && (
-                <p className="text-muted-foreground mt-2">
-                  Welcome back, {engineerInfo.name}
-                  {engineerInfo.region && ` • ${engineerInfo.region}`}
-                </p>
-              )}
-            </div>
-            <Button onClick={forceRefresh} variant="outline" size="sm">
-              🔄 Refresh
-            </Button>
-          </div>
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Welcome back, {engineer.name}</h1>
+          <p className="text-muted-foreground">Here's what's happening today</p>
         </div>
-
-        {/* Alert for incomplete jobs */}
-        {todaysJobs.filter(job => !job.engineer_signed_off_at).length > 0 && (
-          <Alert className="mb-6 border-orange-200 bg-orange-50">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>
-              You have {todaysJobs.filter(job => !job.engineer_signed_off_at).length} job{todaysJobs.filter(job => !job.engineer_signed_off_at).length === 1 ? '' : 's'} today still not marked complete
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {/* Upload reminder alert */}
-        {jobsAwaitingUpload.length > 0 && (
-          <Alert className="mb-6 border-red-200 bg-red-50">
-            <Upload className="h-4 w-4" />
-            <AlertDescription>
-              {jobsAwaitingUpload.length} completed job{jobsAwaitingUpload.length === 1 ? '' : 's'} need{jobsAwaitingUpload.length === 1 ? 's' : ''} installation photos uploaded
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {/* Enhanced Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <Card className={todaysJobs.length === 0 ? "border-blue-200 bg-blue-50" : ""}>
-            <CardContent className="p-4">
-              <div className="flex items-center space-x-2">
-                <Clock className="h-4 w-4 text-blue-600" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Today's Jobs</p>
-                  <p className="text-2xl font-bold">
-                    {todaysJobs.length}
-                    {todaysJobs.length === 0 && <span className="text-sm text-blue-600 ml-2">No jobs today</span>}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center space-x-2">
-                <Calendar className="h-4 w-4 text-purple-600" />
-                <div>
-                  <p className="text-sm text-muted-foreground">This Week</p>
-                  <p className="text-2xl font-bold">{thisWeekJobs.length}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center space-x-2">
-                <CheckCircle className="h-4 w-4 text-green-600" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Completed (7d)</p>
-                  <p className="text-2xl font-bold">{completedLast7Days.length}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card className={jobsAwaitingUpload.length > 0 ? "border-red-200 bg-red-50" : ""}>
-            <CardContent className="p-4">
-              <div className="flex items-center space-x-2">
-                <Upload className="h-4 w-4 text-red-600" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Awaiting Upload</p>
-                  <p className="text-2xl font-bold">{jobsAwaitingUpload.length}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        <div className="flex gap-2">
+          <StockRequestButton 
+            engineerId={engineer.id}
+            variant="outline"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            New Stock Request
+          </StockRequestButton>
         </div>
+      </div>
 
-        {/* Job List with Tabs */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <Card>
           <CardHeader>
-            <CardTitle>Your Jobs</CardTitle>
+            <CardTitle>Today's Jobs</CardTitle>
           </CardHeader>
           <CardContent>
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="today" className="flex items-center gap-2">
-                  Today ({todaysJobs.length})
-                </TabsTrigger>
-                <TabsTrigger value="week" className="flex items-center gap-2">
-                  This Week ({thisWeekJobs.length})
-                </TabsTrigger>
-                <TabsTrigger value="all" className="flex items-center gap-2">
-                  All Jobs ({jobs.length})
-                </TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="today" className="mt-4">
-                {todaysJobs.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Clock className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p>No jobs scheduled for today</p>
-                    <p className="text-sm">Enjoy your day off!</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {todaysJobs.map(job => (
-                      <JobStatusCard
-                        key={job.id}
-                        job={job}
-                        onActionClick={handleJobAction}
-                      />
-                    ))}
-                  </div>
-                )}
-              </TabsContent>
-              
-              <TabsContent value="week" className="mt-4">
-                {thisWeekJobs.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p>No jobs scheduled for this week</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {thisWeekJobs.map(job => (
-                      <JobStatusCard
-                        key={job.id}
-                        job={job}
-                        onActionClick={handleJobAction}
-                      />
-                    ))}
-                  </div>
-                )}
-              </TabsContent>
-              
-              <TabsContent value="all" className="mt-4">
-                {jobs.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p>No jobs assigned to you yet</p>
-                    <p className="text-sm">Check back later for new assignments</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {jobs.map(job => (
-                      <JobStatusCard
-                        key={job.id}
-                        job={job}
-                        onActionClick={handleJobAction}
-                      />
-                    ))}
-                  </div>
-                )}
-              </TabsContent>
-            </Tabs>
+            <div className="text-2xl font-bold">{todaysJobs?.length || 0}</div>
+            <p className="text-muted-foreground">Jobs scheduled for today</p>
           </CardContent>
         </Card>
-      </BrandContainer>
-    </BrandPage>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Upcoming Jobs</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{upcomingJobs?.length || 0}</div>
+            <p className="text-muted-foreground">Jobs in the next few days</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Stock Requests</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">5</div>
+            <p className="text-muted-foreground">Pending stock requests</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Tabs defaultValue="schedule" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="schedule">Today's Schedule</TabsTrigger>
+          <TabsTrigger value="upcoming">Upcoming Jobs</TabsTrigger>
+          <TabsTrigger value="stock">Stock Requests</TabsTrigger>
+          <TabsTrigger value="availability">Availability</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="schedule" className="space-y-4">
+          <h2 className="text-xl font-semibold">Today's Schedule</h2>
+          {todaysJobs && todaysJobs.length > 0 ? (
+            <div className="space-y-4">
+              {todaysJobs.map((job) => (
+                <Card key={job.id}>
+                  <CardHeader>
+                    <CardTitle>{job.order_number}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4" />
+                      <span>{job.job_address}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4" />
+                      <span>{formatDate(job.installation_date)}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-4 w-4" />
+                      <span>{formatTime(job.time_window)}</span>
+                    </div>
+                    <Badge className={getStatusColor(job.status)}>{job.status}</Badge>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <Card>
+              <CardContent>
+                <p className="text-muted-foreground">No jobs scheduled for today.</p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="upcoming" className="space-y-4">
+          <h2 className="text-xl font-semibold">Upcoming Jobs</h2>
+          {upcomingJobs && upcomingJobs.length > 0 ? (
+            <div className="space-y-4">
+              {upcomingJobs.map((job) => (
+                <Card key={job.id}>
+                  <CardHeader>
+                    <CardTitle>{job.order_number}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4" />
+                      <span>{job.job_address}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4" />
+                      <span>{formatDate(job.installation_date)}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-4 w-4" />
+                      <span>{formatTime(job.time_window)}</span>
+                    </div>
+                    <Badge className={getStatusColor(job.status)}>{job.status}</Badge>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <Card>
+              <CardContent>
+                <p className="text-muted-foreground">No upcoming jobs scheduled.</p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="availability">
+          <h2 className="text-xl font-semibold">Availability</h2>
+          <p>Manage your availability here.</p>
+        </TabsContent>
+
+        <TabsContent value="stock" className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold">Stock Requests</h2>
+            <StockRequestButton engineerId={engineer.id} />
+          </div>
+          <StockRequestHistory engineerId={engineer.id} />
+        </TabsContent>
+      </Tabs>
+    </div>
   );
 }
