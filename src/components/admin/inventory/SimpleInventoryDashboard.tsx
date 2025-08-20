@@ -20,9 +20,10 @@ export function SimpleInventoryDashboard({ onSwitchTab }: InventoryStatsProps) {
       
       if (error) throw error;
       
-      const total = data.length;
-      const active = data.filter(item => item.is_active).length;
-      const chargers = data.filter(item => item.is_charger && item.is_active).length;
+      const items = (data as unknown) as any[];
+      const total = items.length;
+      const active = items.filter(item => item.is_active).length;
+      const chargers = items.filter(item => item.is_charger && item.is_active).length;
       
       return { total, active, chargers };
     }

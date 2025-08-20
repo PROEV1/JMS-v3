@@ -47,7 +47,7 @@ export function InventoryItemsSimple() {
         .order('name');
       
       if (error) throw error;
-      return data as InventoryItem[];
+      return (data as unknown) as InventoryItem[];
     }
   });
 

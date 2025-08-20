@@ -85,7 +85,7 @@ export function ChargerDispatchPanel({ onSwitchTab }: ChargerDispatchPanelProps)
 
       const { data, error } = await query;
       if (error) throw error;
-      return data as ChargerDispatch[];
+      return (data as unknown) as ChargerDispatch[];
     }
   });
 

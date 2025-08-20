@@ -103,7 +103,7 @@ export function AddItemModal({ open, onOpenChange, editItem }: AddItemModalProps
         .order('name');
       
       if (error) throw error;
-      return data as Supplier[];
+      return (data as unknown) as Supplier[];
     }
   });
 

@@ -33,9 +33,10 @@ export function LocationsList() {
       
       if (error) throw error;
       
-      return data.map(location => ({
+      return (data as unknown as any[]).map(location => ({
         ...location,
-        engineer_name: (location.engineers as any)?.name
+        engineer_id: location.engineer_id || null,
+        engineer_name: location.engineers?.name
       })) as Location[];
     }
   });
