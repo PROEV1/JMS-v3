@@ -291,13 +291,21 @@ export function WeekViewCalendar({
                              </div>
                            )}
                            
-                           {/* Offer Holds */}
-                           {offerHolds.map((offer) => (
-                             <div
-                               key={offer.id}
-                               className="bg-amber-50 border border-dashed border-amber-300 rounded-md p-2 min-h-[50px] flex flex-col justify-between"
-                               onClick={() => navigate(`/admin/orders/${offer.order_id}`)}
-                             >
+                            {/* Offer Holds */}
+                            {offerHolds.map((offer) => (
+                              <div
+                                key={offer.id}
+                                className="bg-amber-50 border border-dashed border-amber-300 rounded-md p-2 min-h-[50px] flex flex-col justify-between cursor-pointer hover:shadow-md transition-all duration-200 hover:border-amber-400"
+                                onClick={() => offer.order_id && navigate(`/admin/order/${offer.order_id}`)}
+                                onKeyDown={(e) => {
+                                  if ((e.key === 'Enter' || e.key === ' ') && offer.order_id) {
+                                    e.preventDefault();
+                                    navigate(`/admin/order/${offer.order_id}`);
+                                  }
+                                }}
+                                role="button"
+                                tabIndex={0}
+                              >
                                <div className="space-y-1">
                                  <Badge variant="outline" className="text-xs px-1 py-0.5 text-amber-700 border-amber-400 bg-amber-100 w-fit">
                                    Offer Hold
