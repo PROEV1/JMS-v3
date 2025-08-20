@@ -126,10 +126,12 @@ export default function ClientQuoteDetail() {
 
       if (error) throw error;
 
-      toast.success('Quote accepted! Redirecting to your order...');
+      toast.success('Quote accepted! Creating your order...');
       
-      // Redirect to the order page
-      navigate(`/client/orders/${data.orderId}`);
+      // Add a small delay to ensure database consistency before redirect
+      setTimeout(() => {
+        navigate(`/client/orders/${data.orderId}`);
+      }, 1500);
     } catch (error) {
       console.error('Error accepting quote:', error);
       toast.error('Failed to accept quote. Please try logging in again.');

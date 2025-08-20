@@ -106,15 +106,17 @@ export default function ClientQuotes() {
       }
 
       toast({
-        title: "Quote Accepted",
-        description: data.orderCreated ? "Order created successfully!" : "Quote accepted, order already exists",
+        title: "Quote Accepted!",
+        description: "Creating your order...",
       });
 
       // Refresh quotes to show updated status
       fetchQuotes();
 
-      // Redirect to the order page
-      navigate(`/client/orders/${data.orderId}`);
+      // Add a small delay to ensure database consistency before redirect
+      setTimeout(() => {
+        navigate(`/client/orders/${data.orderId}`);
+      }, 1500);
     } catch (error) {
       console.error('Error accepting quote:', error);
       toast({
