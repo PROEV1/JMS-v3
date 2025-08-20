@@ -34,7 +34,7 @@ interface ImportProfile {
 }
 
 export default function AdminPartnerProfiles() {
-  const { partnerId } = useParams<{ partnerId: string }>();
+  const { id: partnerId } = useParams<{ id: string }>();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [editingProfile, setEditingProfile] = useState<ImportProfile | null>(null);
