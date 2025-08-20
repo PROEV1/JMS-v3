@@ -1,7 +1,5 @@
 
-import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,7 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { MapPin } from "lucide-react";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 interface AddLocationModalProps {
   open: boolean;
@@ -17,26 +16,46 @@ interface AddLocationModalProps {
 }
 
 export function AddLocationModal({ open, onOpenChange }: AddLocationModalProps) {
-  const [name, setName] = useState("");
-  const [code, setCode] = useState("");
-  const [type, setType] = useState("warehouse");
-  const [address, setAddress] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [formData, setFormData] = React.useState({
+    name: '',
+    code: '',
+    type: 'warehouse',
+    address: '',
+    engineer_id: ''
+  });
 
-  const addLocationMutation = useMutation({
-    mutationFn: async (locationData: {
-      name: string;
-      code?: string;
-      type: string;
-      address?: string;
-    }) => {
+  // Fetch engineers for van assignment
+  const { data: engineers = [] } = useQuery({
+    queryKey: ['engineers-for-locations'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('engineers')
+        .select('id, name')
+        .order('name');
+      
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  const createLocationMutation = useMutation({
+    mutationFn: async (locationData: typeof formData) => {
+      const payload: any = {
+        name: locationData.name,
+        code: locationData.code || null,
+        type: locationData.type,
+        address: locationData.address || null,
+        engineer_id: locationData.type === 'van' && locationData.engineer_id ? locationData.engineer_id : null
+      };
+
       const { data, error } = await supabase
         .from('inventory_locations')
-        .insert([locationData])
+        .insert([payload])
         .select()
         .single();
-      
+
       if (error) throw error;
       return data;
     },
@@ -50,92 +69,129 @@ export function AddLocationModal({ open, onOpenChange }: AddLocationModalProps) 
       onOpenChange(false);
       resetForm();
     },
-    onError: (error) => {
+    onError: (error: any) => {
+      console.error('Error creating location:', error);
       toast({
-        title: "Error",
-        description: `Failed to add location: ${error.message}`,
         variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to create location",
       });
     },
   });
 
   const resetForm = () => {
-    setName("");
-    setCode("");
-    setType("warehouse");
-    setAddress("");
+    setFormData({
+      name: '',
+      code: '',
+      type: 'warehouse',
+      address: '',
+      engineer_id: ''
+    });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    
+    if (!formData.name.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Location name is required",
+      });
+      return;
+    }
 
-    addLocationMutation.mutate({
-      name: name.trim(),
-      code: code.trim() || undefined,
-      type,
-      address: address.trim() || undefined,
-    });
+    if (formData.type === 'van' && !formData.engineer_id) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Engineer is required for van locations",
+      });
+      return;
+    }
+
+    createLocationMutation.mutate(formData);
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <MapPin className="h-5 w-5" />
-            Add New Location
-          </DialogTitle>
+          <DialogTitle>Add New Location</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
+          <div className="space-y-2">
             <Label htmlFor="name">Location Name *</Label>
             <Input
               id="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Main Warehouse"
+              value={formData.name}
+              onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+              placeholder="Enter location name"
               required
             />
           </div>
-          
-          <div>
-            <Label htmlFor="code">Location Code</Label>
-            <Input
-              id="code"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              placeholder="MW-01"
-            />
-          </div>
 
-          <div>
+          <div className="space-y-2">
             <Label htmlFor="type">Type</Label>
-            <Select value={type} onValueChange={setType}>
+            <Select 
+              value={formData.type} 
+              onValueChange={(value) => setFormData(prev => ({ ...prev, type: value, engineer_id: value !== 'van' ? '' : prev.engineer_id }))}
+            >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="warehouse">Warehouse</SelectItem>
-                <SelectItem value="van">Van</SelectItem>
-                <SelectItem value="job_site">Job Site</SelectItem>
+                <SelectItem value="van">Engineer Van</SelectItem>
+                <SelectItem value="supplier">Supplier</SelectItem>
                 <SelectItem value="other">Other</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          <div>
-            <Label htmlFor="address">Address</Label>
-            <Textarea
-              id="address"
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              placeholder="123 Industrial Estate, City..."
-              rows={3}
+          {formData.type === 'van' && (
+            <div className="space-y-2">
+              <Label htmlFor="engineer_id">Assign to Engineer *</Label>
+              <Select 
+                value={formData.engineer_id} 
+                onValueChange={(value) => setFormData(prev => ({ ...prev, engineer_id: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select engineer" />
+                </SelectTrigger>
+                <SelectContent>
+                  {engineers.map((engineer) => (
+                    <SelectItem key={engineer.id} value={engineer.id}>
+                      {engineer.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <Label htmlFor="code">Location Code</Label>
+            <Input
+              id="code"
+              value={formData.code}
+              onChange={(e) => setFormData(prev => ({ ...prev, code: e.target.value }))}
+              placeholder="Optional code/identifier"
             />
           </div>
 
-          <div className="flex justify-end gap-2">
+          <div className="space-y-2">
+            <Label htmlFor="address">Address</Label>
+            <Textarea
+              id="address"
+              value={formData.address}
+              onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
+              placeholder="Enter address (optional)"
+              className="min-h-[80px]"
+            />
+          </div>
+
+          <div className="flex justify-end space-x-2 pt-4">
             <Button 
               type="button" 
               variant="outline" 
@@ -145,9 +201,9 @@ export function AddLocationModal({ open, onOpenChange }: AddLocationModalProps) 
             </Button>
             <Button 
               type="submit" 
-              disabled={addLocationMutation.isPending}
+              disabled={createLocationMutation.isPending}
             >
-              {addLocationMutation.isPending ? "Adding..." : "Add Location"}
+              {createLocationMutation.isPending ? "Adding..." : "Add Location"}
             </Button>
           </div>
         </form>
