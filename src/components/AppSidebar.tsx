@@ -49,6 +49,7 @@ export function AppSidebar({ userRole }: AppSidebarProps) {
     { icon: FileText, label: 'Quotes', href: '/admin/quotes', action: () => navigate('/admin/quotes') },
     { icon: ShoppingCart, label: 'Orders', href: '/admin/orders', action: () => navigate('/admin/orders') },
     { icon: Calendar, label: 'Schedule', href: '/admin/schedule', action: () => navigate('/admin/schedule') },
+    { icon: Package, label: 'Inventory', href: '/admin/inventory', action: () => navigate('/admin/inventory') },
     { icon: User, label: 'Engineers', href: '/admin/engineers', action: () => navigate('/admin/engineers') },
     { icon: Users, label: 'Clients', href: '/admin/clients', action: () => navigate('/admin/clients') },
     { icon: Users, label: 'Leads', href: '/admin/leads', action: () => navigate('/admin/leads') },
