@@ -771,10 +771,11 @@ async function getSmartEngineerRecommendationsFast(
           travelTime = 45;
         }
 
-        // Check travel time limits with leniency for exact area matches
+        // Check travel time limits with generous leniency for exact area matches
         let maxTravelMinutes;
         if (hasExactAreaMatch) {
-          maxTravelMinutes = Math.max(60, serviceCheck.travelTime || 60); // At least 60 min for exact matches
+          maxTravelMinutes = Math.max(120, serviceCheck.travelTime || 120); // At least 2 hours for exact matches
+          console.log(`🎯 ${engineer.name}: Exact area match - allowing up to ${maxTravelMinutes}min travel time`);
         } else {
           maxTravelMinutes = hasServiceAreaMatch ? (serviceCheck.travelTime || 80) : (settings.max_travel_minutes_fallback || 120);
         }
@@ -784,6 +785,8 @@ async function getSmartEngineerRecommendationsFast(
           console.log(`❌ ${engineer.name}: Travel time ${travelTime}min > ${maxTravelMinutes}min limit`);
           return null;
         }
+        
+        console.log(`✅ ${engineer.name}: Travel time ${travelTime}min within ${maxTravelMinutes}min limit`);
 
         // Check distance limits with leniency for exact area matches  
         const maxDistanceMiles = hasExactAreaMatch ? Math.max(25, settings.max_distance_miles) : settings.max_distance_miles;
