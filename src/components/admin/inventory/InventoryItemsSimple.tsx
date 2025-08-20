@@ -1,188 +1,166 @@
 
-import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
-import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { AddItemModal } from "./AddItemModal";
+import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Plus, Package, Search } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { AddItemModal } from './AddItemModal';
 
 interface InventoryItem {
   id: string;
   name: string;
   sku: string;
-  description: string | null;
   unit: string;
+  description?: string;
   default_cost: number;
   min_level: number;
   max_level: number;
   reorder_point: number;
-  is_serialized: boolean;
-  is_charger: boolean;
   is_active: boolean;
-  supplier_id: string | null;
-  suppliers?: {
-    name: string;
-  } | null;
+  supplier_id?: string;
+  is_serialized: boolean;
 }
 
-export function InventoryItemsSimple() {
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const [editingItem, setEditingItem] = React.useState<InventoryItem | null>(null);
-  const [addItemOpen, setAddItemOpen] = React.useState(false);
+export const InventoryItemsSimple: React.FC = () => {
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
-  const { data: items = [], isLoading } = useQuery({
+  const { data: items, isLoading } = useQuery({
     queryKey: ['inventory-items'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('inventory_items')
-        .select(`
-          *,
-          suppliers (
-            name
-          )
-        `)
+        .select('*')
         .order('name');
       
       if (error) throw error;
-      return (data as unknown) as InventoryItem[];
+      return data as InventoryItem[];
     }
   });
 
-  const toggleActiveMutation = useMutation({
-    mutationFn: async ({ id, is_active }: { id: string, is_active: boolean }) => {
-      const { data, error } = await supabase
-        .from('inventory_items')
-        .update({ is_active })
-        .eq('id', id)
-        .select()
-        .single();
+  const filteredItems = items?.filter(item =>
+    item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.sku.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["inventory-items"] });
-      queryClient.invalidateQueries({ queryKey: ["inventory-stats"] });
-      toast({
-        title: "Success",
-        description: "Item status updated successfully",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.message || "Failed to update item status",
-      });
-    },
-  });
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="text-muted-foreground">Loading items...</div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-4">
-      <div className="grid gap-4">
-        {items.map((item) => (
-          <Card key={item.id} className="relative">
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-semibold">Inventory Items</h2>
+          <p className="text-muted-foreground">Manage your inventory items and stock levels</p>
+        </div>
+        <Button onClick={() => setShowAddModal(true)}>
+          <Plus className="h-4 w-4 mr-2" />
+          Add Item
+        </Button>
+      </div>
+
+      <div className="flex items-center gap-4">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search items..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <div className="text-sm text-muted-foreground">
+          {filteredItems?.length || 0} items
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {filteredItems?.map((item) => (
+          <Card key={item.id} className="hover:shadow-md transition-shadow">
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between">
                 <div className="space-y-1">
-                  <div className="flex items-center space-x-2">
-                    <CardTitle className="text-base">{item.name}</CardTitle>
-                    {item.is_charger && (
-                      <Badge className="bg-purple-100 text-purple-800">
-                        Charger
-                      </Badge>
-                    )}
-                    {item.is_serialized && (
-                      <Badge variant="outline">
-                        Serialized
-                      </Badge>
-                    )}
+                  <CardTitle className="text-base">{item.name}</CardTitle>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="text-xs">
+                      {item.sku}
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">
+                      {item.unit}
+                    </span>
                   </div>
-                  <p className="text-sm text-muted-foreground">SKU: {item.sku}</p>
-                  {item.description && (
-                    <p className="text-sm text-muted-foreground line-clamp-2">{item.description}</p>
-                  )}
                 </div>
-                <div className="flex items-center space-x-2">
-                  <Badge variant={item.is_active ? "default" : "destructive"}>
-                    {item.is_active ? "Active" : "Inactive"}
-                  </Badge>
-                </div>
+                <Package className="h-5 w-5 text-muted-foreground" />
               </div>
             </CardHeader>
-            
-            <CardContent className="space-y-3">
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="text-muted-foreground">Unit: </span>
-                  <span>{item.unit}</span>
+
+            <CardContent className="space-y-2">
+              {item.description && (
+                <p className="text-sm text-muted-foreground line-clamp-2">
+                  {item.description}
+                </p>
+              )}
+              
+              <div className="space-y-1 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Cost:</span>
+                  <span className="font-medium">£{item.default_cost}</span>
                 </div>
-                <div>
-                  <span className="text-muted-foreground">Cost: </span>
-                  <span>£{item.default_cost.toFixed(2)}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Min/Max: </span>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Min/Max:</span>
                   <span>{item.min_level}/{item.max_level}</span>
                 </div>
-                <div>
-                  <span className="text-muted-foreground">Reorder: </span>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Reorder:</span>
                   <span>{item.reorder_point}</span>
                 </div>
               </div>
 
-              {item.suppliers && (
-                <div className="text-sm">
-                  <span className="text-muted-foreground">Supplier: </span>
-                  <span>{item.suppliers.name}</span>
-                </div>
-              )}
-
-              <div className="flex justify-end space-x-2">
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => {
-                    setEditingItem(item);
-                    setAddItemOpen(true);
-                  }}
-                >
-                  Edit Item
-                </Button>
-                <Button 
-                  variant={item.is_active ? "destructive" : "default"}
-                  size="sm"
-                  onClick={() => toggleActiveMutation.mutate({
-                    id: item.id,
-                    is_active: !item.is_active
-                  })}
-                  disabled={toggleActiveMutation.isPending}
-                >
-                  {item.is_active ? "Deactivate" : "Activate"}
-                </Button>
+              <div className="flex items-center justify-between pt-2">
+                <Badge variant={item.is_active ? "default" : "secondary"}>
+                  {item.is_active ? "Active" : "Inactive"}
+                </Badge>
+                {item.is_serialized && (
+                  <Badge variant="outline" className="text-xs">
+                    Serialized
+                  </Badge>
+                )}
               </div>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      {items.length === 0 && (
-        <div className="text-center py-8 text-muted-foreground">
-          No items found. Add your first inventory item to get started.
-        </div>
+      {filteredItems?.length === 0 && (
+        <Card>
+          <CardContent className="p-8 text-center">
+            <Package className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+            <h3 className="text-lg font-medium mb-2">No items found</h3>
+            <p className="text-muted-foreground mb-4">
+              {searchTerm ? "Try adjusting your search terms" : "Get started by adding your first inventory item"}
+            </p>
+            {!searchTerm && (
+              <Button onClick={() => setShowAddModal(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add First Item
+              </Button>
+            )}
+          </CardContent>
+        </Card>
       )}
 
-      <AddItemModal 
-        open={addItemOpen} 
-        onOpenChange={(open) => {
-          setAddItemOpen(open);
-          if (!open) setEditingItem(null);
-        }}
-        editItem={editingItem}
+      <AddItemModal
+        open={showAddModal}
+        onOpenChange={setShowAddModal}
       />
     </div>
   );
-}
+};

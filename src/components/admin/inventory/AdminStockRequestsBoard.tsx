@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -74,76 +73,78 @@ const RequestCard: React.FC<RequestCardProps> = ({ request, onStatusChange }) =>
   return (
     <>
       <Card className="hover:shadow-md transition-shadow">
-        <CardHeader className="pb-3">
+        <CardHeader className="pb-2">
           <div className="flex items-start justify-between">
-            <div className="space-y-2">
-              <CardTitle className="text-base flex items-center gap-2">
-                <StatusIcon className="h-4 w-4" />
-                Request #{request.id.slice(0, 8)}
+            <div className="space-y-1">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <StatusIcon className="h-3 w-3" />
+                #{request.id.slice(0, 8)}
               </CardTitle>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
                 <User className="h-3 w-3" />
                 {request.engineer.name}
               </div>
             </div>
-            <div className="flex flex-col items-end gap-2">
-              <Badge variant={priorityColor}>
+            <div className="flex flex-col items-end gap-1">
+              <Badge variant={priorityColor} className="text-xs">
                 {request.priority}
               </Badge>
-              <Badge className={statusColors[request.status]}>
+              <Badge className={`text-xs ${statusColors[request.status]}`}>
                 {formatStatus(request.status)}
               </Badge>
             </div>
           </div>
         </CardHeader>
 
-        <CardContent className="space-y-3">
-          <div className="space-y-2 text-sm">
-            <div className="flex items-center gap-2">
+        <CardContent className="space-y-2 pt-0">
+          <div className="space-y-1 text-xs">
+            <div className="flex items-center gap-1">
               <MapPin className="h-3 w-3 text-muted-foreground" />
-              <span>{request.destination_location.name}</span>
+              <span className="truncate">{request.destination_location.name}</span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
               <Calendar className="h-3 w-3 text-muted-foreground" />
-              <span>Created {format(new Date(request.created_at), 'MMM d, yyyy')}</span>
+              <span>{format(new Date(request.created_at), 'MMM d')}</span>
             </div>
             {request.needed_by && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
                 <Clock className="h-3 w-3 text-muted-foreground" />
-                <span>Needed by {format(new Date(request.needed_by), 'MMM d, yyyy')}</span>
+                <span>Need by {format(new Date(request.needed_by), 'MMM d')}</span>
               </div>
             )}
           </div>
 
-          <div className="space-y-1">
-            <div className="text-sm font-medium">{request.lines.length} item{request.lines.length !== 1 ? 's' : ''}:</div>
-            <div className="text-sm text-muted-foreground">
-              {request.lines.slice(0, 2).map((line, idx) => (
-                <div key={line.id}>
+          <div className="text-xs">
+            <div className="font-medium">{request.lines.length} item{request.lines.length !== 1 ? 's' : ''}</div>
+            <div className="text-muted-foreground space-y-0.5">
+              {request.lines.slice(0, 2).map((line) => (
+                <div key={line.id} className="truncate">
                   {line.qty}x {line.item.name}
                 </div>
               ))}
               {request.lines.length > 2 && (
-                <div className="text-xs">...and {request.lines.length - 2} more</div>
+                <div className="text-xs">+{request.lines.length - 2} more</div>
               )}
             </div>
           </div>
 
-          <div className="flex gap-2 pt-2">
+          <div className="flex gap-1 pt-1">
             <Button
               variant="outline"
               size="sm"
+              className="text-xs h-6 px-2"
               onClick={() => setShowDetails(true)}
             >
-              View Details
+              Details
             </Button>
             {availableTransitions.length > 0 && (
               <Button
                 variant="default"
                 size="sm"
+                className="text-xs h-6 px-2"
                 onClick={() => setShowStatusChange(true)}
               >
-                Update Status
+                Update
               </Button>
             )}
           </div>
@@ -312,20 +313,20 @@ export const AdminStockRequestsBoard: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-4 xl:grid-cols-5 gap-4">
         {statusOrder.map((status) => {
           const requestsForStatus = groupedRequests[status] || [];
           return (
-            <div key={status} className="space-y-4">
+            <div key={status} className="space-y-3">
               <div className="flex items-center gap-2">
-                <h3 className="font-medium capitalize">
+                <h3 className="font-medium text-sm capitalize">
                   {formatStatus(status)}
                 </h3>
                 <Badge variant="secondary" className="text-xs">
                   {requestsForStatus.length}
                 </Badge>
               </div>
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {requestsForStatus.map((request) => (
                   <RequestCard
                     key={request.id}
@@ -334,7 +335,7 @@ export const AdminStockRequestsBoard: React.FC = () => {
                   />
                 ))}
                 {requestsForStatus.length === 0 && (
-                  <div className="p-4 text-center text-muted-foreground text-sm bg-muted/30 rounded-lg">
+                  <div className="p-3 text-center text-muted-foreground text-xs bg-muted/30 rounded-lg">
                     No {status} requests
                   </div>
                 )}
