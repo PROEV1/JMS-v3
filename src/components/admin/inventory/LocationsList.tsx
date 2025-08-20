@@ -14,30 +14,33 @@ interface Location {
   type: string;
   address: string | null;
   is_active: boolean;
-  engineer_id: string | null;
   engineer_name?: string;
 }
 
 export function LocationsList() {
-  const { data: locations = [], isLoading } = useQuery({
+  const { data: locations = [], isLoading, error } = useQuery({
     queryKey: ['inventory-locations'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('inventory_locations')
-        .select(`
-          *,
-          engineers(name)
-        `)
-        .eq('is_active', true)
-        .order('name');
-      
-      if (error) throw error;
-      
-      return (data as unknown as any[]).map(location => ({
-        ...location,
-        engineer_id: location.engineer_id || null,
-        engineer_name: location.engineers?.name
-      })) as Location[];
+      try {
+        const { data, error } = await supabase
+          .from('inventory_locations')
+          .select('*')
+          .eq('is_active', true)
+          .order('name');
+        
+        if (error) {
+          console.error('Error fetching locations:', error);
+          throw error;
+        }
+        
+        return (data || []).map(location => ({
+          ...location,
+          engineer_name: null // We'll handle engineer lookup separately if needed
+        })) as Location[];
+      } catch (err) {
+        console.error('Query error:', err);
+        throw err;
+      }
     }
   });
 
@@ -61,6 +64,14 @@ export function LocationsList() {
 
   if (isLoading) {
     return <div className="text-center py-8">Loading locations...</div>;
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-8 text-red-600">
+        Error loading locations: {error.message}
+      </div>
+    );
   }
 
   return (

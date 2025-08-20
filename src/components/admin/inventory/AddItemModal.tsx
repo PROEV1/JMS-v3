@@ -54,7 +54,7 @@ export function AddItemModal({ open, onOpenChange, editItem }: AddItemModalProps
     reorder_point: 0,
     is_serialized: false,
     is_charger: false,
-    supplier_id: ''
+    supplier_id: 'none'
   });
 
   // Reset form when modal opens/closes or editItem changes
@@ -72,7 +72,7 @@ export function AddItemModal({ open, onOpenChange, editItem }: AddItemModalProps
           reorder_point: editItem.reorder_point,
           is_serialized: editItem.is_serialized,
           is_charger: editItem.is_charger,
-          supplier_id: editItem.supplier_id || ''
+          supplier_id: editItem.supplier_id || 'none'
         });
       } else {
         setFormData({
@@ -86,7 +86,7 @@ export function AddItemModal({ open, onOpenChange, editItem }: AddItemModalProps
           reorder_point: 0,
           is_serialized: false,
           is_charger: false,
-          supplier_id: ''
+          supplier_id: 'none'
         });
       }
     }
@@ -111,7 +111,7 @@ export function AddItemModal({ open, onOpenChange, editItem }: AddItemModalProps
     mutationFn: async (itemData: typeof formData) => {
       const payload = {
         ...itemData,
-        supplier_id: itemData.supplier_id || null,
+        supplier_id: itemData.supplier_id === 'none' ? null : itemData.supplier_id || null,
         description: itemData.description || null
       };
 
@@ -287,13 +287,13 @@ export function AddItemModal({ open, onOpenChange, editItem }: AddItemModalProps
               <SelectTrigger>
                 <SelectValue placeholder="Select supplier (optional)" />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">No supplier</SelectItem>
-                {suppliers.map((supplier) => (
-                  <SelectItem key={supplier.id} value={supplier.id}>
-                    {supplier.name}
-                  </SelectItem>
-                ))}
+                <SelectContent>
+                  <SelectItem value="none">No supplier</SelectItem>
+                  {suppliers.map((supplier) => (
+                    <SelectItem key={supplier.id} value={supplier.id}>
+                      {supplier.name}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
           </div>
