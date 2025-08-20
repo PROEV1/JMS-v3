@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -76,7 +75,7 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({
         .eq('is_active', true);
       
       if (error) throw error;
-      return (data as unknown) as Array<{ id: string; name: string; code?: string }>;
+      return data as Array<{ id: string; name: string; code?: string }>;
     }
   });
 
@@ -91,7 +90,7 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({
         .order('name');
       
       if (error) throw error;
-      return (data as unknown) as Array<{ id: string; name: string; sku: string; unit: string }>;
+      return data as Array<{ id: string; name: string; sku: string; unit: string }>;
     }
   });
 
@@ -130,14 +129,27 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({
         photoUrl = await uploadPhoto(photoFile) || undefined;
       }
 
-      // Ensure all required fields are present
+      // Filter out lines with missing required data and ensure proper typing
+      const validLines = data.lines
+        .filter(line => line.item_id && line.qty > 0)
+        .map(line => ({
+          item_id: line.item_id!,
+          qty: line.qty!,
+          notes: line.notes
+        }));
+
+      if (validLines.length === 0) {
+        throw new Error('At least one valid item is required');
+      }
+
+      // Ensure all required fields are present with proper typing
       const requestData = {
         destination_location_id: data.destination_location_id,
-        order_id: data.order_id,
-        needed_by: data.needed_by,
+        order_id: data.order_id || undefined,
+        needed_by: data.needed_by || undefined,
         priority: data.priority,
-        notes: data.notes,
-        lines: data.lines,
+        notes: data.notes || undefined,
+        lines: validLines,
         engineer_id: engineerId,
         photo_url: photoUrl
       };
