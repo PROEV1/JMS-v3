@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
@@ -12,6 +11,7 @@ import { AlertsPanel } from './AlertsPanel';
 import { WeekAtAGlance } from './WeekAtAGlance';
 import { RecentActivity } from './RecentActivity';
 import { WeeklyCapacityView } from './WeeklyCapacityView';
+import { useScheduleStatusCounts } from '@/hooks/useScheduleStatusCounts';
 import { 
   Calendar, 
   Zap, 
@@ -32,146 +32,8 @@ export function SchedulingHub({}: SchedulingHubProps) {
   const [regionFilter, setRegionFilter] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState<string>('today');
 
-  // Fetch scheduling KPIs
-  const { data: kpiData, isLoading: kpiLoading, refetch: refetchKpis } = useQuery({
-    queryKey: ['scheduling-kpis', regionFilter, dateFilter],
-    queryFn: async () => {
-      const now = new Date();
-      const tomorrow = new Date(now);
-      tomorrow.setDate(now.getDate() + 1);
-
-      const [
-        unassignedResult,
-        pendingOffersResult,
-        expiringOffersResult,
-        scheduledTodayResult,
-        unavailableEngineersResult
-      ] = await Promise.all([
-        // Unassigned installation jobs that need scheduling (no engineer and no active offers)
-        (async () => {
-          const { data: ordersData, error: ordersError } = await supabase
-            .from('orders')
-            .select('id')
-            .eq('status_enhanced', 'awaiting_install_booking')
-            .eq('job_type', 'installation')
-            .is('engineer_id', null);
-
-          if (ordersError) throw ordersError;
-
-          // Filter out orders with active offers
-          const { data: activeOffers } = await supabase
-            .from('job_offers')
-            .select('order_id')
-            .eq('status', 'pending')
-            .gt('expires_at', now.toISOString());
-
-          const ordersWithActiveOffers = new Set(activeOffers?.map(offer => offer.order_id) || []);
-          const needsSchedulingOrders = (ordersData || []).filter(order => 
-            !ordersWithActiveOffers.has(order.id)
-          );
-
-          return { count: needsSchedulingOrders.length };
-        })(),
-        
-        // Pending offers for installations
-        (async () => {
-          const { data: offers } = await supabase
-            .from('job_offers')
-            .select('order_id')
-            .eq('status', 'pending')
-            .gt('expires_at', now.toISOString());
-          
-          if (!offers?.length) return { count: 0 };
-          
-          const orderIds = offers.map(o => o.order_id);
-          const { count } = await supabase
-            .from('orders')
-            .select('*', { count: 'exact', head: true })
-            .eq('job_type', 'installation')
-            .in('id', orderIds);
-            
-          return { count: count || 0 };
-        })(),
-        
-        // Ready to book installations (awaiting_install_booking status)
-        supabase
-          .from('orders')
-          .select('*', { count: 'exact', head: true })
-          .eq('status_enhanced', 'awaiting_install_booking')
-          .eq('job_type', 'installation'),
-        
-        // Scheduled installations for today
-        supabase
-          .from('orders')
-          .select('*', { count: 'exact', head: true })
-          .eq('status_enhanced', 'scheduled')
-          .eq('job_type', 'installation')
-          .gte('scheduled_install_date', now.toISOString().split('T')[0])
-          .lt('scheduled_install_date', tomorrow.toISOString().split('T')[0]),
-        
-        // Unavailable engineers (improved calculation)
-        (async () => {
-          const todayDayOfWeek = now.getDay();
-          const todayStr = now.toISOString().split('T')[0];
-          
-          const { data: engineers } = await supabase
-            .from('engineers')
-            .select(`
-              id,
-              availability,
-              engineer_availability(day_of_week, is_available),
-              engineer_time_off(start_date, end_date, status)
-            `);
-          
-          if (!engineers) return { count: 0 };
-          
-          let unavailableCount = 0;
-          
-          for (const engineer of engineers) {
-            // Check global availability
-            if (!engineer.availability) {
-              unavailableCount++;
-              continue;
-            }
-            
-            // Check day-of-week availability
-            const dayAvailability = engineer.engineer_availability?.find(
-              (avail: any) => avail.day_of_week === todayDayOfWeek
-            );
-            if (dayAvailability && !dayAvailability.is_available) {
-              unavailableCount++;
-              continue;
-            }
-            
-            // Check approved time off for today
-            const hasTimeOffToday = engineer.engineer_time_off?.some((timeOff: any) => {
-              const startDate = new Date(timeOff.start_date);
-              const endDate = new Date(timeOff.end_date);
-              const today = new Date(todayStr);
-              return timeOff.status === 'approved' && 
-                     today >= startDate && 
-                     today <= endDate;
-            });
-            
-            if (hasTimeOffToday) {
-              unavailableCount++;
-            }
-          }
-          
-          return { count: unavailableCount };
-        })()
-      ]);
-
-      return {
-        unassigned: unassignedResult.count || 0,
-        pendingOffers: pendingOffersResult.count || 0,
-        readyToBook: expiringOffersResult.count || 0,
-        scheduledToday: scheduledTodayResult.count || 0,
-        unavailableEngineers: unavailableEngineersResult.count || 0
-      };
-    },
-    refetchInterval: 30000 // Refresh every 30 seconds
-  });
+  // Use shared status counts hook
+  const { counts, loading: statusLoading, refetch: refetchStatusCounts } = useScheduleStatusCounts();
 
   // Fetch orders and engineers for calendar
   const { data: orders = [], isLoading: ordersLoading } = useQuery({
@@ -208,7 +70,7 @@ export function SchedulingHub({}: SchedulingHubProps) {
   });
 
   const handleRefresh = () => {
-    refetchKpis();
+    refetchStatusCounts();
   };
 
   const handleAutoSchedule = () => {
@@ -223,7 +85,7 @@ export function SchedulingHub({}: SchedulingHubProps) {
     navigate('/admin/schedule', { state: { tab: 'week-view' } });
   };
 
-  if (kpiLoading || ordersLoading || engineersLoading) {
+  if (statusLoading || ordersLoading || engineersLoading) {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -251,34 +113,34 @@ export function SchedulingHub({}: SchedulingHubProps) {
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <KpiCard
           title="Needs Scheduling"
-          value={kpiData?.unassigned || 0}
+          value={counts.needsScheduling}
           icon={Clock}
           variant="warning"
           onClick={() => navigate('/admin/schedule/status/needs-scheduling')}
         />
         <KpiCard
           title="Pending Offers"
-          value={kpiData?.pendingOffers || 0}
+          value={counts.dateOffered}
           icon={CheckCircle}
           variant="info"
           onClick={() => navigate('/admin/schedule/status/date-offered')}
         />
         <KpiCard
           title="Ready to Book"
-          value={kpiData?.readyToBook || 0}
+          value={counts.readyToBook}
           icon={BookOpen}
           variant="success"
           onClick={() => navigate('/admin/schedule/status/ready-to-book')}
         />
         <KpiCard
           title="Scheduled Today"
-          value={kpiData?.scheduledToday || 0}
+          value={counts.scheduledToday}
           icon={Calendar}
           variant="success"
         />
         <KpiCard
           title="Unavailable Engineers"
-          value={kpiData?.unavailableEngineers || 0}
+          value={counts.unavailableEngineers}
           icon={Users}
           variant="neutral"
         />
@@ -287,7 +149,7 @@ export function SchedulingHub({}: SchedulingHubProps) {
       {/* Alerts Panel */}
       <AlertsPanel 
         expiringOffers={0} // Expiring offers now handled separately in alerts logic
-        unassignedJobs={kpiData?.unassigned || 0}
+        unassignedJobs={counts.needsScheduling}
       />
 
       {/* Quick Actions */}
@@ -319,24 +181,21 @@ export function SchedulingHub({}: SchedulingHubProps) {
       {/* Full Width Capacity View */}
       <WeeklyCapacityView />
 
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left: Week View Calendar */}
-        <div className="lg:col-span-2">
-          <WeekViewCalendar 
-            orders={orders} 
-            engineers={engineers}
-            onOrderClick={(order) => navigate(`/admin/order/${order.id}`)}
-            currentDate={new Date()}
-            onDateChange={() => {}}
-          />
-        </div>
+      {/* Full Width Engineer Week View */}
+      <div className="w-full">
+        <WeekViewCalendar 
+          orders={orders} 
+          engineers={engineers}
+          onOrderClick={(order) => navigate(`/admin/order/${order.id}`)}
+          currentDate={new Date()}
+          onDateChange={() => {}}
+        />
+      </div>
 
-        {/* Right: Week at a Glance + Recent Activity */}
-        <div className="space-y-6">
-          <WeekAtAGlance />
-          <RecentActivity />
-        </div>
+      {/* Week at a Glance + Recent Activity Below */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <WeekAtAGlance />
+        <RecentActivity />
       </div>
 
       {/* Filters (Hidden for now but structure ready) */}
