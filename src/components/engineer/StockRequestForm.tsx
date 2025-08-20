@@ -73,7 +73,7 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({
         .select('*')
         .eq('type', 'van')
         .eq('engineer_id', engineerId)
-        .is_active(true);
+        .eq('is_active', true);
       
       if (error) throw error;
       return (data as unknown) as Array<{ id: string; name: string; code?: string }>;
@@ -130,11 +130,19 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({
         photoUrl = await uploadPhoto(photoFile) || undefined;
       }
 
-      await createRequest.mutateAsync({
-        ...data,
+      // Ensure all required fields are present
+      const requestData = {
+        destination_location_id: data.destination_location_id,
+        order_id: data.order_id,
+        needed_by: data.needed_by,
+        priority: data.priority,
+        notes: data.notes,
+        lines: data.lines,
         engineer_id: engineerId,
         photo_url: photoUrl
-      });
+      };
+
+      await createRequest.mutateAsync(requestData);
 
       onClose?.();
     } catch (error) {

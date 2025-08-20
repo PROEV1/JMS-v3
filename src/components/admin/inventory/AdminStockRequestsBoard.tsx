@@ -234,7 +234,7 @@ const RequestCard: React.FC<RequestCardProps> = ({ request, onStatusChange }) =>
           <div className="space-y-4">
             <div>
               <label className="text-sm font-medium">New Status</label>
-              <Select value={newStatus} onValueChange={setNewStatus}>
+              <Select value={newStatus} onValueChange={(value: string) => setNewStatus(value as StockRequestStatus)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select new status" />
                 </SelectTrigger>

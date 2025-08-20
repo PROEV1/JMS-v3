@@ -8,7 +8,7 @@ export const useStockRequests = (engineerId?: string, limit = 30) => {
   return useQuery({
     queryKey: ['stock-requests', engineerId, limit],
     queryFn: async () => {
-      let query = supabase
+      let query = (supabase as any)
         .from('stock_requests')
         .select(`
           *,
@@ -46,7 +46,7 @@ export const useCreateStockRequest = () => {
       const idempotencyKey = crypto.randomUUID();
       
       // Create the main request
-      const { data: request, error: requestError } = await supabase
+      const { data: request, error: requestError } = await (supabase as any)
         .from('stock_requests')
         .insert([{
           ...requestFields,
@@ -59,7 +59,7 @@ export const useCreateStockRequest = () => {
 
       // Create the lines
       if (lines.length > 0) {
-        const { error: linesError } = await supabase
+        const { error: linesError } = await (supabase as any)
           .from('stock_request_lines')
           .insert(
             lines.map(line => ({
@@ -89,7 +89,7 @@ export const useUpdateStockRequestStatus = () => {
 
   return useMutation({
     mutationFn: async ({ id, status, notes }: { id: string; status: string; notes?: string }) => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('stock_requests')
         .update({ 
           status: status as any,
