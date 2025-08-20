@@ -308,6 +308,24 @@ export function AutoScheduleReviewModal({
               return;
             }
 
+            // Validate recommendation data structure to prevent undefined errors
+            const validRecommendations = recommendations.recommendations.filter(rec => 
+              rec?.engineer?.id && rec?.engineer?.name && rec?.availableDate
+            );
+
+            if (validRecommendations.length === 0) {
+              console.log('❌ No valid recommendations after filtering for order:', order.order_number);
+              unscheduled.push({
+                order,
+                reason: 'Invalid recommendation data',
+                details: 'All recommendations missing required engineer or date information'
+              });
+              return;
+            }
+
+            // Replace the recommendations with validated ones
+            recommendations.recommendations = validRecommendations;
+
             let assignedCandidate = null;
             const alternatives: any[] = [];
             
@@ -568,6 +586,21 @@ export function AutoScheduleReviewModal({
             estimated_duration_hours: getOrderEstimatedHours(order)
           }));
         
+        // Defensive checks to prevent undefined UUID errors
+        if (!proposal.order?.id || !proposal.selectedCandidate?.engineer?.id) {
+          console.error('Missing required IDs for preflight check:', {
+            orderId: proposal.order?.id,
+            engineerId: proposal.selectedCandidate?.engineer?.id,
+            orderNumber: proposal.order?.order_number
+          });
+          updatedAssignments[i] = {
+            ...proposal,
+            status: 'preflight_failed',
+            statusMessage: 'Missing required order or engineer ID'
+          };
+          continue;
+        }
+
         const { data: preflightResult, error } = await supabase.functions.invoke('preflight-capacity-check', {
           body: {
             order_id: proposal.order.id,

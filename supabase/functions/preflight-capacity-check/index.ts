@@ -29,7 +29,33 @@ serve(async (req: Request) => {
   try {
     console.log('Preflight capacity check requested');
 
-    const { order_id, engineer_id, offered_date, virtual_orders = [] }: PreflightRequest = await req.json();
+    const requestBody = await req.json();
+    const { order_id, engineer_id, offered_date, virtual_orders = [] }: PreflightRequest = requestBody;
+
+    // Validate required parameters to prevent UUID errors
+    if (!order_id || !engineer_id || !offered_date) {
+      console.error('Missing required parameters:', { order_id, engineer_id, offered_date, requestBody });
+      return new Response(JSON.stringify({
+        canFit: false,
+        reason: 'Missing required parameters: order_id, engineer_id, or offered_date'
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Validate UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(order_id) || !uuidRegex.test(engineer_id)) {
+      console.error('Invalid UUID format:', { order_id: order_id, engineer_id: engineer_id });
+      return new Response(JSON.stringify({
+        canFit: false,
+        reason: 'Invalid UUID format for order_id or engineer_id'
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
 
     // Get order details
     const { data: order, error: orderError } = await supabase

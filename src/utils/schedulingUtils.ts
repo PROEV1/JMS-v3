@@ -964,11 +964,27 @@ export const getBatchDistancesForOrder = async (
   const destinations = [destinationPostcode];
   
   try {
+    // Add more detailed logging for debugging
+    console.log('🚀 Calling mapbox-distance with:', { 
+      originsCount: origins.length, 
+      destinationsCount: destinations.length,
+      origins: origins.slice(0, 3), // Log first 3 for debugging
+      destinations 
+    });
+
     const { data, error } = await supabase.functions.invoke('mapbox-distance', {
       body: { origins, destinations }
     });
     
     if (error) {
+      console.error('❌ Mapbox distance function error details:', {
+        error,
+        message: error.message,
+        stack: error.stack,
+        origins,
+        destinations
+      });
+
       // Check for rate limiting (429)
       if (error.message?.includes('429') || error.message?.includes('Too Many Requests')) {
         console.warn('⚠️ Mapbox rate limited, implementing exponential backoff');
@@ -977,10 +993,18 @@ export const getBatchDistancesForOrder = async (
         const retryResult = await supabase.functions.invoke('mapbox-distance', {
           body: { origins, destinations }
         });
-        if (retryResult.error) throw retryResult.error;
+        if (retryResult.error) {
+          console.error('❌ Retry also failed:', retryResult.error);
+          throw retryResult.error;
+        }
         return processBatchResults(retryResult.data, validEngineers, origins, destinations);
       }
       throw error;
+    }
+
+    if (!data) {
+      console.error('❌ No data returned from mapbox-distance function');
+      throw new Error('No data returned from distance calculation');
     }
 
     return processBatchResults(data, validEngineers, origins, destinations);
