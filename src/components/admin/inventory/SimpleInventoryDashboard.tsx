@@ -1,7 +1,8 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Package, Database, CheckCircle, TrendingUp, AlertTriangle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Package, Database, CheckCircle, TrendingUp, AlertTriangle, Building, MapPin, FileText } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -13,7 +14,11 @@ interface InventoryStats {
   totalTransactions: number;
 }
 
-export function SimpleInventoryDashboard() {
+interface SimpleInventoryDashboardProps {
+  onSwitchTab?: (tab: string) => void;
+}
+
+export function SimpleInventoryDashboard({ onSwitchTab }: SimpleInventoryDashboardProps) {
   const [stats, setStats] = useState<InventoryStats>({
     totalItems: 0,
     totalSuppliers: 0,
@@ -171,18 +176,50 @@ export function SimpleInventoryDashboard() {
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="grid gap-2">
-              <Badge variant="outline" className="justify-start p-2">
-                📦 Add new inventory items
-              </Badge>
-              <Badge variant="outline" className="justify-start p-2">
-                🏢 Set up suppliers
-              </Badge>
-              <Badge variant="outline" className="justify-start p-2">
-                📍 Configure locations
-              </Badge>
-              <Badge variant="outline" className="justify-start p-2">
-                📊 View stock levels
-              </Badge>
+              <Button 
+                variant="outline" 
+                className="justify-start p-3 h-auto"
+                onClick={() => onSwitchTab?.('items')}
+              >
+                <Package className="h-4 w-4 mr-2" />
+                <div className="text-left">
+                  <div className="font-medium">Manage Items</div>
+                  <div className="text-xs text-muted-foreground">Add and configure inventory items</div>
+                </div>
+              </Button>
+              <Button 
+                variant="outline" 
+                className="justify-start p-3 h-auto"
+                onClick={() => onSwitchTab?.('suppliers')}
+              >
+                <Building className="h-4 w-4 mr-2" />
+                <div className="text-left">
+                  <div className="font-medium">Manage Suppliers</div>
+                  <div className="text-xs text-muted-foreground">Set up and maintain supplier relationships</div>
+                </div>
+              </Button>
+              <Button 
+                variant="outline" 
+                className="justify-start p-3 h-auto"
+                onClick={() => onSwitchTab?.('locations')}
+              >
+                <MapPin className="h-4 w-4 mr-2" />
+                <div className="text-left">
+                  <div className="font-medium">Manage Locations</div>
+                  <div className="text-xs text-muted-foreground">Configure storage locations</div>
+                </div>
+              </Button>
+              <Button 
+                variant="outline" 
+                className="justify-start p-3 h-auto"
+                onClick={() => onSwitchTab?.('transactions')}
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                <div className="text-left">
+                  <div className="font-medium">Stock Adjustments</div>
+                  <div className="text-xs text-muted-foreground">Record stock movements and adjustments</div>
+                </div>
+              </Button>
             </div>
           </CardContent>
         </Card>

@@ -1,13 +1,20 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Package, MapPin, FileText, Truck, ShoppingCart, AlertTriangle } from "lucide-react";
+import { Package, MapPin, FileText, Truck, ShoppingCart, AlertTriangle, Building } from "lucide-react";
 import { InventoryItemsSimple } from "@/components/admin/inventory/InventoryItemsSimple";
 import { SimplePlaceholder } from "@/components/admin/inventory/SimplePlaceholder";
 import { SimpleInventoryDashboard } from "@/components/admin/inventory/SimpleInventoryDashboard";
+import { LocationsList } from "@/components/admin/inventory/LocationsList";
+import { SuppliersList } from "@/components/admin/inventory/SuppliersList";
+import { TransactionsList } from "@/components/admin/inventory/TransactionsList";
 
 export default function AdminInventory() {
   const [activeTab, setActiveTab] = useState("dashboard");
+
+  const switchToTab = (tab: string) => {
+    setActiveTab(tab);
+  };
 
   return (
     <div className="space-y-6">
@@ -21,7 +28,7 @@ export default function AdminInventory() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="dashboard" className="flex items-center gap-2">
             <AlertTriangle className="h-4 w-4" />
             Dashboard
@@ -33,6 +40,10 @@ export default function AdminInventory() {
           <TabsTrigger value="locations" className="flex items-center gap-2">
             <MapPin className="h-4 w-4" />
             Locations
+          </TabsTrigger>
+          <TabsTrigger value="suppliers" className="flex items-center gap-2">
+            <Building className="h-4 w-4" />
+            Suppliers
           </TabsTrigger>
           <TabsTrigger value="transactions" className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
@@ -49,7 +60,7 @@ export default function AdminInventory() {
         </TabsList>
 
         <TabsContent value="dashboard">
-          <SimpleInventoryDashboard />
+          <SimpleInventoryDashboard onSwitchTab={switchToTab} />
         </TabsContent>
 
         <TabsContent value="items">
@@ -57,19 +68,15 @@ export default function AdminInventory() {
         </TabsContent>
 
         <TabsContent value="locations">
-          <SimplePlaceholder 
-            title="Locations" 
-            icon={<MapPin className="h-5 w-5" />} 
-            description="Manage warehouses, engineer vans, and job site locations." 
-          />
+          <LocationsList />
+        </TabsContent>
+
+        <TabsContent value="suppliers">
+          <SuppliersList />
         </TabsContent>
 
         <TabsContent value="transactions">
-          <SimplePlaceholder 
-            title="Transactions" 
-            icon={<FileText className="h-5 w-5" />} 
-            description="View complete audit trail of all inventory movements." 
-          />
+          <TransactionsList />
         </TabsContent>
 
         <TabsContent value="requests">

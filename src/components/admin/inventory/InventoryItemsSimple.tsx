@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, Package, AlertCircle } from "lucide-react";
+import { Plus, Search, Package, AlertCircle, Edit, MoreHorizontal } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AddItemModal } from "./AddItemModal";
 
 interface InventoryItem {
@@ -113,6 +114,7 @@ export function InventoryItemsSimple() {
                   <TableHead>Reorder Point</TableHead>
                   <TableHead>Supplier</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -133,6 +135,24 @@ export function InventoryItemsSimple() {
                       <Badge variant={item.is_active ? "default" : "destructive"}>
                         {item.is_active ? "Active" : "Inactive"}
                       </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit Item
+                          </DropdownMenuItem>
+                          <DropdownMenuItem>
+                            {item.is_active ? 'Deactivate' : 'Activate'}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 ))}
