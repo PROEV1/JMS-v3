@@ -590,7 +590,7 @@ async function getSmartEngineerRecommendationsFast(
         setTimeout(() => reject(new Error('Mapbox timeout after 20s')), 20000);
       });
       
-      const distancePromise = getBatchDistancesForOrder(engineerPostcodes, postcode);
+      const distancePromise = getBatchDistancesForOrder(lightFilteredEngineers, postcode);
       distanceResults = await Promise.race([distancePromise, timeoutPromise]);
       
       console.log(`✅ Batch distances received: ${distanceResults.size}/${engineerPostcodes.length}`);
@@ -887,6 +887,8 @@ const processBatchResults = (
   }
   
   return result;
+};
+
 export const clearDistanceCache = () => {
   distanceCache.clear();
   console.log('Distance cache cleared');
@@ -1519,6 +1521,7 @@ export function validateEngineerSetup(engineer: EngineerSettings): {
   isComplete: boolean;
   missingItems: string[];
 } {
+  console.log('Validating setup for:', engineer.name); // Added to trigger recompilation
   const missingItems: string[] = [];
 
   if (!engineer.starting_postcode) {

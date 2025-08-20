@@ -250,15 +250,16 @@ export function AutoScheduleReviewModal({
     passNumber: number,
     maxPasses: number
   ) => {
-    // Configure pass-specific parameters
-    const passConfig = {
-      1: { maxCandidates: 6, searchDays: 30, travelRelaxation: 1.0, allowOverfill: false },
-      2: { maxCandidates: 12, searchDays: 60, travelRelaxation: 1.15, allowOverfill: false },
-      3: { maxCandidates: 24, searchDays: 90, travelRelaxation: 1.3, allowOverfill: true }
-    };
-    
-    const config = passConfig[passNumber as keyof typeof passConfig] || passConfig[1];
-    console.log(`🔧 Pass ${passNumber} config:`, config);
+    try {
+      // Configure pass-specific parameters
+      const passConfig = {
+        1: { maxCandidates: 6, searchDays: 30, travelRelaxation: 1.0, allowOverfill: false },
+        2: { maxCandidates: 12, searchDays: 60, travelRelaxation: 1.15, allowOverfill: false },
+        3: { maxCandidates: 24, searchDays: 90, travelRelaxation: 1.3, allowOverfill: true }
+      };
+      
+      const config = passConfig[passNumber as keyof typeof passConfig] || passConfig[1];
+      console.log(`🔧 Pass ${passNumber} config:`, config);
     
     // Process orders in batches with concurrency
     for (let batchStart = 0; batchStart < ordersToProcess.length; batchStart += concurrencyLimit) {
