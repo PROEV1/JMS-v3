@@ -161,7 +161,16 @@ export const updateOrderAssignment = async (orderId: string, engineerId: string 
   }
 };
 
-export const getSmartEngineerRecommendations = async (order: Order, postcode?: string, options: { startDate?: Date } = {}) => {
+export const getSmartEngineerRecommendations = async (
+  order: Order, 
+  postcode?: string, 
+  options: { 
+    startDate?: Date;
+    preloadedEngineers?: EngineerSettings[];
+    workloadLookup?: (engineerId: string, date: string) => number;
+    clientBlockedDatesMap?: Map<string, Set<string>>;
+  } = {}
+) => {
   try {
     console.log('Getting smart engineer recommendations for order:', order.order_number);
     
@@ -478,6 +487,56 @@ let distanceCache = new Map<string, { distance: number; duration: number; timest
 const CACHE_DURATION = 60 * 60 * 1000; // 1 hour in milliseconds
 
 /**
+ * Get batch distances from multiple origins to a single destination using Mapbox Matrix API
+ */
+export async function getBatchDistancesForOrder(
+  engineerPostcodes: string[], 
+  destinationPostcode: string
+): Promise<Map<string, { distance: number; duration: number }>> {
+  const results = new Map<string, { distance: number; duration: number }>();
+  
+  if (engineerPostcodes.length === 0) return results;
+
+  try {
+    console.log(`🗺️ Getting batch distances from ${engineerPostcodes.length} engineers to ${destinationPostcode}`);
+    
+    const { data, error } = await supabase.functions.invoke('mapbox-distance', {
+      body: {
+        origins: engineerPostcodes,
+        destinations: [destinationPostcode]
+      }
+    });
+
+    if (error) throw error;
+
+    // Process results - data.distances and data.durations are 2D arrays [origins][destinations]
+    engineerPostcodes.forEach((engineerPostcode, index) => {
+      const distance = data.distances[index]?.[0];
+      const duration = data.durations[index]?.[0];
+      
+      if (distance !== undefined && duration !== undefined) {
+        results.set(engineerPostcode, { distance, duration });
+        
+        // Also cache individual results for future single calls
+        const cacheKey = `${engineerPostcode.toLowerCase()}-${destinationPostcode.toLowerCase()}`;
+        distanceCache.set(cacheKey, {
+          distance,
+          duration,
+          timestamp: Date.now()
+        });
+      }
+    });
+
+    console.log(`✅ Batch distance results: ${results.size}/${engineerPostcodes.length} successful`);
+    return results;
+  } catch (error) {
+    console.error('Error getting batch distances:', error);
+    // Fallback to individual calls for critical operations
+    throw error;
+  }
+}
+
+/**
  * Get live distance and travel time between two postcodes using Mapbox
  */
 export async function getLiveDistance(fromPostcode: string, toPostcode: string): Promise<{ distance: number; duration: number }> {
@@ -529,7 +588,110 @@ export const clearDistanceCache = () => {
 };
 
 /**
- * Get engineer's daily workload for a specific date
+ * Precompute workload map for multiple engineers across a date range
+ */
+export async function getWorkloadMap(
+  engineerIds: string[], 
+  startDate: string, 
+  days: number = 90
+): Promise<Map<string, number>> {
+  const workloadMap = new Map<string, number>();
+  
+  if (engineerIds.length === 0) return workloadMap;
+
+  try {
+    console.log(`📊 Precomputing workload for ${engineerIds.length} engineers over ${days} days from ${startDate}`);
+    
+    const endDate = new Date(startDate);
+    endDate.setDate(endDate.getDate() + days);
+    const endDateStr = endDate.toISOString().split('T')[0];
+
+    // 1. Get confirmed orders in the date range
+    const { data: orders, error: ordersError } = await supabase
+      .from('orders')
+      .select('engineer_id, scheduled_install_date, status')
+      .in('engineer_id', engineerIds)
+      .gte('scheduled_install_date', startDate)
+      .lt('scheduled_install_date', endDateStr)
+      .in('status', ['scheduled', 'in_progress', 'completed']);
+
+    if (ordersError) throw ordersError;
+
+    // 2. Get pending/accepted job offers in the date range
+    const { data: offers, error: offersError } = await supabase
+      .from('job_offers')
+      .select('engineer_id, offered_date, status, expires_at')
+      .in('engineer_id', engineerIds)
+      .gte('offered_date', startDate)
+      .lt('offered_date', endDateStr)
+      .in('status', ['pending', 'accepted'])
+      .gt('expires_at', new Date().toISOString());
+
+    if (offersError) throw offersError;
+
+    // 3. Build workload map
+    // Count confirmed orders
+    orders?.forEach(order => {
+      if (order.engineer_id && order.scheduled_install_date) {
+        const dateStr = order.scheduled_install_date.split('T')[0];
+        const key = `${order.engineer_id}_${dateStr}`;
+        workloadMap.set(key, (workloadMap.get(key) || 0) + 1);
+      }
+    });
+
+    // Count soft holds from pending offers
+    offers?.forEach(offer => {
+      if (offer.engineer_id && offer.offered_date) {
+        const dateStr = offer.offered_date.split('T')[0];
+        const key = `${offer.engineer_id}_${dateStr}`;
+        workloadMap.set(key, (workloadMap.get(key) || 0) + 1);
+      }
+    });
+
+    console.log(`✅ Precomputed workload for ${workloadMap.size} engineer-date combinations`);
+    return workloadMap;
+  } catch (error) {
+    console.error('Error precomputing workload map:', error);
+    return workloadMap;
+  }
+}
+
+/**
+ * Get client blocked dates for multiple clients
+ */
+export async function getClientBlockedDatesMap(clientIds: string[]): Promise<Map<string, Set<string>>> {
+  const blockedDatesMap = new Map<string, Set<string>>();
+  
+  if (clientIds.length === 0) return blockedDatesMap;
+
+  try {
+    console.log(`🚫 Fetching blocked dates for ${clientIds.length} clients`);
+    
+    const { data: blockedDates, error } = await supabase
+      .from('client_blocked_dates')
+      .select('client_id, blocked_date')
+      .in('client_id', clientIds);
+
+    if (error) throw error;
+
+    // Build map of client_id -> Set of blocked dates
+    blockedDates?.forEach(entry => {
+      if (!blockedDatesMap.has(entry.client_id)) {
+        blockedDatesMap.set(entry.client_id, new Set());
+      }
+      blockedDatesMap.get(entry.client_id)!.add(entry.blocked_date);
+    });
+
+    console.log(`✅ Loaded blocked dates for ${blockedDatesMap.size} clients`);
+    return blockedDatesMap;
+  } catch (error) {
+    console.error('Error fetching client blocked dates:', error);
+    return blockedDatesMap;
+  }
+}
+
+/**
+ * Get engineer's daily workload for a specific date (ORIGINAL VERSION - kept for backward compatibility)
  */
 export async function getEngineerDailyWorkload(engineerId: string, date: string): Promise<number> {
   try {
@@ -766,7 +928,74 @@ export async function getEngineerSettings(engineerId: string): Promise<EngineerS
 }
 
 /**
- * Get all engineers with their complete settings for scheduling
+ * Get all engineers with their complete settings for scheduling (FAST VERSION - bulk queries)
+ */
+export async function getAllEngineersForSchedulingFast(): Promise<EngineerSettings[]> {
+  try {
+    console.log('🚀 Loading engineers with bulk queries...');
+    
+    // 1. Get all available engineers in one query
+    const { data: engineers, error: engineersError } = await supabase
+      .from('engineers')
+      .select('id, name, email, starting_postcode, availability')
+      .eq('availability', true);
+
+    if (engineersError) throw engineersError;
+    if (!engineers.length) return [];
+
+    const engineerIds = engineers.map(e => e.id);
+    console.log(`Found ${engineers.length} available engineers`);
+
+    // 2. Get all service areas for these engineers in one query
+    const { data: serviceAreas, error: serviceAreasError } = await supabase
+      .from('engineer_service_areas')
+      .select('*')
+      .in('engineer_id', engineerIds);
+
+    if (serviceAreasError) throw serviceAreasError;
+
+    // 3. Get all working hours for these engineers in one query
+    const { data: workingHours, error: workingHoursError } = await supabase
+      .from('engineer_availability')
+      .select('*')
+      .in('engineer_id', engineerIds)
+      .order('day_of_week');
+
+    if (workingHoursError) throw workingHoursError;
+
+    // 4. Get all approved time off for these engineers in one query
+    const { data: timeOff, error: timeOffError } = await supabase
+      .from('engineer_time_off')
+      .select('*')
+      .in('engineer_id', engineerIds)
+      .eq('status', 'approved')
+      .gte('end_date', new Date().toISOString().split('T')[0]);
+
+    if (timeOffError) throw timeOffError;
+
+    // 5. Assemble the data in memory
+    const engineerSettings: EngineerSettings[] = engineers.map(engineer => ({
+      id: engineer.id,
+      name: engineer.name,
+      email: engineer.email,
+      starting_postcode: engineer.starting_postcode,
+      availability: engineer.availability,
+      service_areas: serviceAreas?.filter(sa => sa.engineer_id === engineer.id) || [],
+      working_hours: workingHours?.filter(wh => wh.engineer_id === engineer.id) || [],
+      time_off: timeOff?.filter(to => to.engineer_id === engineer.id) || [],
+    }));
+
+    console.log(`✅ Bulk-loaded ${engineerSettings.length} engineers with all settings`);
+    return engineerSettings;
+  } catch (error) {
+    console.error('Error in fast bulk loading:', error);
+    // Fallback to original method
+    return getAllEngineersForScheduling();
+  }
+}
+
+/**
+ * Get all engineers with their complete settings for scheduling (ORIGINAL VERSION - kept for backward compatibility)
  */
 export async function getAllEngineersForScheduling(): Promise<EngineerSettings[]> {
   try {

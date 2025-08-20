@@ -9,7 +9,7 @@ import { CalendarDays, Clock, User, AlertTriangle, CheckCircle, Bot, Send, Packa
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Order, EngineerSettings, getOrderEstimatedHours, getOrderEstimatedMinutes } from '@/utils/schedulingUtils';
-import { getSmartEngineerRecommendations, getSchedulingSettings, getAllEngineersForScheduling, getEngineerDailyWorkload } from '@/utils/schedulingUtils';
+import { getSmartEngineerRecommendations, getSchedulingSettings, getAllEngineersForSchedulingFast, getEngineerDailyWorkload, getClientBlockedDatesMap, getWorkloadMap } from '@/utils/schedulingUtils';
 import { calculateDayFit } from '@/utils/dayFitUtils';
 import { getLocationDisplayText } from '@/utils/postcodeUtils';
 
@@ -79,10 +79,14 @@ export function AutoScheduleReviewModal({
   const [preflightChecking, setPreflightChecking] = useState(false);
   const [progressCurrent, setProgressCurrent] = useState(0);
   const [progressTotal, setProgressTotal] = useState(0);
+  const [progressText, setProgressText] = useState('');
   // Cache for workload lookups to speed up generation
   const [workloadCache, setWorkloadCache] = useState<Map<string, number>>(new Map());
   // Ref to prevent concurrent generation runs
   const isGeneratingRef = useRef(false);
+  // Cancel flag for interrupting long operations
+  const [isCancelled, setIsCancelled] = useState(false);
+  const cancelledRef = useRef(false);
   // Snapshot of orders when generation starts (to prevent flickering from prop changes)
   const ordersSnapshotRef = useRef<Order[]>([]);
 
@@ -102,6 +106,8 @@ export function AutoScheduleReviewModal({
     isGeneratingRef.current = true;
     setLoading(true);
     setGenerated(true); // Set early to prevent new triggers
+    setIsCancelled(false);
+    cancelledRef.current = false;
     
     // Capture orders snapshot to prevent flickering from prop changes
     const ordersSnapshot = [...orders];
@@ -109,95 +115,143 @@ export function AutoScheduleReviewModal({
     
     setProgressCurrent(0);
     setProgressTotal(ordersSnapshot.length);
-    console.log('Starting intelligent batch scheduling for', ordersSnapshot.length, 'orders with virtual capacity tracking');
+    setProgressText('Initializing bulk data loading...');
+    console.log('🚀 Starting FAST intelligent batch scheduling for', ordersSnapshot.length, 'orders');
     
     try {
+      // STEP 1: Bulk-load all data upfront
+      setProgressText('Loading engineers and settings...');
       const settings = await getSchedulingSettings();
-      const allEngineers = await getAllEngineersForScheduling();
+      const allEngineers = await getAllEngineersForSchedulingFast(); // 🚀 FAST VERSION
+      
+      if (cancelledRef.current) {
+        console.log('❌ Cancelled during engineer loading');
+        return;
+      }
+
+      setProgressText('Fetching client blocked dates...');
+      const clientIds = [...new Set(ordersSnapshot.map(o => o.client_id))];
+      const clientBlockedDatesMap = await getClientBlockedDatesMap(clientIds); // 🚀 BULK FETCH
+      
+      if (cancelledRef.current) {
+        console.log('❌ Cancelled during blocked dates loading');
+        return;
+      }
+
+      setProgressText('Precomputing workload map...');
+      const engineerIds = allEngineers.map(e => e.id);
+      const startDate = new Date().toISOString().split('T')[0];
+      const workloadMap = await getWorkloadMap(engineerIds, startDate, 90); // 🚀 PRECOMPUTE 90 days
+      
+      if (cancelledRef.current) {
+        console.log('❌ Cancelled during workload precomputation');
+        return;
+      }
+
+      console.log(`✅ Bulk data loaded: ${allEngineers.length} engineers, ${clientBlockedDatesMap.size} clients with blocked dates, ${workloadMap.size} workload entries`);
+      
+      // Helper function to get workload from precomputed map
+      const workloadLookup = (engineerId: string, date: string): number => {
+        return workloadMap.get(`${engineerId}_${date}`) || 0;
+      };
+
       const proposals: ProposedAssignment[] = [];
       const unscheduled: UnscheduledOrder[] = [];
       const ledger = new Map<string, VirtualLedgerEntry>();
       const capacityInfo: BatchCapacityInfo[] = [];
-      const cache = new Map<string, number>(); // Cache for workload lookups
       
-      console.log('Loaded', allEngineers.length, 'engineers and settings:', settings);
+      // STEP 2: Process orders with concurrency
+      const CONCURRENCY_LIMIT = 6; // Process 6 orders at a time
+      const concurrentTasks: Promise<void>[] = [];
       
-      for (let orderIndex = 0; orderIndex < ordersSnapshot.length; orderIndex++) {
-        const order = ordersSnapshot[orderIndex];
-        setProgressCurrent(orderIndex + 1);
+      setProgressText('Processing orders with smart recommendations...');
+      
+      // Process orders in batches with concurrency
+      for (let batchStart = 0; batchStart < ordersSnapshot.length; batchStart += CONCURRENCY_LIMIT) {
+        if (cancelledRef.current) {
+          console.log('❌ Cancelled during order processing');
+          break;
+        }
+
+        const batchEnd = Math.min(batchStart + CONCURRENCY_LIMIT, ordersSnapshot.length);
+        const batchOrders = ordersSnapshot.slice(batchStart, batchEnd);
         
-        try {
-          console.log(`\n🔄 Processing order ${order.order_number} (${orderIndex + 1}/${ordersSnapshot.length})`);
+        // Process this batch concurrently
+        const batchPromises = batchOrders.map(async (order, batchIndex) => {
+          const orderIndex = batchStart + batchIndex;
           
-          // Get all recommendations for this order
-          const recommendations = await getSmartEngineerRecommendations(order, order.postcode, {
-            startDate: new Date()
-          });
-
-          console.log(`Found ${recommendations.recommendations?.length || 0} candidates for order ${order.order_number}`);
-
-          if (!recommendations.recommendations || recommendations.recommendations.length === 0) {
-            console.log('❌ No recommendations found for order:', order.order_number);
-            unscheduled.push({
-              order,
-              reason: 'No available engineers',
-              details: 'No engineers found that can serve this postcode or have availability'
+          if (cancelledRef.current) return;
+          
+          try {
+            console.log(`\n🔄 Processing order ${order.order_number} (${orderIndex + 1}/${ordersSnapshot.length})`);
+            setProgressCurrent(orderIndex + 1);
+            
+            // Get all recommendations for this order using preloaded data
+            const recommendations = await getSmartEngineerRecommendations(order, order.postcode, {
+              startDate: new Date(),
+              preloadedEngineers: allEngineers, // 🚀 USE PRELOADED
+              workloadLookup, // 🚀 USE PRECOMPUTED WORKLOAD
+              clientBlockedDatesMap // 🚀 USE PRELOADED BLOCKED DATES
             });
-            continue;
-          }
 
-          let assignedCandidate = null;
-          const alternatives: any[] = [];
-          
-          // Limit to top 6 candidates for performance
-          const candidatesToCheck = recommendations.recommendations.slice(0, 6);
+            console.log(`Found ${recommendations.recommendations?.length || 0} candidates for order ${order.order_number}`);
 
-          // Try each candidate in order of preference
-          for (let i = 0; i < candidatesToCheck.length; i++) {
-            const candidate = candidatesToCheck[i];
-            const ledgerKey = `${candidate.engineer.id}_${candidate.availableDate}`;
-            const cacheKey = `${candidate.engineer.id}_${candidate.availableDate}`;
-            
-            console.log(`  🔍 Checking candidate ${i + 1}: ${candidate.engineer.name} on ${candidate.availableDate}`);
-            
-            // Get current virtual ledger entry for this engineer/date
-            const virtualEntry = ledger.get(ledgerKey) || {
-              engineerId: candidate.engineer.id,
-              date: candidate.availableDate,
-              jobCount: 0,
-              estimatedMinutes: 0,
-              orders: []
-            };
-
-            // Get current database workload (use cache if available)
-            let currentWorkload = cache.get(cacheKey);
-            if (currentWorkload === undefined) {
-              currentWorkload = await getEngineerDailyWorkload(candidate.engineer.id, candidate.availableDate);
-              cache.set(cacheKey, currentWorkload);
-            }
-            
-            const totalVirtualJobs = currentWorkload + virtualEntry.jobCount;
-            
-            // Check job count limit
-            if (totalVirtualJobs >= settings.max_jobs_per_day) {
-              console.log(`  ❌ Job limit exceeded: ${totalVirtualJobs}/${settings.max_jobs_per_day} jobs`);
-              alternatives.push(candidate); // Still keep as alternative
-              continue;
+            if (!recommendations.recommendations || recommendations.recommendations.length === 0) {
+              console.log('❌ No recommendations found for order:', order.order_number);
+              unscheduled.push({
+                order,
+                reason: 'No available engineers',
+                details: 'No engineers found that can serve this postcode or have availability'
+              });
+              return;
             }
 
-            // Find engineer settings for capacity check
-            const engineerSettings = allEngineers.find(e => e.id === candidate.engineer.id);
-            if (!engineerSettings) {
-              console.log(`  ❌ Engineer settings not found`);
-              alternatives.push(candidate);
-              continue;
-            }
+            let assignedCandidate = null;
+            const alternatives: any[] = [];
+            
+            // Limit to top 6 candidates for performance
+            const candidatesToCheck = recommendations.recommendations.slice(0, 6);
 
-            // Check if adding this order would exceed daily capacity using virtual orders
-            const virtualOrders = virtualEntry.orders.map(vOrder => ({
-              ...vOrder,
-              estimated_duration_hours: getOrderEstimatedHours(vOrder)
-            }));
+            // Try each candidate in order of preference
+            for (let i = 0; i < candidatesToCheck.length; i++) {
+              const candidate = candidatesToCheck[i];
+              const ledgerKey = `${candidate.engineer.id}_${candidate.availableDate}`;
+              
+              console.log(`  🔍 Checking candidate ${i + 1}: ${candidate.engineer.name} on ${candidate.availableDate}`);
+              
+              // Get current virtual ledger entry for this engineer/date
+              const virtualEntry = ledger.get(ledgerKey) || {
+                engineerId: candidate.engineer.id,
+                date: candidate.availableDate,
+                jobCount: 0,
+                estimatedMinutes: 0,
+                orders: []
+              };
+
+              // Get current database workload using precomputed lookup
+              const currentWorkload = workloadLookup(candidate.engineer.id, candidate.availableDate);
+              const totalVirtualJobs = currentWorkload + virtualEntry.jobCount;
+              
+              // Check job count limit
+              if (totalVirtualJobs >= settings.max_jobs_per_day) {
+                console.log(`  ❌ Job limit exceeded: ${totalVirtualJobs}/${settings.max_jobs_per_day} jobs`);
+                alternatives.push(candidate); // Still keep as alternative
+                continue;
+              }
+
+              // Find engineer settings for capacity check
+              const engineerSettings = allEngineers.find(e => e.id === candidate.engineer.id);
+              if (!engineerSettings) {
+                console.log(`  ❌ Engineer settings not found`);
+                alternatives.push(candidate);
+                continue;
+              }
+
+              // Check if adding this order would exceed daily capacity using virtual orders
+              const virtualOrders = virtualEntry.orders.map(vOrder => ({
+                ...vOrder,
+                estimated_duration_hours: getOrderEstimatedHours(vOrder)
+              }));
 
             try {
               const dayFit = await calculateDayFit(
@@ -273,13 +327,11 @@ export function AutoScheduleReviewModal({
             if (candidatesToCheck.length === 0) {
               reason = 'No engineer candidates';
               details = 'No engineers found with availability for this order';
-            } else {
               // Check what was the most common issue
               const hasCapacityIssues = alternatives.some(alt => {
                 const ledgerKey = `${alt.engineer.id}_${alt.availableDate}`;
                 const virtualEntry = ledger.get(ledgerKey);
-                const cacheKey = `${alt.engineer.id}_${alt.availableDate}`;
-                const currentWorkload = cache.get(cacheKey) || 0;
+                const currentWorkload = workloadLookup(alt.engineer.id, alt.availableDate);
                 return (currentWorkload + (virtualEntry?.jobCount || 0)) >= settings.max_jobs_per_day;
               });
               
@@ -302,26 +354,30 @@ export function AutoScheduleReviewModal({
         } catch (error) {
           console.error(`Error processing order ${order.order_number}:`, error);
         }
+        });
+
+        // Wait for this batch to complete before starting the next batch
+        await Promise.all(batchPromises);
       }
 
-      console.log(`\n🎯 Batch scheduling complete: ${proposals.length}/${ordersSnapshot.length} orders scheduled`);
+      console.log(`\n🎯 FAST batch scheduling complete: ${proposals.length}/${ordersSnapshot.length} orders scheduled`);
       console.log('Virtual capacity reservations:', Array.from(ledger.values()));
-      console.log('Workload cache hits:', cache.size, 'unique engineer-date combinations cached');
+      console.log('Using precomputed workload data, no cache needed');
 
       setVirtualLedger(ledger);
       setBatchCapacityInfo(capacityInfo);
       setProposedAssignments(proposals);
       setUnscheduledOrders(unscheduled);
-      setWorkloadCache(cache);
       
     } catch (error) {
-      console.error('Error in intelligent batch scheduling:', error);
+      console.error('Error in FAST intelligent batch scheduling:', error);
       toast.error('Failed to generate intelligent scheduling proposals');
       setGenerated(false); // Reset on error to allow retry
     } finally {
       setLoading(false);
       setProgressCurrent(0);
       setProgressTotal(0);
+      setProgressText('');
       isGeneratingRef.current = false; // Always reset the guard
     }
   };
@@ -580,18 +636,22 @@ export function AutoScheduleReviewModal({
     }
   };
 
+  const handleCancel = () => {
+    console.log('🛑 User cancelled operation');
+    setIsCancelled(true);
+    cancelledRef.current = true;
+    setLoading(false);
+    setProgressText('Cancelling...');
+    toast.info('Operation cancelled');
+  };
+
   const handleClose = () => {
+    handleCancel(); // Cancel any ongoing operations
     setProposedAssignments([]);
     setUnscheduledOrders([]);
-    setLoading(false);
-    setSubmitting(false);
     setGenerated(false);
-    setVirtualLedger(new Map());
-    setBatchCapacityInfo([]);
-    setPreflightChecking(false);
-    setProgressCurrent(0);
-    setProgressTotal(0);
-    setWorkloadCache(new Map());
+    setIsCancelled(false);
+    cancelledRef.current = false;
     onClose();
   };
 
