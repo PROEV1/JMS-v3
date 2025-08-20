@@ -164,7 +164,7 @@ export default function AdminQuotes() {
   };
 
   const handleCreateQuote = () => {
-    navigate('/admin/quotes/new');
+    navigate('/admin/quotes/create');
   };
 
   const handleEditQuote = (quoteId: string, e: React.MouseEvent) => {

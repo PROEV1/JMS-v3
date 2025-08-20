@@ -36,6 +36,16 @@ interface ImportProfile {
 export default function AdminPartnerProfiles() {
   const { id: partnerId } = useParams<{ id: string }>();
   const { toast } = useToast();
+
+  // Add defensive check for missing partnerId
+  if (!partnerId) {
+    toast({
+      title: "Error",
+      description: "Partner ID is required",
+      variant: "destructive",
+    });
+    return null;
+  }
   const queryClient = useQueryClient();
   const [editingProfile, setEditingProfile] = useState<ImportProfile | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);

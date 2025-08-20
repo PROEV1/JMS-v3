@@ -36,8 +36,7 @@ interface OfferDetails {
 }
 
 export default function ClientOfferViewPublic() {
-  const { clientToken } = useParams<{ clientToken: string }>();
-  const token = clientToken;
+  const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
   const [offer, setOffer] = useState<OfferDetails | null>(null);
   const [loading, setLoading] = useState(true);

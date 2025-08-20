@@ -91,7 +91,6 @@ function App() {
                     <Route path="/admin/settings" element={<AdminSettings />} />
                     <Route path="/admin/partners" element={<AdminPartners />} />
                     <Route path="/admin/partners/:id/profiles" element={<AdminPartnerProfiles />} />
-                    <Route path="/admin/partner-profiles" element={<AdminPartnerProfiles />} />
                     <Route path="/admin/engineers" element={<AdminEngineers />} />
                     <Route path="/admin/schedule" element={<AdminSchedule />} />
                     <Route path="/admin/schedule/status/:status" element={<AdminScheduleStatus />} />
