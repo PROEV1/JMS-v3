@@ -269,7 +269,7 @@ export const getSmartEngineerRecommendations = async (
           // Service area check - enhanced with unbounded support
           const serviceCheck = canEngineerServePostcode(engineer, finalPostcode);
           const hasServiceAreaMatch = serviceCheck.canServe;
-          const isUnbounded = serviceCheck.unbounded || false;
+          const isUnbounded = engineer.service_areas?.some(area => area.unbounded === true) || false;
           
           // Only hard-exclude if strict service area matching is required AND no unbounded coverage
           if (settings.require_service_area_match && !hasServiceAreaMatch) {
@@ -427,7 +427,7 @@ export const getSmartEngineerRecommendations = async (
           score += jitter;
           
           // Generate recommendation reasons including workload info and service area status
-          const reasons = generateRecommendationReasons(engineer, distance, travelTime, availableDate, minimumDate, dailyWorkloadThatDay, hasServiceAreaMatch, isUnbounded);
+          const reasons = generateRecommendationReasons(engineer, distance, travelTime, availableDate, minimumDate, dailyWorkloadThatDay, hasServiceAreaMatch);
 
           return {
             engineer: engineer as Engineer,
@@ -748,6 +748,10 @@ async function getSmartEngineerRecommendationsFast(
   };
 }
 
+// Mapbox concurrency control
+let mapboxConcurrency = 0;
+const MAX_MAPBOX_CONCURRENCY = 3;
+
 // Distance cache for Mapbox API calls
 let distanceCache = new Map<string, { distance: number; duration: number; timestamp: number }>();
 const CACHE_DURATION = 60 * 60 * 1000; // 1 hour in milliseconds
@@ -823,39 +827,6 @@ export const getBatchDistancesForOrder = async (
     mapboxConcurrency = Math.max(0, mapboxConcurrency - 1);
   }
 };
-  const results = new Map<string, { distance: number; duration: number }>();
-  
-  if (engineerPostcodes.length === 0) return results;
-
-  try {
-    console.log(`🗺️ Getting batch distances from ${engineerPostcodes.length} engineers to ${destinationPostcode}`);
-    
-    const { data, error } = await supabase.functions.invoke('mapbox-distance', {
-      body: {
-        origins: engineerPostcodes,
-        destinations: [destinationPostcode]
-      }
-    });
-
-    if (error) throw error;
-
-    // Process results - data.distances and data.durations are 2D arrays [origins][destinations]
-    engineerPostcodes.forEach((engineerPostcode, index) => {
-      const distance = data.distances[index]?.[0];
-      const duration = data.durations[index]?.[0];
-      
-      if (distance !== undefined && duration !== undefined) {
-        results.set(engineerPostcode, { distance, duration });
-        
-        // Also cache individual results for future single calls
-        const cacheKey = `${engineerPostcode.toLowerCase()}-${destinationPostcode.toLowerCase()}`;
-        distanceCache.set(cacheKey, {
-          distance,
-          duration,
-          timestamp: Date.now()
-        });
-      }
-    });
 
 // Process batch Mapbox results into engineer-specific data
 const processBatchResults = (
@@ -1537,4 +1508,5 @@ export function validateEngineerSetup(engineer: EngineerSettings): { isComplete:
   };
 }
 
-// Ensure file ends properly
+// Debug: File structure validation
+console.log('schedulingUtils.ts loaded successfully');

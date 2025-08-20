@@ -308,14 +308,6 @@ async function calculateTotalDayTime(engineer: EngineerSettings, orders: any[]):
 }
 
 /**
- * Parse time string (HH:MM) to minutes since midnight
- */
-function parseTime(timeStr: string): number {
-  const [hours, minutes] = timeStr.split(':').map(Number);
-  return hours * 60 + minutes;
-}
-
-/**
  * Check if adding a new order would exceed the engineer's capacity
  */
 export async function wouldExceedCapacity(
