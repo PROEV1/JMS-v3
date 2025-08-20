@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -12,12 +12,28 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { Package } from "lucide-react";
 
+interface InventoryItem {
+  id: string;
+  sku: string;
+  name: string;
+  description?: string;
+  is_serialized: boolean;
+  default_cost: number;
+  unit: string;
+  min_level: number;
+  max_level: number;
+  reorder_point: number;
+  supplier_id?: string;
+  is_active: boolean;
+}
+
 interface AddItemModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  editingItem?: InventoryItem | null;
 }
 
-export function AddItemModal({ open, onOpenChange }: AddItemModalProps) {
+export function AddItemModal({ open, onOpenChange, editingItem }: AddItemModalProps) {
   const [sku, setSku] = useState("");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -30,6 +46,37 @@ export function AddItemModal({ open, onOpenChange }: AddItemModalProps) {
   const [supplierId, setSupplierId] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  const resetForm = () => {
+    setSku("");
+    setName("");
+    setDescription("");
+    setIsSerializedState(false);
+    setDefaultCost("");
+    setUnit("each");
+    setMinLevel("");
+    setMaxLevel("");
+    setReorderPoint("");
+    setSupplierId("");
+  };
+
+  // Populate form when editing
+  useEffect(() => {
+    if (editingItem) {
+      setSku(editingItem.sku);
+      setName(editingItem.name);
+      setDescription(editingItem.description || "");
+      setIsSerializedState(editingItem.is_serialized);
+      setDefaultCost(editingItem.default_cost.toString());
+      setUnit(editingItem.unit);
+      setMinLevel(editingItem.min_level.toString());
+      setMaxLevel(editingItem.max_level.toString());
+      setReorderPoint(editingItem.reorder_point.toString());
+      setSupplierId(editingItem.supplier_id || "");
+    } else {
+      resetForm();
+    }
+  }, [editingItem, open]);
 
   const { data: suppliers } = useQuery({
     queryKey: ["suppliers"],
@@ -57,19 +104,33 @@ export function AddItemModal({ open, onOpenChange }: AddItemModalProps) {
       reorder_point: number;
       supplier_id?: string;
     }) => {
-      const { data, error } = await supabase
-        .from('inventory_items')
-        .insert([itemData])
-        .select()
-        .single();
-      
-      if (error) throw error;
-      return data;
+      if (editingItem) {
+        // Update existing item
+        const { data, error } = await supabase
+          .from('inventory_items')
+          .update(itemData)
+          .eq('id', editingItem.id)
+          .select()
+          .single();
+        
+        if (error) throw error;
+        return data;
+      } else {
+        // Add new item
+        const { data, error } = await supabase
+          .from('inventory_items')
+          .insert([itemData])
+          .select()
+          .single();
+        
+        if (error) throw error;
+        return data;
+      }
     },
     onSuccess: () => {
       toast({
         title: "Success",
-        description: "Item added successfully",
+        description: editingItem ? "Item updated successfully" : "Item added successfully",
       });
       queryClient.invalidateQueries({ queryKey: ["inventory-items-simple"] });
       queryClient.invalidateQueries({ queryKey: ["inventory-stats"] });
@@ -79,24 +140,11 @@ export function AddItemModal({ open, onOpenChange }: AddItemModalProps) {
     onError: (error) => {
       toast({
         title: "Error",
-        description: `Failed to add item: ${error.message}`,
+        description: `Failed to ${editingItem ? 'update' : 'add'} item: ${error.message}`,
         variant: "destructive",
       });
     },
   });
-
-  const resetForm = () => {
-    setSku("");
-    setName("");
-    setDescription("");
-    setIsSerializedState(false);
-    setDefaultCost("");
-    setUnit("each");
-    setMinLevel("");
-    setMaxLevel("");
-    setReorderPoint("");
-    setSupplierId("");
-  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -122,7 +170,7 @@ export function AddItemModal({ open, onOpenChange }: AddItemModalProps) {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Package className="h-5 w-5" />
-            Add New Item
+            {editingItem ? 'Edit Item' : 'Add New Item'}
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -267,7 +315,10 @@ export function AddItemModal({ open, onOpenChange }: AddItemModalProps) {
               type="submit" 
               disabled={addItemMutation.isPending}
             >
-              {addItemMutation.isPending ? "Adding..." : "Add Item"}
+              {addItemMutation.isPending 
+                ? (editingItem ? "Updating..." : "Adding...") 
+                : (editingItem ? "Update Item" : "Add Item")
+              }
             </Button>
           </div>
         </form>

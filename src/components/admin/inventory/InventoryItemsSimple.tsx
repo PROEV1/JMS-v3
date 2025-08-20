@@ -1,7 +1,8 @@
 
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +29,8 @@ interface InventoryItem {
 export function InventoryItemsSimple() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
+  const queryClient = useQueryClient();
 
   const { data: items, isLoading } = useQuery({
     queryKey: ["inventory-items-simple", searchTerm],
@@ -49,6 +52,28 @@ export function InventoryItemsSimple() {
       return data as InventoryItem[];
     },
   });
+
+  const handleToggleActive = async (item: InventoryItem) => {
+    try {
+      const { error } = await supabase
+        .from('inventory_items')
+        .update({ is_active: !item.is_active })
+        .eq('id', item.id);
+
+      if (error) throw error;
+
+      toast.success(`Item ${!item.is_active ? 'activated' : 'deactivated'} successfully`);
+      queryClient.invalidateQueries({ queryKey: ["inventory-items-simple"] });
+    } catch (error) {
+      console.error('Error toggling item status:', error);
+      toast.error('Failed to update item status');
+    }
+  };
+
+  const handleEditItem = (item: InventoryItem) => {
+    setEditingItem(item);
+    setShowAddModal(true);
+  };
 
   if (isLoading) {
     return (
@@ -144,11 +169,11 @@ export function InventoryItemsSimple() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleEditItem(item)}>
                             <Edit className="h-4 w-4 mr-2" />
                             Edit Item
                           </DropdownMenuItem>
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleToggleActive(item)}>
                             {item.is_active ? 'Deactivate' : 'Activate'}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -164,7 +189,11 @@ export function InventoryItemsSimple() {
 
       <AddItemModal 
         open={showAddModal} 
-        onOpenChange={setShowAddModal} 
+        onOpenChange={(open) => {
+          setShowAddModal(open);
+          if (!open) setEditingItem(null);
+        }}
+        editingItem={editingItem}
       />
     </>
   );
