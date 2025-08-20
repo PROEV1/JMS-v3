@@ -28,6 +28,7 @@ interface DayCapacity {
 
 export function WeeklyCapacityView() {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
   
   const { data: capacityData, isLoading } = useQuery({
     queryKey: ['weekly-capacity'],
@@ -185,9 +186,11 @@ export function WeeklyCapacityView() {
             </div>
             <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
               <CollapsibleTrigger asChild>
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" disabled={!selectedDate}>
                   {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                  {isExpanded ? 'Less Detail' : 'More Detail'}
+                  {selectedDate ? (
+                    isExpanded ? 'Hide Details' : `View ${format(new Date(selectedDate), 'EEE MMM d')}`
+                  ) : 'Select a day'}
                 </Button>
               </CollapsibleTrigger>
             </Collapsible>
@@ -204,11 +207,16 @@ export function WeeklyCapacityView() {
             return (
               <div 
                 key={day.date} 
+                onClick={() => {
+                  setSelectedDate(day.date);
+                  setIsExpanded(true);
+                }}
                 className={`
-                  p-3 rounded-lg border text-center space-y-2
+                  p-3 rounded-lg border text-center space-y-2 cursor-pointer transition-all hover:ring-2 hover:ring-primary/50
                   ${isWeekend ? 'bg-muted/50' : 'bg-background'}
                   ${isToday ? 'ring-2 ring-primary' : ''}
                   ${day.isAtRisk ? 'border-orange-300 bg-orange-50/50' : ''}
+                  ${selectedDate === day.date ? 'ring-2 ring-primary bg-primary/5' : ''}
                 `}
               >
                 <div className="text-sm font-medium">
@@ -254,19 +262,27 @@ export function WeeklyCapacityView() {
             <div className="pt-4 border-t">
               <h4 className="text-sm font-medium mb-3">Engineers with Spare Capacity</h4>
               <div className="space-y-4">
-                {capacityData?.map((day) => {
+                {selectedDate && capacityData?.find(day => day.date === selectedDate) && (() => {
+                  const day = capacityData.find(day => day.date === selectedDate)!;
                   // Get engineers with spare capacity for this day
                   const engineersWithSpareCapacity = day.engineerBreakdown
                     ?.filter(engineer => engineer.scheduledJobs < engineer.maxCapacity)
                     .sort((a, b) => (b.maxCapacity - b.scheduledJobs) - (a.maxCapacity - a.scheduledJobs)) || [];
                     
-                  if (engineersWithSpareCapacity.length === 0) return null;
-                  
                   const isWeekend = new Date(day.date).getDay() === 0 || new Date(day.date).getDay() === 6;
                   const isToday = day.date === format(new Date(), 'yyyy-MM-dd');
                   
+                  if (engineersWithSpareCapacity.length === 0) {
+                    return (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">All engineers are at full capacity on {day.dayName}, {format(new Date(day.date), 'MMM d')}</p>
+                      </div>
+                    );
+                  }
+                  
                   return (
-                    <div key={day.date} className="border rounded-lg overflow-hidden">
+                    <div className="border rounded-lg overflow-hidden">
                       <div className={`
                         px-4 py-2 border-b flex items-center justify-between
                         ${isWeekend ? 'bg-muted/30' : 'bg-background'}
@@ -325,16 +341,7 @@ export function WeeklyCapacityView() {
                       </div>
                     </div>
                   );
-                })}
-                
-                {capacityData?.every(day => 
-                  !day.engineerBreakdown?.some(engineer => engineer.scheduledJobs < engineer.maxCapacity)
-                ) && (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">All engineers are at full capacity this week</p>
-                  </div>
-                )}
+                })()}
               </div>
             </div>
           </CollapsibleContent>
