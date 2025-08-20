@@ -276,8 +276,18 @@ export const getSmartEngineerRecommendations = async (
     if (areaMatchEngineers.length > 0) {
       console.log(`🎯 Found ${areaMatchEngineers.length} engineers with exact area match for ${jobAreaLetters}, filtering to these only`);
       allEngineers = areaMatchEngineers;
+    } else if (settings.require_service_area_match) {
+      // If strict service area matching is required and no exact area matches found, return empty results
+      console.log(`❌ No engineers found with exact area match for ${jobAreaLetters} and strict service area matching is enabled`);
+      return { 
+        recommendations: [], 
+        featured: [],
+        all: [],
+        settings,
+        error: `No engineers available in service area ${jobAreaLetters}`
+      };
     } else {
-      console.log(`⚠️ No engineers found with exact area match for ${jobAreaLetters}, using all ${allEngineers.length} engineers`);
+      console.log(`⚠️ No engineers found with exact area match for ${jobAreaLetters}, using all ${allEngineers.length} engineers (non-strict mode)`);
     }
 
     console.log(`Found ${allEngineers.length} engineers to evaluate (after prefix filtering)`);
@@ -643,14 +653,37 @@ async function getSmartEngineerRecommendationsFast(
     };
   }
 
-  // PHASE 2: Batch distance lookups for remaining engineers (skip for exact area matches)
+  // STRICT AREA FILTERING: If we have exact area matches, ONLY use those engineers
   const exactAreaMatches = lightFilteredEngineers.filter(engineer => 
     engineer.service_areas?.some(area => 
       area.postcode_area && area.postcode_area.toUpperCase() === finalAreaLetters
     )
   );
   
-  const engineersNeedingDistance = lightFilteredEngineers.filter(eng => 
+  let engineersToEvaluate = lightFilteredEngineers;
+  
+  if (exactAreaMatches.length > 0) {
+    console.log(`🎯 FAST: Found ${exactAreaMatches.length} engineers with exact area match for ${finalAreaLetters}, filtering to these only`);
+    engineersToEvaluate = exactAreaMatches;
+  } else if (settings.require_service_area_match) {
+    console.log(`❌ FAST: No engineers found with exact area match for ${finalAreaLetters} and strict service area matching is enabled`);
+    return {
+      recommendations: [],
+      featured: [],
+      all: [],
+      settings,
+      diagnostics: {
+        totalEngineers: allEngineers.length,
+        excludedEngineers: allEngineers.length,
+        exclusionReasons: { 'strict_area_filtering': [`No engineers available in service area ${finalAreaLetters}`] }
+      }
+    };
+  } else {
+    console.log(`⚠️ FAST: No engineers found with exact area match for ${finalAreaLetters}, using all ${lightFilteredEngineers.length} engineers (non-strict mode)`);
+  }
+
+  // PHASE 2: Batch distance lookups for remaining engineers (skip for exact area matches)
+  const engineersNeedingDistance = engineersToEvaluate.filter(eng => 
     eng.starting_postcode && !exactAreaMatches.includes(eng)
   );
 
@@ -680,10 +713,10 @@ async function getSmartEngineerRecommendationsFast(
   }
 
   // PHASE 3: Heavy evaluation on remaining candidates
-  console.log(`🔬 Phase 3: Heavy evaluation on ${lightFilteredEngineers.length} candidates`);
+  console.log(`🔬 Phase 3: Heavy evaluation on ${engineersToEvaluate.length} candidates`);
   
   const recommendations = await Promise.all(
-    lightFilteredEngineers.map(async (engineer) => {
+    engineersToEvaluate.map(async (engineer) => {
       try {
         // Check if this engineer has exact area match
         const hasExactAreaMatch = engineer.service_areas?.some(area => 
