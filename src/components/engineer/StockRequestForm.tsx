@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useForm, useFieldArray, DefaultValues } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
@@ -15,20 +15,31 @@ import { supabase } from '@/integrations/supabase/client';
 import { useCreateStockRequest } from '@/hooks/useStockRequests';
 import { toast } from 'sonner';
 
-const stockRequestSchema = z.object({
+// Keep schema simple and flat for the form layer
+const StockRequestSchema = z.object({
   destination_location_id: z.string().min(1, 'Please select a destination'),
-  order_id: z.string().optional(),
-  needed_by: z.string().optional(),
-  priority: z.enum(['low', 'medium', 'high']),
+  job_id: z.string().nullable().optional(),
+  priority: z.enum(['low','medium','high']).default('medium'),
+  needed_by_date: z.string().nullable().optional(),
   notes: z.string().optional(),
+  attachments: z.array(z.object({ name: z.string(), path: z.string() })).optional(),
   lines: z.array(z.object({
     item_id: z.string().min(1, 'Please select an item'),
-    qty: z.number().min(1, 'Quantity must be at least 1'),
-    notes: z.string().optional(),
-  })).min(1, 'At least one item is required'),
+    qty: z.number().min(1, 'Quantity must be at least 1')
+  })).min(1, 'At least one item is required')
 });
 
-type StockRequestFormData = z.infer<typeof stockRequestSchema>;
+type StockRequestFormValues = z.infer<typeof StockRequestSchema>;
+
+const defaults: DefaultValues<StockRequestFormValues> = {
+  destination_location_id: '',
+  job_id: null,
+  priority: 'medium',
+  needed_by_date: null,
+  notes: '',
+  attachments: [],
+  lines: [{ item_id: '', qty: 1 }]
+};
 
 interface StockRequestFormProps {
   engineerId: string;
@@ -59,71 +70,85 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const createRequest = useCreateStockRequest();
 
-  const form = useForm<StockRequestFormData>({
-    resolver: zodResolver(stockRequestSchema),
+  const form = useForm<StockRequestFormValues>({
+    resolver: zodResolver(StockRequestSchema) as any, // prevent deep generic instantiation
     defaultValues: {
-      destination_location_id: '',
-      order_id: orderId || '',
-      needed_by: '',
-      priority: 'medium',
-      notes: '',
-      lines: prefilledItems.length > 0 ? prefilledItems : [{ item_id: '', qty: 1, notes: '' }]
-    }
+      ...defaults,
+      job_id: orderId || null,
+      lines: prefilledItems.length > 0 ? prefilledItems.map(item => ({ item_id: item.item_id, qty: item.qty })) : [{ item_id: '', qty: 1 }]
+    },
+    mode: 'onSubmit'
   });
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
-    name: 'lines'
+    name: 'lines' as const
   });
 
-  // Get van locations for engineer - using simple fetch approach
-  const locationsQuery = useQuery({
-    queryKey: ['engineer-locations', engineerId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('inventory_locations')
-        .select('id, name, code')
-        .eq('type', 'van')
-        .eq('engineer_id', engineerId)
-        .eq('is_active', true);
-      
-      if (error) throw error;
-      return data as LocationData[];
-    }
-  });
+  // Get van locations for engineer - completely avoid complex types
+  const [locations, setLocations] = useState<LocationData[]>([]);
+  const [items, setItems] = useState<ItemData[]>([]);
+  const [isLoadingData, setIsLoadingData] = useState(true);
 
-  // Get inventory items - using simple fetch approach
-  const itemsQuery = useQuery({
-    queryKey: ['inventory-items-active'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('inventory_items')
-        .select('id, name, sku, unit')
-        .eq('is_active', true)
-        .order('name');
-      
-      if (error) throw error;
-      return data as ItemData[];
-    }
-  });
+  React.useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setIsLoadingData(true);
+        
+        // Fetch locations - cast to avoid deep type instantiation
+        const locationResponse: any = await (supabase as any)
+          .from('inventory_locations')
+          .select('id, name, code')
+          .eq('type', 'van')
+          .eq('engineer_id', engineerId)
+          .eq('is_active', true);
+        
+        // Fetch items - cast to avoid deep type instantiation
+        const itemResponse: any = await (supabase as any)
+          .from('inventory_items')
+          .select('id, name, sku, unit')
+          .eq('is_active', true)
+          .order('name');
 
-  const locations = locationsQuery.data;
-  const items = itemsQuery.data;
+        const locationData = locationResponse?.data || [];
+        const itemData = itemResponse?.data || [];
+
+        setLocations(locationData.map((item: any) => ({
+          id: item.id,
+          name: item.name,
+          code: item.code
+        })));
+        
+        setItems(itemData.map((item: any) => ({
+          id: item.id,
+          name: item.name,
+          sku: item.sku,
+          unit: item.unit
+        })));
+      } catch (error) {
+        console.error('Failed to fetch data:', error);
+      } finally {
+        setIsLoadingData(false);
+      }
+    };
+
+    fetchData();
+  }, [engineerId]);
 
   const uploadPhoto = async (file: File): Promise<string | null> => {
     try {
       const fileName = `${Date.now()}-${file.name}`;
-      const { error: uploadError } = await supabase.storage
+      const uploadError = await (supabase as any).storage
         .from('stock-request-attachments')
         .upload(fileName, file);
 
-      if (uploadError) throw uploadError;
+      if (uploadError.error) throw uploadError.error;
 
-      const { data: { publicUrl } } = supabase.storage
+      const { data } = (supabase as any).storage
         .from('stock-request-attachments')
         .getPublicUrl(fileName);
 
-      return publicUrl;
+      return data?.publicUrl || null;
     } catch (error) {
       console.error('Photo upload failed:', error);
       toast.error('Failed to upload photo');
@@ -131,7 +156,7 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({
     }
   };
 
-  const onSubmit = async (data: StockRequestFormData) => {
+  const onSubmit = async (values: StockRequestFormValues) => {
     try {
       let photoUrl: string | undefined;
       
@@ -139,23 +164,23 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({
         photoUrl = await uploadPhoto(photoFile) || undefined;
       }
 
-      // Ensure all required fields are present and properly typed
-      const requestData = {
-        destination_location_id: data.destination_location_id,
-        order_id: data.order_id,
-        needed_by: data.needed_by,
-        priority: data.priority,
-        notes: data.notes,
+      // Map to lightweight DTO; avoid DB/Prisma/Supabase heavy types here
+      const dto = {
+        destination_location_id: values.destination_location_id,
+        order_id: values.job_id ?? null,
+        needed_by: values.needed_by_date ?? null,
+        priority: values.priority,
+        notes: values.notes ?? '',
         photo_url: photoUrl,
-        lines: data.lines.map(line => ({
-          item_id: line.item_id,
-          qty: Number(line.qty) || 1,
-          notes: line.notes
+        lines: values.lines.map(l => ({ 
+          item_id: l.item_id, 
+          qty: Number(l.qty),
+          notes: undefined
         })),
         engineer_id: engineerId
       };
 
-      await createRequest.mutateAsync(requestData);
+      await createRequest.mutateAsync(dto);
       onClose();
     } catch (error) {
       console.error('Failed to create stock request:', error);
@@ -208,10 +233,10 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({
       </div>
 
       <div>
-        <Label htmlFor="needed_by">Needed By (Optional)</Label>
+        <Label htmlFor="needed_by_date">Needed By (Optional)</Label>
         <Input
           type="date"
-          {...form.register('needed_by')}
+          {...form.register('needed_by_date')}
         />
       </div>
 
@@ -230,7 +255,7 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => append({ item_id: '', qty: 1, notes: '' })}
+            onClick={() => append({ item_id: '', qty: 1 })}
           >
             <Plus className="h-4 w-4 mr-2" />
             Add Item
@@ -267,11 +292,7 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({
                 </div>
 
                 <div className="col-span-4">
-                  <Label className="text-sm">Notes</Label>
-                  <Input
-                    {...form.register(`lines.${index}.notes`)}
-                    placeholder="Optional notes"
-                  />
+                  {/* Notes removed for simpler form structure */}
                 </div>
 
                 <div className="col-span-1 flex justify-end">
