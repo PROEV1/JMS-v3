@@ -18,7 +18,9 @@ export async function calculateDayFit(
   date: Date,
   newOrder?: Order,
   lenienceMinutes: number = 15,
-  additionalVirtualOrders: Order[] = []
+  additionalVirtualOrders: Order[] = [],
+  enforceJobCount: boolean = true,
+  jobCountLimitOverfill: number = 0
 ): Promise<DayFitResult> {
   try {
     // Get engineer's working hours for this day
@@ -321,12 +323,40 @@ export async function wouldExceedCapacity(
   date: Date,
   newOrder: Order,
   lenienceMinutes: number = 15,
-  additionalVirtualOrders: Order[] = []
+  additionalVirtualOrders: Order[] = [],
+  enforceJobCount: boolean = true,
+  jobCountLimitOverfill: number = 0
 ): Promise<{ wouldExceed: boolean; reason: string }> {
-  const dayFit = await calculateDayFit(engineer, date, newOrder, lenienceMinutes, additionalVirtualOrders);
+  const dayFit = await calculateDayFit(engineer, date, newOrder, lenienceMinutes, additionalVirtualOrders, enforceJobCount, jobCountLimitOverfill);
   
   return {
     wouldExceed: !dayFit.canFit,
     reason: dayFit.reasons.join(', ')
   };
+}
+
+/**
+ * Calculate working day duration and remaining minutes for quick pre-filtering
+ */
+export function getWorkingDayInfo(engineer: EngineerSettings, date: Date): { workDayMinutes: number; hasWorkingHours: boolean } {
+  const dayOfWeek = date.getDay();
+  const workingHour = engineer.working_hours.find(wh => wh.day_of_week === dayOfWeek);
+  
+  if (!workingHour || !workingHour.is_available) {
+    return { workDayMinutes: 0, hasWorkingHours: false };
+  }
+
+  const startTimeMinutes = parseTime(workingHour.start_time);
+  const endTimeMinutes = parseTime(workingHour.end_time);
+  const workDayMinutes = endTimeMinutes - startTimeMinutes;
+
+  return { workDayMinutes, hasWorkingHours: true };
+}
+
+/**
+ * Parse time string (HH:MM) to minutes since midnight (exported helper)
+ */
+export function parseTime(timeStr: string): number {
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  return hours * 60 + minutes;
 }

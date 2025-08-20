@@ -3,6 +3,12 @@ import { corsHeaders } from '../_shared/cors.ts'
 
 const MAPBOX_ACCESS_TOKEN = Deno.env.get('MAPBOX_ACCESS_TOKEN')
 
+// In-function caching and rate limiting
+const geocodeCache = new Map<string, [number, number]>()
+const rateLimitedRequests = new Map<string, number>()
+const RATE_LIMIT_WINDOW = 60000 // 1 minute
+const MAX_REQUESTS_PER_WINDOW = 100
+
 interface DistanceRequest {
   origins: string[]
   destinations: string[]
@@ -56,16 +62,33 @@ serve(async (req) => {
       throw new Error('Origins and destinations arrays cannot be empty')
     }
 
-    // Convert postcodes to coordinates using Mapbox Geocoding API
+    // Rate limiting check
+    const now = Date.now()
+    const requestsInWindow = rateLimitedRequests.get('global') || 0
+    if (requestsInWindow >= MAX_REQUESTS_PER_WINDOW) {
+      console.warn('⚠️ Rate limit reached, implementing backoff')
+      await new Promise(resolve => setTimeout(resolve, 2000))
+    }
+    rateLimitedRequests.set('global', requestsInWindow + 1)
+
+    // Convert postcodes to coordinates using Mapbox Geocoding API with enhanced caching
     const coordinatesCache = new Map<string, [number, number]>()
     
-    const getCoordinates = async (postcode: string): Promise<[number, number]> => {
+    const getCoordinates = async (postcode: string, retryCount = 0): Promise<[number, number]> => {
       const cleanPostcode = postcode.trim().toUpperCase()
       console.log(`Geocoding postcode: ${cleanPostcode}`)
       
+      // Check persistent cache first
+      if (geocodeCache.has(cleanPostcode)) {
+        const cached = geocodeCache.get(cleanPostcode)!
+        console.log(`Using persistent cache for ${cleanPostcode}:`, cached)
+        coordinatesCache.set(cleanPostcode, cached)
+        return cached
+      }
+      
       if (coordinatesCache.has(cleanPostcode)) {
         const cached = coordinatesCache.get(cleanPostcode)!
-        console.log(`Using cached coordinates for ${cleanPostcode}:`, cached)
+        console.log(`Using local cache for ${cleanPostcode}:`, cached)
         return cached
       }
       
@@ -86,6 +109,14 @@ serve(async (req) => {
       console.log(`Geocoding response data:`, data)
       
       if (!response.ok) {
+        // Handle 429 rate limiting with exponential backoff
+        if (response.status === 429 && retryCount < 3) {
+          const backoffMs = Math.pow(2, retryCount) * 1000 + Math.random() * 1000
+          console.warn(`Rate limited (429), retrying in ${backoffMs}ms (attempt ${retryCount + 1})`)
+          await new Promise(resolve => setTimeout(resolve, backoffMs))
+          return getCoordinates(postcode, retryCount + 1)
+        }
+        
         console.error(`Geocoding API error details:`, {
           postcode: cleanPostcode,
           status: response.status,
@@ -102,6 +133,7 @@ serve(async (req) => {
       const [lng, lat] = data.features[0].center
       const coordinates: [number, number] = [lng, lat]
       coordinatesCache.set(cleanPostcode, coordinates)
+      geocodeCache.set(cleanPostcode, coordinates) // Store in persistent cache
       console.log(`Geocoded ${cleanPostcode} to coordinates:`, coordinates)
       
       return coordinates
@@ -215,16 +247,38 @@ serve(async (req) => {
       console.log('Sources:', sources)
       console.log('Destinations param:', destinationsParam)
       
-      const matrixResponse = await fetch(matrixUrl)
-      const matrixData = await matrixResponse.json()
+      // Implement exponential backoff for Matrix API as well
+      let matrixResponse, matrixData
+      let retryCount = 0
+      const maxRetries = 3
       
-      console.log('=== Matrix API Response ===')
-      console.log('Status:', matrixResponse.status)
-      console.log('Response data:', JSON.stringify(matrixData, null, 2))
-      
-      if (!matrixResponse.ok) {
-        console.error('Matrix API error details:', matrixData)
-        throw new Error(`Mapbox Matrix API error: ${matrixResponse.status} - ${matrixData.message || matrixData.error || 'Unknown error'}`)
+      while (retryCount <= maxRetries) {
+        try {
+          matrixResponse = await fetch(matrixUrl)
+          matrixData = await matrixResponse.json()
+          
+          console.log('=== Matrix API Response ===')
+          console.log('Status:', matrixResponse.status)
+          console.log('Response data:', JSON.stringify(matrixData, null, 2))
+          
+          if (matrixResponse.status === 429 && retryCount < maxRetries) {
+            const backoffMs = Math.pow(2, retryCount) * 1000 + Math.random() * 1000
+            console.warn(`Matrix API rate limited, retrying in ${backoffMs}ms (attempt ${retryCount + 1})`)
+            await new Promise(resolve => setTimeout(resolve, backoffMs))
+            retryCount++
+            continue
+          }
+          
+          if (!matrixResponse.ok) {
+            console.error('Matrix API error details:', matrixData)
+            throw new Error(`Mapbox Matrix API error: ${matrixResponse.status} - ${matrixData.message || matrixData.error || 'Unknown error'}`)
+          }
+          
+          break // Success, exit retry loop
+        } catch (error) {
+          if (retryCount === maxRetries) throw error
+          retryCount++
+        }
       }
       
       if (!matrixData.distances || !matrixData.durations) {

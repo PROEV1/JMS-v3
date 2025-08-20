@@ -208,6 +208,7 @@ export type Database = {
           id: string
           max_travel_minutes: number | null
           postcode_area: string
+          unbounded: boolean
         }
         Insert: {
           created_at?: string
@@ -215,6 +216,7 @@ export type Database = {
           id?: string
           max_travel_minutes?: number | null
           postcode_area: string
+          unbounded?: boolean
         }
         Update: {
           created_at?: string
@@ -222,6 +224,7 @@ export type Database = {
           id?: string
           max_travel_minutes?: number | null
           postcode_area?: string
+          unbounded?: boolean
         }
         Relationships: [
           {

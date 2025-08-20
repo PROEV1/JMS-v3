@@ -89,6 +89,14 @@ export function AutoScheduleReviewModal({
   const cancelledRef = useRef(false);
   // Snapshot of orders when generation starts (to prevent flickering from prop changes)
   const ordersSnapshotRef = useRef<Order[]>([]);
+  // Multi-pass scheduling options
+  const [guaranteeSchedule, setGuaranteeSchedule] = useState(false);
+  // Diagnostics
+  const [diagnostics, setDiagnostics] = useState<{
+    mapbox429Count: number;
+    fallbacksUsed: number;
+    unboundedMatches: number;
+  }>({ mapbox429Count: 0, fallbacksUsed: 0, unboundedMatches: 0 });
 
   useEffect(() => {
     if (isOpen && orders.length > 0 && !generated && !isGeneratingRef.current) {
@@ -162,19 +170,105 @@ export function AutoScheduleReviewModal({
       
       // STEP 2: Process orders with concurrency
       const CONCURRENCY_LIMIT = 6; // Process 6 orders at a time
-      const concurrentTasks: Promise<void>[] = [];
+      let passNumber = 1;
+      const maxPasses = guaranteeSchedule ? 3 : 1;
       
       setProgressText('Processing orders with smart recommendations...');
       
-      // Process orders in batches with concurrency
-      for (let batchStart = 0; batchStart < ordersSnapshot.length; batchStart += CONCURRENCY_LIMIT) {
+      // PASS 1: Standard fast mode (top 6, 30 days)
+      await processOrdersInPasses(
+        ordersSnapshot, allEngineers, settings, workloadLookup, 
+        clientBlockedDatesMap, proposals, unscheduled, ledger, capacityInfo, 
+        CONCURRENCY_LIMIT, 1, maxPasses
+      );
+      
+      // PASS 2: Enhanced mode for unscheduled (top 12, 60 days, relaxed travel)
+      if (guaranteeSchedule && unscheduled.length > 0 && passNumber < maxPasses) {
+        console.log(`🔄 PASS 2: Re-attempting ${unscheduled.length} unscheduled orders with expanded criteria`);
+        setProgressText(`Pass 2: Expanding search for ${unscheduled.length} remaining orders...`);
+        
+        const remainingOrders = unscheduled.map(u => u.order);
+        unscheduled.length = 0; // Clear for second pass
+        
+        await processOrdersInPasses(
+          remainingOrders, allEngineers, settings, workloadLookup,
+          clientBlockedDatesMap, proposals, unscheduled, ledger, capacityInfo,
+          CONCURRENCY_LIMIT, 2, maxPasses
+        );
+      }
+      
+      // PASS 3: Maximum expansion for critical orders (top 24, 90 days, allow overfill)
+      if (guaranteeSchedule && unscheduled.length > 0 && passNumber < maxPasses) {
+        console.log(`🔄 PASS 3: Final attempt for ${unscheduled.length} orders with maximum expansion`);
+        setProgressText(`Pass 3: Final scheduling attempt with expanded capacity...`);
+        
+        const remainingOrders = unscheduled.map(u => u.order).sort((a, b) => 
+          (getOrderEstimatedHours(b) || 0) - (getOrderEstimatedHours(a) || 0)
+        );
+        unscheduled.length = 0; // Clear for final pass
+        
+        await processOrdersInPasses(
+          remainingOrders, allEngineers, settings, workloadLookup,
+          clientBlockedDatesMap, proposals, unscheduled, ledger, capacityInfo,
+          CONCURRENCY_LIMIT, 3, maxPasses
+        );
+      }
+
+      console.log(`\n🎯 Multi-pass scheduling complete: ${proposals.length}/${ordersSnapshot.length} orders scheduled`);
+      console.log('Virtual capacity reservations:', Array.from(ledger.values()));
+
+      setVirtualLedger(ledger);
+      setBatchCapacityInfo(capacityInfo);
+      setProposedAssignments(proposals);
+      setUnscheduledOrders(unscheduled);
+      
+    } catch (error) {
+      console.error('Error in multi-pass intelligent batch scheduling:', error);
+      toast.error('Failed to generate intelligent scheduling proposals');
+      setGenerated(false); // Reset on error to allow retry
+    } finally {
+      setLoading(false);
+      setProgressCurrent(0);
+      setProgressTotal(0);
+      setProgressText('');
+      isGeneratingRef.current = false; // Always reset the guard
+    }
+  };
+
+  // Process orders in passes with different criteria
+  const processOrdersInPasses = async (
+    ordersToProcess: Order[],
+    allEngineers: EngineerSettings[],
+    settings: any,
+    workloadLookup: (engineerId: string, date: string) => number,
+    clientBlockedDatesMap: Map<string, Set<string>>,
+    proposals: ProposedAssignment[],
+    unscheduled: UnscheduledOrder[],
+    ledger: Map<string, VirtualLedgerEntry>,
+    capacityInfo: BatchCapacityInfo[],
+    concurrencyLimit: number,
+    passNumber: number,
+    maxPasses: number
+  ) => {
+    // Configure pass-specific parameters
+    const passConfig = {
+      1: { maxCandidates: 6, searchDays: 30, travelRelaxation: 1.0, allowOverfill: false },
+      2: { maxCandidates: 12, searchDays: 60, travelRelaxation: 1.15, allowOverfill: false },
+      3: { maxCandidates: 24, searchDays: 90, travelRelaxation: 1.3, allowOverfill: true }
+    };
+    
+    const config = passConfig[passNumber as keyof typeof passConfig] || passConfig[1];
+    console.log(`🔧 Pass ${passNumber} config:`, config);
+    
+    // Process orders in batches with concurrency
+    for (let batchStart = 0; batchStart < ordersToProcess.length; batchStart += concurrencyLimit) {
         if (cancelledRef.current) {
           console.log('❌ Cancelled during order processing');
           break;
         }
 
-        const batchEnd = Math.min(batchStart + CONCURRENCY_LIMIT, ordersSnapshot.length);
-        const batchOrders = ordersSnapshot.slice(batchStart, batchEnd);
+        const batchEnd = Math.min(batchStart + concurrencyLimit, ordersToProcess.length);
+        const batchOrders = ordersToProcess.slice(batchStart, batchEnd);
         
         // Process this batch concurrently
         const batchPromises = batchOrders.map(async (order, batchIndex) => {
@@ -183,12 +277,18 @@ export function AutoScheduleReviewModal({
           if (cancelledRef.current) return;
           
           try {
-            console.log(`\n🔄 Processing order ${order.order_number} (${orderIndex + 1}/${ordersSnapshot.length})`);
+            console.log(`\n🔄 Pass ${passNumber}: Processing order ${order.order_number} (${orderIndex + 1}/${ordersToProcess.length})`);
             setProgressCurrent(orderIndex + 1);
             
             // Get all recommendations for this order using preloaded data
+            const startDate = new Date();
+            if (passNumber > 1) {
+              // Expand search horizon for later passes
+              startDate.setDate(startDate.getDate() - (passNumber - 1) * 10);
+            }
+            
             const recommendations = await getSmartEngineerRecommendations(order, order.postcode, {
-              startDate: new Date(),
+              startDate,
               preloadedEngineers: allEngineers, // 🚀 USE PRELOADED
               workloadLookup, // 🚀 USE PRECOMPUTED WORKLOAD
               clientBlockedDatesMap, // 🚀 USE PRELOADED BLOCKED DATES
@@ -210,8 +310,8 @@ export function AutoScheduleReviewModal({
             let assignedCandidate = null;
             const alternatives: any[] = [];
             
-            // Limit to top 6 candidates for performance
-            const candidatesToCheck = recommendations.recommendations.slice(0, 6);
+            // Limit candidates based on pass number
+            const candidatesToCheck = recommendations.recommendations.slice(0, config.maxCandidates);
 
             // Try each candidate in order of preference
             for (let i = 0; i < candidatesToCheck.length; i++) {
@@ -233,9 +333,12 @@ export function AutoScheduleReviewModal({
               const currentWorkload = workloadLookup(candidate.engineer.id, candidate.availableDate);
               const totalVirtualJobs = currentWorkload + virtualEntry.jobCount;
               
-              // Check job count limit
-              if (totalVirtualJobs >= settings.max_jobs_per_day) {
-                console.log(`  ❌ Job limit exceeded: ${totalVirtualJobs}/${settings.max_jobs_per_day} jobs`);
+              // Check job count limit (soft constraint in later passes)
+              const jobLimitExceeded = totalVirtualJobs >= settings.max_jobs_per_day;
+              const allowOverfillForThisPass = config.allowOverfill && passNumber >= 3;
+              
+              if (jobLimitExceeded && !allowOverfillForThisPass) {
+                console.log(`  ❌ Job limit exceeded: ${totalVirtualJobs}/${settings.max_jobs_per_day} jobs (Pass ${passNumber})`);
                 alternatives.push(candidate); // Still keep as alternative
                 continue;
               }
@@ -254,14 +357,16 @@ export function AutoScheduleReviewModal({
                 estimated_duration_hours: getOrderEstimatedHours(vOrder)
               }));
 
-            try {
-              const dayFit = await calculateDayFit(
-                engineerSettings,
-                new Date(candidate.availableDate),
-                order,
-                settings.day_lenience_minutes || 15,
-                virtualOrders
-              );
+              try {
+                const dayFit = await calculateDayFit(
+                  engineerSettings,
+                  new Date(candidate.availableDate),
+                  order,
+                  settings.day_lenience_minutes || 15,
+                  virtualOrders,
+                  !config.allowOverfill, // enforce job count unless overfill allowed
+                  config.allowOverfill ? 1 : 0 // allow 1 extra job if overfill
+                );
 
               if (!dayFit.canFit) {
                 console.log(`  ❌ Capacity exceeded: ${dayFit.reasons.join(', ')}`);
@@ -362,25 +467,8 @@ export function AutoScheduleReviewModal({
         await Promise.all(batchPromises);
       }
 
-      console.log(`\n🎯 FAST batch scheduling complete: ${proposals.length}/${ordersSnapshot.length} orders scheduled`);
-      console.log('Virtual capacity reservations:', Array.from(ledger.values()));
-      console.log('Using precomputed workload data, no cache needed');
-
-      setVirtualLedger(ledger);
-      setBatchCapacityInfo(capacityInfo);
-      setProposedAssignments(proposals);
-      setUnscheduledOrders(unscheduled);
-      
-    } catch (error) {
-      console.error('Error in FAST intelligent batch scheduling:', error);
-      toast.error('Failed to generate intelligent scheduling proposals');
-      setGenerated(false); // Reset on error to allow retry
-    } finally {
-      setLoading(false);
-      setProgressCurrent(0);
-      setProgressTotal(0);
-      setProgressText('');
-      isGeneratingRef.current = false; // Always reset the guard
+      // Wait for this batch to complete before starting the next batch
+      await Promise.all(batchPromises);
     }
   };
 
@@ -661,12 +749,26 @@ export function AutoScheduleReviewModal({
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="h-[85vh] w-[95vw] max-w-[1200px] flex flex-col overflow-hidden">
         <DialogHeader className="flex-shrink-0 pb-4 border-b">
-          <DialogTitle className="flex items-center gap-2">
-            <Bot className="w-5 h-5" />
-            Auto-Schedule Review & Batch Submission
+          <DialogTitle className="flex items-center gap-2 justify-between">
+            <div className="flex items-center gap-2">
+              <Bot className="h-5 w-5" />
+              AI Scheduling Review
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-normal flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={guaranteeSchedule}
+                  onChange={(e) => setGuaranteeSchedule(e.target.checked)}
+                  className="rounded"
+                />
+                Guarantee schedule (multi-pass)
+              </label>
+            </div>
           </DialogTitle>
           <DialogDescription>
-            Review AI-generated scheduling proposals and submit offers to clients.
+            Review and submit the automatically generated scheduling proposals for {orders.length} orders.
+            {guaranteeSchedule && " Multi-pass mode will attempt to schedule all jobs using expanded criteria."}
             {progressTotal > 0 && (
               <div className="flex items-center gap-2 mt-2">
                 <div className="text-xs text-muted-foreground">

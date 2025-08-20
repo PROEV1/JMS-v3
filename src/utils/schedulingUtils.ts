@@ -71,6 +71,7 @@ export interface EngineerSettings {
   service_areas: Array<{
     postcode_area: string;
     max_travel_minutes: number;
+    unbounded?: boolean;
   }>;
   working_hours: Array<{
     day_of_week: number;
@@ -265,22 +266,23 @@ export const getSmartEngineerRecommendations = async (
             return null;
           }
 
-          // Service area check - now soft preference unless strict mode enabled
+          // Service area check - enhanced with unbounded support
           const serviceCheck = canEngineerServePostcode(engineer, finalPostcode);
           const hasServiceAreaMatch = serviceCheck.canServe;
+          const isUnbounded = serviceCheck.unbounded || false;
           
-          // Only hard-exclude if strict service area matching is required
+          // Only hard-exclude if strict service area matching is required AND no unbounded coverage
           if (settings.require_service_area_match && !hasServiceAreaMatch) {
             exclusionReasons[engineer.name].push(`No service area coverage for ${finalPostcode} (strict mode)`);
             console.log(`Engineer ${engineer.name} excluded - no service area for ${finalPostcode} (strict mode enabled)`);
             return null;
           }
 
-          // Get live distance and travel time from Mapbox
+          // Get live distance and travel time from Mapbox (skip if unbounded)
           let distance = 0;
           let travelTime = hasServiceAreaMatch ? (serviceCheck.travelTime || 60) : 80; // Default higher if no service area match
           
-           if (engineer.starting_postcode) {
+           if (engineer.starting_postcode && !isUnbounded) {
              try {
                const distanceResult = await getLiveDistance(engineer.starting_postcode, finalPostcode);
                distance = distanceResult.distance;
@@ -289,7 +291,7 @@ export const getSmartEngineerRecommendations = async (
                 // Final check: respect engineer's travel time limits based on actual Mapbox data
                 // Use service area limit if matched, otherwise use global fallback
                 const maxTravelMinutes = hasServiceAreaMatch ? (serviceCheck.travelTime || 80) : (settings.max_travel_minutes_fallback || 120);
-                if (travelTime > maxTravelMinutes) {
+                if (travelTime > maxTravelMinutes && !isUnbounded) {
                   exclusionReasons[engineer.name].push(`Travel time ${travelTime}min exceeds limit ${maxTravelMinutes}min`);
                   console.log(`Engineer ${engineer.name} travel time ${travelTime} exceeds limit ${maxTravelMinutes}`);
                   return null;
@@ -300,6 +302,11 @@ export const getSmartEngineerRecommendations = async (
                distance = serviceCheck.travelTime ? Math.round(serviceCheck.travelTime / 2) : 25; // Rough estimate
                travelTime = serviceCheck.travelTime || 60;
              }
+           } else if (isUnbounded) {
+             // For unbounded areas, use minimal travel time/distance
+             console.log(`Engineer ${engineer.name} has unbounded coverage for ${finalPostcode}`);
+             distance = 15; // Nominal distance
+             travelTime = 30; // Nominal time
            }
 
           // Check distance limits
@@ -412,11 +419,15 @@ export const getSmartEngineerRecommendations = async (
             return null;
           }
 
-          // Calculate recommendation score (kept for display purposes)
-          const score = calculateEngineerScore(engineer, distance, travelTime, availableDate, dailyWorkloadThatDay);
+          // Calculate recommendation score with small jitter to break ties
+          let score = calculateEngineerScore(engineer, distance, travelTime, availableDate, dailyWorkloadThatDay);
+          
+          // Add tiny jitter (0.01-0.09) to break perfect ties deterministically
+          const jitter = (engineer.id.charCodeAt(0) % 9 + 1) / 100;
+          score += jitter;
           
           // Generate recommendation reasons including workload info and service area status
-          const reasons = generateRecommendationReasons(engineer, distance, travelTime, availableDate, minimumDate, dailyWorkloadThatDay, hasServiceAreaMatch);
+          const reasons = generateRecommendationReasons(engineer, distance, travelTime, availableDate, minimumDate, dailyWorkloadThatDay, hasServiceAreaMatch, isUnbounded);
 
           return {
             engineer: engineer as Engineer,

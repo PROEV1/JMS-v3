@@ -491,7 +491,8 @@ Deno.serve(async (req) => {
               .upsert({
                 engineer_id: engineer.id,
                 postcode_area: area,
-                max_travel_minutes: row.max_travel_minutes || 60
+                max_travel_minutes: row.max_travel_minutes || 60,
+                unbounded: true // Explicit service areas are unbounded
               }, {
                 onConflict: 'engineer_id,postcode_area'
               });
