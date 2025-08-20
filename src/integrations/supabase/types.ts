@@ -493,6 +493,7 @@ export type Database = {
           description: string | null
           id: string
           is_active: boolean
+          is_charger: boolean
           is_serialized: boolean
           max_level: number
           min_level: number
@@ -509,6 +510,7 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean
+          is_charger?: boolean
           is_serialized?: boolean
           max_level?: number
           min_level?: number
@@ -525,6 +527,7 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean
+          is_charger?: boolean
           is_serialized?: boolean
           max_level?: number
           min_level?: number
