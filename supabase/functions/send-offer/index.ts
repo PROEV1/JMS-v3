@@ -111,8 +111,12 @@ serve(async (req: Request) => {
       .single();
 
     if (engineerError || !engineer) {
+      console.error('Engineer query error:', engineerError);
       throw new Error('Engineer not found');
     }
+
+    console.log('Engineer data:', JSON.stringify(engineer, null, 2));
+    console.log('Engineer availability:', JSON.stringify(engineer.engineer_availability, null, 2));
 
     // Check if client has blocked this date
     const offeredDateOnly = new Date(offered_date).toISOString().split('T')[0];
@@ -140,7 +144,12 @@ serve(async (req: Request) => {
       (wh: any) => wh.day_of_week === dayOfWeek && wh.is_available
     )
 
+    console.log(`Looking for working hours for day ${dayOfWeek}, found:`, workingHour);
+    console.log('All availability records:', engineer.engineer_availability);
+
     if (!workingHour) {
+      console.error(`Engineer ${engineer.name} (${engineer_id}) not available on day ${dayOfWeek}. Available days:`, 
+        engineer.engineer_availability?.filter((wh: any) => wh.is_available).map((wh: any) => wh.day_of_week));
       throw new Error('Engineer not available on this day of the week');
     }
 
