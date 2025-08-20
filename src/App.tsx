@@ -101,29 +101,45 @@ function AppContent() {
         {/* Dashboard Routes */}
         <Route path="/" element={<Dashboard />} />
         
-        {/* Client Routes */}
+        {/* Client Routes - Both /client/* and root paths for compatibility */}
         {role === 'client' && (
           <>
             <Route path="/dashboard" element={<ClientDashboard />} />
+            <Route path="/client" element={<ClientDashboard />} />
+            <Route path="/client/dashboard" element={<Navigate to="/client" replace />} />
             <Route path="/quotes" element={<ClientQuotes />} />
+            <Route path="/client/quotes" element={<Navigate to="/quotes" replace />} />
             <Route path="/quotes/:id" element={<ClientQuoteDetail />} />
+            <Route path="/client/quotes/:id" element={<Navigate to="/quotes/:id" replace />} />
             <Route path="/orders" element={<ClientOrders />} />
+            <Route path="/client/orders" element={<Navigate to="/orders" replace />} />
             <Route path="/orders/:id" element={<EnhancedClientOrderView />} />
+            <Route path="/client/orders/:id" element={<Navigate to="/orders/:id" replace />} />
             <Route path="/messages" element={<ClientMessages />} />
+            <Route path="/client/messages" element={<Navigate to="/messages" replace />} />
             <Route path="/documents" element={<ClientDocuments />} />
+            <Route path="/client/documents" element={<Navigate to="/documents" replace />} />
             <Route path="/payments" element={<ClientPayments />} />
+            <Route path="/client/payments" element={<Navigate to="/payments" replace />} />
             <Route path="/date-blocking" element={<ClientDateBlocking />} />
+            <Route path="/client/date-blocking" element={<Navigate to="/date-blocking" replace />} />
             <Route path="/profile" element={<ClientProfileSelf />} />
+            <Route path="/client/profile" element={<Navigate to="/profile" replace />} />
           </>
         )}
 
-        {/* Engineer Routes */}
+        {/* Engineer Routes - Both /engineer/* and root paths for compatibility */}
         {role === 'engineer' && (
           <>
             <Route path="/dashboard" element={<EngineerDashboard />} />
+            <Route path="/engineer" element={<EngineerDashboard />} />
+            <Route path="/engineer/dashboard" element={<Navigate to="/engineer" replace />} />
             <Route path="/profile" element={<EngineerProfile />} />
+            <Route path="/engineer/profile" element={<Navigate to="/profile" replace />} />
             <Route path="/availability" element={<EngineerAvailability />} />
+            <Route path="/engineer/availability" element={<Navigate to="/availability" replace />} />
             <Route path="/jobs/:id" element={<EngineerJobDetail />} />
+            <Route path="/engineer/jobs/:id" element={<Navigate to="/jobs/:id" replace />} />
           </>
         )}
 

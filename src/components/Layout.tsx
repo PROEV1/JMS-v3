@@ -33,22 +33,25 @@ export default function Layout({ children }: LayoutProps) {
   const currentPath = location.pathname;
   console.log('Layout: Current path:', currentPath, 'User role:', userRole);
   
-  // Protect admin routes from non-admins
-  if (userRole !== 'admin' && (currentPath.startsWith('/admin') || currentPath === '/dashboard')) {
+  // Protect admin routes from non-admins (but allow admins to access /dashboard)
+  if (userRole !== 'admin' && userRole !== 'manager' && currentPath.startsWith('/admin')) {
     const redirectTo = userRole === 'engineer' ? '/engineer' : '/client';
     console.log(`Layout: ${userRole} accessing admin route, redirecting to ${redirectTo}`);
     return <Navigate to={redirectTo} replace />;
   }
   
   // Protect client routes from non-clients
-  if (userRole !== 'client' && currentPath === '/client') {
+  if (userRole !== 'client' && (currentPath.startsWith('/client') || 
+      (userRole === 'admin' && ['/quotes', '/orders', '/messages', '/documents', '/payments', '/date-blocking', '/profile'].includes(currentPath)))) {
     const redirectTo = userRole === 'admin' ? '/dashboard' : '/engineer';
     console.log(`Layout: ${userRole} accessing client route, redirecting to ${redirectTo}`);
     return <Navigate to={redirectTo} replace />;
   }
 
   // Protect engineer routes from non-engineers
-  if (userRole !== 'engineer' && currentPath.startsWith('/engineer')) {
+  if (userRole !== 'engineer' && (currentPath.startsWith('/engineer') ||
+      (userRole === 'admin' && ['/availability', '/profile'].includes(currentPath)) ||
+      (userRole === 'client' && ['/availability', '/profile'].includes(currentPath)))) {
     const redirectTo = userRole === 'admin' ? '/dashboard' : '/client';
     console.log(`Layout: ${userRole} accessing engineer route, redirecting to ${redirectTo}`);
     return <Navigate to={redirectTo} replace />;
