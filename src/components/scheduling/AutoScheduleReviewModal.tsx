@@ -327,6 +327,7 @@ export function AutoScheduleReviewModal({
             if (candidatesToCheck.length === 0) {
               reason = 'No engineer candidates';
               details = 'No engineers found with availability for this order';
+            } else {
               // Check what was the most common issue
               const hasCapacityIssues = alternatives.some(alt => {
                 const ledgerKey = `${alt.engineer.id}_${alt.availableDate}`;
