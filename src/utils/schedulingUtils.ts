@@ -889,10 +889,6 @@ const processBatchResults = (
   return result;
 };
 
-export const clearDistanceCache = () => {
-  distanceCache.clear();
-  console.log('Distance cache cleared');
-};
 
 /**
  * Get live distance and travel time between two postcodes using Mapbox
@@ -1495,9 +1491,6 @@ export async function getEngineersForPostcode(postcode: string): Promise<Array<{
 }
 
 /**
- * Validate engineer setup completeness
- */
-/**
  * Get default working hours (Monday-Friday, 9AM-5PM)
  */
 function getDefaultWorkingHours() {
@@ -1517,10 +1510,7 @@ function getDefaultWorkingHours() {
 /**
  * Validate engineer setup completeness
  */
-export function validateEngineerSetup(engineer: EngineerSettings): {
-  isComplete: boolean;
-  missingItems: string[];
-} {
+export function validateEngineerSetup(engineer: EngineerSettings): { isComplete: boolean; missingItems: string[] } {
   console.log('Validating setup for:', engineer.name); // Added to trigger recompilation
   const missingItems: string[] = [];
 
@@ -1546,3 +1536,5 @@ export function validateEngineerSetup(engineer: EngineerSettings): {
     missingItems
   };
 }
+
+// Ensure file ends properly
