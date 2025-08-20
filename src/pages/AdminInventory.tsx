@@ -3,11 +3,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Package, MapPin, FileText, Truck, ShoppingCart, AlertTriangle, Building } from "lucide-react";
 import { InventoryItemsSimple } from "@/components/admin/inventory/InventoryItemsSimple";
-import { SimplePlaceholder } from "@/components/admin/inventory/SimplePlaceholder";
 import { SimpleInventoryDashboard } from "@/components/admin/inventory/SimpleInventoryDashboard";
 import { LocationsList } from "@/components/admin/inventory/LocationsList";
 import { SuppliersList } from "@/components/admin/inventory/SuppliersList";
 import { TransactionsList } from "@/components/admin/inventory/TransactionsList";
+import { StockTransferPanel } from "@/components/admin/inventory/StockTransferPanel";
+import { QuickReceivePanel } from "@/components/admin/inventory/QuickReceivePanel";
 
 export default function AdminInventory() {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -80,19 +81,11 @@ export default function AdminInventory() {
         </TabsContent>
 
         <TabsContent value="requests">
-          <SimplePlaceholder 
-            title="Stock Requests" 
-            icon={<Truck className="h-5 w-5" />} 
-            description="Manage stock requests and transfers between locations." 
-          />
+          <StockTransferPanel />
         </TabsContent>
 
         <TabsContent value="purchases">
-          <SimplePlaceholder 
-            title="Purchase Orders" 
-            icon={<ShoppingCart className="h-5 w-5" />} 
-            description="Create and track purchase orders with suppliers." 
-          />
+          <QuickReceivePanel />
         </TabsContent>
       </Tabs>
     </div>
