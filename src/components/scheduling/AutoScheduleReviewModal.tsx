@@ -10,7 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Order, EngineerSettings, getOrderEstimatedHours, getOrderEstimatedMinutes } from '@/utils/schedulingUtils';
 import { getSmartEngineerRecommendations, getSchedulingSettings, getAllEngineersForSchedulingFast, getEngineerDailyWorkload, getClientBlockedDatesMap, getWorkloadMap } from '@/utils/schedulingUtils';
-import { calculateDayFit } from '@/utils/dayFitUtils';
+import { calculateDayFit, getWorkingDayInfo } from '@/utils/dayFitUtils';
 import { getLocationDisplayText } from '@/utils/postcodeUtils';
 
 interface Engineer {
@@ -466,9 +466,8 @@ export function AutoScheduleReviewModal({
         // Wait for this batch to complete before starting the next batch
         await Promise.all(batchPromises);
       }
-
-      // Wait for this batch to complete before starting the next batch
-      await Promise.all(batchPromises);
+    } catch (error) {
+      console.error('Error processing orders:', error);
     }
   };
 

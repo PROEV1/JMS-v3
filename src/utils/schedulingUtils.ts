@@ -755,10 +755,74 @@ const CACHE_DURATION = 60 * 60 * 1000; // 1 hour in milliseconds
 /**
  * Get batch distances from multiple origins to a single destination using Mapbox Matrix API
  */
-export async function getBatchDistancesForOrder(
-  engineerPostcodes: string[], 
-  destinationPostcode: string
-): Promise<Map<string, { distance: number; duration: number }>> {
+export const getBatchDistancesForOrder = async (
+  engineers: EngineerSettings[],
+  destinationPostcode: string,
+  timeoutMs = 20000
+): Promise<Map<string, { distance: number; duration: number }>> => {
+  const validEngineers = engineers.filter(e => e.starting_postcode);
+  
+  if (validEngineers.length === 0) {
+    return new Map();
+  }
+
+  console.log(`🚀 FAST: Batch distance calculation for ${validEngineers.length} engineers to ${destinationPostcode}`);
+  
+  // Rate limiting - wait if too many concurrent requests
+  while (mapboxConcurrency >= MAX_MAPBOX_CONCURRENCY) {
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  mapboxConcurrency++;
+  
+  // Extract unique origin postcodes
+  const origins = [...new Set(validEngineers.map(e => e.starting_postcode))];
+  const destinations = [destinationPostcode];
+  
+  try {
+    const { data, error } = await supabase.functions.invoke('mapbox-distance', {
+      body: { origins, destinations }
+    });
+    
+    if (error) {
+      // Check for rate limiting (429)
+      if (error.message?.includes('429') || error.message?.includes('Too Many Requests')) {
+        console.warn('⚠️ Mapbox rate limited, implementing exponential backoff');
+        await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
+        // Retry once after backoff
+        const retryResult = await supabase.functions.invoke('mapbox-distance', {
+          body: { origins, destinations }
+        });
+        if (retryResult.error) throw retryResult.error;
+        return processBatchResults(retryResult.data, validEngineers, origins, destinations);
+      }
+      throw error;
+    }
+
+    return processBatchResults(data, validEngineers, origins, destinations);
+  } catch (error) {
+    console.error('❌ Batch distance calculation failed:', error);
+    // Return enhanced fallback estimates based on service areas and setup
+    const fallbackResults = new Map<string, { distance: number; duration: number }>();
+    
+    validEngineers.forEach(engineer => {
+      // Use service area max_travel_minutes if available, otherwise defaults
+      const serviceArea = engineer.service_areas?.[0];
+      const estimatedTravelTime = serviceArea?.max_travel_minutes || 60;
+      
+      // Penalize missing starting_postcode to reduce ties
+      const penalty = engineer.starting_postcode ? 0 : 15;
+      
+      fallbackResults.set(engineer.id, {
+        distance: Math.round(estimatedTravelTime / 2), // Rough estimate: 2 min/mile
+        duration: estimatedTravelTime + penalty
+      });
+    });
+    
+    return fallbackResults;
+  } finally {
+    mapboxConcurrency = Math.max(0, mapboxConcurrency - 1);
+  }
+};
   const results = new Map<string, { distance: number; duration: number }>();
   
   if (engineerPostcodes.length === 0) return results;
@@ -793,14 +857,40 @@ export async function getBatchDistancesForOrder(
       }
     });
 
-    console.log(`✅ Batch distance results: ${results.size}/${engineerPostcodes.length} successful`);
-    return results;
-  } catch (error) {
-    console.error('Error getting batch distances:', error);
-    // Fallback to individual calls for critical operations
-    throw error;
+// Process batch Mapbox results into engineer-specific data
+const processBatchResults = (
+  data: any,
+  validEngineers: EngineerSettings[],
+  origins: string[],
+  destinations: string[]
+): Map<string, { distance: number; duration: number }> => {
+  const result = new Map<string, { distance: number; duration: number }>();
+  
+  if (data?.distances && data?.durations) {
+    validEngineers.forEach(engineer => {
+      const originIndex = origins.findIndex(origin => origin === engineer.starting_postcode);
+      if (originIndex >= 0 && data.distances[originIndex] && data.durations[originIndex]) {
+        result.set(engineer.id, {
+          distance: data.distances[originIndex][0] || 25,
+          duration: data.durations[originIndex][0] || 60
+        });
+      } else {
+        // Fallback for this specific engineer
+        const serviceArea = engineer.service_areas?.[0];
+        const estimatedTravelTime = serviceArea?.max_travel_minutes || 60;
+        result.set(engineer.id, {
+          distance: Math.round(estimatedTravelTime / 2),
+          duration: estimatedTravelTime
+        });
+      }
+    });
   }
-}
+  
+  return result;
+export const clearDistanceCache = () => {
+  distanceCache.clear();
+  console.log('Distance cache cleared');
+};
 
 /**
  * Get live distance and travel time between two postcodes using Mapbox
