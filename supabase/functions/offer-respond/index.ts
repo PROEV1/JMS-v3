@@ -168,7 +168,7 @@ serve(async (req: Request) => {
     const responseTime = now.toISOString();
 
     if (response === 'accept') {
-      // Accept the offer - only update job offer status, don't schedule yet
+      // Accept the offer and assign engineer/date to order
       const { error: updateOfferError } = await supabase
         .from('job_offers')
         .update({
@@ -179,6 +179,21 @@ serve(async (req: Request) => {
 
       if (updateOfferError) {
         throw new Error('Failed to update offer status');
+      }
+
+      // Assign engineer and date to the order
+      const { error: updateOrderError } = await supabase
+        .from('orders')
+        .update({
+          engineer_id: jobOffer.engineer_id,
+          scheduled_install_date: jobOffer.offered_date,
+          time_window: jobOffer.time_window
+        })
+        .eq('id', jobOffer.order_id);
+
+      if (updateOrderError) {
+        console.error('Failed to assign engineer to order:', updateOrderError);
+        throw new Error('Failed to assign engineer to order');
       }
 
       // Log activity
