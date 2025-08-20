@@ -1,3 +1,4 @@
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Package, Database, CheckCircle, TrendingUp, AlertTriangle } from "lucide-react";
@@ -35,11 +36,11 @@ export function SimpleInventoryDashboard() {
         { count: transactionsCount },
         { data: lowStockData }
       ] = await Promise.all([
-        (supabase as any).from('inventory_items').select('*', { count: 'exact', head: true }),
-        (supabase as any).from('suppliers').select('*', { count: 'exact', head: true }),
-        (supabase as any).from('inventory_locations').select('*', { count: 'exact', head: true }),
-        (supabase as any).from('inventory_txns').select('*', { count: 'exact', head: true }),
-        (supabase as any).from('vw_item_location_balances').select('item_id').lt('on_hand', 5)
+        supabase.from('inventory_items').select('*', { count: 'exact', head: true }),
+        supabase.from('suppliers').select('*', { count: 'exact', head: true }),
+        supabase.from('inventory_locations').select('*', { count: 'exact', head: true }),
+        supabase.from('inventory_txns').select('*', { count: 'exact', head: true }),
+        supabase.from('vw_item_location_balances').select('item_id').lt('on_hand', 5)
       ]);
 
       setStats({

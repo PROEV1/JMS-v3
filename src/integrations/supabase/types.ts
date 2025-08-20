@@ -486,6 +486,149 @@ export type Database = {
         }
         Relationships: []
       }
+      inventory_items: {
+        Row: {
+          created_at: string
+          default_cost: number
+          description: string | null
+          id: string
+          is_active: boolean
+          is_serialized: boolean
+          max_level: number
+          min_level: number
+          name: string
+          reorder_point: number
+          sku: string
+          supplier_id: string | null
+          unit: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          default_cost?: number
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_serialized?: boolean
+          max_level?: number
+          min_level?: number
+          name: string
+          reorder_point?: number
+          sku: string
+          supplier_id?: string | null
+          unit?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          default_cost?: number
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_serialized?: boolean
+          max_level?: number
+          min_level?: number
+          name?: string
+          reorder_point?: number
+          sku?: string
+          supplier_id?: string | null
+          unit?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_items_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_locations: {
+        Row: {
+          address: string | null
+          code: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          type: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          code?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          type?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          code?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          type?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      inventory_txns: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          direction: string
+          id: string
+          item_id: string
+          location_id: string
+          notes: string | null
+          qty: number
+          reference: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          direction?: string
+          id?: string
+          item_id: string
+          location_id: string
+          notes?: string | null
+          qty: number
+          reference?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          direction?: string
+          id?: string
+          item_id?: string
+          location_id?: string
+          notes?: string | null
+          qty?: number
+          reference?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_txns_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_txns_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       job_offers: {
         Row: {
           accepted_at: string | null
@@ -1758,6 +1901,39 @@ export type Database = {
           },
         ]
       }
+      suppliers: {
+        Row: {
+          address: string | null
+          created_at: string
+          email: string | null
+          id: string
+          is_active: boolean
+          name: string
+          phone: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          phone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          phone?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_audit_log: {
         Row: {
           action_type: string
@@ -1811,7 +1987,29 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      vw_item_location_balances: {
+        Row: {
+          item_id: string | null
+          location_id: string | null
+          on_hand: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_txns_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_txns_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       archive_engineer_work: {
