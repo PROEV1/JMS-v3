@@ -14,17 +14,9 @@ export function InventoryItemsSimple() {
   const { data: items, isLoading } = useQuery({
     queryKey: ["inventory-items-simple", searchTerm],
     queryFn: async () => {
-      // Use raw query to access inventory tables
-      const query = searchTerm
-        ? `SELECT * FROM inventory_items WHERE name ILIKE '%${searchTerm}%' OR sku ILIKE '%${searchTerm}%' ORDER BY name`
-        : `SELECT * FROM inventory_items ORDER BY name`;
-        
-      const { data, error } = await supabase.rpc('execute_sql', { query });
-      if (error) {
-        console.log("Fallback: using mock data");
-        return [];
-      }
-      return data;
+      // Tables are created but types not generated yet
+      // Return empty array for now
+      return [];
     },
   });
 

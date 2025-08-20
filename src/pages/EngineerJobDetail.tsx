@@ -31,6 +31,7 @@ import {
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import JobStatusUpdater from '@/components/engineer/JobStatusUpdater';
 import CompletionChecklist from '@/components/engineer/CompletionChecklist';
+import { SimpleMaterialsUsed } from '@/components/engineer/SimpleMaterialsUsed';
 
 interface JobDetails {
   id: string;
@@ -622,6 +623,14 @@ export default function EngineerJobDetail() {
                 setChecklistItems(items);
                 setIsChecklistComplete(isComplete);
               }}
+            />
+          )}
+
+          {/* Materials Used */}
+          {!job.engineer_signed_off_at && (
+            <SimpleMaterialsUsed 
+              orderId={job.id} 
+              engineerId={engineerInfo?.id || ""} 
             />
           )}
 
