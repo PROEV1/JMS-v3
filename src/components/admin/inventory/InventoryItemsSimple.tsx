@@ -6,7 +6,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, Package } from "lucide-react";
+import { Plus, Search, Package, AlertCircle } from "lucide-react";
+
+interface InventoryItem {
+  id: string;
+  sku: string;
+  name: string;
+  is_serialized: boolean;
+  default_cost: number;
+  unit: string;
+  min_level: number;
+  max_level: number;
+  reorder_point: number;
+  is_active: boolean;
+  suppliers?: { name: string };
+}
 
 export function InventoryItemsSimple() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -14,14 +28,35 @@ export function InventoryItemsSimple() {
   const { data: items, isLoading } = useQuery({
     queryKey: ["inventory-items-simple", searchTerm],
     queryFn: async () => {
-      // Tables are created but types not generated yet
-      // Return empty array for now
-      return [];
+      let query = (supabase as any)
+        .from('inventory_items')
+        .select(`
+          *,
+          suppliers (name)
+        `)
+        .order('name');
+
+      if (searchTerm) {
+        query = query.or(`name.ilike.%${searchTerm}%,sku.ilike.%${searchTerm}%`);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return data as InventoryItem[];
     },
   });
 
   if (isLoading) {
-    return <div className="p-6">Loading inventory items...</div>;
+    return (
+      <Card>
+        <CardContent className="p-8">
+          <div className="flex items-center justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            <span className="ml-2">Loading inventory items...</span>
+          </div>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
@@ -30,7 +65,7 @@ export function InventoryItemsSimple() {
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
             <Package className="h-5 w-5" />
-            Inventory Items
+            Inventory Items ({items?.length || 0})
           </CardTitle>
           <Button>
             <Plus className="h-4 w-4 mr-2" />
@@ -50,11 +85,56 @@ export function InventoryItemsSimple() {
         </div>
       </CardHeader>
       <CardContent>
-        <div className="text-sm text-muted-foreground p-4 text-center">
-          Inventory system is being set up. Tables created successfully.
-          <br />
-          Please wait for the TypeScript types to be regenerated.
-        </div>
+        {!items || items.length === 0 ? (
+          <div className="text-center py-8">
+            <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-medium mb-2">No inventory items found</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              {searchTerm ? 'No items match your search criteria.' : 'Get started by adding your first inventory item.'}
+            </p>
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Your First Item
+            </Button>
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>SKU</TableHead>
+                <TableHead>Name</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Unit</TableHead>
+                <TableHead>Cost</TableHead>
+                <TableHead>Reorder Point</TableHead>
+                <TableHead>Supplier</TableHead>
+                <TableHead>Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {items.map((item) => (
+                <TableRow key={item.id}>
+                  <TableCell className="font-mono text-sm">{item.sku}</TableCell>
+                  <TableCell className="font-medium">{item.name}</TableCell>
+                  <TableCell>
+                    <Badge variant={item.is_serialized ? "default" : "secondary"}>
+                      {item.is_serialized ? "Serialized" : "Standard"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>{item.unit}</TableCell>
+                  <TableCell>£{item.default_cost.toFixed(2)}</TableCell>
+                  <TableCell>{item.reorder_point}</TableCell>
+                  <TableCell>{item.suppliers?.name || "N/A"}</TableCell>
+                  <TableCell>
+                    <Badge variant={item.is_active ? "default" : "destructive"}>
+                      {item.is_active ? "Active" : "Inactive"}
+                    </Badge>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </CardContent>
     </Card>
   );
