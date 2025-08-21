@@ -135,7 +135,7 @@ export function PartnerStatusMappingEditor({ statusActions, onUpdate }: PartnerS
                   <Label>Partner Status</Label>
                   <Input
                     value={mapping.partnerStatus}
-                    onChange={(e) => updateMapping(index, 'partnerStatus', e.target.value)}
+                    onChange={(e) => updateMapping(index, 'partnerStatus', e.target.value.toUpperCase())}
                     placeholder="e.g., INSTALLED"
                   />
                 </div>

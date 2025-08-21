@@ -37,23 +37,24 @@ interface ImportProfile {
 
 // Default status mappings for common partner statuses
 const getDefaultStatusMappings = () => ({
-  'unknown': 'awaiting_install_booking',
-  'pending': 'awaiting_install_booking',
-  'confirmed': 'scheduled',
-  'scheduled': 'scheduled',
-  'complete': 'completed',
-  'completed': 'completed',
-  'cancelled': 'cancelled',
-  'canceled': 'cancelled',
-  'in_progress': 'in_progress',
-  'on_hold': 'on_hold_parts_docs',
-  'awaiting_quotation': 'awaiting_install_booking'
+  'AWAITING_INSTALL_DATE': 'needs_scheduling',
+  'INSTALL_DATE_CONFIRMED': 'scheduled',
+  'INSTALLED': 'install_completed_pending_qa',
+  'COMPLETION_PENDING': 'install_completed_pending_qa',
+  'COMPLETE': 'completed',
+  'WAITING_FOR_OHME_APPROVAL': 'on_hold_parts_docs',
+  'ON_HOLD': 'on_hold_parts_docs',
+  'SWITCH_JOB_SUB_TYPE_REQUESTED': 'on_hold_parts_docs',
+  'CANCELLATION_REQUESTED': 'cancelled',
+  'CANCELLED': 'cancelled',
+  'ABANDONED': 'cancelled',
+  'AWAITING_QUOTATION': 'awaiting_install_booking'
 });
 
 // Default status actions for common scenarios
 const getDefaultStatusActions = () => ({
-  'unknown': {
-    jms_status: 'awaiting_install_booking',
+  'AWAITING_INSTALL_DATE': {
+    jms_status: 'needs_scheduling',
     bucket: 'needs_scheduling',
     actions: {
       suppress_scheduling: false,
@@ -61,16 +62,7 @@ const getDefaultStatusActions = () => ({
       surface_to_qa: false
     }
   },
-  'pending': {
-    jms_status: 'awaiting_install_booking', 
-    bucket: 'needs_scheduling',
-    actions: {
-      suppress_scheduling: false,
-      keep_calendar_block: false,
-      surface_to_qa: false
-    }
-  },
-  'confirmed': {
+  'INSTALL_DATE_CONFIRMED': {
     jms_status: 'scheduled',
     bucket: 'scheduled',
     actions: {
@@ -79,17 +71,25 @@ const getDefaultStatusActions = () => ({
       surface_to_qa: false
     }
   },
-  'cancelled': {
-    jms_status: 'cancelled',
-    bucket: 'completed',
+  'INSTALLED': {
+    jms_status: 'install_completed_pending_qa',
+    bucket: 'completion_pending',
     actions: {
-      suppress_scheduling: true,
-      keep_calendar_block: false,
-      surface_to_qa: true,
-      suppression_reason: 'partner_cancelled'
+      suppress_scheduling: false,
+      keep_calendar_block: true,
+      surface_to_qa: false
     }
   },
-  'completed': {
+  'COMPLETION_PENDING': {
+    jms_status: 'install_completed_pending_qa',
+    bucket: 'completion_pending',
+    actions: {
+      suppress_scheduling: false,
+      keep_calendar_block: true,
+      surface_to_qa: false
+    }
+  },
+  'COMPLETE': {
     jms_status: 'completed',
     bucket: 'completed',
     actions: {
@@ -97,6 +97,76 @@ const getDefaultStatusActions = () => ({
       keep_calendar_block: false,
       surface_to_qa: false,
       suppression_reason: 'partner_completed'
+    }
+  },
+  'WAITING_FOR_OHME_APPROVAL': {
+    jms_status: 'on_hold_parts_docs',
+    bucket: 'on_hold',
+    actions: {
+      suppress_scheduling: true,
+      keep_calendar_block: true,
+      surface_to_qa: true,
+      suppression_reason: 'awaiting_ohme_approval'
+    }
+  },
+  'ON_HOLD': {
+    jms_status: 'on_hold_parts_docs',
+    bucket: 'on_hold',
+    actions: {
+      suppress_scheduling: true,
+      keep_calendar_block: true,
+      surface_to_qa: true,
+      suppression_reason: 'partner_on_hold'
+    }
+  },
+  'SWITCH_JOB_SUB_TYPE_REQUESTED': {
+    jms_status: 'on_hold_parts_docs',
+    bucket: 'on_hold',
+    actions: {
+      suppress_scheduling: true,
+      keep_calendar_block: true,
+      surface_to_qa: true,
+      suppression_reason: 'switch_job_sub_type'
+    }
+  },
+  'CANCELLATION_REQUESTED': {
+    jms_status: 'cancelled',
+    bucket: 'cancelled',
+    actions: {
+      suppress_scheduling: true,
+      keep_calendar_block: false,
+      surface_to_qa: true,
+      suppression_reason: 'partner_cancellation_requested'
+    }
+  },
+  'CANCELLED': {
+    jms_status: 'cancelled',
+    bucket: 'cancelled',
+    actions: {
+      suppress_scheduling: true,
+      keep_calendar_block: false,
+      surface_to_qa: true,
+      suppression_reason: 'partner_cancelled'
+    }
+  },
+  'ABANDONED': {
+    jms_status: 'cancelled',
+    bucket: 'cancelled',
+    actions: {
+      suppress_scheduling: true,
+      keep_calendar_block: false,
+      surface_to_qa: true,
+      suppression_reason: 'partner_abandoned'
+    }
+  },
+  'AWAITING_QUOTATION': {
+    jms_status: 'awaiting_install_booking',
+    bucket: 'not_in_scheduling',
+    actions: {
+      suppress_scheduling: true,
+      keep_calendar_block: false,
+      surface_to_qa: false,
+      suppression_reason: 'awaiting_quotation'
     }
   }
 });
