@@ -673,19 +673,31 @@ serve(async (req: Request): Promise<Response> => {
           
           // Get existing orders to update
           const externalIds = recordsForUpdate.map(r => r.partner_external_id).filter(Boolean);
-          const { data: existingOrders } = await supabase
+          console.log(`Looking for existing orders with external IDs:`, externalIds.slice(0, 5), `... (${externalIds.length} total)`);
+          
+          const { data: existingOrders, error: queryError } = await supabase
             .from('orders')
             .select('id, partner_external_id')
             .eq('partner_id', importProfile.partner_id)
             .in('partner_external_id', externalIds);
           
+          if (queryError) {
+            console.error('Error querying existing orders:', queryError);
+            throw new Error(`Failed to query existing orders: ${queryError.message}`);
+          }
+          
+          console.log(`Found ${existingOrders?.length || 0} existing orders to update`);
+          
           if (existingOrders && existingOrders.length > 0) {
             const existingMap = new Map(existingOrders.map(o => [o.partner_external_id, o.id]));
+            console.log('Existing order mapping:', Array.from(existingMap.entries()).slice(0, 3));
             
             // Update each existing order individually
             for (const record of recordsForUpdate) {
               const orderId = existingMap.get(record.partner_external_id);
               if (orderId) {
+                console.log(`Updating order ${orderId} with external ID: ${record.partner_external_id}`);
+                
                 const { error: updateError } = await supabase
                   .from('orders')
                   .update({
@@ -702,10 +714,25 @@ serve(async (req: Request): Promise<Response> => {
                     data: record
                   });
                 } else {
+                  console.log(`Successfully updated order ${orderId}`);
                   totalUpdated++;
                 }
+              } else {
+                console.log(`No existing order found for external ID: ${record.partner_external_id}`);
+                results.warnings.push({
+                  row: 0,
+                  message: `No existing order found for external ID: ${record.partner_external_id}`,
+                  data: record
+                });
               }
             }
+          } else {
+            console.log('No existing orders found for any external IDs');
+            results.warnings.push({
+              row: 0,
+              message: `No existing orders found for partner ${importProfile.partner_id} with provided external IDs`,
+              data: { partner_id: importProfile.partner_id, external_ids_sample: externalIds.slice(0, 5) }
+            });
           }
         }
         
