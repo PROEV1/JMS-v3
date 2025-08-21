@@ -17,6 +17,7 @@ export default function Layout({ children }: LayoutProps) {
   const { user, loading, signOut } = useAuth();
   const { role: userRole, loading: roleLoading } = useUserRole();
   const location = useLocation();
+  const navigate = useNavigate();
 
   // Persist current path for redirect after auth (including search params and hash)
   useEffect(() => {
@@ -26,6 +27,29 @@ export default function Layout({ children }: LayoutProps) {
       sessionStorage.setItem('lastAuthenticatedPath', fullPath);
     }
   }, [location, user]);
+
+  // Self-heal mechanism: restore user to exact page after refresh redirect
+  useEffect(() => {
+    if (user && userRole) {
+      const currentPath = location.pathname;
+      const savedPath = sessionStorage.getItem('lastAuthenticatedPath');
+      
+      // Define section roots that might be default redirects
+      const sectionRoots = ['/admin', '/client', '/engineer'];
+      
+      // Check if we're on a section root and have a saved deeper path
+      const isOnSectionRoot = sectionRoots.includes(currentPath);
+      const hasSavedDeepPath = savedPath && savedPath !== currentPath && savedPath.startsWith(currentPath + '/');
+      
+      if (isOnSectionRoot && hasSavedDeepPath) {
+        console.log('Layout: Self-heal detected - redirecting from', currentPath, 'to saved path:', savedPath);
+        // Clear the saved path to prevent loops
+        sessionStorage.removeItem('lastAuthenticatedPath');
+        // Navigate to the saved deeper path
+        navigate(savedPath, { replace: true });
+      }
+    }
+  }, [user, userRole, location.pathname, navigate]);
 
   if (loading || roleLoading) {
     return (
