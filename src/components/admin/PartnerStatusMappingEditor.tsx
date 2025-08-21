@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -53,6 +53,17 @@ export function PartnerStatusMappingEditor({ statusActions, onUpdate }: PartnerS
       actions: config.actions || {}
     }));
   });
+
+  // Re-hydrate state when statusActions prop changes
+  useEffect(() => {
+    const newMappings = Object.entries(statusActions || {}).map(([partnerStatus, config]: [string, any]) => ({
+      partnerStatus,
+      jmsStatus: config.jms_status || 'awaiting_install_booking',
+      bucket: config.bucket || 'needs_scheduling',
+      actions: config.actions || {}
+    }));
+    setMappings(newMappings);
+  }, [statusActions]);
 
   const addMapping = () => {
     setMappings([...mappings, {
@@ -110,6 +121,7 @@ export function PartnerStatusMappingEditor({ statusActions, onUpdate }: PartnerS
               <div className="flex items-center justify-between">
                 <h4 className="font-medium">Status Mapping #{index + 1}</h4>
                 <Button
+                  type="button"
                   variant="ghost"
                   size="sm"
                   onClick={() => removeMapping(index)}
@@ -240,7 +252,7 @@ export function PartnerStatusMappingEditor({ statusActions, onUpdate }: PartnerS
           </Card>
         ))}
 
-        <Button onClick={addMapping} variant="outline" className="w-full">
+        <Button type="button" onClick={addMapping} variant="outline" className="w-full">
           <Plus className="h-4 w-4 mr-2" />
           Add Status Mapping
         </Button>

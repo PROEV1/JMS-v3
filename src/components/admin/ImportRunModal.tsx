@@ -75,14 +75,37 @@ export default function ImportRunModal({
   const handleImport = async () => {
     setIsImporting(true);
     setImportResult(null);
+    
+    // Add timeout to prevent stuck imports
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Import timed out after 30 seconds')), 30000)
+    );
+    
     try {
-      const result = await onImport(sourceType === 'csv' ? csvData : undefined, dryRun, createMissingOrders);
+      const result = await Promise.race([
+        onImport(sourceType === 'csv' ? csvData : undefined, dryRun, createMissingOrders),
+        timeoutPromise
+      ]) as ImportResult;
+      
       if (result) {
         setImportResult(result);
       }
-      if (!dryRun) {
+      if (!dryRun && result?.success) {
         onClose();
       }
+    } catch (error: any) {
+      console.error('Import failed:', error);
+      setImportResult({
+        success: false,
+        summary: {
+          processed: 0,
+          inserted_count: 0,
+          updated_count: 0,
+          skipped_count: 0,
+          errors: [{ row: 0, error: error.message }],
+          warnings: []
+        }
+      });
     } finally {
       setIsImporting(false);
     }

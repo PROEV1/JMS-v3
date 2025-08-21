@@ -204,6 +204,9 @@ export default function AdminPartnerProfiles() {
       });
     }
     
+    // Normalize status_actions to ensure proper structure
+    const normalizedStatusActions = profile.status_actions || {};
+    
     setFormData({
       name: profile.name,
       source_type: profile.source_type,
@@ -213,7 +216,7 @@ export default function AdminPartnerProfiles() {
       status_mappings: profile.status_mappings,
       engineer_mapping_rules: profile.engineer_mapping_rules,
       status_override_rules: profile.status_override_rules,
-      status_actions: profile.status_actions || {},
+      status_actions: normalizedStatusActions,
       engineer_mappings: engineerMappings,
       is_active: profile.is_active
     });
