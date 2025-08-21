@@ -26,6 +26,8 @@ export default function Layout({ children }: LayoutProps) {
   }
 
   if (!user) {
+    // Save current path for redirect after auth
+    localStorage.setItem('authRedirectPath', location.pathname);
     return <Navigate to="/auth" replace />;
   }
 

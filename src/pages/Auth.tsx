@@ -24,10 +24,17 @@ export default function Auth() {
   useEffect(() => {
     if (user && !authLoading) {
       console.log('Auth: User authenticated, preparing redirect', { userId: user.id, email: user.email });
-      // Redirect authenticated users to root for role-based routing
+      
+      // Check for saved redirect path
+      const savedPath = localStorage.getItem('authRedirectPath');
+      const redirectTo = savedPath || '/';
+      
+      // Clear saved path
+      localStorage.removeItem('authRedirectPath');
+      
       setTimeout(() => {
-        console.log('Auth: Executing redirect to root');
-        navigate('/', { replace: true });
+        console.log('Auth: Executing redirect to', redirectTo);
+        navigate(redirectTo, { replace: true });
       }, 500);
     }
   }, [user, authLoading, navigate]);
@@ -144,11 +151,16 @@ export default function Auth() {
           description: "Signed in successfully",
         });
         
-        // Force navigation after successful login
-        console.log('Auth: Login successful, user data:', data.user);
+        // Check for saved redirect path
+        const savedPath = localStorage.getItem('authRedirectPath');
+        const redirectTo = savedPath || '/';
+        
+        // Clear saved path
+        localStorage.removeItem('authRedirectPath');
+        
+        console.log('Auth: Login successful, redirecting to:', redirectTo);
         setTimeout(() => {
-          console.log('Auth: Forcing navigation to root');
-          navigate('/', { replace: true });
+          navigate(redirectTo, { replace: true });
         }, 300);
       }
     } catch (error) {
