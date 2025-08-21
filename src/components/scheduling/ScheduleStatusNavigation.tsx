@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
-import { Clock, Calendar, CheckCircle, XCircle, AlertTriangle, Package, Ban } from 'lucide-react';
+import { Clock, Calendar, CheckCircle, XCircle, AlertTriangle, Package, Ban, FileCheck, Trophy, Eye } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 
@@ -45,6 +44,46 @@ const statusTiles: StatusTile[] = [
     statusKey: 'ready-to-book'
   },
   {
+    id: 'scheduled',
+    title: 'Scheduled',
+    icon: Calendar,
+    colorClass: 'bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-200 hover:border-emerald-300',
+    route: '/admin/schedule/status/scheduled',
+    statusKey: 'scheduled'
+  },
+  {
+    id: 'completion_pending',
+    title: 'Completion Pending',
+    icon: FileCheck,
+    colorClass: 'bg-gradient-to-br from-amber-50 to-amber-100 border-amber-200 hover:border-amber-300',
+    route: '/admin/schedule/status/completion-pending',
+    statusKey: 'completion-pending'
+  },
+  {
+    id: 'completed',
+    title: 'Completed',
+    icon: Trophy,
+    colorClass: 'bg-gradient-to-br from-green-50 to-green-100 border-green-200 hover:border-green-300',
+    route: '/admin/schedule/status/completed',
+    statusKey: 'completed'
+  },
+  {
+    id: 'on_hold',
+    title: 'On Hold',
+    icon: Package,
+    colorClass: 'bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 hover:border-purple-300',
+    route: '/admin/schedule/status/on-hold',
+    statusKey: 'on-hold'
+  },
+  {
+    id: 'cancelled',
+    title: 'Cancelled',
+    icon: Ban,
+    colorClass: 'bg-gradient-to-br from-red-50 to-red-100 border-red-200 hover:border-red-300',
+    route: '/admin/schedule/status/cancelled',
+    statusKey: 'cancelled'
+  },
+  {
     id: 'date_rejected',
     title: 'Date Rejected',
     icon: XCircle,
@@ -61,20 +100,12 @@ const statusTiles: StatusTile[] = [
     statusKey: 'offer-expired'
   },
   {
-    id: 'scheduled',
-    title: 'Scheduled',
-    icon: Calendar,
-    colorClass: 'bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-200 hover:border-emerald-300',
-    route: '/admin/schedule/status/scheduled',
-    statusKey: 'scheduled'
-  },
-  {
-    id: 'on_hold',
-    title: 'On Hold',
-    icon: Package,
-    colorClass: 'bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 hover:border-purple-300',
-    route: '/admin/schedule/status/on-hold',
-    statusKey: 'on-hold'
+    id: 'not_in_scheduling',
+    title: 'Not in Scheduling',
+    icon: Eye,
+    colorClass: 'bg-gradient-to-br from-gray-50 to-gray-100 border-gray-200 hover:border-gray-300',
+    route: '/admin/schedule/status/not-in-scheduling',
+    statusKey: 'not-in-scheduling'
   }
 ];
 
@@ -159,8 +190,15 @@ export function ScheduleStatusNavigation({ currentStatus }: ScheduleStatusNaviga
           .select('*', { count: 'exact', head: true })
           .eq('status', 'expired');
 
-        // Fetch order-based counts - exclude scheduling_suppressed orders from active flow
-        const [scheduledResult, onHoldResult] = await Promise.all([
+        // Fetch order-based counts with new buckets
+        const [
+          scheduledResult, 
+          onHoldResult, 
+          completionPendingResult,
+          completedResult,
+          cancelledResult,
+          notInSchedulingResult
+        ] = await Promise.all([
           supabase
             .from('orders')
             .select('*', { count: 'exact', head: true })
@@ -169,7 +207,24 @@ export function ScheduleStatusNavigation({ currentStatus }: ScheduleStatusNaviga
           supabase
             .from('orders')
             .select('*', { count: 'exact', head: true })
-            .or('status_enhanced.eq.on_hold_parts_docs,scheduling_suppressed.eq.true')
+            .eq('status_enhanced', 'on_hold_parts_docs'),
+          supabase
+            .from('orders')
+            .select('*', { count: 'exact', head: true })
+            .eq('status_enhanced', 'install_completed_pending_qa'),
+          supabase
+            .from('orders')
+            .select('*', { count: 'exact', head: true })
+            .eq('status_enhanced', 'completed'),
+          supabase
+            .from('orders')
+            .select('*', { count: 'exact', head: true })
+            .eq('status_enhanced', 'cancelled'),
+          supabase
+            .from('orders')
+            .select('*', { count: 'exact', head: true })
+            .eq('scheduling_suppressed', true)
+            .eq('scheduling_suppressed_reason', 'awaiting_quotation')
         ]);
 
         // For needs-scheduling, get count of orders with no engineer and no active offers
@@ -234,7 +289,11 @@ export function ScheduleStatusNavigation({ currentStatus }: ScheduleStatusNaviga
           'date-rejected': dateRejectedCount,
           'offer-expired': expiredResult.count || 0,
           'scheduled': scheduledResult.count || 0,
-          'on-hold': onHoldResult.count || 0
+          'completion-pending': completionPendingResult.count || 0,
+          'completed': completedResult.count || 0,
+          'on-hold': onHoldResult.count || 0,
+          'cancelled': cancelledResult.count || 0,
+          'not-in-scheduling': notInSchedulingResult.count || 0
         });
       } catch (error) {
         console.error('Error fetching status counts:', error);

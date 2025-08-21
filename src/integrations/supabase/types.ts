@@ -1574,6 +1574,7 @@ export type Database = {
           name: string
           partner_id: string
           source_type: string
+          status_actions: Json
           status_mappings: Json
           status_override_rules: Json
           updated_at: string
@@ -1590,6 +1591,7 @@ export type Database = {
           name: string
           partner_id: string
           source_type: string
+          status_actions?: Json
           status_mappings?: Json
           status_override_rules?: Json
           updated_at?: string
@@ -1606,6 +1608,7 @@ export type Database = {
           name?: string
           partner_id?: string
           source_type?: string
+          status_actions?: Json
           status_mappings?: Json
           status_override_rules?: Json
           updated_at?: string

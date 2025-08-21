@@ -1,37 +1,39 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
-export interface ScheduleStatusCounts {
+interface StatusCounts {
   needsScheduling: number;
   dateOffered: number;
   readyToBook: number;
-  dateRejected: number;
-  offerExpired: number;
-  scheduled: number;
-  onHold: number;
   scheduledToday: number;
+  scheduled: number;
+  completionPending: number;
+  completed: number;
+  cancelled: number;
+  onHold: number;
+  notInScheduling: number;
   unavailableEngineers: number;
 }
 
 export function useScheduleStatusCounts() {
-  const [counts, setCounts] = useState<ScheduleStatusCounts>({
+  const [counts, setCounts] = useState<StatusCounts>({
     needsScheduling: 0,
     dateOffered: 0,
     readyToBook: 0,
-    dateRejected: 0,
-    offerExpired: 0,
-    scheduled: 0,
-    onHold: 0,
     scheduledToday: 0,
+    scheduled: 0,
+    completionPending: 0,
+    completed: 0,
+    cancelled: 0,
+    onHold: 0,
+    notInScheduling: 0,
     unavailableEngineers: 0
   });
   const [loading, setLoading] = useState(true);
 
   const fetchCounts = async () => {
     try {
-      const now = new Date();
-      const tomorrow = new Date(now);
-      tomorrow.setDate(now.getDate() + 1);
+      setLoading(true);
 
       // Fetch offer-based counts
       // For date-offered, we need to count pending offers for orders that have engineers and aren't back to awaiting_install_booking
@@ -39,7 +41,7 @@ export function useScheduleStatusCounts() {
         .from('job_offers')
         .select('order_id')
         .eq('status', 'pending')
-        .gt('expires_at', now.toISOString());
+        .gt('expires_at', new Date().toISOString());
 
       let dateOfferedCount = 0;
       if (pendingOffers?.length) {
@@ -60,7 +62,7 @@ export function useScheduleStatusCounts() {
           .from('job_offers')
           .select('order_id')
           .in('status', ['pending', 'accepted'])
-          .gt('expires_at', now.toISOString());
+          .gt('expires_at', new Date().toISOString());
 
         const ordersWithActiveOffers = new Set(activeOffers?.map(offer => offer.order_id) || []);
         const uniqueRejectedOrderIds = [...new Set(rejectedOffers.map(offer => offer.order_id))]
@@ -68,68 +70,78 @@ export function useScheduleStatusCounts() {
         dateRejectedCount = uniqueRejectedOrderIds.length;
       }
 
-      const expiredResult = await supabase
-        .from('job_offers')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'expired');
+      // Fetch scheduled today count
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(today.getDate() + 1);
 
-      // Fetch order-based counts - exclude scheduling_suppressed orders from active flow
-      const [scheduledResult, onHoldResult] = await Promise.all([
-        supabase
-          .from('orders')
-          .select('*', { count: 'exact', head: true })
-          .eq('status_enhanced', 'scheduled')
-          .eq('scheduling_suppressed', false)
-          .eq('job_type', 'installation'),
-        supabase
-          .from('orders')
-          .select('*', { count: 'exact', head: true })
-          .or('status_enhanced.eq.on_hold_parts_docs,scheduling_suppressed.eq.true')
-          .eq('job_type', 'installation')
-      ]);
-
-      // Scheduled installations for today
-      const scheduledTodayResult = await supabase
+      const { count: scheduledTodayCount } = await supabase
         .from('orders')
         .select('*', { count: 'exact', head: true })
         .eq('status_enhanced', 'scheduled')
-        .eq('job_type', 'installation')
-        .gte('scheduled_install_date', now.toISOString().split('T')[0])
-        .lt('scheduled_install_date', tomorrow.toISOString().split('T')[0]);
+        .gte('scheduled_install_date', today.toISOString())
+        .lt('scheduled_install_date', tomorrow.toISOString());
+
+      // Fetch new bucket counts
+      const [
+        scheduledResult,
+        completionPendingResult,
+        completedResult,
+        cancelledResult,
+        onHoldResult,
+        notInSchedulingResult,
+        unavailableEngineersResult
+      ] = await Promise.all([
+        supabase.from('orders').select('*', { count: 'exact', head: true })
+          .eq('status_enhanced', 'scheduled')
+          .eq('scheduling_suppressed', false),
+        supabase.from('orders').select('*', { count: 'exact', head: true })
+          .eq('status_enhanced', 'install_completed_pending_qa'),
+        supabase.from('orders').select('*', { count: 'exact', head: true })
+          .eq('status_enhanced', 'completed'),
+        supabase.from('orders').select('*', { count: 'exact', head: true })
+          .eq('status_enhanced', 'cancelled'),
+        supabase.from('orders').select('*', { count: 'exact', head: true })
+          .eq('status_enhanced', 'on_hold_parts_docs'),
+        supabase.from('orders').select('*', { count: 'exact', head: true })
+          .eq('scheduling_suppressed', true)
+          .neq('status_enhanced', 'cancelled'),
+        supabase.from('engineers').select('*', { count: 'exact', head: true })
+          .eq('availability', false)
+      ]);
 
       // For needs-scheduling, get count of orders with no engineer and no active offers
       // Exclude scheduling_suppressed orders
       let needsSchedulingCount = 0;
-      
+        
       // First get orders that need scheduling (no engineer assigned) and not suppressed
       const { count: unassignedOrdersCount } = await supabase
         .from('orders')
         .select('*', { count: 'exact', head: true })
         .eq('status_enhanced', 'awaiting_install_booking')
-        .eq('job_type', 'installation')
         .is('engineer_id', null)
         .eq('scheduling_suppressed', false);
-      
+        
       needsSchedulingCount = unassignedOrdersCount || 0;
-      
+        
       // Subtract any unassigned orders that have active offers
       if (needsSchedulingCount > 0) {
         const { data: activeOffers } = await supabase
           .from('job_offers')
           .select('order_id')
           .eq('status', 'pending')
-          .gt('expires_at', now.toISOString());
-        
+          .gt('expires_at', new Date().toISOString());
+          
         if (activeOffers?.length) {
           const { count: unassignedOrdersWithOffersCount } = await supabase
             .from('orders')
             .select('*', { count: 'exact', head: true })
             .eq('status_enhanced', 'awaiting_install_booking')
-            .eq('job_type', 'installation')
             .is('engineer_id', null)
             .eq('scheduling_suppressed', false)
             .in('id', activeOffers.map(offer => offer.order_id));
-          
+            
           needsSchedulingCount = Math.max(0, needsSchedulingCount - (unassignedOrdersWithOffersCount || 0));
         }
       }
@@ -141,92 +153,34 @@ export function useScheduleStatusCounts() {
         .from('job_offers')
         .select('order_id')
         .eq('status', 'accepted');
-      
+        
       if (acceptedOffers?.length) {
         const { count: ordersWithAcceptedOffersCount } = await supabase
           .from('orders')
           .select('*', { count: 'exact', head: true })
           .eq('status_enhanced', 'awaiting_install_booking')
-          .eq('job_type', 'installation')
           .is('scheduled_install_date', null)
           .eq('scheduling_suppressed', false)
           .in('id', acceptedOffers.map(offer => offer.order_id));
-        
+          
         readyToBookCount = ordersWithAcceptedOffersCount || 0;
-      }
-
-      // Unavailable engineers calculation
-      const todayDayOfWeek = now.getDay();
-      const todayStr = now.toISOString().split('T')[0];
-      
-      const { data: engineers } = await supabase
-        .from('engineers')
-        .select(`
-          id,
-          availability,
-          engineer_availability(day_of_week, is_available),
-          engineer_time_off(start_date, end_date, status)
-        `);
-      
-      let unavailableEngineersCount = 0;
-      
-      if (engineers) {
-        for (const engineer of engineers) {
-          // Check global availability
-          if (!engineer.availability) {
-            unavailableEngineersCount++;
-            continue;
-          }
-          
-          // Check day-of-week availability
-          const dayAvailability = engineer.engineer_availability?.find(
-            (avail: any) => avail.day_of_week === todayDayOfWeek
-          );
-          if (dayAvailability && !dayAvailability.is_available) {
-            unavailableEngineersCount++;
-            continue;
-          }
-          
-          // Check approved time off for today
-          const hasTimeOffToday = engineer.engineer_time_off?.some((timeOff: any) => {
-            const startDate = new Date(timeOff.start_date);
-            const endDate = new Date(timeOff.end_date);
-            const today = new Date(todayStr);
-            return timeOff.status === 'approved' && 
-                   today >= startDate && 
-                   today <= endDate;
-          });
-          
-          if (hasTimeOffToday) {
-            unavailableEngineersCount++;
-          }
-        }
       }
 
       setCounts({
         needsScheduling: needsSchedulingCount,
         dateOffered: dateOfferedCount,
         readyToBook: readyToBookCount,
-        dateRejected: dateRejectedCount,
-        offerExpired: expiredResult.count || 0,
+        scheduledToday: scheduledTodayCount,
         scheduled: scheduledResult.count || 0,
+        completionPending: completionPendingResult.count || 0,
+        completed: completedResult.count || 0,
+        cancelled: cancelledResult.count || 0,
         onHold: onHoldResult.count || 0,
-        scheduledToday: scheduledTodayResult.count || 0,
-        unavailableEngineers: unavailableEngineersCount
+        notInScheduling: notInSchedulingResult.count || 0,
+        unavailableEngineers: unavailableEngineersResult.count || 0
       });
     } catch (error) {
       console.error('Error fetching status counts:', error);
-      setCounts({
-        needsScheduling: 0,
-        dateOffered: 0,
-        readyToBook: 0,
-        dateRejected: 0,
-        offerExpired: 0,
-        scheduled: 0,
-        onHold: 0,
-        scheduledToday: 0,
-        unavailableEngineers: 0
-      });
     } finally {
       setLoading(false);
     }
@@ -235,21 +189,11 @@ export function useScheduleStatusCounts() {
   useEffect(() => {
     fetchCounts();
     
-    // Listen for scheduling refresh events
-    const handleRefresh = () => {
-      fetchCounts();
-    };
-    
+    // Listen for refresh events
+    const handleRefresh = () => fetchCounts();
     window.addEventListener('scheduling:refresh', handleRefresh);
     return () => window.removeEventListener('scheduling:refresh', handleRefresh);
   }, []);
 
-  return { 
-    counts, 
-    loading, 
-    refetch: () => {
-      setLoading(true);
-      fetchCounts();
-    }
-  };
+  return { counts, loading, refetch: fetchCounts };
 }
