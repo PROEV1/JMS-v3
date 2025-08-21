@@ -2476,6 +2476,7 @@ export type Database = {
         | "date_rejected"
         | "offer_expired"
         | "on_hold_parts_docs"
+        | "awaiting_final_payment"
       partner_calendar_status:
         | "available"
         | "soft_hold"
@@ -2636,6 +2637,7 @@ export const Constants = {
         "date_rejected",
         "offer_expired",
         "on_hold_parts_docs",
+        "awaiting_final_payment",
       ],
       partner_calendar_status: [
         "available",

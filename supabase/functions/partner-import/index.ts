@@ -420,6 +420,15 @@ serve(async (req) => {
     const statusMapping = importProfile.status_mappings || {};
     const statusOverrides = importProfile.status_override_rules || {};
     
+    // Valid order status enhanced values (matching database enum)
+    const validOrderStatuses = [
+      'quote_accepted', 'awaiting_payment', 'payment_received', 'awaiting_agreement', 
+      'agreement_signed', 'awaiting_install_booking', 'scheduled', 'in_progress',
+      'install_completed_pending_qa', 'completed', 'revisit_required', 'cancelled',
+      'needs_scheduling', 'date_offered', 'date_accepted', 'date_rejected', 
+      'offer_expired', 'on_hold_parts_docs', 'awaiting_final_payment'
+    ];
+    
     console.log('Status mapping:', statusMapping);
     console.log('Status overrides:', statusOverrides);
     
@@ -473,6 +482,32 @@ serve(async (req) => {
         // Apply status override rules
         if (statusOverrides[mappedStatus]) {
           mappedStatus = statusOverrides[mappedStatus];
+        }
+        
+        // Validate mapped status is a valid database enum value
+        if (!validOrderStatuses.includes(mappedStatus)) {
+          // Provide sensible defaults for common partner statuses
+          const statusDefaults: Record<string, string> = {
+            'pending': 'awaiting_install_booking',
+            'confirmed': 'scheduled', 
+            'complete': 'completed',
+            'completed': 'completed',
+            'scheduled': 'scheduled',
+            'in_progress': 'in_progress',
+            'cancelled': 'cancelled',
+            'on_hold': 'on_hold_parts_docs'
+          };
+          
+          const defaultStatus = statusDefaults[mappedStatus.toLowerCase()] || 'awaiting_install_booking';
+          console.warn(`Invalid status '${mappedStatus}' mapped to default: ${defaultStatus}`);
+          
+          results.warnings.push({
+            row: i + batch.indexOf(row) + 1,
+            message: `Invalid mapped status '${mappedStatus}' - using default '${defaultStatus}' instead`,
+            data: mappedData
+          });
+          
+          mappedStatus = defaultStatus;
         }
         
         console.log(`Status mapping: ${mappedData.status} -> ${mappedStatus}`);
