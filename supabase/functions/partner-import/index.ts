@@ -6,11 +6,14 @@ interface ImportProfile {
   id: string;
   partner_id: string;
   name: string;
-  csv_column_mapping: Record<string, string>;
+  source_type: 'csv' | 'gsheet';
+  gsheet_id: string | null;
+  gsheet_sheet_name: string | null;
+  column_mappings: Record<string, string>;
   status_mappings: Record<string, string>;
   status_override_rules: Record<string, string>;
   status_actions: Record<string, any>;
-  engineer_mapping: Record<string, string>;
+  engineer_mapping_rules: Array<{ partner_identifier: string; engineer_id: string }>;
   created_at: string;
   updated_at: string;
 }
@@ -100,20 +103,108 @@ async function fetchPartner(supabase: any, partnerId: string) {
   return data;
 }
 
+// Helper function to fetch Google Sheets data
+async function fetchGoogleSheetData(sheetId: string, sheetName: string) {
+  const serviceAccountKey = Deno.env.get('GOOGLE_SERVICE_ACCOUNT_KEY');
+  if (!serviceAccountKey) {
+    throw new Error('Google Service Account Key not configured');
+  }
+
+  const credentials = JSON.parse(serviceAccountKey);
+  
+  // Get access token
+  const jwt = await createJWT(credentials);
+  const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+      assertion: jwt,
+    }),
+  });
+  
+  const { access_token } = await tokenResponse.json();
+  
+  // Fetch sheet data
+  const sheetResponse = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${sheetName}?valueRenderOption=FORMATTED_VALUE`,
+    { headers: { Authorization: `Bearer ${access_token}` } }
+  );
+  
+  const sheetData = await sheetResponse.json();
+  const rows = sheetData.values || [];
+  
+  if (rows.length === 0) return [];
+  
+  // Convert to objects with header keys
+  const headers = rows[0];
+  return rows.slice(1).map((row: any[]) => {
+    const obj: Record<string, string> = {};
+    headers.forEach((header: string, index: number) => {
+      obj[header] = row[index] || '';
+    });
+    return obj;
+  });
+}
+
+// Helper function to create JWT for Google API
+async function createJWT(credentials: any) {
+  const header = { alg: 'RS256', typ: 'JWT' };
+  const now = Math.floor(Date.now() / 1000);
+  const payload = {
+    iss: credentials.client_email,
+    scope: 'https://www.googleapis.com/auth/spreadsheets.readonly',
+    aud: 'https://oauth2.googleapis.com/token',
+    exp: now + 3600,
+    iat: now,
+  };
+  
+  const encoder = new TextEncoder();
+  const headerBytes = encoder.encode(JSON.stringify(header));
+  const payloadBytes = encoder.encode(JSON.stringify(payload));
+  
+  const headerB64 = btoa(String.fromCharCode(...headerBytes)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+  const payloadB64 = btoa(String.fromCharCode(...payloadBytes)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+  
+  const message = `${headerB64}.${payloadB64}`;
+  const messageBytes = encoder.encode(message);
+  
+  // Import private key and sign
+  const pemKey = credentials.private_key.replace(/\\n/g, '\n');
+  const keyData = pemKey.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\n/g, '');
+  const keyBytes = Uint8Array.from(atob(keyData), c => c.charCodeAt(0));
+  
+  const cryptoKey = await crypto.subtle.importKey(
+    'pkcs8',
+    keyBytes,
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  
+  const signature = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', cryptoKey, messageBytes);
+  const signatureB64 = btoa(String.fromCharCode(...new Uint8Array(signature)))
+    .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+  
+  return `${message}.${signatureB64}`;
+}
+
 export default async function handler(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    const { 
-      partnerImportProfileId, 
-      csvData, 
-      dryRun = false 
-    } = await req.json()
+    const requestBody = await req.json();
+    
+    // Support both camelCase and snake_case parameters
+    const profileId = requestBody.profile_id || requestBody.partnerImportProfileId;
+    const csvData = requestBody.csv_data || requestBody.csvData;
+    const dryRun = requestBody.dry_run ?? requestBody.dryRun ?? true;
+    const createMissingOrders = requestBody.create_missing_orders ?? requestBody.createMissingOrders ?? true;
 
-    if (!partnerImportProfileId || !csvData) {
-      return new Response(JSON.stringify({ error: 'Missing partnerImportProfileId or csvData' }), {
+    if (!profileId) {
+      return new Response(JSON.stringify({ error: 'Missing profile_id or partnerImportProfileId' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
@@ -129,7 +220,7 @@ export default async function handler(req: Request): Promise<Response> {
       }
     )
 
-    const importProfile = await fetchImportProfile(supabase, partnerImportProfileId);
+    const importProfile = await fetchImportProfile(supabase, profileId);
     if (!importProfile) {
       return new Response(JSON.stringify({ error: 'Import profile not found' }), {
         status: 404,
@@ -145,6 +236,40 @@ export default async function handler(req: Request): Promise<Response> {
       });
     }
 
+    console.log('Import profile:', {
+      id: importProfile.id,
+      source_type: importProfile.source_type,
+      gsheet_id: importProfile.gsheet_id,
+      status_actions_count: Object.keys(importProfile.status_actions || {}).length
+    });
+
+    // Get data source - either CSV or Google Sheets
+    let parsedData: any[] = [];
+    
+    if (importProfile.source_type === 'gsheet' && !csvData) {
+      if (!importProfile.gsheet_id) {
+        return new Response(JSON.stringify({ error: 'Google Sheet ID not configured for this profile' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
+      console.log('Fetching Google Sheet data:', importProfile.gsheet_id, importProfile.gsheet_sheet_name);
+      parsedData = await fetchGoogleSheetData(importProfile.gsheet_id, importProfile.gsheet_sheet_name || 'Sheet1');
+      console.log('Fetched', parsedData.length, 'rows from Google Sheets');
+    } else if (csvData) {
+      parsedData = parse(csvData, {
+        skipFirstRow: true,
+        header: true,
+      });
+      console.log('Parsed', parsedData.length, 'rows from CSV');
+    } else {
+      return new Response(JSON.stringify({ error: 'No data source provided' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const results: Results = {
       data: [],
       errors: [],
@@ -152,25 +277,32 @@ export default async function handler(req: Request): Promise<Response> {
       skipped: 0,
     };
 
-    const columnMapping = importProfile.csv_column_mapping || {};
+    const columnMapping = importProfile.column_mappings || {};
     const statusMapping = importProfile.status_mappings || {};
     const statusOverrideRules = importProfile.status_override_rules || {};
-    const engineerMapping = importProfile.engineer_mapping || {};
-
-    // Parse CSV data
-    const parsedCsv = await parse(csvData, {
-      skipFirstRow: true,
-      header: true,
-    });
+    const statusActions = importProfile.status_actions || {};
+    
+    // Build engineer mapping from rules
+    const engineerMapping: Record<string, string> = {};
+    if (importProfile.engineer_mapping_rules) {
+      for (const rule of importProfile.engineer_mapping_rules) {
+        if (rule.partner_identifier && rule.engineer_id) {
+          engineerMapping[rule.partner_identifier] = rule.engineer_id;
+        }
+      }
+    }
+    
+    // Pre-fetch all engineers to check for unmapped ones
+    const unmappedEngineers = new Set<string>();
 
     const batchSize = 100;
-    for (let batchStart = 0; batchStart < parsedCsv.length; batchStart += batchSize) {
-      const batch = parsedCsv.slice(batchStart, batchStart + batchSize);
+    for (let batchStart = 0; batchStart < parsedData.length; batchStart += batchSize) {
+      const batch = parsedData.slice(batchStart, batchStart + batchSize);
 
-      for (let i = 0; i < batch.length; i++) {
-        const row = batch[i];
-
-        const processRow = (row: any, i: number): ProcessedRow => {
+      for (const [index, row] of batch.entries()) {
+        const actualRowIndex = batchStart + index;
+        
+        const processRow = (row: any, rowIndex: number): ProcessedRow => {
           try {
             const mappedData: MappedData = {
               partner_external_id: row[columnMapping['partner_external_id']]?.toString()?.trim() || null,
@@ -224,15 +356,15 @@ export default async function handler(req: Request): Promise<Response> {
               mappedStatus = statusOverrides[mappedStatus];
             }
 
-            // Get status actions from the profile
-            const statusActions = importProfile.status_actions || {};
-            const actionConfig = statusActions[mappedData.status] || {};
+            // Use status actions as primary mapping (new approach)
+            const originalPartnerStatus = mappedData.partner_status || mappedData.status || 'unknown';
+            const actionConfig = statusActions[originalPartnerStatus] || {};
             
-            let jmsStatus = mappedStatus;
+            let jmsStatus = mappedStatus; // fallback to old mapping
             let suppressScheduling = false;
             let suppressionReason = null;
             
-            // Use actions configuration if available
+            // Prefer status_actions over old status_mappings
             if (actionConfig.jms_status) {
               jmsStatus = actionConfig.jms_status;
             }
@@ -240,7 +372,7 @@ export default async function handler(req: Request): Promise<Response> {
             if (actionConfig.actions) {
               if (actionConfig.actions.suppress_scheduling === true) {
                 suppressScheduling = true;
-                suppressionReason = actionConfig.actions.suppression_reason || `partner_status_${mappedData.status.toLowerCase()}`;
+                suppressionReason = actionConfig.actions.suppression_reason || `partner_status_${originalPartnerStatus.toLowerCase()}`;
               } else if (actionConfig.actions.suppress_scheduling === false) {
                 suppressScheduling = false;
                 suppressionReason = null;
@@ -272,7 +404,7 @@ export default async function handler(req: Request): Promise<Response> {
               console.warn(`Invalid status '${jmsStatus}' mapped to default: ${defaultStatus}`);
               
               results.warnings.push({
-                row: i + batch.indexOf(row) + 1,
+                row: rowIndex + 1,
                 message: `Invalid mapped status '${jmsStatus}' - using default '${defaultStatus}' instead`,
                 data: mappedData
               });
@@ -280,27 +412,28 @@ export default async function handler(req: Request): Promise<Response> {
               jmsStatus = defaultStatus;
             }
 
-            console.log(`Status flow: ${mappedData.status} -> JMS: ${jmsStatus}, Suppressed: ${suppressScheduling}`);
+            console.log(`Status flow: ${originalPartnerStatus} -> JMS: ${jmsStatus}, Suppressed: ${suppressScheduling}`);
 
             let mappedEngineerId: string | null = null;
-            const mappedEngineer = row[engineerMapping['engineer_email']]?.toString()?.trim() || null;
-
-            if (mappedEngineer) {
-              const { data: engineerData, error: engineerError } = await supabase
-                .from('engineers')
-                .select('id')
-                .eq('email', mappedEngineer)
-                .single();
-
-              if (engineerError) {
-                console.error('Error fetching engineer:', engineerError);
-              } else if (engineerData) {
-                mappedEngineerId = engineerData.id;
+            
+            // Check for engineer mapping - use multiple possible fields
+            const engineerIdentifier = row[columnMapping['engineer_name']] || 
+                                     row[columnMapping['engineer_email']] ||
+                                     row['engineer_name'] || 
+                                     row['engineer_email'] ||
+                                     null;
+            
+            if (engineerIdentifier) {
+              const engineerKey = engineerIdentifier.toString().trim();
+              
+              if (engineerMapping[engineerKey]) {
+                mappedEngineerId = engineerMapping[engineerKey];
               } else {
-                console.warn(`Engineer with email ${mappedEngineer} not found`);
+                unmappedEngineers.add(engineerKey);
+                console.warn(`Unmapped engineer: ${engineerKey}`);
                 results.warnings.push({
-                  row: i + batch.indexOf(row) + 1,
-                  message: `Engineer with email ${mappedEngineer} not found`,
+                  row: rowIndex + 1,
+                  message: `Engineer '${engineerKey}' not mapped to internal engineer`,
                   data: mappedData
                 });
               }
@@ -324,7 +457,7 @@ export default async function handler(req: Request): Promise<Response> {
           } catch (error) {
             console.error('Error processing row:', error);
             results.errors.push({
-              row: i + batch.indexOf(row) + 1,
+              row: rowIndex + 1,
               message: error.message,
               data: row,
             });
@@ -332,13 +465,13 @@ export default async function handler(req: Request): Promise<Response> {
           }
         };
 
-        const processedRow = processRow(row, i);
+        const processedRow = processRow(row, actualRowIndex);
 
         if (processedRow.success && processedRow.data) {
           results.data.push(processedRow.data);
         } else {
           results.errors.push({
-            row: i + batch.indexOf(row) + 1,
+            row: actualRowIndex + 1,
             message: processedRow.error || 'Unknown error',
             data: row,
           });
@@ -346,28 +479,115 @@ export default async function handler(req: Request): Promise<Response> {
       }
     }
 
-    // When updating orders, include the new scheduling fields
-    if (!dryRun && results.data.length > 0) {
-      const { error: updateError } = await supabase
-        .from('orders')
-        .upsert(results.data.map(item => ({
-          ...item,
-          updated_at: new Date().toISOString()
-        })), {
-          onConflict: 'partner_external_id,partner_id'
-        });
+    // Check for unmapped engineers and block if found
+    if (unmappedEngineers.size > 0) {
+      console.log('Found unmapped engineers, blocking import:', Array.from(unmappedEngineers));
+      return new Response(
+        JSON.stringify({
+          success: false,
+          unmapped_engineers: Array.from(unmappedEngineers),
+          summary: {
+            processed: results.data.length,
+            inserted_count: 0,
+            updated_count: 0,
+            skipped_count: results.skipped,
+            errors: results.errors,
+            warnings: results.warnings,
+          }
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
 
-      if (updateError) {
-        throw updateError;
+    // Build response
+    const totalProcessed = results.data.length;
+    let insertCount = 0;
+    let updateCount = 0;
+    const preview: any = { updates: [], inserts: [], skips: [] };
+
+    if (dryRun) {
+      // For dry run, check which orders already exist
+      const externalIds = results.data.map(d => d.partner_external_id).filter(Boolean);
+      
+      if (externalIds.length > 0) {
+        const { data: existingOrders } = await supabase
+          .from('orders')
+          .select('partner_external_id, status_enhanced, partner_status')
+          .eq('partner_id', importProfile.partner_id)
+          .in('partner_external_id', externalIds);
+
+        const existingMap = new Map(existingOrders?.map(o => [o.partner_external_id, o]) || []);
+        
+        results.data.forEach((item, index) => {
+          const existing = existingMap.get(item.partner_external_id);
+          if (existing) {
+            updateCount++;
+            preview.updates.push({
+              row: index + 1,
+              external_id: item.partner_external_id,
+              current_status: existing.status_enhanced,
+              new_status: item.status_enhanced,
+              reason: `Status update from ${existing.partner_status || 'unknown'} to ${item.partner_status || 'unknown'}`,
+              data: item
+            });
+          } else if (createMissingOrders) {
+            insertCount++;
+            preview.inserts.push({
+              row: index + 1,
+              external_id: item.partner_external_id,
+              status: item.status_enhanced,
+              reason: `New order for partner status: ${item.partner_status || 'unknown'}`,
+              data: item
+            });
+          } else {
+            preview.skips.push({
+              row: index + 1,
+              external_id: item.partner_external_id,
+              reason: 'Order does not exist and create_missing_orders is disabled',
+              data: item
+            });
+          }
+        });
+      } else {
+        insertCount = createMissingOrders ? results.data.length : 0;
+      }
+    } else {
+      // Live import
+      if (results.data.length > 0) {
+        const { error: upsertError, count } = await supabase
+          .from('orders')
+          .upsert(results.data.map(item => ({
+            ...item,
+            updated_at: new Date().toISOString()
+          })), {
+            onConflict: 'partner_external_id,partner_id',
+            count: 'estimated'
+          });
+
+        if (upsertError) {
+          throw upsertError;
+        }
+        
+        updateCount = count || results.data.length;
       }
     }
 
     return new Response(
-      JSON.stringify({ 
-        data: results.data, 
-        errors: results.errors, 
-        warnings: results.warnings,
-        skipped: results.skipped,
+      JSON.stringify({
+        success: true,
+        summary: {
+          processed: totalProcessed,
+          inserted_count: insertCount,
+          updated_count: updateCount,
+          skipped_count: results.skipped,
+          errors: results.errors,
+          warnings: results.warnings,
+          dry_run: dryRun,
+          ...(dryRun ? { preview_inserted_count: insertCount, preview_updated_count: updateCount } : {})
+        },
+        ...(dryRun ? { preview } : {})
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

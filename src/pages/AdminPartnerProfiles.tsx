@@ -14,6 +14,7 @@ import { Plus, Edit, Upload, FileSpreadsheet, Trash2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import MappingConfiguration from '@/components/admin/MappingConfiguration';
+import { PartnerStatusMappingEditor } from '@/components/admin/PartnerStatusMappingEditor';
 import ImportRunModal from '@/components/admin/ImportRunModal';
 import { DeletePartnerJobsModal } from '@/components/admin/DeletePartnerJobsModal';
 import { ImportProfileActions } from '@/components/admin/ImportProfileActions';
@@ -62,6 +63,7 @@ export default function AdminPartnerProfiles() {
     status_mappings: {} as Record<string, string>,
     engineer_mapping_rules: [] as Array<any>,
     status_override_rules: {} as Record<string, boolean>,
+    status_actions: {} as Record<string, any>,
     engineer_mappings: {} as Record<string, string>, // Add this for UI convenience
     is_active: true
   });
@@ -114,6 +116,7 @@ export default function AdminPartnerProfiles() {
           status_mappings: data.status_mappings,
           engineer_mapping_rules: engineerMappingRules,
           status_override_rules: data.status_override_rules,
+          status_actions: data.status_actions,
           is_active: data.is_active
         }]);
       
@@ -152,6 +155,7 @@ export default function AdminPartnerProfiles() {
           status_mappings: data.status_mappings,
           engineer_mapping_rules: engineerMappingRules,
           status_override_rules: data.status_override_rules,
+          status_actions: data.status_actions,
           is_active: data.is_active
         })
         .eq('id', editingProfile.id);
@@ -180,6 +184,7 @@ export default function AdminPartnerProfiles() {
       status_mappings: {},
       engineer_mapping_rules: [],
       status_override_rules: {},
+      status_actions: {},
       engineer_mappings: {},
       is_active: true
     });
@@ -208,6 +213,7 @@ export default function AdminPartnerProfiles() {
       status_mappings: profile.status_mappings,
       engineer_mapping_rules: profile.engineer_mapping_rules,
       status_override_rules: profile.status_override_rules,
+      status_actions: profile.status_actions || {},
       engineer_mappings: engineerMappings,
       is_active: profile.is_active
     });
@@ -242,10 +248,18 @@ export default function AdminPartnerProfiles() {
 
       if (error) throw error;
 
-      toast({ 
-        title: dryRun ? 'Dry run completed' : 'Import completed',
-        description: `Processed ${data.summary.processed} rows. ${data.summary.inserted_count} inserted, ${data.summary.updated_count} updated, ${data.summary.skipped_count} skipped. ${data.summary.errors.length} errors.`
-      });
+      if (data.success) {
+        toast({ 
+          title: dryRun ? 'Dry run completed' : 'Import completed',
+          description: `Processed ${data.summary.processed} rows. ${data.summary.inserted_count} inserted, ${data.summary.updated_count} updated, ${data.summary.skipped_count} skipped. ${data.summary.errors.length} errors.`
+        });
+      } else {
+        toast({
+          title: 'Import failed',
+          description: data.unmapped_engineers ? `${data.unmapped_engineers.length} engineers need to be mapped` : 'Unknown error',
+          variant: 'destructive'
+        });
+      }
 
       return data; // Return the result for the modal to display
     } catch (error: any) {
@@ -356,6 +370,11 @@ export default function AdminPartnerProfiles() {
                 onEngineerMappingsChange={(mappings) => setFormData({ ...formData, engineer_mappings: mappings })}
               />
 
+              <PartnerStatusMappingEditor
+                statusActions={formData.status_actions}
+                onUpdate={(statusActions) => setFormData({ ...formData, status_actions: statusActions })}
+              />
+
               <div className="flex items-center space-x-2">
                 <Switch
                   id="is_active"
@@ -436,6 +455,7 @@ export default function AdminPartnerProfiles() {
             <CardContent>
               <div className="text-sm text-muted-foreground space-y-1">
                 <p>Status mappings: {Object.keys(profile.status_mappings).length} configured</p>
+                <p>Bucket mappings: {Object.keys(profile.status_actions || {}).length} configured</p>
                 <p>Column mappings: {Object.keys(profile.column_mappings).length} configured</p>
                 <p>Override rules: {Object.keys(profile.status_override_rules).length} configured</p>
               </div>
