@@ -489,8 +489,8 @@ export const getSmartEngineerRecommendations = async (
             return null;
           }
 
-          // Calculate recommendation score with small jitter to break ties
-          let score = calculateEngineerScore(engineer, distance, travelTime, availableDate, dailyWorkloadThatDay);
+          // Calculate recommendation score with travel source consideration
+          let score = calculateEngineerScore(engineer, distance, travelTime, availableDate, dailyWorkloadThatDay, travelSource);
           
           // Add tiny jitter (0.01-0.09) to break perfect ties deterministically
           const jitter = (engineer.id.charCodeAt(0) % 9 + 1) / 100;
@@ -715,7 +715,7 @@ async function getSmartEngineerRecommendationsFast(
   // For exact area matches, we still want real distances, not nominal values
   const engineersNeedingDistance = engineersToEvaluate.filter(eng => eng.starting_postcode);
 
-  let distanceResults = new Map<string, { distance: number; duration: number }>();
+  let distanceResults = new Map<string, { distance: number; duration: number; source: 'mapbox' | 'fallback' }>();
   
   console.log(`📍 Getting real distances for ${engineersNeedingDistance.length} engineers (including exact matches)`);
   
@@ -760,8 +760,8 @@ async function getSmartEngineerRecommendationsFast(
           const result = distanceResults.get(engineer.id)!;
           distance = result.distance;
           travelTime = result.duration;
-          travelSource = 'mapbox';
-          console.log(`📍 ${engineer.name}: Using live Mapbox data - ${distance}mi, ${travelTime}min`);
+          travelSource = result.source === 'mapbox' ? 'mapbox' : 'fallback-default';
+          console.log(`📍 ${engineer.name}: Using ${result.source} data - ${distance}mi, ${travelTime}min`);
         } else if (hasServiceAreaMatch) {
           // Use service area estimates based on match type
           const matchType = serviceCheck.matchType || 'area';
@@ -873,7 +873,7 @@ async function getSmartEngineerRecommendationsFast(
         }
 
         // Calculate score and reasons
-        const score = calculateEngineerScore(engineer, distance, travelTime, availableDate, dailyWorkloadThatDay);
+        const score = calculateEngineerScore(engineer, distance, travelTime, availableDate, dailyWorkloadThatDay, travelSource);
         const reasons = generateRecommendationReasons(engineer, distance, travelTime, availableDate, minimumDate, dailyWorkloadThatDay, hasServiceAreaMatch);
 
         return {
@@ -944,7 +944,7 @@ export const getBatchDistancesForOrder = async (
   engineers: EngineerSettings[],
   destinationPostcode: string,
   timeoutMs = 20000
-): Promise<Map<string, { distance: number; duration: number }>> => {
+): Promise<Map<string, { distance: number; duration: number; source: 'mapbox' | 'fallback' }>> => {
   const validEngineers = engineers.filter(e => e.starting_postcode);
   
   if (validEngineers.length === 0) {
@@ -953,19 +953,21 @@ export const getBatchDistancesForOrder = async (
 
   console.log(`🚀 FAST: Batch distance calculation for ${validEngineers.length} engineers to ${destinationPostcode}`);
   
+  // Normalize destination postcode consistently
+  const normalizedDestination = destinationPostcode.replace(/\s+/g, '').toUpperCase().trim();
+  
   // Rate limiting - wait if too many concurrent requests
   while (mapboxConcurrency >= MAX_MAPBOX_CONCURRENCY) {
     await new Promise(resolve => setTimeout(resolve, 100));
   }
   mapboxConcurrency++;
   
-  // Extract unique origin postcodes
-  const origins = [...new Set(validEngineers.map(e => e.starting_postcode))];
-  const destinations = [destinationPostcode];
+  // Extract and normalize unique origin postcodes
+  const origins = [...new Set(validEngineers.map(e => e.starting_postcode?.replace(/\s+/g, '').toUpperCase().trim()).filter(Boolean))];
+  const destinations = [normalizedDestination];
   
   try {
-    // Add more detailed logging for debugging
-    console.log('🚀 Calling mapbox-distance with:', { 
+    console.log('🚀 Calling mapbox-distance with normalized postcodes:', { 
       originsCount: origins.length, 
       destinationsCount: destinations.length,
       origins: origins.slice(0, 3), // Log first 3 for debugging
@@ -997,7 +999,7 @@ export const getBatchDistancesForOrder = async (
           console.error('❌ Retry also failed:', retryResult.error);
           throw retryResult.error;
         }
-        return processBatchResults(retryResult.data, validEngineers, origins, destinations);
+        return processBatchResults(retryResult.data, validEngineers, origins, destinations, true);
       }
       throw error;
     }
@@ -1007,23 +1009,25 @@ export const getBatchDistancesForOrder = async (
       throw new Error('No data returned from distance calculation');
     }
 
-    return processBatchResults(data, validEngineers, origins, destinations);
+    return processBatchResults(data, validEngineers, origins, destinations, true);
   } catch (error) {
     console.error('❌ Batch distance calculation failed:', error);
     // Return enhanced fallback estimates based on service areas and setup
-    const fallbackResults = new Map<string, { distance: number; duration: number }>();
+    const fallbackResults = new Map<string, { distance: number; duration: number; source: 'mapbox' | 'fallback' }>();
     
-    validEngineers.forEach(engineer => {
+    validEngineers.forEach((engineer, index) => {
       // Use service area max_travel_minutes if available, otherwise defaults
       const serviceArea = engineer.service_areas?.[0];
       const estimatedTravelTime = serviceArea?.max_travel_minutes || 60;
       
-      // Penalize missing starting_postcode to reduce ties
-      const penalty = engineer.starting_postcode ? 0 : 15;
+      // Add variation to prevent identical values - use engineer index and ID for deterministic jitter
+      const jitterMultiplier = 0.8 + (engineer.id.charCodeAt(0) % 5) * 0.1; // 0.8 to 1.2 multiplier
+      const timeJitter = Math.round(estimatedTravelTime * jitterMultiplier);
       
       fallbackResults.set(engineer.id, {
-        distance: Math.round(estimatedTravelTime / 2), // Rough estimate: 2 min/mile
-        duration: estimatedTravelTime + penalty
+        distance: Math.round(timeJitter / 2.2), // Rough estimate: ~2.2 min/mile
+        duration: timeJitter,
+        source: 'fallback'
       });
     });
     
@@ -1038,25 +1042,33 @@ const processBatchResults = (
   data: any,
   validEngineers: EngineerSettings[],
   origins: string[],
-  destinations: string[]
-): Map<string, { distance: number; duration: number }> => {
-  const result = new Map<string, { distance: number; duration: number }>();
+  destinations: string[],
+  isMapboxData = false
+): Map<string, { distance: number; duration: number; source: 'mapbox' | 'fallback' }> => {
+  const result = new Map<string, { distance: number; duration: number; source: 'mapbox' | 'fallback' }>();
   
   if (data?.distances && data?.durations) {
-    validEngineers.forEach(engineer => {
-      const originIndex = origins.findIndex(origin => origin === engineer.starting_postcode);
+    validEngineers.forEach((engineer, engineerIndex) => {
+      const normalizedEngineerPostcode = engineer.starting_postcode?.replace(/\s+/g, '').toUpperCase().trim();
+      const originIndex = origins.findIndex(origin => origin === normalizedEngineerPostcode);
+      
       if (originIndex >= 0 && data.distances[originIndex] && data.durations[originIndex]) {
         result.set(engineer.id, {
           distance: data.distances[originIndex][0] || 25,
-          duration: data.durations[originIndex][0] || 60
+          duration: data.durations[originIndex][0] || 60,
+          source: isMapboxData ? 'mapbox' : 'fallback'
         });
       } else {
-        // Fallback for this specific engineer
+        // Fallback for this specific engineer with variation
         const serviceArea = engineer.service_areas?.[0];
         const estimatedTravelTime = serviceArea?.max_travel_minutes || 60;
+        const jitterMultiplier = 0.8 + (engineer.id.charCodeAt(0) % 5) * 0.1;
+        const timeJitter = Math.round(estimatedTravelTime * jitterMultiplier);
+        
         result.set(engineer.id, {
-          distance: Math.round(estimatedTravelTime / 2),
-          duration: estimatedTravelTime
+          distance: Math.round(timeJitter / 2.2),
+          duration: timeJitter,
+          source: 'fallback'
         });
       }
     });
@@ -1327,16 +1339,17 @@ function calculateEngineerScore(
   distance: number,
   travelTime: number,
   availableDate: Date,
-  dailyWorkload: number = 0
+  dailyWorkload: number = 0,
+  travelSource: 'mapbox' | 'service-area-estimate' | 'fallback-default' = 'fallback-default'
 ): number {
   let score = 100;
 
-  // Distance penalty (closer is better)
-  const distancePenalty = Math.min(distance * 2, 50); // Max 50 point penalty
+  // Distance penalty (closer is better) - more aggressive penalty for far distances
+  const distancePenalty = Math.min(distance * 2.5, 60); // Max 60 point penalty, more aggressive
   score -= distancePenalty;
 
-  // Travel time penalty (shorter is better)
-  const travelTimePenalty = Math.min(travelTime * 0.5, 30); // Max 30 point penalty
+  // Travel time penalty (shorter is better) - increased weight for travel time
+  const travelTimePenalty = Math.min(travelTime * 0.8, 40); // Max 40 point penalty, increased weight
   score -= travelTimePenalty;
 
   // Availability bonus (earlier available date is better)
@@ -1347,11 +1360,24 @@ function calculateEngineerScore(
 
   // Workload bonus (0 jobs preferred)
   if (dailyWorkload === 0) {
-    score += 8; // Small bonus for free day
+    score += 10; // Increased bonus for free day
+  } else if (dailyWorkload === 1) {
+    score += 3; // Small bonus for light workload
   }
 
+  // Data quality bonus - reward real Mapbox data over estimates
+  if (travelSource === 'mapbox') {
+    score += 5; // Bonus for live data
+  } else if (travelSource === 'service-area-estimate') {
+    score += 2; // Small bonus for area-based estimates
+  }
+
+  // Add deterministic tie-breaker based on engineer ID to ensure consistent ordering
+  const tieBreaker = (engineer.id.charCodeAt(0) + engineer.id.charCodeAt(engineer.id.length - 1)) % 10 / 100;
+  score += tieBreaker;
+
   // Ensure score stays within 0-100 range
-  return Math.max(0, Math.min(100, Math.round(score)));
+  return Math.max(0, Math.min(100, Math.round(score * 100) / 100)); // Preserve decimal precision
 }
 
 /**

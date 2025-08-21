@@ -10,7 +10,7 @@ export function normalizePostcode(postcode: string): string {
   
   return postcode
     .replace(/O/g, '0') // Replace O with 0
-    .replace(/\s+/g, ' ') // Normalize spaces
+    .replace(/\s+/g, '') // Remove all spaces for consistency
     .toUpperCase()
     .trim();
 }

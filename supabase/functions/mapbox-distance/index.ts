@@ -75,7 +75,7 @@ serve(async (req) => {
     const coordinatesCache = new Map<string, [number, number]>()
     
     const getCoordinates = async (postcode: string, retryCount = 0): Promise<[number, number]> => {
-      const cleanPostcode = postcode.trim().toUpperCase()
+      const cleanPostcode = postcode.replace(/\s+/g, '').toUpperCase().trim() // Consistent normalization
       console.log(`Geocoding postcode: ${cleanPostcode}`)
       
       // Check persistent cache first
@@ -139,27 +139,28 @@ serve(async (req) => {
       return coordinates
     }
 
-    // Get coordinates for all unique postcodes
-    const allPostcodes = [...new Set([...origins, ...destinations])]
-    console.log(`Getting coordinates for postcodes:`, allPostcodes)
+    // Get coordinates for all unique postcodes with consistent normalization
+    const normalizePostcode = (pc: string) => pc.replace(/\s+/g, '').toUpperCase().trim();
+    const normalizedOrigins = origins.map(normalizePostcode);
+    const normalizedDestinations = destinations.map(normalizePostcode);
+    const allPostcodes = [...new Set([...normalizedOrigins, ...normalizedDestinations])];
+    console.log(`Getting coordinates for postcodes:`, allPostcodes);
     
     // Geocode all postcodes
     for (const postcode of allPostcodes) {
       await getCoordinates(postcode)
     }
 
-    // Prepare coordinates
-    const originCoords = origins.map(postcode => {
-      const cleanPostcode = postcode.trim().toUpperCase()
-      const coords = coordinatesCache.get(cleanPostcode)
-      if (!coords) throw new Error(`No coordinates found for origin: ${cleanPostcode}`)
+    // Prepare coordinates using normalized postcodes
+    const originCoords = normalizedOrigins.map(postcode => {
+      const coords = coordinatesCache.get(postcode)
+      if (!coords) throw new Error(`No coordinates found for origin: ${postcode}`)
       return coords
     })
     
-    const destinationCoords = destinations.map(postcode => {
-      const cleanPostcode = postcode.trim().toUpperCase()
-      const coords = coordinatesCache.get(cleanPostcode)
-      if (!coords) throw new Error(`No coordinates found for destination: ${cleanPostcode}`)
+    const destinationCoords = normalizedDestinations.map(postcode => {
+      const coords = coordinatesCache.get(postcode)
+      if (!coords) throw new Error(`No coordinates found for destination: ${postcode}`)
       return coords
     })
     
@@ -169,7 +170,7 @@ serve(async (req) => {
     
     // Check if we have a single source-destination pair (use Directions API)
     // or multiple points (use Matrix API)
-    if (origins.length === 1 && destinations.length === 1) {
+    if (normalizedOrigins.length === 1 && normalizedDestinations.length === 1) {
       console.log('=== Using Directions API (single route) ===')
       
       const startCoord = originCoords[0]

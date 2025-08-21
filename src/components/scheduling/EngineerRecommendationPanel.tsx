@@ -218,13 +218,13 @@ export function EngineerRecommendationPanel({
                           <div className="flex items-center gap-1">
                             <MapPin className="h-3 w-3" />
                             <span>{suggestion.distance.toFixed(1)}mi from {suggestion.engineer.starting_postcode || 'N/A'}</span>
-                            <Badge 
-                              variant={suggestion.travelSource === 'mapbox' ? 'default' : 'secondary'} 
-                              className="text-xs ml-1"
-                            >
-                              {suggestion.travelSource === 'mapbox' ? 'Live' : 
-                               suggestion.travelSource === 'service-area-estimate' ? 'Est.' : 'Default'}
-                            </Badge>
+                             <Badge 
+                               variant={suggestion.travelSource === 'mapbox' ? 'default' : 'secondary'} 
+                               className="text-xs ml-1"
+                             >
+                               {suggestion.travelSource === 'mapbox' ? 'Live' : 
+                                suggestion.travelSource === 'service-area-estimate' ? 'Est.' : 'Default'}
+                             </Badge>
                           </div>
                           <div className="flex items-center gap-1">
                             <Clock className="h-3 w-3" />
