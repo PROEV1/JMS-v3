@@ -403,7 +403,7 @@ serve(async (req: Request): Promise<Response> => {
 
             // Get partner status from mapped data (prioritize partner_status column)
             const partnerStatusFromColumn = mappedData.partner_status || mappedData.status;
-            const originalPartnerStatus = partnerStatusFromColumn ? partnerStatusFromColumn.toString().trim().toUpperCase() : 'UNKNOWN';
+            const originalPartnerStatus = partnerStatusFromColumn ? String(partnerStatusFromColumn).trim().toUpperCase() : 'UNKNOWN';
             
             console.log(`Processing row ${rowIndex + 1}: Partner Status = '${originalPartnerStatus}'`);
             
