@@ -411,41 +411,481 @@ serve(async (req) => {
       const batchOrders: any[] = [];
       const batchQuotes: any[] = [];
 
-      for (let j = 0; j < batch.length; j++) {
-        const row = batch[j];
-        const rowNumber = i + j + 1;
+// Load engineer mappings and existing orders for idempotent processing
+  console.log('\n=== Loading Engineer Mappings ===');
+  const { data: engineerMappings } = await supabase
+    .from('partner_engineer_mappings')
+    .select('partner_engineer_name, engineer_id, engineers(id, name)')
+    .eq('partner_id', partner.id)
+    .eq('is_active', true);
+    
+  console.log(`Loaded ${engineerMappings?.length || 0} engineer mappings`);
+  
+  // Create mapping lookup
+  const engineerMap = new Map();
+  engineerMappings?.forEach(mapping => {
+    engineerMap.set(mapping.partner_engineer_name.toLowerCase(), mapping.engineer_id);
+  });
+  
+  // Get status mappings from profile
+  const statusMapping = importProfile.status_mappings || {};
+  const statusOverrides = importProfile.status_override_rules || {};
+  
+  console.log('Status mapping:', statusMapping);
+  console.log('Status overrides:', statusOverrides);
+  
+  // Process data in batches with idempotent upserts
+  console.log(`\n=== PROCESSING ${rows.length} ROWS ===`);
+  
+  for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+    const batch = rows.slice(i, i + BATCH_SIZE);
+    console.log(`Processing batch ${Math.floor(i/BATCH_SIZE) + 1}/${Math.ceil(rows.length/BATCH_SIZE)}: ${batch.length} rows`);
+    
+    for (const row of batch) {
+      try {
+        console.log(`\n--- Processing Row ${batch.indexOf(row) + 1 + i} ---`);
+        
+        // Extract data using resolved headers
+        const getValue = (logicalKey: string): string => {
+          const header = resolveHeader(logicalKey);
+          if (!header) return '';
+          const headerIndex = headers.indexOf(header);
+          return headerIndex >= 0 ? (row[headerIndex]?.toString().trim() || '') : '';
+        };
 
-        try {
-          // Extract data using resolved headers
-          const getValue = (logicalKey: string): string => {
-            const header = resolveHeader(logicalKey);
-            if (!header) return '';
-            const headerIndex = headers.indexOf(header);
-            return headerIndex >= 0 ? (row[headerIndex]?.toString().trim() || '') : '';
-          };
-
-          const clientEmail = getValue('client_email').toLowerCase().trim();
-          if (!clientEmail) {
-            results.errors.push({ row: rowNumber, error: 'Missing customer email', data: { resolved_email: clientEmail } });
-            continue;
-          }
-
-          // Check for existing order
-          const externalId = getValue('partner_external_id');
-          if (externalId && existingOrders.has(externalId)) {
-            results.skipped_count++;
-            continue;
-          }
-
-          // Combine address fields into a single address (same logic as before)
-          const addressParts = [
+        const mappedData = {
+          job_id: getValue('partner_external_id'),
+          status: getValue('partner_status'),
+          engineer_name: getValue('engineer_identifier'),
+          install_date: getValue('scheduled_date'),
+          time_slot: getValue('time_slot'),
+          client_name: getValue('client_name'),
+          client_email: getValue('client_email'),
+          client_phone: getValue('client_phone'),
+          client_address: [
             getValue('customer_address_line_1'),
             getValue('customer_address_line_2'),
             getValue('customer_address_city')
-          ].filter(Boolean);
-          const combinedAddress = addressParts.join(', ') || null;
-
-          // Map job type from resolved "Type" field
+          ].filter(Boolean).join(', ') || null,
+          postcode: getValue('customer_address_post_code'),
+          total_amount: getValue('quote_amount'),
+          sub_partner: getValue('sub_partner'),
+          deep_link: getValue('deep_link')
+        };
+        
+        console.log('Mapped data:', JSON.stringify(mappedData, null, 2));
+        
+        // Apply status mapping
+        let mappedStatus = mappedData.status || 'pending';
+        if (statusMapping[mappedStatus]) {
+          mappedStatus = statusMapping[mappedStatus];
+        }
+        
+        // Apply status override rules
+        if (statusOverrides[mappedStatus]) {
+          mappedStatus = statusOverrides[mappedStatus];
+        }
+        
+        console.log(`Status mapping: ${mappedData.status} -> ${mappedStatus}`);
+        
+        // Skip rows with missing required data
+        if (!mappedData.client_name || !mappedData.client_email) {
+          results.skipped_count++;
+          results.warnings.push({
+            row: i + batch.indexOf(row) + 1,
+            message: 'Missing required client data (name/email)',
+            data: mappedData
+          });
+          continue;
+        }
+        
+        // Skip if job_id is missing (required for idempotent processing)
+        if (!mappedData.job_id) {
+          results.skipped_count++;
+          results.warnings.push({
+            row: i + batch.indexOf(row) + 1,
+            message: 'Missing job_id - required for partner imports',
+            data: mappedData
+          });
+          continue;
+        }
+        
+        let client_id: string;
+        let isExistingClient = false;
+        
+        // Check if client exists
+        const { data: existingClient, error: clientError } = await supabase
+          .from('clients')
+          .select('id')
+          .eq('email', mappedData.client_email)
+          .maybeSingle();
+          
+        if (clientError && clientError.code !== 'PGRST116') {
+          console.error('Client lookup error:', clientError);
+          results.skipped_count++;
+          results.errors.push({
+            row: i + batch.indexOf(row) + 1,
+            error: `Client lookup failed: ${clientError.message}`,
+            data: mappedData
+          });
+          continue;
+        }
+        
+        if (existingClient) {
+          client_id = existingClient.id;
+          isExistingClient = true;
+          console.log(`Found existing client: ${client_id}`);
+        } else {
+          // Create new client
+          if (!dry_run && create_missing_orders) {
+            const { data: newClient, error: createClientError } = await supabase
+              .from('clients')
+              .insert({
+                full_name: mappedData.client_name,
+                email: mappedData.client_email,
+                phone: mappedData.client_phone || null,
+                address: mappedData.client_address || null,
+                postcode: mappedData.postcode || null,
+              })
+              .select('id')
+              .single();
+              
+            if (createClientError) {
+              console.error('Client creation error:', createClientError);
+              results.skipped_count++;
+              results.errors.push({
+                row: i + batch.indexOf(row) + 1,
+                error: `Client creation failed: ${createClientError.message}`,
+                data: mappedData
+              });
+              continue;
+            }
+            
+            client_id = newClient.id;
+            console.log(`Created new client: ${client_id}`);
+          } else {
+            client_id = 'dry-run-client-id';
+            console.log('DRY RUN: Would create new client');
+          }
+          results.inserted_count++;
+        }
+        
+        // Check for existing order with same partner_id + partner_external_id
+        const { data: existingOrder, error: orderLookupError } = await supabase
+          .from('orders')
+          .select('id, status_enhanced, engineer_id, scheduled_install_date, partner_status')
+          .eq('partner_id', partner.id)
+          .eq('partner_external_id', mappedData.job_id)
+          .maybeSingle();
+          
+        if (orderLookupError && orderLookupError.code !== 'PGRST116') {
+          console.error('Order lookup error:', orderLookupError);
+          results.skipped_count++;
+          results.errors.push({
+            row: i + batch.indexOf(row) + 1,
+            error: `Order lookup failed: ${orderLookupError.message}`,
+            data: mappedData
+          });
+          continue;
+        }
+        
+        let order_id: string;
+        let quote_id: string;
+        
+        if (existingOrder) {
+          // Handle overrides: On Hold, Cancellation, Completed
+          if (['on_hold', 'cancelled', 'completed'].includes(mappedStatus)) {
+            if (!dry_run) {
+              // Update order status and clear scheduling if needed
+              const updateData: any = {
+                partner_status: mappedStatus,
+                partner_metadata: {
+                  ...existingOrder.partner_metadata,
+                  status_updated_at: new Date().toISOString(),
+                  import_run_id: run_id
+                }
+              };
+              
+              // Clear scheduling for cancelled/completed jobs
+              if (['cancelled', 'completed'].includes(mappedStatus)) {
+                updateData.engineer_id = null;
+                updateData.scheduled_install_date = null;
+                updateData.scheduling_suppressed = true;
+                updateData.scheduling_suppressed_reason = `Partner marked as ${mappedStatus}`;
+              }
+              
+              const { error: updateError } = await supabase
+                .from('orders')
+                .update(updateData)
+                .eq('id', existingOrder.id);
+                
+              if (updateError) {
+                console.error('Order update error:', updateError);
+                results.skipped_count++;
+                results.errors.push({
+                  row: i + batch.indexOf(row) + 1,
+                  error: `Order update failed: ${updateError.message}`,
+                  data: mappedData
+                });
+                continue;
+              }
+              
+              console.log(`Updated existing order ${existingOrder.id} with ${mappedStatus} status`);
+            } else {
+              console.log(`DRY RUN: Would update order ${existingOrder.id} with ${mappedStatus} status`);
+            }
+            
+            results.updated_count++;
+            continue;
+          }
+          
+          // Update existing order
+          order_id = existingOrder.id;
+          console.log(`Found existing order: ${order_id}`);
+          
+          // Map engineer if provided
+          let mapped_engineer_id = existingOrder.engineer_id;
+          if (mappedData.engineer_name) {
+            const engineerKey = mappedData.engineer_name.toLowerCase().trim();
+            if (engineerMap.has(engineerKey)) {
+              mapped_engineer_id = engineerMap.get(engineerKey);
+              console.log(`Mapped engineer: ${mappedData.engineer_name} -> ${mapped_engineer_id}`);
+            } else {
+              results.warnings.push({
+                row: i + batch.indexOf(row) + 1,
+                message: `Unknown engineer: ${mappedData.engineer_name}`,
+                data: mappedData
+              });
+            }
+          }
+          
+          // Update order with new data
+          if (!dry_run) {
+            const updateData: any = {
+              partner_status: mappedStatus,
+              partner_metadata: {
+                updated_at: new Date().toISOString(),
+                import_run_id: run_id,
+                source_row: i + batch.indexOf(row) + 1,
+                sub_partner: mappedData.sub_partner || null,
+                partner_url: mappedData.deep_link || null
+              },
+            };
+            
+            // Update engineer assignment if mapped
+            if (mapped_engineer_id && mapped_engineer_id !== existingOrder.engineer_id) {
+              updateData.engineer_id = mapped_engineer_id;
+            }
+            
+            // Handle date/slot mapping for confirmed jobs
+            if (mappedStatus === 'confirmed' && mappedData.install_date) {
+              const installDate = new Date(mappedData.install_date);
+              if (!isNaN(installDate.getTime())) {
+                updateData.scheduled_install_date = installDate.toISOString();
+                updateData.scheduling_suppressed = false; // Allow scheduling
+              }
+            }
+            
+            const { error: updateError } = await supabase
+              .from('orders')
+              .update(updateData)
+              .eq('id', existingOrder.id);
+              
+            if (updateError) {
+              console.error('Order update error:', updateError);
+              results.skipped_count++;
+              results.errors.push({
+                row: i + batch.indexOf(row) + 1,
+                error: `Order update failed: ${updateError.message}`,
+                data: mappedData
+              });
+              continue;
+            }
+            
+            console.log(`Updated order: ${existingOrder.id}`);
+          } else {
+            console.log('DRY RUN: Would update existing order');
+          }
+          
+          results.updated_count++;
+        } else {
+          // Create new order if create_missing_orders is true
+          if (!create_missing_orders) {
+            results.skipped_count++;
+            results.warnings.push({
+              row: i + batch.indexOf(row) + 1,
+              message: 'Order not found and create_missing_orders is false',
+              data: mappedData
+            });
+            continue;
+          }
+          
+          // Create quote first
+          const quoteData = {
+            client_id,
+            quote_number: `PARTNER-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            total_amount: parseFloat(mappedData.total_amount) || 0,
+            status: 'accepted',
+            is_shareable: true,
+            products_data: [],
+          };
+          
+          if (!dry_run) {
+            const { data: newQuote, error: quoteError } = await supabase
+              .from('quotes')
+              .insert(quoteData)
+              .select('id')
+              .single();
+              
+            if (quoteError) {
+              console.error('Quote creation error:', quoteError);
+              results.skipped_count++;
+              results.errors.push({
+                row: i + batch.indexOf(row) + 1,
+                error: `Quote creation failed: ${quoteError.message}`,
+                data: mappedData
+              });
+              continue;
+            }
+            
+            quote_id = newQuote.id;
+            console.log(`Created quote: ${quote_id}`);
+          } else {
+            quote_id = 'dry-run-quote-id';
+            console.log('DRY RUN: Would create quote');
+          }
+          
+          // Map engineer if provided
+          let mapped_engineer_id = null;
+          if (mappedData.engineer_name) {
+            const engineerKey = mappedData.engineer_name.toLowerCase().trim();
+            if (engineerMap.has(engineerKey)) {
+              mapped_engineer_id = engineerMap.get(engineerKey);
+              console.log(`Mapped engineer: ${mappedData.engineer_name} -> ${mapped_engineer_id}`);
+            } else {
+              results.warnings.push({
+                row: i + batch.indexOf(row) + 1,
+                message: `Unknown engineer: ${mappedData.engineer_name}`,
+                data: mappedData
+              });
+            }
+          }
+          
+          // Create order
+          const orderData: any = {
+            client_id,
+            quote_id,
+            total_amount: parseFloat(mappedData.total_amount) || 0,
+            amount_paid: 0,
+            deposit_amount: 0,
+            status: 'awaiting_payment',
+            is_partner_job: true,
+            partner_id: partner.id,
+            partner_external_id: mappedData.job_id,
+            partner_status: mappedStatus,
+            partner_metadata: {
+              imported_at: new Date().toISOString(),
+              import_run_id: run_id,
+              source_row: i + batch.indexOf(row) + 1,
+              sub_partner: mappedData.sub_partner || null,
+              partner_url: mappedData.deep_link || null
+            },
+            postcode: mappedData.postcode || null,
+            engineer_id: mapped_engineer_id,
+          };
+          
+          // Handle date/slot for confirmed jobs
+          if (mappedStatus === 'confirmed' && mappedData.install_date) {
+            const installDate = new Date(mappedData.install_date);
+            if (!isNaN(installDate.getTime())) {
+              orderData.scheduled_install_date = installDate.toISOString();
+              orderData.scheduling_suppressed = false;
+            }
+          } else {
+            orderData.scheduling_suppressed = true; // Suppress until confirmed
+          }
+          
+          if (!dry_run) {
+            const { data: newOrder, error: orderError } = await supabase
+              .from('orders')
+              .insert(orderData)
+              .select('id')
+              .single();
+              
+            if (orderError) {
+              console.error('Order creation error:', orderError);
+              results.skipped_count++;
+              results.errors.push({
+                row: i + batch.indexOf(row) + 1,
+                error: `Order creation failed: ${orderError.message}`,
+                data: mappedData
+              });
+              continue;
+            }
+            
+            console.log(`Created order: ${newOrder.id}`);
+            order_id = newOrder.id;
+          } else {
+            console.log('DRY RUN: Would create order');
+            order_id = 'dry-run-order-id';
+          }
+          
+          results.inserted_count++;
+        }
+        
+        // Handle calendar blocking for confirmed installs
+        if (mappedStatus === 'confirmed' && mappedData.install_date && mappedData.engineer_name) {
+          const installDate = new Date(mappedData.install_date);
+          const engineerKey = mappedData.engineer_name.toLowerCase().trim();
+          
+          if (!isNaN(installDate.getTime()) && engineerMap.has(engineerKey)) {
+            const engineer_id = engineerMap.get(engineerKey);
+            const timeSlot = mappedData.time_slot || 'full_day';
+            
+            if (!dry_run) {
+              // Upsert calendar block
+              const { error: blockError } = await supabase
+                .from('partner_calendar_blocks')
+                .upsert({
+                  partner_id: partner.id,
+                  engineer_id: engineer_id,
+                  blocked_date: installDate.toISOString().split('T')[0],
+                  time_slot: timeSlot,
+                  block_status: 'confirmed',
+                  partner_job_id: mappedData.job_id,
+                  order_id: order_id,
+                  notes: `Imported from partner system - ${mappedData.sub_partner || 'main'}`
+                }, {
+                  onConflict: 'partner_id,engineer_id,blocked_date,time_slot'
+                });
+                
+              if (blockError) {
+                console.error('Calendar block error:', blockError);
+                results.warnings.push({
+                  row: i + batch.indexOf(row) + 1,
+                  message: `Failed to create calendar block: ${blockError.message}`,
+                  data: mappedData
+                });
+              } else {
+                console.log(`Created calendar block for ${installDate.toISOString().split('T')[0]}`);
+              }
+            } else {
+              console.log('DRY RUN: Would create calendar block');
+            }
+          }
+        }
+        
+      } catch (error) {
+        console.error(`Error processing row ${i + batch.indexOf(row) + 1}:`, error);
+        results.skipped_count++;
+        results.errors.push({
+          row: i + batch.indexOf(row) + 1,
+          error: error.message,
+          data: row
+        });
+      }
+    }
+  }
           const rawJobType = getValue('type').trim().toUpperCase();
           let jobType = 'installation'; // default
           

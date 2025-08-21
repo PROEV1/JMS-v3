@@ -2,6 +2,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EnhancedJobStatusBadge, OrderStatusEnhanced } from "./EnhancedJobStatusBadge";
+import { PartnerJobBadge } from './PartnerJobBadge';
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { 
@@ -28,6 +29,13 @@ interface Order {
   scheduled_install_date: string | null;
   created_at: string;
   job_type?: 'installation' | 'assessment' | 'service_call';
+  is_partner_job?: boolean;
+  sub_partner?: string;
+  partner_status?: string;
+  partner_external_url?: string;
+  partners?: {
+    name: string;
+  };
   client: {
     id: string;
     full_name: string;
@@ -170,13 +178,20 @@ export function EnhancedAdminOrderOverview({ order }: EnhancedAdminOrderOverview
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <span className="text-muted-foreground">Order Number:</span>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <p className="font-mono">{order.order_number}</p>
                   {order.job_type && (
                     <Badge variant="secondary" className="text-xs">
                       {order.job_type.charAt(0).toUpperCase() + order.job_type.slice(1).replace('_', ' ')}
                     </Badge>
                   )}
+                  <PartnerJobBadge
+                    isPartnerJob={order.is_partner_job}
+                    partnerName={order.partners?.name}
+                    subPartner={order.sub_partner}
+                    partnerStatus={order.partner_status}
+                    partnerUrl={order.partner_external_url}
+                  />
                 </div>
               </div>
               <div>

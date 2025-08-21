@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { MoreHorizontal, UserPlus, UserMinus, Calendar, ExternalLink, CheckCircle } from 'lucide-react';
+import { PartnerJobBadge } from '@/components/admin/PartnerJobBadge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Database } from '@/integrations/supabase/types';
 import { getOrderEstimatedMinutes, isDefaultEstimatedHours } from '@/utils/schedulingUtils';
@@ -11,6 +12,7 @@ type Order = Database['public']['Tables']['orders']['Row'] & {
   clients?: { name: string; email: string; phone: string; };
   quotes?: { products?: any[]; };
   engineer?: { name: string; email: string; region?: string; };
+  partners?: { name: string; };
 };
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -93,18 +95,20 @@ export function EnhancedJobCard({ order, onAssignEngineer, onUnassign, onSchedul
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
           <div className="space-y-1">
-            <CardTitle className="text-base flex items-center gap-2">
+            <CardTitle className="text-base flex items-center gap-2 flex-wrap">
               {order.order_number}
               {order.job_type && (
                 <Badge variant="secondary" className="text-xs">
                   {order.job_type.charAt(0).toUpperCase() + order.job_type.slice(1).replace('_', ' ')}
                 </Badge>
               )}
-              {order.is_partner_job && (
-                <Badge variant="outline" className="text-xs">
-                  Partner
-                </Badge>
-              )}
+              <PartnerJobBadge
+                isPartnerJob={order.is_partner_job}
+                partnerName={order.partners?.name}
+                subPartner={order.sub_partner}
+                partnerStatus={order.partner_status}
+                partnerUrl={order.partner_external_url}
+              />
               {order.scheduling_suppressed && (
                 <Badge variant="destructive" className="text-xs">
                   Suppressed

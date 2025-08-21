@@ -1386,6 +1386,118 @@ export type Database = {
           },
         ]
       }
+      partner_calendar_blocks: {
+        Row: {
+          block_status: Database["public"]["Enums"]["partner_calendar_status"]
+          blocked_date: string
+          created_at: string
+          engineer_id: string
+          id: string
+          notes: string | null
+          order_id: string | null
+          partner_id: string
+          partner_job_id: string | null
+          time_slot: string | null
+          updated_at: string
+        }
+        Insert: {
+          block_status?: Database["public"]["Enums"]["partner_calendar_status"]
+          blocked_date: string
+          created_at?: string
+          engineer_id: string
+          id?: string
+          notes?: string | null
+          order_id?: string | null
+          partner_id: string
+          partner_job_id?: string | null
+          time_slot?: string | null
+          updated_at?: string
+        }
+        Update: {
+          block_status?: Database["public"]["Enums"]["partner_calendar_status"]
+          blocked_date?: string
+          created_at?: string
+          engineer_id?: string
+          id?: string
+          notes?: string | null
+          order_id?: string | null
+          partner_id?: string
+          partner_job_id?: string | null
+          time_slot?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_calendar_blocks_engineer_id_fkey"
+            columns: ["engineer_id"]
+            isOneToOne: false
+            referencedRelation: "engineers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partner_calendar_blocks_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partner_calendar_blocks_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      partner_engineer_mappings: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          engineer_id: string
+          id: string
+          is_active: boolean
+          partner_engineer_name: string
+          partner_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          engineer_id: string
+          id?: string
+          is_active?: boolean
+          partner_engineer_name: string
+          partner_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          engineer_id?: string
+          id?: string
+          is_active?: boolean
+          partner_engineer_name?: string
+          partner_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_engineer_mappings_engineer_id_fkey"
+            columns: ["engineer_id"]
+            isOneToOne: false
+            referencedRelation: "engineers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partner_engineer_mappings_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       partner_import_logs: {
         Row: {
           created_at: string
@@ -2364,6 +2476,11 @@ export type Database = {
         | "date_rejected"
         | "offer_expired"
         | "on_hold_parts_docs"
+      partner_calendar_status:
+        | "available"
+        | "soft_hold"
+        | "confirmed"
+        | "blocked"
       user_role:
         | "admin"
         | "client"
@@ -2519,6 +2636,12 @@ export const Constants = {
         "date_rejected",
         "offer_expired",
         "on_hold_parts_docs",
+      ],
+      partner_calendar_status: [
+        "available",
+        "soft_hold",
+        "confirmed",
+        "blocked",
       ],
       user_role: [
         "admin",
