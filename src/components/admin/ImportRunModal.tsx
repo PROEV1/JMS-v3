@@ -20,6 +20,9 @@ interface ImportResult {
     skipped_count: number;
     errors: Array<{ row: number; error: string; data?: any }>;
     warnings: Array<{ row: number; warning: string; data?: any }>;
+    dry_run?: boolean;
+    preview_inserted_count?: number;
+    preview_updated_count?: number;
   };
   preview?: {
     updates: Array<{ 
@@ -263,25 +266,25 @@ export default function ImportRunModal({
                 {/* Normal Import Results */}
                 {!importResult.unmapped_engineers && (
                   <>
-                    {/* Summary Statistics */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      <div className="text-center p-3 bg-blue-50 rounded-lg">
-                        <div className="text-2xl font-bold text-blue-600">{importResult.summary.updated_count}</div>
-                        <div className="text-sm text-blue-600">Updates</div>
-                      </div>
-                      <div className="text-center p-3 bg-yellow-50 rounded-lg">
-                        <div className="text-2xl font-bold text-yellow-600">{importResult.summary.skipped_count}</div>
-                        <div className="text-sm text-yellow-600">Skipped</div>
-                      </div>
-                      <div className="text-center p-3 bg-green-50 rounded-lg">
-                        <div className="text-2xl font-bold text-green-600">{importResult.summary.inserted_count}</div>
-                        <div className="text-sm text-green-600">Inserted</div>
-                      </div>
-                      <div className="text-center p-3 bg-red-50 rounded-lg">
-                        <div className="text-2xl font-bold text-red-600">{importResult.summary.errors.length}</div>
-                        <div className="text-sm text-red-600">Errors</div>
-                      </div>
-                    </div>
+                     {/* Summary Statistics */}
+                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                       <div className="text-center p-3 bg-blue-50 rounded-lg">
+                         <div className="text-2xl font-bold text-blue-600">{importResult.summary.updated_count}</div>
+                         <div className="text-sm text-blue-600">{importResult.summary.dry_run ? 'Would Update' : 'Updates'}</div>
+                       </div>
+                       <div className="text-center p-3 bg-yellow-50 rounded-lg">
+                         <div className="text-2xl font-bold text-yellow-600">{importResult.summary.skipped_count}</div>
+                         <div className="text-sm text-yellow-600">Skipped</div>
+                       </div>
+                       <div className="text-center p-3 bg-green-50 rounded-lg">
+                         <div className="text-2xl font-bold text-green-600">{importResult.summary.inserted_count}</div>
+                         <div className="text-sm text-green-600">{importResult.summary.dry_run ? 'Would Insert' : 'Inserted'}</div>
+                       </div>
+                       <div className="text-center p-3 bg-red-50 rounded-lg">
+                         <div className="text-2xl font-bold text-red-600">{importResult.summary.errors.length}</div>
+                         <div className="text-sm text-red-600">Errors</div>
+                       </div>
+                     </div>
 
                 {/* Detailed Preview */}
                 {importResult.preview && (

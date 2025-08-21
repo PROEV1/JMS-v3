@@ -712,11 +712,10 @@ serve(async (req) => {
           // Create quote first
           const quoteData = {
             client_id,
-            quote_number: `PARTNER-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            total_amount: parseFloat(mappedData.total_amount) || 0,
+            total_cost: parseFloat(mappedData.total_amount) || 0,
             status: 'accepted',
             is_shareable: true,
-            products_data: [],
+            product_details: 'Partner imported installation'
           };
           
           if (!dry_run) {
@@ -905,15 +904,20 @@ serve(async (req) => {
       success: true,
       summary: {
         processed: results.processed,
-        inserted_count: dry_run ? 0 : results.inserted_count,
-        updated_count: dry_run ? 0 : results.updated_count,
+        inserted_count: results.inserted_count,
+        updated_count: results.updated_count,
         skipped_count: results.skipped_count,
         errors: results.errors,
         warnings: results.warnings,
         run_id: run_id,
         partner_name: partner.name,
         total_time_ms: Math.round(totalTime),
-        dry_run: dry_run
+        dry_run: dry_run,
+        // Add preview labels for dry run
+        ...(dry_run && {
+          preview_inserted_count: results.inserted_count,
+          preview_updated_count: results.updated_count
+        })
       }
     };
 
