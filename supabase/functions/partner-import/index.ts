@@ -401,8 +401,13 @@ serve(async (req: Request): Promise<Response> => {
               mappedStatus = statusOverrides[mappedStatus];
             }
 
-            // Use status actions as primary mapping (new approach)
-            const originalPartnerStatus = mappedData.partner_status || mappedData.status || 'unknown';
+            // Get partner status from mapped data (prioritize partner_status column)
+            const partnerStatusFromColumn = mappedData.partner_status || mappedData.status;
+            const originalPartnerStatus = partnerStatusFromColumn ? partnerStatusFromColumn.toString().trim().toUpperCase() : 'UNKNOWN';
+            
+            console.log(`Processing row ${rowIndex + 1}: Partner Status = '${originalPartnerStatus}'`);
+            
+            // Use status actions as primary mapping
             const actionConfig = statusActions[originalPartnerStatus] || {};
             
             let jmsStatus = mappedStatus; // fallback to old mapping
@@ -412,6 +417,26 @@ serve(async (req: Request): Promise<Response> => {
             // Prefer status_actions over old status_mappings
             if (actionConfig.jms_status) {
               jmsStatus = actionConfig.jms_status;
+              console.log(`Using status action mapping: ${originalPartnerStatus} -> ${jmsStatus}`);
+            } else {
+              // Default mappings for common partner statuses
+              const defaultPartnerMappings: Record<string, string> = {
+                'AWAITING_INSTALL_DATE': 'needs_scheduling',
+                'AWAITING_QUOTATION': 'awaiting_install_booking',
+                'CANCELLATION_REQUESTED': 'cancelled',
+                'CANCELLED': 'cancelled',
+                'COMPLETE': 'completed',
+                'INSTALL_DATE_CONFIRMED': 'scheduled',
+                'INSTALLED': 'install_completed_pending_qa',
+                'ON_HOLD': 'on_hold_parts_docs',
+                'SWITCH_JOB_SUB_TYPE_REQUESTED': 'awaiting_install_booking',
+                'UNKNOWN': 'awaiting_install_booking'
+              };
+              
+              if (defaultPartnerMappings[originalPartnerStatus]) {
+                jmsStatus = defaultPartnerMappings[originalPartnerStatus];
+                console.log(`Using default mapping: ${originalPartnerStatus} -> ${jmsStatus}`);
+              }
             }
             
             if (actionConfig.actions) {
@@ -421,6 +446,13 @@ serve(async (req: Request): Promise<Response> => {
               } else if (actionConfig.actions.suppress_scheduling === false) {
                 suppressScheduling = false;
                 suppressionReason = null;
+              }
+            } else {
+              // Default suppression rules for certain statuses
+              const suppressByDefault = ['AWAITING_QUOTATION', 'CANCELLED', 'CANCELLATION_REQUESTED', 'COMPLETE', 'ON_HOLD'];
+              suppressScheduling = suppressByDefault.includes(originalPartnerStatus);
+              if (suppressScheduling) {
+                suppressionReason = `partner_status_${originalPartnerStatus.toLowerCase()}`;
               }
             }
 
