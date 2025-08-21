@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -36,6 +35,72 @@ interface ImportProfile {
   updated_at: string;
 }
 
+// Default status mappings for common partner statuses
+const getDefaultStatusMappings = () => ({
+  'unknown': 'awaiting_install_booking',
+  'pending': 'awaiting_install_booking',
+  'confirmed': 'scheduled',
+  'scheduled': 'scheduled',
+  'complete': 'completed',
+  'completed': 'completed',
+  'cancelled': 'cancelled',
+  'canceled': 'cancelled',
+  'in_progress': 'in_progress',
+  'on_hold': 'on_hold_parts_docs',
+  'awaiting_quotation': 'awaiting_install_booking'
+});
+
+// Default status actions for common scenarios
+const getDefaultStatusActions = () => ({
+  'unknown': {
+    jms_status: 'awaiting_install_booking',
+    bucket: 'needs_scheduling',
+    actions: {
+      suppress_scheduling: false,
+      keep_calendar_block: false,
+      surface_to_qa: false
+    }
+  },
+  'pending': {
+    jms_status: 'awaiting_install_booking', 
+    bucket: 'needs_scheduling',
+    actions: {
+      suppress_scheduling: false,
+      keep_calendar_block: false,
+      surface_to_qa: false
+    }
+  },
+  'confirmed': {
+    jms_status: 'scheduled',
+    bucket: 'scheduled',
+    actions: {
+      suppress_scheduling: false,
+      keep_calendar_block: true,
+      surface_to_qa: false
+    }
+  },
+  'cancelled': {
+    jms_status: 'cancelled',
+    bucket: 'completed',
+    actions: {
+      suppress_scheduling: true,
+      keep_calendar_block: false,
+      surface_to_qa: true,
+      suppression_reason: 'partner_cancelled'
+    }
+  },
+  'completed': {
+    jms_status: 'completed',
+    bucket: 'completed',
+    actions: {
+      suppress_scheduling: true,
+      keep_calendar_block: false,
+      surface_to_qa: false,
+      suppression_reason: 'partner_completed'
+    }
+  }
+});
+
 export default function AdminPartnerProfiles() {
   const { id: partnerId } = useParams<{ id: string }>();
   const { toast } = useToast();
@@ -54,17 +119,18 @@ export default function AdminPartnerProfiles() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+
   const [formData, setFormData] = useState({
     name: '',
     source_type: 'csv' as 'csv' | 'gsheet',
     gsheet_id: '',
     gsheet_sheet_name: '',
     column_mappings: {} as Record<string, string>,
-    status_mappings: {} as Record<string, string>,
+    status_mappings: getDefaultStatusMappings(),
     engineer_mapping_rules: [] as Array<any>,
     status_override_rules: {} as Record<string, boolean>,
-    status_actions: {} as Record<string, any>,
-    engineer_mappings: {} as Record<string, string>, // Add this for UI convenience
+    status_actions: getDefaultStatusActions(),
+    engineer_mappings: {} as Record<string, string>,
     is_active: true
   });
 
@@ -181,10 +247,10 @@ export default function AdminPartnerProfiles() {
       gsheet_id: '',
       gsheet_sheet_name: '',
       column_mappings: {},
-      status_mappings: {},
+      status_mappings: getDefaultStatusMappings(),
       engineer_mapping_rules: [],
       status_override_rules: {},
-      status_actions: {},
+      status_actions: getDefaultStatusActions(),
       engineer_mappings: {},
       is_active: true
     });
@@ -213,10 +279,10 @@ export default function AdminPartnerProfiles() {
       gsheet_id: profile.gsheet_id || '',
       gsheet_sheet_name: profile.gsheet_sheet_name || '',
       column_mappings: profile.column_mappings,
-      status_mappings: profile.status_mappings,
+      status_mappings: { ...getDefaultStatusMappings(), ...profile.status_mappings },
       engineer_mapping_rules: profile.engineer_mapping_rules,
       status_override_rules: profile.status_override_rules,
-      status_actions: normalizedStatusActions,
+      status_actions: { ...getDefaultStatusActions(), ...normalizedStatusActions },
       engineer_mappings: engineerMappings,
       is_active: profile.is_active
     });
@@ -364,18 +430,18 @@ export default function AdminPartnerProfiles() {
                 gsheetId={formData.gsheet_id}
                 gsheetSheetName={formData.gsheet_sheet_name}
                 columnMappings={formData.column_mappings}
-                statusMappings={formData.status_mappings}
+                statusMappings={formData.status_mappings as Record<string, string>}
                 statusOverrideRules={formData.status_override_rules}
                 engineerMappings={formData.engineer_mappings}
                 onColumnMappingsChange={(mappings) => setFormData({ ...formData, column_mappings: mappings })}
-                onStatusMappingsChange={(mappings) => setFormData({ ...formData, status_mappings: mappings })}
+                onStatusMappingsChange={(mappings) => setFormData({ ...formData, status_mappings: { ...getDefaultStatusMappings(), ...mappings } })}
                 onStatusOverrideRulesChange={(rules) => setFormData({ ...formData, status_override_rules: rules })}
                 onEngineerMappingsChange={(mappings) => setFormData({ ...formData, engineer_mappings: mappings })}
               />
 
               <PartnerStatusMappingEditor
-                statusActions={formData.status_actions}
-                onUpdate={(statusActions) => setFormData({ ...formData, status_actions: statusActions })}
+                statusActions={formData.status_actions as Record<string, any>}
+                onUpdate={(statusActions) => setFormData({ ...formData, status_actions: { ...getDefaultStatusActions(), ...statusActions } })}
               />
 
               <div className="flex items-center space-x-2">
@@ -457,10 +523,10 @@ export default function AdminPartnerProfiles() {
             </CardHeader>
             <CardContent>
               <div className="text-sm text-muted-foreground space-y-1">
-                <p>Status mappings: {Object.keys(profile.status_mappings).length} configured</p>
+                <p>Status mappings: {Object.keys(profile.status_mappings || {}).length} configured</p>
                 <p>Bucket mappings: {Object.keys(profile.status_actions || {}).length} configured</p>
-                <p>Column mappings: {Object.keys(profile.column_mappings).length} configured</p>
-                <p>Override rules: {Object.keys(profile.status_override_rules).length} configured</p>
+                <p>Column mappings: {Object.keys(profile.column_mappings || {}).length} configured</p>
+                <p>Override rules: {Object.keys(profile.status_override_rules || {}).length} configured</p>
               </div>
             </CardContent>
           </Card>
