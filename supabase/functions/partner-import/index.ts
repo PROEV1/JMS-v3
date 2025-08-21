@@ -517,6 +517,22 @@ serve(async (req: Request): Promise<Response> => {
               }
             }
 
+            // Validate required fields for order creation
+            if (!mappedData.client_id || !mappedData.quote_id) {
+              if (createMissingOrders) {
+                results.warnings.push({
+                  row: rowIndex + 1,
+                  message: `Missing required client_id or quote_id for new order creation. Skipping row.`,
+                  data: mappedData
+                });
+                results.skipped++;
+                return { success: false, error: 'Missing required client_id or quote_id' };
+              } else {
+                // For updates only, we can proceed without client_id/quote_id if we're updating existing orders
+                console.log(`Row ${rowIndex + 1}: Missing client_id/quote_id but proceeding for update-only mode`);
+              }
+            }
+
             return {
               success: true,
               data: {
@@ -529,6 +545,9 @@ serve(async (req: Request): Promise<Response> => {
                 partner_id: importProfile.partner_id,
                 partner_confirmed_externally: false,
                 external_confirmation_source: 'partner_import',
+                // Only include client_id and quote_id if they exist
+                ...(mappedData.client_id && { client_id: mappedData.client_id }),
+                ...(mappedData.quote_id && { quote_id: mappedData.quote_id }),
               }
             };
 
@@ -633,28 +652,92 @@ serve(async (req: Request): Promise<Response> => {
       }
     } else {
       // Live import
+      console.log(`Starting live import with ${results.data.length} records`);
+      
       if (results.data.length > 0) {
-        const { error: upsertError, count } = await supabase
-          .from('orders')
-          .upsert(results.data.map(item => ({
-            ...item,
-            updated_at: new Date().toISOString()
-          })), {
-            onConflict: 'partner_external_id,partner_id',
-            count: 'estimated'
-          });
-
-        if (upsertError) {
-          console.error('Database upsert error:', {
-            message: upsertError.message,
-            details: upsertError.details,
-            hint: upsertError.hint,
-            code: upsertError.code
-          });
-          throw new Error(`Database upsert failed: ${upsertError.message}${upsertError.hint ? ' (' + upsertError.hint + ')' : ''}`);
+        // Log first record for debugging
+        console.log('First record to upsert:', JSON.stringify(results.data[0], null, 2));
+        
+        // Separate records with and without required fields
+        const recordsForUpdate = results.data.filter(item => item.partner_external_id);
+        const recordsForInsert = results.data.filter(item => item.client_id && item.quote_id);
+        
+        console.log(`Records for update: ${recordsForUpdate.length}, Records for insert: ${recordsForInsert.length}`);
+        
+        let totalUpdated = 0;
+        let totalInserted = 0;
+        
+        // Handle updates first - update existing orders by partner_external_id
+        if (recordsForUpdate.length > 0) {
+          console.log('Updating existing orders...');
+          
+          // Get existing orders to update
+          const externalIds = recordsForUpdate.map(r => r.partner_external_id).filter(Boolean);
+          const { data: existingOrders } = await supabase
+            .from('orders')
+            .select('id, partner_external_id')
+            .eq('partner_id', importProfile.partner_id)
+            .in('partner_external_id', externalIds);
+          
+          if (existingOrders && existingOrders.length > 0) {
+            const existingMap = new Map(existingOrders.map(o => [o.partner_external_id, o.id]));
+            
+            // Update each existing order individually
+            for (const record of recordsForUpdate) {
+              const orderId = existingMap.get(record.partner_external_id);
+              if (orderId) {
+                const { error: updateError } = await supabase
+                  .from('orders')
+                  .update({
+                    ...record,
+                    updated_at: new Date().toISOString()
+                  })
+                  .eq('id', orderId);
+                
+                if (updateError) {
+                  console.error(`Error updating order ${orderId}:`, updateError);
+                  results.errors.push({
+                    row: 0,
+                    message: `Failed to update order ${record.partner_external_id}: ${updateError.message}`,
+                    data: record
+                  });
+                } else {
+                  totalUpdated++;
+                }
+              }
+            }
+          }
         }
         
-        updateCount = count || results.data.length;
+        // Handle inserts for records with complete data
+        if (recordsForInsert.length > 0 && createMissingOrders) {
+          console.log('Inserting new orders...');
+          
+          const { error: insertError, count: insertCount } = await supabase
+            .from('orders')
+            .insert(recordsForInsert.map(item => ({
+              ...item,
+              updated_at: new Date().toISOString(),
+              created_at: new Date().toISOString()
+            })))
+            .select('id', { count: 'estimated' });
+          
+          if (insertError) {
+            console.error('Database insert error:', {
+              message: insertError.message,
+              details: insertError.details,
+              hint: insertError.hint,
+              code: insertError.code
+            });
+            throw new Error(`Database insert failed: ${insertError.message}${insertError.hint ? ' (' + insertError.hint + ')' : ''}`);
+          }
+          
+          totalInserted = insertCount || recordsForInsert.length;
+        }
+        
+        console.log(`Import completed - Updated: ${totalUpdated}, Inserted: ${totalInserted}`);
+        updateCount = totalUpdated;
+        insertCount = totalInserted;
       }
     }
 
