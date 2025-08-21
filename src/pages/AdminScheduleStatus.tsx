@@ -6,21 +6,31 @@ import { CompletionPendingListPage } from '@/components/scheduling/CompletionPen
 import { CompletedListPage } from '@/components/scheduling/CompletedListPage';
 import { CancelledListPage } from '@/components/scheduling/CancelledListPage';
 import { NotInSchedulingListPage } from '@/components/scheduling/NotInSchedulingListPage';
+import { ScheduleStatusNavigation } from '@/components/scheduling/ScheduleStatusNavigation';
 
 export default function AdminScheduleStatus() {
   const { status } = useParams<{ status: string }>();
 
-  // Handle new bucket routes
-  switch (status) {
-    case 'completion-pending':
-      return <CompletionPendingListPage />;
-    case 'completed':
-      return <CompletedListPage />;
-    case 'cancelled':
-      return <CancelledListPage />;
-    case 'not-in-scheduling':
-      return <NotInSchedulingListPage />;
-    default:
-      return <ScheduleStatusListPage orders={[]} engineers={[]} title="Schedule Status" />;
-  }
+  return (
+    <div className="space-y-6">
+      {/* Always show the bucket navigation tiles */}
+      <ScheduleStatusNavigation currentStatus={status} />
+      
+      {/* Render the appropriate status page */}
+      {(() => {
+        switch (status) {
+          case 'completion-pending':
+            return <CompletionPendingListPage />;
+          case 'completed':
+            return <CompletedListPage />;
+          case 'cancelled':
+            return <CancelledListPage />;
+          case 'not-in-scheduling':
+            return <NotInSchedulingListPage />;
+          default:
+            return <ScheduleStatusListPage orders={[]} engineers={[]} title="Schedule Status" />;
+        }
+      })()}
+    </div>
+  );
 }
