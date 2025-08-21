@@ -26,8 +26,10 @@ export default function Layout({ children }: LayoutProps) {
   }
 
   if (!user) {
-    // Save current path for redirect after auth
-    localStorage.setItem('authRedirectPath', location.pathname);
+    // Save current path for redirect after auth (including search params)
+    const fullPath = location.pathname + location.search;
+    console.log('Layout: Saving current path for redirect after auth:', fullPath);
+    localStorage.setItem('authRedirectPath', fullPath);
     return <Navigate to="/auth" replace />;
   }
 

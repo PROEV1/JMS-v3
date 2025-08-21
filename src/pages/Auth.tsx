@@ -27,13 +27,14 @@ export default function Auth() {
       
       // Check for saved redirect path
       const savedPath = localStorage.getItem('authRedirectPath');
+      console.log('Auth: Found saved path:', savedPath);
       const redirectTo = savedPath || '/';
       
       // Clear saved path
       localStorage.removeItem('authRedirectPath');
       
       setTimeout(() => {
-        console.log('Auth: Executing redirect to', redirectTo);
+        console.log('Auth: useEffect executing redirect to', redirectTo);
         navigate(redirectTo, { replace: true });
       }, 500);
     }
@@ -145,23 +146,13 @@ export default function Auth() {
           variant: "destructive",
         });
       } else if (data.user) {
-        // Force navigation after successful login
         toast({
           title: "Success!",
           description: "Signed in successfully",
         });
         
-        // Check for saved redirect path
-        const savedPath = localStorage.getItem('authRedirectPath');
-        const redirectTo = savedPath || '/';
-        
-        // Clear saved path
-        localStorage.removeItem('authRedirectPath');
-        
-        console.log('Auth: Login successful, redirecting to:', redirectTo);
-        setTimeout(() => {
-          navigate(redirectTo, { replace: true });
-        }, 300);
+        // Don't redirect here - let the useEffect handle it to avoid double redirects
+        console.log('Auth: Login successful, useEffect will handle redirect');
       }
     } catch (error) {
       toast({
