@@ -15,3 +15,6 @@ verify_jwt = false
 
 [functions.debug-secrets]
 verify_jwt = false
+
+[functions.partner-import]
+verify_jwt = true

@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { corsHeaders } from '../_shared/cors.ts'
-import { parse } from "https://deno.land/std@0.192.0/csv/parse.ts";
+import { getCorsHeaders } from '../_shared/cors.ts'
+import { parse } from "https://deno.land/std@0.192.0/csv/parse.ts"
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
 interface ImportProfile {
   id: string;
@@ -111,9 +112,13 @@ async function fetchGoogleSheetData(sheetId: string, sheetName: string) {
   }
 
   const credentials = JSON.parse(serviceAccountKey);
+  console.log('Google Sheets: Using service account email:', credentials.client_email);
   
   // Get access token
+  console.log('Google Sheets: Creating JWT for authentication...');
   const jwt = await createJWT(credentials);
+  
+  console.log('Google Sheets: Requesting access token...');
   const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -123,28 +128,66 @@ async function fetchGoogleSheetData(sheetId: string, sheetName: string) {
     }),
   });
   
-  const { access_token } = await tokenResponse.json();
+  if (!tokenResponse.ok) {
+    const errorText = await tokenResponse.text();
+    console.error('Google Sheets: Token request failed:', tokenResponse.status, errorText);
+    throw new Error(`Failed to get Google access token: ${tokenResponse.status} - ${errorText}`);
+  }
+  
+  const tokenData = await tokenResponse.json();
+  if (!tokenData.access_token) {
+    console.error('Google Sheets: No access token in response:', tokenData);
+    throw new Error('No access token received from Google');
+  }
+  
+  console.log('Google Sheets: Access token obtained, fetching sheet data...');
   
   // Fetch sheet data
   const sheetResponse = await fetch(
     `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${sheetName}?valueRenderOption=FORMATTED_VALUE`,
-    { headers: { Authorization: `Bearer ${access_token}` } }
+    { headers: { Authorization: `Bearer ${tokenData.access_token}` } }
   );
   
+  if (!sheetResponse.ok) {
+    const errorText = await sheetResponse.text();
+    console.error('Google Sheets: Sheet fetch failed:', sheetResponse.status, errorText);
+    
+    if (sheetResponse.status === 403) {
+      throw new Error(`Access denied to Google Sheet. Please ensure the sheet is shared with the service account email: ${credentials.client_email}`);
+    } else if (sheetResponse.status === 404) {
+      throw new Error(`Google Sheet not found. Please check the Sheet ID: ${sheetId}`);
+    } else {
+      throw new Error(`Failed to fetch Google Sheet: ${sheetResponse.status} - ${errorText}`);
+    }
+  }
+  
   const sheetData = await sheetResponse.json();
+  console.log('Google Sheets: Raw response:', { 
+    hasValues: !!sheetData.values, 
+    rowCount: sheetData.values?.length || 0 
+  });
+  
   const rows = sheetData.values || [];
   
-  if (rows.length === 0) return [];
+  if (rows.length === 0) {
+    console.warn('Google Sheets: No data found in sheet');
+    return [];
+  }
+  
+  console.log('Google Sheets: Processing', rows.length, 'rows (including header)');
   
   // Convert to objects with header keys
   const headers = rows[0];
-  return rows.slice(1).map((row: any[]) => {
+  const dataRows = rows.slice(1).map((row: any[]) => {
     const obj: Record<string, string> = {};
     headers.forEach((header: string, index: number) => {
       obj[header] = row[index] || '';
     });
     return obj;
   });
+  
+  console.log('Google Sheets: Successfully processed', dataRows.length, 'data rows');
+  return dataRows;
 }
 
 // Helper function to create JWT for Google API
@@ -189,7 +232,9 @@ async function createJWT(credentials: any) {
   return `${message}.${signatureB64}`;
 }
 
-export default async function handler(req: Request): Promise<Response> {
+serve(async (req: Request): Promise<Response> => {
+  const corsHeaders = getCorsHeaders(req.headers.get('origin'));
+  
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -594,10 +639,21 @@ export default async function handler(req: Request): Promise<Response> {
       }
     )
   } catch (error) {
-    console.error(error)
-    return new Response(String(error), {
+    console.error('Partner Import Error:', error)
+    return new Response(JSON.stringify({ 
+      success: false,
+      error: error.message,
+      summary: {
+        processed: 0,
+        inserted_count: 0,
+        updated_count: 0,
+        skipped_count: 0,
+        errors: [{ row: 0, error: error.message }],
+        warnings: []
+      }
+    }), {
       status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'text/plain' },
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
-}
+});

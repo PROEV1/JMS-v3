@@ -78,7 +78,7 @@ export default function ImportRunModal({
     
     // Add timeout to prevent stuck imports
     const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Import timed out after 30 seconds')), 30000)
+      setTimeout(() => reject(new Error('Import timed out after 120 seconds')), 120000)
     );
     
     try {
