@@ -435,6 +435,7 @@ serve(async (req: Request): Promise<Response> => {
             
             if (!validOrderStatuses.includes(jmsStatus)) {
               const statusDefaults: Record<string, string> = {
+                'unknown': 'awaiting_install_booking',
                 'pending': 'awaiting_install_booking',
                 'confirmed': 'scheduled', 
                 'complete': 'completed',
@@ -446,7 +447,7 @@ serve(async (req: Request): Promise<Response> => {
               };
               
               const defaultStatus = statusDefaults[jmsStatus.toLowerCase()] || 'awaiting_install_booking';
-              console.warn(`Invalid status '${jmsStatus}' mapped to default: ${defaultStatus}`);
+              console.log(`Status flow: Invalid '${jmsStatus}' -> Default: ${defaultStatus}`);
               
               results.warnings.push({
                 row: rowIndex + 1,
