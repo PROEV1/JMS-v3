@@ -400,46 +400,35 @@ serve(async (req) => {
 
     console.log(`Pre-loaded ${existingClients.size} clients and ${existingOrders.size} orders`);
 
+    // Load engineer mappings and existing orders for idempotent processing
+    console.log('\n=== Loading Engineer Mappings ===');
+    const { data: engineerMappings } = await supabase
+      .from('partner_engineer_mappings')
+      .select('partner_engineer_name, engineer_id, engineers(id, name)')
+      .eq('partner_id', partner.id)
+      .eq('is_active', true);
+      
+    console.log(`Loaded ${engineerMappings?.length || 0} engineer mappings`);
+    
+    // Clear the engineer map and repopulate with partner mappings
+    engineerMap.clear();
+    engineerMappings?.forEach(mapping => {
+      engineerMap.set(mapping.partner_engineer_name.toLowerCase(), mapping.engineer_id);
+    });
+    
+    // Get status mappings from profile
+    const statusMapping = importProfile.status_mappings || {};
+    const statusOverrides = importProfile.status_override_rules || {};
+    
+    console.log('Status mapping:', statusMapping);
+    console.log('Status overrides:', statusOverrides);
+    
+    // Process data in batches with idempotent upserts
+    console.log(`\n=== PROCESSING ${rows.length} ROWS ===`);
+    
     for (let i = 0; i < rows.length; i += BATCH_SIZE) {
       const batch = rows.slice(i, i + BATCH_SIZE);
-      const batchStartTime = performance.now();
-
-      console.log(`Processing batch ${Math.floor(i / BATCH_SIZE) + 1}, rows ${i + 1}-${Math.min(i + BATCH_SIZE, rows.length)}`);
-
-      // Process batch items
-      const batchClients: any[] = [];
-      const batchOrders: any[] = [];
-      const batchQuotes: any[] = [];
-
-// Load engineer mappings and existing orders for idempotent processing
-  console.log('\n=== Loading Engineer Mappings ===');
-  const { data: engineerMappings } = await supabase
-    .from('partner_engineer_mappings')
-    .select('partner_engineer_name, engineer_id, engineers(id, name)')
-    .eq('partner_id', partner.id)
-    .eq('is_active', true);
-    
-  console.log(`Loaded ${engineerMappings?.length || 0} engineer mappings`);
-  
-  // Create mapping lookup
-  const engineerMap = new Map();
-  engineerMappings?.forEach(mapping => {
-    engineerMap.set(mapping.partner_engineer_name.toLowerCase(), mapping.engineer_id);
-  });
-  
-  // Get status mappings from profile
-  const statusMapping = importProfile.status_mappings || {};
-  const statusOverrides = importProfile.status_override_rules || {};
-  
-  console.log('Status mapping:', statusMapping);
-  console.log('Status overrides:', statusOverrides);
-  
-  // Process data in batches with idempotent upserts
-  console.log(`\n=== PROCESSING ${rows.length} ROWS ===`);
-  
-  for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-    const batch = rows.slice(i, i + BATCH_SIZE);
-    console.log(`Processing batch ${Math.floor(i/BATCH_SIZE) + 1}/${Math.ceil(rows.length/BATCH_SIZE)}: ${batch.length} rows`);
+      console.log(`Processing batch ${Math.floor(i/BATCH_SIZE) + 1}/${Math.ceil(rows.length/BATCH_SIZE)}: ${batch.length} rows`);
     
     for (const row of batch) {
       try {
@@ -885,269 +874,10 @@ serve(async (req) => {
         });
       }
     }
-  }
-          const rawJobType = getValue('type').trim().toUpperCase();
-          let jobType = 'installation'; // default
-          
-          if (rawJobType === 'ASSESSMENT') {
-            jobType = 'assessment';
-          } else if (rawJobType === 'INSTALLATION') {
-            jobType = 'installation';
-          } else if (rawJobType === 'SERVICE_CALL') {
-            jobType = 'service_call';
-          }
-
-          // Prepare client data
-          let clientId = existingClients.get(clientEmail)?.id;
-          if (!clientId) {
-            const newClientId = crypto.randomUUID();
-            const clientData = {
-              id: newClientId,
-              email: clientEmail,
-              full_name: getValue('client_name') || 'Unknown',
-              phone: getValue('client_phone') || null,
-              address: combinedAddress,
-              postcode: getValue('customer_address_post_code') || null,
-              user_id: null, // Partner clients don't have user accounts initially
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            };
-            batchClients.push(clientData);
-            existingClients.set(clientEmail, { id: newClientId, email: clientEmail, full_name: clientData.full_name });
-            clientId = newClientId;
-          }
-
-          // Map engineer
-          let engineerId = null;
-          const engineerName = getValue('engineer_identifier').trim();
-          if (engineerName) {
-            engineerId = engineerMap.get(engineerName.toLowerCase()) || null;
-          }
-
-          // Prepare quote and order
-          const quoteAmount = parseFloat(getValue('quote_amount') || '0') || 0;
-          const quoteId = crypto.randomUUID();
-          const orderId = crypto.randomUUID();
-
-           // Parse duration with robust format handling
-           let estimatedDurationHours = null;
-           const durationStr = getValue('estimated_duration_hours').trim();
-           if (durationStr) {
-             try {
-               // Handle various formats: "4", "4h", "4 hours", "4.5", etc.
-               const cleanDuration = durationStr.toLowerCase()
-                 .replace(/[^\d.]/g, '') // Remove non-numeric chars except decimal
-                 .trim();
-               
-               if (cleanDuration) {
-                 const parsed = parseFloat(cleanDuration);
-                 if (!isNaN(parsed) && parsed > 0 && parsed <= 24) {
-                   estimatedDurationHours = parsed;
-                   console.log(`Parsed duration for row ${rowNumber}: ${durationStr} => ${estimatedDurationHours}h`);
-                 } else {
-                   console.warn(`Invalid duration value for row ${rowNumber}: ${durationStr}`);
-                 }
-               }
-             } catch (durationError) {
-               console.warn(`Duration parsing error for row ${rowNumber}: ${durationStr}, error: ${durationError.message}`);
-             }
-           }
-
-           // Parse date in DD/MM/YYYY format
-          let scheduledInstallDate = null;
-          const scheduledDateStr = getValue('scheduled_date');
-          if (scheduledDateStr && scheduledDateStr.trim()) {
-            try {
-              const dateStr = scheduledDateStr.trim();
-              // Check if it's in DD/MM/YYYY format
-              if (dateStr.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
-                const [day, month, year] = dateStr.split('/');
-                // Create date in ISO format (YYYY-MM-DD)
-                const isoDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-                scheduledInstallDate = new Date(isoDate).toISOString();
-              } else {
-                // Try parsing as-is for other formats
-                scheduledInstallDate = new Date(dateStr).toISOString();
-              }
-              
-              // Validate the date
-              if (isNaN(new Date(scheduledInstallDate).getTime())) {
-                console.warn(`Invalid date for row ${rowNumber}: ${dateStr}`);
-                scheduledInstallDate = null;
-              }
-            } catch (dateError) {
-              console.warn(`Date parsing error for row ${rowNumber}: ${scheduledDateStr}, error: ${dateError.message}`);
-              scheduledInstallDate = null;
-            }
-          }
-
-          batchQuotes.push({
-            id: quoteId,
-            client_id: clientId,
-            quote_number: `${partner.name}-${externalId || rowNumber}`,
-            product_details: `Import from ${partner.name}`,
-            total_cost: quoteAmount,
-            status: 'accepted'
-          });
-
-           batchOrders.push({
-             id: orderId,
-             client_id: clientId,
-             quote_id: quoteId,
-             total_amount: quoteAmount,
-             partner_id: partner.id,
-             partner_external_id: externalId,
-             is_partner_job: true,
-             engineer_id: engineerId,
-             scheduled_install_date: scheduledInstallDate,
-             estimated_duration_hours: estimatedDurationHours,
-             job_address: combinedAddress,
-             postcode: getValue('customer_address_post_code') || null,
-             job_type: jobType,
-             partner_metadata: {
-               import_run_id: run_id,
-               original_status: getValue('partner_status'),
-               original_type: rawJobType,
-               sub_partner: getValue('sub_partner')
-             }
-           });
-
-          results.processed++;
-
-        } catch (error) {
-          console.error(`Error processing row ${rowNumber}:`, error);
-          results.errors.push({
-            row: rowNumber,
-            error: error.message,
-            data: row
-          });
-        }
-      }
-
-      // Insert batch data (only if not a dry run)
-      try {
-        if (!dry_run) {
-          // Insert clients first - check for duplicates and only insert new ones
-          const validClientIds = new Set();
-          
-          if (batchClients.length > 0) {
-            console.log(`Processing ${batchClients.length} clients...`);
-            
-            // Get emails to check for existing clients
-            const emailsToCheck = batchClients.map(c => c.email);
-            const { data: existingClientsInBatch } = await supabase
-              .from('clients')
-              .select('id, email')
-              .in('email', emailsToCheck);
-            
-            // Track existing clients from this batch
-            const existingEmailMap = new Map();
-            existingClientsInBatch?.forEach(client => {
-              existingEmailMap.set(client.email, client.id);
-              validClientIds.add(client.id);
-            });
-            
-            // Only insert clients that don't already exist
-            const newClients = batchClients.filter(client => !existingEmailMap.has(client.email));
-            
-            if (newClients.length > 0) {
-              console.log(`Inserting ${newClients.length} new clients...`);
-              const { data: insertedClients, error: clientsError } = await supabase
-                .from('clients')
-                .insert(newClients)
-                .select('id, email');
-              
-              if (clientsError) {
-                console.error('Batch clients insert error:', clientsError);
-                throw clientsError;
-              } else {
-                console.log(`Successfully inserted ${insertedClients?.length || 0} clients`);
-                // Track newly inserted clients
-                insertedClients?.forEach(client => {
-                  validClientIds.add(client.id);
-                });
-              }
-            } else {
-              console.log('All clients already exist, skipping insert');
-            }
-            
-            // Add all batch client IDs to valid set (existing + new)
-            batchClients.forEach(client => {
-              const existingId = existingEmailMap.get(client.email);
-              if (existingId) {
-                validClientIds.add(existingId);
-              } else {
-                validClientIds.add(client.id);
-              }
-            });
-          }
-
-          // Add any existing clients from the pre-loaded data that are used in this batch
-          batchOrders.forEach(order => {
-            // Check if this client was already in our existing clients map
-            for (const [email, clientData] of existingClients.entries()) {
-              if (clientData.id === order.client_id) {
-                validClientIds.add(order.client_id);
-              }
-            }
-          });
-
-          // Only insert quotes and orders for clients that are valid
-          const validQuotes = batchQuotes.filter(quote => validClientIds.has(quote.client_id));
-          const validOrders = batchOrders.filter(order => validClientIds.has(order.client_id));
-
-          if (validQuotes.length > 0) {
-            console.log(`Inserting ${validQuotes.length} quotes...`);
-            const { error: quotesError } = await supabase
-              .from('quotes')
-              .insert(validQuotes);
-            
-            if (quotesError) {
-              console.error('Batch quotes insert error:', quotesError);
-              throw quotesError;
-            }
-          }
-
-          if (validOrders.length > 0) {
-            console.log(`Inserting ${validOrders.length} orders...`);
-            const { data: insertedOrders, error: ordersError } = await supabase
-              .from('orders')
-              .insert(validOrders)
-              .select('id');
-            
-            if (ordersError) {
-              console.error('Batch orders insert error:', ordersError);
-              throw ordersError;
-            } else {
-              results.inserted_count += insertedOrders?.length || 0;
-              console.log(`Successfully inserted ${insertedOrders?.length || 0} orders`);
-            }
-          }
-
-          // Track any skipped items due to client creation failures
-          const skippedQuotes = batchQuotes.length - validQuotes.length;
-          const skippedOrders = batchOrders.length - validOrders.length;
-          if (skippedQuotes > 0 || skippedOrders > 0) {
-            console.log(`Skipped ${skippedQuotes} quotes and ${skippedOrders} orders due to client creation issues`);
-            results.skipped_count += skippedOrders;
-          }
-          
-        } else {
-          // Dry run - just count what would be inserted
-          results.inserted_count += batchOrders.length;
-        }
-
-      } catch (batchError) {
-        console.error('Batch insert error:', batchError);
-        results.errors.push({
-          batch: Math.floor(i / BATCH_SIZE) + 1,
-          error: batchError.message
-        });
-      }
-
-      const batchTime = performance.now() - batchStartTime;
-      console.log(`Batch ${Math.floor(i / BATCH_SIZE) + 1} completed in ${Math.round(batchTime)}ms`);
     }
+    
+    // Update processed count
+    results.processed = rows.length;
 
     const totalTime = performance.now() - startTime;
     console.log(`Import ${dry_run ? 'dry run' : 'execution'} completed in ${Math.round(totalTime)}ms:`, results);
