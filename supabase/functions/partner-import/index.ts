@@ -645,7 +645,13 @@ serve(async (req: Request): Promise<Response> => {
           });
 
         if (upsertError) {
-          throw upsertError;
+          console.error('Database upsert error:', {
+            message: upsertError.message,
+            details: upsertError.details,
+            hint: upsertError.hint,
+            code: upsertError.code
+          });
+          throw new Error(`Database upsert failed: ${upsertError.message}${upsertError.hint ? ' (' + upsertError.hint + ')' : ''}`);
         }
         
         updateCount = count || results.data.length;
