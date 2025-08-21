@@ -57,7 +57,14 @@ export function CompletionPendingListPage() {
               orders.map((order) => (
                 <EnhancedJobCard
                   key={order.id}
-                  order={order}
+                  order={{
+                    ...order,
+                    clients: order.clients ? {
+                      name: order.clients.full_name,
+                      email: order.clients.email,
+                      phone: order.clients.phone
+                    } : undefined
+                  }}
                   onUpdate={() => {
                     // Refresh the data
                   }}

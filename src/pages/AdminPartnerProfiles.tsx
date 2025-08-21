@@ -16,6 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import MappingConfiguration from '@/components/admin/MappingConfiguration';
 import ImportRunModal from '@/components/admin/ImportRunModal';
 import { DeletePartnerJobsModal } from '@/components/admin/DeletePartnerJobsModal';
+import { ImportProfileActions } from '@/components/admin/ImportProfileActions';
 
 interface ImportProfile {
   id: string;
@@ -28,6 +29,7 @@ interface ImportProfile {
   status_mappings: Record<string, string>;
   engineer_mapping_rules: Array<any>;
   status_override_rules: Record<string, boolean>;
+  status_actions: Record<string, any>;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -423,6 +425,12 @@ export default function AdminPartnerProfiles() {
                   <Edit className="h-4 w-4" />
                   Edit
                 </Button>
+                <ImportProfileActions 
+                  profile={profile} 
+                  onUpdate={() => {
+                    queryClient.invalidateQueries({ queryKey: ['partner-profiles', partnerId] });
+                  }} 
+                />
               </div>
             </CardHeader>
             <CardContent>
