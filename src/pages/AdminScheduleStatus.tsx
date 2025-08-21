@@ -21,6 +21,6 @@ export default function AdminScheduleStatus() {
     case 'not-in-scheduling':
       return <NotInSchedulingListPage />;
     default:
-      return <ScheduleStatusListPage />;
+      return <ScheduleStatusListPage orders={[]} engineers={[]} title="Schedule Status" />;
   }
 }

@@ -9,7 +9,7 @@ import { Database } from '@/integrations/supabase/types';
 import { getOrderEstimatedMinutes, isDefaultEstimatedHours } from '@/utils/schedulingUtils';
 
 type Order = Database['public']['Tables']['orders']['Row'] & {
-  clients?: { name: string; email: string; phone: string; };
+  clients?: { name?: string; full_name?: string; email: string; phone: string; };
   quotes?: { products?: any[]; };
   engineer?: { name: string; email: string; region?: string; };
   partners?: { name: string; };
@@ -116,7 +116,7 @@ export function EnhancedJobCard({ order, onAssignEngineer, onUnassign, onSchedul
               )}
             </CardTitle>
             <div className="text-sm text-muted-foreground">
-              <p>{order.clients?.name}</p>
+              <p>{order.clients?.name || order.clients?.full_name}</p>
               {order.sub_partner && (
                 <p className="text-xs">Dealer: {order.sub_partner}</p>
               )}
