@@ -17,16 +17,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('Initial session:', session);
-      setSession(session);
-      setUser(session?.user ?? null);
-      console.log('Initial user:', session?.user);
-      setLoading(false);
-    });
-
-    // Listen for auth changes
+    // Register auth state listener FIRST to prevent race conditions
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         console.log('Auth state change:', event, session?.user?.email);
@@ -35,6 +26,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setLoading(false);
       }
     );
+
+    // THEN get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('Initial session:', session);
+      setSession(session);
+      setUser(session?.user ?? null);
+      console.log('Initial user:', session?.user);
+      setLoading(false);
+    });
 
     return () => subscription.unsubscribe();
   }, []);

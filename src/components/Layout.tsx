@@ -7,6 +7,7 @@ import { LogOut } from 'lucide-react';
 import { ProEVLogo } from '@/components/ProEVLogo';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/AppSidebar';
+import { useEffect } from 'react';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -17,6 +18,15 @@ export default function Layout({ children }: LayoutProps) {
   const { role: userRole, loading: roleLoading } = useUserRole();
   const location = useLocation();
 
+  // Persist current path for redirect after auth (including search params and hash)
+  useEffect(() => {
+    if (user) {
+      const fullPath = location.pathname + location.search + location.hash;
+      console.log('Layout: Persisting current authenticated path:', fullPath);
+      sessionStorage.setItem('lastAuthenticatedPath', fullPath);
+    }
+  }, [location, user]);
+
   if (loading || roleLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -26,10 +36,10 @@ export default function Layout({ children }: LayoutProps) {
   }
 
   if (!user) {
-    // Save current path for redirect after auth (including search params)
-    const fullPath = location.pathname + location.search;
+    // Save current path for redirect after auth (including search params and hash)
+    const fullPath = location.pathname + location.search + location.hash;
     console.log('Layout: Saving current path for redirect after auth:', fullPath);
-    localStorage.setItem('authRedirectPath', fullPath);
+    sessionStorage.setItem('authRedirectPath', fullPath);
     return <Navigate to="/auth" replace />;
   }
 

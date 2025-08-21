@@ -25,18 +25,27 @@ export default function Auth() {
     if (user && !authLoading) {
       console.log('Auth: User authenticated, preparing redirect', { userId: user.id, email: user.email });
       
-      // Check for saved redirect path
-      const savedPath = localStorage.getItem('authRedirectPath');
-      console.log('Auth: Found saved path:', savedPath);
-      const redirectTo = savedPath || '/';
+      // Priority order: explicit redirect -> last authenticated path -> default
+      const explicitRedirect = sessionStorage.getItem('authRedirectPath');
+      const lastAuthPath = sessionStorage.getItem('lastAuthenticatedPath');
       
-      // Clear saved path
-      localStorage.removeItem('authRedirectPath');
+      let redirectTo = '/';
       
-      setTimeout(() => {
-        console.log('Auth: useEffect executing redirect to', redirectTo);
-        navigate(redirectTo, { replace: true });
-      }, 500);
+      if (explicitRedirect) {
+        redirectTo = explicitRedirect;
+        console.log('Auth: Using explicit redirect path:', explicitRedirect);
+      } else if (lastAuthPath) {
+        redirectTo = lastAuthPath;
+        console.log('Auth: Using last authenticated path:', lastAuthPath);
+      }
+      
+      console.log('Auth: Final redirect target:', redirectTo);
+      
+      // Clear saved paths
+      sessionStorage.removeItem('authRedirectPath');
+      
+      // Immediate redirect without timeout
+      navigate(redirectTo, { replace: true });
     }
   }, [user, authLoading, navigate]);
 
