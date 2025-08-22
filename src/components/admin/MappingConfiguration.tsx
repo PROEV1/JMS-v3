@@ -135,7 +135,16 @@ export default function MappingConfiguration({
 
       if (error) {
         console.error('Supabase function error:', error);
-        throw new Error(error.message || 'Failed to connect to Google Sheets service');
+        
+        // Provide more specific error messages based on error type
+        let errorMessage = 'Failed to connect to Google Sheets service';
+        if (error.message?.includes('FunctionsHttpError')) {
+          errorMessage = 'Google Sheets service unavailable. Please contact your administrator.';
+        } else if (error.message) {
+          errorMessage = error.message;
+        }
+        
+        throw new Error(errorMessage);
       }
       
       if (data.success && data.headers) {
@@ -190,6 +199,74 @@ export default function MappingConfiguration({
       delete newMappings[orderField];
     }
     onColumnMappingsChange(newMappings);
+  };
+
+  const autoMapColumns = () => {
+    const newMappings = { ...columnMappings };
+    let mappedCount = 0;
+
+    ORDER_FIELDS.forEach(field => {
+      // Skip if already mapped
+      if (newMappings[field.key]) return;
+      
+      // Try exact match first (case insensitive)
+      const exactMatch = availableColumns.find(col => 
+        col.toLowerCase() === field.label.toLowerCase() ||
+        col.toLowerCase() === field.key.toLowerCase()
+      );
+      
+      if (exactMatch) {
+        newMappings[field.key] = exactMatch;
+        mappedCount++;
+        return;
+      }
+      
+      // Try partial matches
+      const partialMatch = availableColumns.find(col => {
+        const columnLower = col.toLowerCase();
+        const fieldLower = field.label.toLowerCase();
+        
+        // Match key patterns
+        if (field.key === 'partner_external_id' && (columnLower.includes('id') || columnLower.includes('ref'))) return true;
+        if (field.key === 'partner_status' && columnLower.includes('status')) return true;
+        if (field.key === 'engineer_identifier' && (columnLower.includes('engineer') || columnLower.includes('installer'))) return true;
+        if (field.key === 'scheduled_date' && (columnLower.includes('date') || columnLower.includes('schedule'))) return true;
+        if (field.key === 'client_name' && (columnLower.includes('customer') || columnLower.includes('client')) && columnLower.includes('name')) return true;
+        if (field.key === 'client_email' && columnLower.includes('email')) return true;
+        if (field.key === 'client_phone' && (columnLower.includes('phone') || columnLower.includes('mobile'))) return true;
+        if (field.key === 'job_address' && columnLower.includes('address')) return true;
+        if (field.key === 'postcode' && (columnLower.includes('postcode') || columnLower.includes('zip'))) return true;
+        
+        return false;
+      });
+      
+      if (partialMatch) {
+        newMappings[field.key] = partialMatch;
+        mappedCount++;
+      }
+    });
+
+    onColumnMappingsChange(newMappings);
+    
+    if (mappedCount > 0) {
+      toast({
+        title: "Auto-mapping Complete",
+        description: `Mapped ${mappedCount} columns automatically. Review and adjust as needed.`,
+      });
+    } else {
+      toast({
+        title: "No Auto-mappings",
+        description: "Could not auto-match any columns. Please map them manually.",
+      });
+    }
+  };
+
+  const clearAllMappings = () => {
+    onColumnMappingsChange({});
+    toast({
+      title: "Mappings Cleared",
+      description: "All column mappings have been cleared.",
+    });
   };
 
   const addStatusMapping = () => {
@@ -339,28 +416,63 @@ export default function MappingConfiguration({
         <CardContent>
           <div className="space-y-4">
             {sourceType === 'gsheet' && gsheetId && (
-              <div className="space-y-2 p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+              <div className="space-y-3 p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
                 <div className="flex items-center justify-between">
                   <h4 className="text-sm font-medium text-blue-900 dark:text-blue-100">Google Sheets Integration</h4>
-                  <Button 
-                    onClick={fetchGoogleSheetsPreview} 
-                    disabled={isLoadingPreview}
-                    variant="outline"
-                    size="sm"
-                  >
-                    <FileSpreadsheet className="h-4 w-4 mr-2" />
-                    {isLoadingPreview ? 'Loading...' : 'Load Columns'}
-                  </Button>
+                   <div className="flex gap-2">
+                     <Button 
+                       onClick={fetchGoogleSheetsPreview} 
+                       disabled={isLoadingPreview}
+                       variant="outline"
+                       size="sm"
+                     >
+                       <FileSpreadsheet className="h-4 w-4 mr-2" />
+                       {isLoadingPreview ? 'Loading...' : 'Load Columns'}
+                     </Button>
+                     {availableColumns.length > 0 && (
+                       <>
+                         <Button 
+                           onClick={autoMapColumns} 
+                           variant="secondary"
+                           size="sm"
+                         >
+                           Auto-map
+                         </Button>
+                         <Button 
+                           onClick={clearAllMappings}
+                           variant="outline"
+                           size="sm"
+                         >
+                           Clear All
+                         </Button>
+                       </>
+                     )}
+                   </div>
                 </div>
                 <div className="text-xs text-blue-700 dark:text-blue-300 space-y-1">
-                  <p>• Ensure the Google Sheet is shared with the service account</p>
-                  <p>• Grant "Viewer" permissions to the service account email</p>
-                  <p>• Check that the Sheet ID is correct and the sheet exists</p>
-                  {availableColumns.length === 0 && (
+                  <p>• Sheet must be shared with service account email</p>
+                  <p>• Grant "Viewer" permissions for access</p>
+                  <p>• Verify Sheet ID and sheet name are correct</p>
+                  {availableColumns.length === 0 ? (
                     <p className="text-orange-600 dark:text-orange-400 font-medium">
                       → Click "Load Columns" to fetch available columns from your sheet
                     </p>
+                  ) : (
+                    <p className="text-green-600 dark:text-green-400 font-medium">
+                      ✓ Loaded {availableColumns.length} columns from sheet
+                    </p>
                   )}
+                </div>
+              </div>
+            )}
+            
+            {availableColumns.length > 0 && (
+              <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                <div className="text-xs text-amber-700 dark:text-amber-300">
+                  <p><strong>About Column Mappings:</strong></p>
+                  <p>• When a sheet column name exactly matches our internal field (e.g., "Customer Address Line 2"), the mapping appears as "mapped to itself" - this is correct!</p>
+                  <p>• Use "Auto-map" to intelligently match similar column names</p>
+                  <p>• Review all mappings carefully before running imports</p>
                 </div>
               </div>
             )}
@@ -394,6 +506,9 @@ export default function MappingConfiguration({
                     {columnMappings[field.key] && (
                       <div className="text-xs text-muted-foreground">
                         Currently mapped to: <span className="font-medium">{columnMappings[field.key]}</span>
+                        {columnMappings[field.key] === field.label && (
+                          <span className="text-green-600 dark:text-green-400 ml-2">✓ Exact match</span>
+                        )}
                       </div>
                     )}
                   </div>
