@@ -8,6 +8,9 @@ import { Badge } from '@/components/ui/badge';
 import { Plus, Package, Search, Boxes, AlertTriangle, BarChart3, Hash } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { AddItemModal } from './AddItemModal';
+import { StockAdjustmentModal } from './StockAdjustmentModal';
+import { StockTransferModal } from './StockTransferModal';
+import { ItemQuickViewDialog } from './ItemQuickViewDialog';
 import { InventoryKpiTile } from './shared/InventoryKpiTile';
 import { StatusChip } from './shared/StatusChip';
 import { AdvancedSearchModal } from './shared/AdvancedSearchModal';
@@ -37,6 +40,12 @@ export const InventoryItemsSimple: React.FC = () => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [searchFilters, setSearchFilters] = useState({});
   const [viewMode, setViewMode] = useInventoryView('grid', 'inventory-items-view');
+  
+  // Modal states for actions
+  const [showAdjustModal, setShowAdjustModal] = useState(false);
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [showQuickView, setShowQuickView] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<any>(null);
 
   const { data: items, isLoading } = useQuery({
     queryKey: ['inventory-items'],
@@ -311,9 +320,18 @@ export const InventoryItemsSimple: React.FC = () => {
               isSelected={selectedIds.includes(item.id)}
               onSelect={(selected) => handleItemSelect(item.id, selected)}
               showSelection={true}
-              onTransfer={() => console.log('Transfer', item.id)}
-              onAdjust={() => console.log('Adjust', item.id)}
-              onView={() => console.log('View', item.id)}
+              onTransfer={() => {
+                setSelectedItem(item);
+                setShowTransferModal(true);
+              }}
+              onAdjust={() => {
+                setSelectedItem(item);
+                setShowAdjustModal(true);
+              }}
+              onView={() => {
+                setSelectedItem(item);
+                setShowQuickView(true);
+              }}
             />
           ))}
         </div>
@@ -340,6 +358,26 @@ export const InventoryItemsSimple: React.FC = () => {
       <AddItemModal
         open={showAddModal}
         onOpenChange={setShowAddModal}
+      />
+      
+      <StockAdjustmentModal
+        open={showAdjustModal}
+        onOpenChange={setShowAdjustModal}
+        itemId={selectedItem?.id}
+        itemName={selectedItem?.name}
+      />
+      
+      <StockTransferModal
+        open={showTransferModal}
+        onOpenChange={setShowTransferModal}
+        itemId={selectedItem?.id}
+        itemName={selectedItem?.name}
+      />
+      
+      <ItemQuickViewDialog
+        open={showQuickView}
+        onOpenChange={setShowQuickView}
+        item={selectedItem}
       />
     </div>
   );

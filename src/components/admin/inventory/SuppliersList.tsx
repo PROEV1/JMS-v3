@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Search, Building, AlertCircle, Edit, Mail, Phone, TrendingUp, Clock, Star } from "lucide-react";
 import { AddSupplierModal } from "./AddSupplierModal";
+import { EditSupplierModal } from './EditSupplierModal';
 import { InventoryKpiTile } from './shared/InventoryKpiTile';
 import { StatusChip } from './shared/StatusChip';
 
@@ -25,6 +26,8 @@ interface Supplier {
 export function SuppliersList() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedSupplier, setSelectedSupplier] = useState<any>(null);
 
   const { data: suppliers, isLoading } = useQuery({
     queryKey: ["suppliers", searchTerm],
@@ -218,7 +221,14 @@ export function SuppliersList() {
                       </StatusChip>
                     </TableCell>
                     <TableCell>
-                      <Button variant="ghost" size="sm">
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => {
+                          setSelectedSupplier(supplier);
+                          setShowEditModal(true);
+                        }}
+                      >
                         <Edit className="h-4 w-4" />
                       </Button>
                     </TableCell>
@@ -233,6 +243,12 @@ export function SuppliersList() {
       <AddSupplierModal 
         open={showAddModal} 
         onOpenChange={setShowAddModal} 
+      />
+      
+      <EditSupplierModal
+        open={showEditModal}
+        onOpenChange={setShowEditModal}
+        supplier={selectedSupplier}
       />
     </div>
   );

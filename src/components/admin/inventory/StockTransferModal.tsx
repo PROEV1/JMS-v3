@@ -1,202 +1,113 @@
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useInventoryEnhanced } from "@/hooks/useInventoryEnhanced";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowRight } from "lucide-react";
 
 interface StockTransferModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  itemId?: string;
+  itemName?: string;
 }
 
-export function StockTransferModal({ open, onOpenChange }: StockTransferModalProps) {
-  const [formData, setFormData] = useState({
-    item_id: "",
-    from_location_id: "",
-    to_location_id: "",
-    quantity: "",
-    reference: "",
-    notes: ""
-  });
+export function StockTransferModal({ open, onOpenChange, itemId, itemName }: StockTransferModalProps) {
+  const [fromLocationId, setFromLocationId] = useState("");
+  const [toLocationId, setToLocationId] = useState("");
+  const [quantity, setQuantity] = useState("");
+  const [notes, setNotes] = useState("");
 
+  const { createStockTransfer } = useInventoryEnhanced();
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
-  const { data: items } = useQuery({
-    queryKey: ["inventory-items-transfer"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('inventory_items')
-        .select('id, name, sku')
-        .eq('is_active', true)
-        .order('name');
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const { data: locations } = useQuery({
-    queryKey: ["inventory-locations-transfer"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('inventory_locations')
-        .select('id, name, code')
-        .eq('is_active', true)
-        .order('name');
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const transferMutation = useMutation({
-    mutationFn: async () => {
-      const quantity = parseInt(formData.quantity);
-      if (!quantity || quantity <= 0) {
-        throw new Error("Quantity must be greater than 0");
-      }
-
-      // Create "out" transaction for source location
-      const { error: outError } = await supabase
-        .from('inventory_txns')
-        .insert({
-          item_id: formData.item_id,
-          location_id: formData.from_location_id,
-          qty: quantity,
-          direction: 'out',
-          reference: formData.reference || `Transfer to ${locations?.find(l => l.id === formData.to_location_id)?.name}`,
-          notes: formData.notes
-        });
-
-      if (outError) throw outError;
-
-      // Create "in" transaction for destination location
-      const { error: inError } = await supabase
-        .from('inventory_txns')
-        .insert({
-          item_id: formData.item_id,
-          location_id: formData.to_location_id,
-          qty: quantity,
-          direction: 'in',
-          reference: formData.reference || `Transfer from ${locations?.find(l => l.id === formData.from_location_id)?.name}`,
-          notes: formData.notes
-        });
-
-      if (inError) throw inError;
-    },
-    onSuccess: () => {
-      toast({
-        title: "Stock Transfer Completed",
-        description: "Stock has been successfully transferred between locations.",
-      });
-      queryClient.invalidateQueries({ queryKey: ["inventory-txns"] });
-      queryClient.invalidateQueries({ queryKey: ["item-location-balances"] });
-      setFormData({
-        item_id: "",
-        from_location_id: "",
-        to_location_id: "",
-        quantity: "",
-        reference: "",
-        notes: ""
-      });
-      onOpenChange(false);
-    },
-    onError: (error) => {
-      toast({
-        title: "Transfer Failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.item_id || !formData.from_location_id || !formData.to_location_id || !formData.quantity) {
+    
+    if (!itemId || !fromLocationId || !toLocationId || !quantity) {
       toast({
-        title: "Missing Information",
-        description: "Please fill in all required fields.",
+        title: "Error",
+        description: "Please fill in all required fields",
         variant: "destructive",
       });
       return;
     }
 
-    if (formData.from_location_id === formData.to_location_id) {
+    if (fromLocationId === toLocationId) {
       toast({
-        title: "Invalid Transfer",
-        description: "Source and destination locations must be different.",
+        title: "Error",
+        description: "Source and destination locations must be different",
         variant: "destructive",
       });
       return;
     }
 
-    transferMutation.mutate();
+    try {
+      await createStockTransfer.mutateAsync({
+        itemId: itemId,
+        fromLocationId: fromLocationId,
+        toLocationId: toLocationId,
+        quantity: parseInt(quantity),
+        notes,
+      });
+
+      toast({
+        title: "Success",
+        description: "Stock transfer completed successfully",
+      });
+
+      onOpenChange(false);
+      // Reset form
+      setFromLocationId("");
+      setToLocationId("");
+      setQuantity("");
+      setNotes("");
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to complete stock transfer",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Transfer Stock Between Locations</DialogTitle>
+          <DialogTitle>Transfer Stock - {itemName}</DialogTitle>
         </DialogHeader>
+        
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="item_id">Item *</Label>
-            <Select value={formData.item_id} onValueChange={(value) => setFormData(prev => ({ ...prev, item_id: value }))}>
+            <Label htmlFor="from-location">From Location *</Label>
+            <Select value={fromLocationId} onValueChange={setFromLocationId}>
               <SelectTrigger>
-                <SelectValue placeholder="Select item to transfer" />
+                <SelectValue placeholder="Select source location" />
               </SelectTrigger>
               <SelectContent>
-                {items?.map((item) => (
-                  <SelectItem key={item.id} value={item.id}>
-                    {item.name} ({item.sku})
-                  </SelectItem>
-                ))}
+                <SelectItem value="main-warehouse">Main Warehouse</SelectItem>
+                <SelectItem value="van-1">Van 1</SelectItem>
+                <SelectItem value="van-2">Van 2</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="from_location_id">From Location *</Label>
-              <Select value={formData.from_location_id} onValueChange={(value) => setFormData(prev => ({ ...prev, from_location_id: value }))}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Source" />
-                </SelectTrigger>
-                <SelectContent>
-                  {locations?.map((location) => (
-                    <SelectItem key={location.id} value={location.id}>
-                      {location.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="to_location_id">To Location *</Label>
-              <Select value={formData.to_location_id} onValueChange={(value) => setFormData(prev => ({ ...prev, to_location_id: value }))}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Destination" />
-                </SelectTrigger>
-                <SelectContent>
-                  {locations?.map((location) => (
-                    <SelectItem key={location.id} value={location.id}>
-                      {location.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-center py-2">
-            <ArrowRight className="h-5 w-5 text-muted-foreground" />
+          <div className="space-y-2">
+            <Label htmlFor="to-location">To Location *</Label>
+            <Select value={toLocationId} onValueChange={setToLocationId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select destination location" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="main-warehouse">Main Warehouse</SelectItem>
+                <SelectItem value="van-1">Van 1</SelectItem>
+                <SelectItem value="van-2">Van 2</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-2">
@@ -204,20 +115,11 @@ export function StockTransferModal({ open, onOpenChange }: StockTransferModalPro
             <Input
               id="quantity"
               type="number"
-              min="1"
-              value={formData.quantity}
-              onChange={(e) => setFormData(prev => ({ ...prev, quantity: e.target.value }))}
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
               placeholder="Enter quantity to transfer"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="reference">Reference</Label>
-            <Input
-              id="reference"
-              value={formData.reference}
-              onChange={(e) => setFormData(prev => ({ ...prev, reference: e.target.value }))}
-              placeholder="Transfer reference (optional)"
+              min="1"
+              required
             />
           </div>
 
@@ -225,19 +127,19 @@ export function StockTransferModal({ open, onOpenChange }: StockTransferModalPro
             <Label htmlFor="notes">Notes</Label>
             <Textarea
               id="notes"
-              value={formData.notes}
-              onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-              placeholder="Additional notes about this transfer"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Transfer notes (optional)"
               rows={3}
             />
           </div>
 
-          <div className="flex justify-end space-x-2 pt-4">
+          <div className="flex justify-end space-x-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={transferMutation.isPending}>
-              {transferMutation.isPending ? "Transferring..." : "Transfer Stock"}
+            <Button type="submit" disabled={createStockTransfer.isPending}>
+              {createStockTransfer.isPending ? "Transferring..." : "Transfer Stock"}
             </Button>
           </div>
         </form>

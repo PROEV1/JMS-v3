@@ -15,12 +15,14 @@ import {
   CheckCircle
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { CreatePurchaseOrderModal } from './CreatePurchaseOrderModal';
 import { InventoryKpiTile } from './shared/InventoryKpiTile';
 import { StatusChip } from './shared/StatusChip';
 import { EmptyState } from './shared/EmptyState';
 
 export function PurchaseOrdersList() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   // Header metrics
   const { data: metrics } = useQuery({
@@ -206,11 +208,16 @@ export function PurchaseOrdersList() {
               title="No Purchase Orders"
               description="Create your first purchase order to start tracking inventory replenishment"
               actionLabel="Create Purchase Order"
-              onAction={() => {/* TODO: Open create PO modal */}}
+              onAction={() => setShowCreateModal(true)}
             />
           )}
         </CardContent>
       </Card>
+      
+      <CreatePurchaseOrderModal
+        open={showCreateModal}
+        onOpenChange={setShowCreateModal}
+      />
     </div>
   );
 }

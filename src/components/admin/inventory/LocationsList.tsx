@@ -1,11 +1,13 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { MapPin, Warehouse, Truck, Building, User, DollarSign, Hash } from "lucide-react";
+import { MapPin, Warehouse, Truck, Building, User, DollarSign, Hash, Plus } from "lucide-react";
+import { AddLocationModal } from './AddLocationModal';
+import { LocationStockModal } from './LocationStockModal';
 import { InventoryKpiTile } from './shared/InventoryKpiTile';
 import { StatusChip } from './shared/StatusChip';
 
@@ -20,6 +22,9 @@ interface Location {
 }
 
 export function LocationsList() {
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showStockModal, setShowStockModal] = useState(false);
+  const [selectedLocation, setSelectedLocation] = useState<any>(null);
   const { data: locations = [], isLoading, error } = useQuery({
     queryKey: ['inventory-locations'],
     queryFn: async () => {
@@ -161,7 +166,14 @@ export function LocationsList() {
               )}
 
               <div className="flex justify-end pt-2">
-                <Button variant="outline" size="sm">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => {
+                    setSelectedLocation(location);
+                    setShowStockModal(true);
+                  }}
+                >
                   View Stock
                 </Button>
               </div>
@@ -175,6 +187,17 @@ export function LocationsList() {
           No locations found. Add your first location to get started.
         </div>
       )}
+      
+      <AddLocationModal
+        open={showAddModal}
+        onOpenChange={setShowAddModal}
+      />
+      
+      <LocationStockModal
+        open={showStockModal}
+        onOpenChange={setShowStockModal}
+        location={selectedLocation}
+      />
     </div>
   );
 }
