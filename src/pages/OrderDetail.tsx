@@ -400,6 +400,10 @@ export default function OrderDetail() {
     
     try {
       // Generate the agreement document HTML
+      if (!order.quote?.id) {
+        throw new Error('Quote ID not found');
+      }
+      
       const response = await supabase.functions.invoke('generate-quote-pdf', {
         body: {
           quoteId: order.quote.id,
@@ -450,6 +454,10 @@ export default function OrderDetail() {
     if (!order) return;
     
     try {
+      if (!order.quote?.id) {
+        throw new Error('Quote ID not found');
+      }
+      
       const { data, error } = await supabase.functions.invoke('generate-quote-pdf', {
         body: {
           quoteId: order.quote.id,  // Fixed: changed from quote_id to quoteId
@@ -589,7 +597,7 @@ export default function OrderDetail() {
                 <div>
                   <div className="flex items-center gap-3">
                     <BrandHeading1>Order {order.order_number}</BrandHeading1>
-                    {order.is_partner_job && order.partner && (
+                    {order.is_partner_job && order.partner?.name && (
                       <Badge variant="secondary" className="bg-blue-100 text-blue-700">
                         Partner: {order.partner.name}
                       </Badge>
@@ -643,10 +651,12 @@ export default function OrderDetail() {
             <ActivityHistorySection orderId={orderId!} />
 
             {/* Client Blocked Dates */}
-            <ClientBlockedDatesSection 
-              clientId={order.client.id}
-              onDataChange={fetchOrder}
-            />
+            {order.client?.id && (
+              <ClientBlockedDatesSection 
+                clientId={order.client.id}
+                onDataChange={fetchOrder}
+              />
+            )}
 
             {/* Engineer Uploads & Completion */}
             <EngineerUploadsSection 

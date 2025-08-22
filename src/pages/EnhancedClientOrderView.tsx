@@ -199,7 +199,7 @@ export default function EnhancedClientOrderView() {
           quote:quotes(
             quote_number,
             warranty_period,
-            quote_items(product_name, quantity, total_price)
+            quote_items!inner(product_name, quantity, total_price)
           ),
           engineer:engineers(name, email)
         `)
@@ -555,7 +555,7 @@ export default function EnhancedClientOrderView() {
                 <h3 className="font-semibold text-blue-900">✅ Your installation is now confirmed!</h3>
                 <p className="text-blue-700">
                   {format(new Date(order.scheduled_install_date), 'EEEE, MMMM d, yyyy')}
-                  {order.engineer && ` with ${order.engineer.name}`}
+                  {order.engineer?.name && ` with ${order.engineer.name}`}
                 </p>
               </div>
             </div>
@@ -767,7 +767,7 @@ export default function EnhancedClientOrderView() {
                     <h3 className="text-lg font-semibold text-green-800 mb-2">Installation Scheduled!</h3>
                     <p className="text-muted-foreground">
                       {format(new Date(order.scheduled_install_date), 'EEEE, MMMM d, yyyy')}
-                      {order.engineer && ` with ${order.engineer.name}`}
+                      {order.engineer?.name && ` with ${order.engineer.name}`}
                     </p>
                   </div>
                 ) : (

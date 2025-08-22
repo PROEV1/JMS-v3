@@ -150,7 +150,7 @@ export function EnhancedAdminOrderOverview({ order }: EnhancedAdminOrderOverview
                   {order.client.email}
                 </a>
               </div>
-              {order.client.phone && (
+              {order.client?.phone && (
                 <div className="flex items-center gap-2">
                   <Phone className="h-4 w-4 text-muted-foreground" />
                   <a 
@@ -161,7 +161,7 @@ export function EnhancedAdminOrderOverview({ order }: EnhancedAdminOrderOverview
                   </a>
                 </div>
               )}
-              {order.client.address && (
+              {order.client?.address && (
                 <div className="flex items-center gap-2">
                   <MapPin className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm">{order.client.address}</span>
@@ -196,7 +196,7 @@ export function EnhancedAdminOrderOverview({ order }: EnhancedAdminOrderOverview
               </div>
               <div>
                 <span className="text-muted-foreground">Quote Number:</span>
-                <p className="font-mono">{order.quote.quote_number}</p>
+                <p className="font-mono">{order.quote?.quote_number || 'N/A'}</p>
               </div>
               <div>
                 <span className="text-muted-foreground">Order Value:</span>
@@ -290,12 +290,12 @@ export function EnhancedAdminOrderOverview({ order }: EnhancedAdminOrderOverview
               <Button 
                 variant="outline" 
                 size="sm"
-                onClick={() => window.open(`mailto:${order.client.email}`, '_blank')}
+                onClick={() => window.open(`mailto:${order.client?.email}`, '_blank')}
               >
                 <Mail className="h-4 w-4 mr-1" />
                 Email Client
               </Button>
-              {order.client.phone && (
+              {order.client?.phone && (
                 <Button 
                   variant="outline" 
                   size="sm"
