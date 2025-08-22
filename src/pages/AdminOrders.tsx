@@ -400,9 +400,9 @@ export default function AdminOrders() {
                              </Badge>
                            </TableCell>
                            <TableCell>
-                             {order.is_partner_job && order.partner_status ? (
+                             {order.is_partner_job ? (
                                <Badge variant="outline" className="text-xs bg-slate-100 text-slate-700">
-                                 {order.partner_status}
+                                 {order.partner_status || 'Imported'}
                                </Badge>
                              ) : (
                                <span className="text-muted-foreground text-sm">-</span>
