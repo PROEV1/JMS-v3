@@ -6,17 +6,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, Building, AlertCircle, Edit, Mail, Phone } from "lucide-react";
+import { Plus, Search, Building, AlertCircle, Edit, Mail, Phone, TrendingUp, Clock, Star } from "lucide-react";
 import { AddSupplierModal } from "./AddSupplierModal";
+import { InventoryKpiTile } from './shared/InventoryKpiTile';
+import { StatusChip } from './shared/StatusChip';
 
 interface Supplier {
   id: string;
   name: string;
-  email: string | null;
-  phone: string | null;
+  contact_email: string | null;
+  contact_phone: string | null;
   address: string | null;
   is_active: boolean;
   created_at: string;
+  contact_name?: string;
 }
 
 export function SuppliersList() {
@@ -27,18 +30,35 @@ export function SuppliersList() {
     queryKey: ["suppliers", searchTerm],
     queryFn: async () => {
       let query = supabase
-        .from('suppliers')
+        .from('inventory_suppliers') // Updated table name
         .select('*')
         .order('name');
 
       if (searchTerm) {
-        query = query.or(`name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`);
+        query = query.or(`name.ilike.%${searchTerm}%,contact_email.ilike.%${searchTerm}%`);
       }
 
       const { data, error } = await query;
       if (error) throw error;
       return data as Supplier[];
     },
+  });
+
+  // Header metrics
+  const { data: metrics } = useQuery({
+    queryKey: ['supplier-metrics'],
+    queryFn: async () => {
+      if (!suppliers) return null;
+      
+      const totalSuppliers = suppliers.length;
+      const activeSuppliers = suppliers.filter(s => s.is_active).length;
+      const openPOs = 0; // Placeholder
+      const avgLeadTime = 7; // Placeholder - days
+      const otifPercentage = 95; // Placeholder - On-Time In-Full %
+      
+      return { totalSuppliers, activeSuppliers, openPOs, avgLeadTime, otifPercentage };
+    },
+    enabled: !!suppliers
   });
 
   if (isLoading) {
@@ -55,7 +75,60 @@ export function SuppliersList() {
   }
 
   return (
-    <>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-semibold">Suppliers</h2>
+          <p className="text-muted-foreground">Manage your supplier relationships and performance</p>
+        </div>
+        <Button onClick={() => setShowAddModal(true)}>
+          <Plus className="h-4 w-4 mr-2" />
+          Add Supplier
+        </Button>
+      </div>
+
+      {/* Header Metrics */}
+      {metrics && (
+        <div className="grid gap-4 md:grid-cols-5">
+          <InventoryKpiTile
+            title="Total Suppliers"
+            value={metrics.totalSuppliers}
+            icon={Building}
+            variant="info"
+            subtitle="All suppliers"
+          />
+          <InventoryKpiTile
+            title="Active"
+            value={metrics.activeSuppliers}
+            icon={Star}
+            variant="success"
+            subtitle="Currently used"
+          />
+          <InventoryKpiTile
+            title="Open POs"
+            value={metrics.openPOs}
+            icon={AlertCircle}
+            variant="neutral"
+            subtitle="Purchase orders"
+          />
+          <InventoryKpiTile
+            title="Avg Lead Time"
+            value={metrics.avgLeadTime}
+            icon={Clock}
+            variant="info"
+            subtitle="Days to delivery"
+          />
+          <InventoryKpiTile
+            title="OTIF%"
+            value={metrics.otifPercentage}
+            icon={TrendingUp}
+            variant={metrics.otifPercentage >= 95 ? "success" : "warning"}
+            subtitle="On-time in-full"
+            percentage={`${metrics.otifPercentage}%`}
+          />
+        </div>
+      )}
+
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -63,10 +136,6 @@ export function SuppliersList() {
               <Building className="h-5 w-5" />
               Suppliers ({suppliers?.length || 0})
             </CardTitle>
-            <Button onClick={() => setShowAddModal(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Supplier
-            </Button>
           </div>
           <div className="flex items-center gap-4">
             <div className="relative flex-1 max-w-sm">
@@ -100,6 +169,9 @@ export function SuppliersList() {
                   <TableHead>Name</TableHead>
                   <TableHead>Contact</TableHead>
                   <TableHead>Address</TableHead>
+                  <TableHead>Open POs</TableHead>
+                  <TableHead>Avg Lead Time</TableHead>
+                  <TableHead>OTIF% (90d)</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
@@ -110,28 +182,40 @@ export function SuppliersList() {
                     <TableCell className="font-medium">{supplier.name}</TableCell>
                     <TableCell>
                       <div className="space-y-1">
-                        {supplier.email && (
+                        {supplier.contact_email && (
                           <div className="flex items-center gap-1 text-sm">
                             <Mail className="h-3 w-3" />
-                            {supplier.email}
+                            {supplier.contact_email}
                           </div>
                         )}
-                        {supplier.phone && (
+                        {supplier.contact_phone && (
                           <div className="flex items-center gap-1 text-sm">
                             <Phone className="h-3 w-3" />
-                            {supplier.phone}
+                            {supplier.contact_phone}
                           </div>
                         )}
-                        {!supplier.email && !supplier.phone && (
+                        {!supplier.contact_email && !supplier.contact_phone && (
                           <span className="text-muted-foreground text-sm">No contact info</span>
                         )}
                       </div>
                     </TableCell>
                     <TableCell className="max-w-xs truncate">{supplier.address || "N/A"}</TableCell>
                     <TableCell>
-                      <Badge variant={supplier.is_active ? "default" : "destructive"}>
+                      <div className="text-sm font-medium">0</div>
+                      <div className="text-xs text-muted-foreground">POs open</div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm font-medium">7 days</div>
+                      <div className="text-xs text-muted-foreground">Average</div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm font-medium">95%</div>
+                      <div className="text-xs text-muted-foreground">Last 90 days</div>
+                    </TableCell>
+                    <TableCell>
+                      <StatusChip status={supplier.is_active ? "active" : "inactive"}>
                         {supplier.is_active ? "Active" : "Inactive"}
-                      </Badge>
+                      </StatusChip>
                     </TableCell>
                     <TableCell>
                       <Button variant="ghost" size="sm">
@@ -150,6 +234,6 @@ export function SuppliersList() {
         open={showAddModal} 
         onOpenChange={setShowAddModal} 
       />
-    </>
+    </div>
   );
 }

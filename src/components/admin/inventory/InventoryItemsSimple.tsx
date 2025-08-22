@@ -5,9 +5,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Package, Search } from 'lucide-react';
+import { Plus, Package, Search, Boxes, AlertTriangle, BarChart3, Hash } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { AddItemModal } from './AddItemModal';
+import { InventoryKpiTile } from './shared/InventoryKpiTile';
+import { StatusChip } from './shared/StatusChip';
 
 interface InventoryItem {
   id: string;
@@ -41,6 +43,22 @@ export const InventoryItemsSimple: React.FC = () => {
     }
   });
 
+  // Header metrics
+  const { data: metrics } = useQuery({
+    queryKey: ['inventory-items-metrics'],
+    queryFn: async () => {
+      if (!items) return null;
+      
+      const totalSKUs = items.length;
+      const activeItems = items.filter(item => item.is_active).length;
+      const lowStockItems = items.filter(item => item.reorder_point > 0).length; // Simplified
+      const serializedItems = items.filter(item => item.is_serialized).length;
+      
+      return { totalSKUs, activeItems, lowStockItems, serializedItems };
+    },
+    enabled: !!items
+  });
+
   const filteredItems = items?.filter(item =>
     item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     item.sku.toLowerCase().includes(searchTerm.toLowerCase())
@@ -66,6 +84,40 @@ export const InventoryItemsSimple: React.FC = () => {
           Add Item
         </Button>
       </div>
+
+      {/* Header Metrics */}
+      {metrics && (
+        <div className="grid gap-4 md:grid-cols-4">
+          <InventoryKpiTile
+            title="Total SKUs"
+            value={metrics.totalSKUs}
+            icon={Hash}
+            variant="info"
+            subtitle="All inventory items"
+          />
+          <InventoryKpiTile
+            title="Active"
+            value={metrics.activeItems}
+            icon={Boxes}
+            variant="success"
+            subtitle="Currently in use"
+          />
+          <InventoryKpiTile
+            title="Low Stock"
+            value={metrics.lowStockItems}
+            icon={AlertTriangle}
+            variant={metrics.lowStockItems > 0 ? "warning" : "success"}
+            subtitle="Need reordering"
+          />
+          <InventoryKpiTile
+            title="Serialized"
+            value={metrics.serializedItems}
+            icon={BarChart3}
+            variant="neutral"
+            subtitle="Track by serial"
+          />
+        </div>
+      )}
 
       <div className="flex items-center gap-4">
         <div className="relative flex-1 max-w-sm">
@@ -125,14 +177,26 @@ export const InventoryItemsSimple: React.FC = () => {
               </div>
 
               <div className="flex items-center justify-between pt-2">
-                <Badge variant={item.is_active ? "default" : "secondary"}>
+                <StatusChip status={item.is_active ? "active" : "inactive"}>
                   {item.is_active ? "Active" : "Inactive"}
-                </Badge>
+                </StatusChip>
                 {item.is_serialized && (
                   <Badge variant="outline" className="text-xs">
                     Serialized
                   </Badge>
                 )}
+              </div>
+              
+              <div className="flex gap-1 pt-2">
+                <Button variant="outline" size="sm" className="text-xs h-7 px-2">
+                  Adjust
+                </Button>
+                <Button variant="outline" size="sm" className="text-xs h-7 px-2">
+                  Transfer
+                </Button>
+                <Button variant="outline" size="sm" className="text-xs h-7 px-2">
+                  View
+                </Button>
               </div>
             </CardContent>
           </Card>

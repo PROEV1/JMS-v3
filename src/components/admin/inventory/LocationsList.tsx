@@ -5,7 +5,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { MapPin, Warehouse, Truck, Building, User } from "lucide-react";
+import { MapPin, Warehouse, Truck, Building, User, DollarSign, Hash } from "lucide-react";
+import { InventoryKpiTile } from './shared/InventoryKpiTile';
+import { StatusChip } from './shared/StatusChip';
 
 interface Location {
   id: string;
@@ -44,6 +46,21 @@ export function LocationsList() {
     }
   });
 
+  // Header metrics
+  const { data: metrics } = useQuery({
+    queryKey: ['location-metrics'],
+    queryFn: async () => {
+      if (!locations) return null;
+      
+      const warehouses = locations.filter(l => l.type === 'warehouse').length;
+      const vans = locations.filter(l => l.type === 'van').length;
+      const totalStockValue = 0; // Placeholder
+      
+      return { warehouses, vans, totalStockValue, total: locations.length };
+    },
+    enabled: !!locations
+  });
+
   const getLocationIcon = (type: string) => {
     switch (type) {
       case 'warehouse': return <Warehouse className="w-4 h-4" />;
@@ -75,10 +92,40 @@ export function LocationsList() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Locations ({locations.length})</h3>
+        <div>
+          <h2 className="text-2xl font-semibold">Stock Locations</h2>
+          <p className="text-muted-foreground">Manage warehouses, vans, and storage locations</p>
+        </div>
       </div>
+
+      {/* Header Metrics */}
+      {metrics && (
+        <div className="grid gap-4 md:grid-cols-3">
+          <InventoryKpiTile
+            title="Warehouses"
+            value={metrics.warehouses}
+            icon={Warehouse}
+            variant="info"
+            subtitle="Central storage"
+          />
+          <InventoryKpiTile
+            title="Vans"
+            value={metrics.vans}
+            icon={Truck}
+            variant="success"
+            subtitle="Mobile inventory"
+          />
+          <InventoryKpiTile
+            title="Total Stock Value"
+            value={metrics.totalStockValue}
+            icon={DollarSign}
+            variant="neutral"
+            subtitle="£ across all locations"
+          />
+        </div>
+      )}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {locations.map((location) => (
@@ -89,9 +136,9 @@ export function LocationsList() {
                   {getLocationIcon(location.type)}
                   <CardTitle className="text-base">{location.name}</CardTitle>
                 </div>
-                <Badge className={getTypeColor(location.type)}>
+                <StatusChip status="active">
                   {location.type}
-                </Badge>
+                </StatusChip>
               </div>
               {location.code && (
                 <p className="text-sm text-muted-foreground">Code: {location.code}</p>

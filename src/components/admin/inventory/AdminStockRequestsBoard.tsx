@@ -20,15 +20,7 @@ const statusIcons = {
   cancelled: XCircle
 };
 
-const statusColors = {
-  submitted: 'bg-blue-100 text-blue-800 border-blue-200',
-  approved: 'bg-green-100 text-green-800 border-green-200',
-  rejected: 'bg-red-100 text-red-800 border-red-200',
-  in_pick: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-  in_transit: 'bg-purple-100 text-purple-800 border-purple-200',
-  delivered: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-  cancelled: 'bg-gray-100 text-gray-800 border-gray-200'
-};
+import { StatusChip } from './shared/StatusChip';
 
 const formatStatus = (status: StockRequestStatus) => {
   return status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
@@ -89,9 +81,9 @@ const RequestCard: React.FC<RequestCardProps> = ({ request, onStatusChange }) =>
               <Badge variant={priorityColor} className="text-xs">
                 {request.priority}
               </Badge>
-              <Badge className={`text-xs ${statusColors[request.status]}`}>
+              <StatusChip status={request.status as any}>
                 {formatStatus(request.status)}
-              </Badge>
+              </StatusChip>
             </div>
           </div>
         </CardHeader>
@@ -173,9 +165,9 @@ const RequestCard: React.FC<RequestCardProps> = ({ request, onStatusChange }) =>
               </div>
               <div>
                 <span className="font-medium">Status:</span>
-                <Badge className={`ml-2 ${statusColors[request.status]}`}>
+                <StatusChip status={request.status as any}>
                   {formatStatus(request.status)}
-                </Badge>
+                </StatusChip>
               </div>
             </div>
 
@@ -307,7 +299,12 @@ export const AdminStockRequestsBoard: React.FC = () => {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-semibold">Stock Requests</h2>
+        <div>
+          <h2 className="text-2xl font-semibold">Stock Requests</h2>
+          <p className="text-muted-foreground">
+            Track and manage stock requests from engineers
+          </p>
+        </div>
         <div className="text-sm text-muted-foreground">
           {requests?.length || 0} total requests
         </div>

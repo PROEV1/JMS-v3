@@ -1,10 +1,10 @@
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { SimpleInventoryDashboard } from "@/components/admin/inventory/SimpleInventoryDashboard";
+import { InventoryDashboardV2 } from "@/components/admin/inventory/InventoryDashboardV2";
 import { InventoryItemsSimple } from "@/components/admin/inventory/InventoryItemsSimple";
 import { LocationsList } from "@/components/admin/inventory/LocationsList";
 import { SuppliersList } from "@/components/admin/inventory/SuppliersList";
-import { TransactionsList } from "@/components/admin/inventory/TransactionsList";
+import { TransactionsListV2 } from "@/components/admin/inventory/TransactionsListV2";
 import { AdminStockRequestsBoard } from "@/components/admin/inventory/AdminStockRequestsBoard";
 import { useState } from "react";
 
@@ -18,7 +18,7 @@ const AdminInventory = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Inventory Management</h1>
+        <h1 className="text-2xl font-semibold">Inventory Management</h1>
         <p className="text-muted-foreground">
           Manage inventory items, locations, stock levels, and requests
         </p>
@@ -35,7 +35,7 @@ const AdminInventory = () => {
         </TabsList>
 
         <TabsContent value="dashboard">
-          <SimpleInventoryDashboard onSwitchTab={handleTabSwitch} />
+          <InventoryDashboardV2 onSwitchTab={handleTabSwitch} />
         </TabsContent>
 
         <TabsContent value="items">
@@ -51,7 +51,7 @@ const AdminInventory = () => {
         </TabsContent>
 
         <TabsContent value="transactions">
-          <TransactionsList />
+          <TransactionsListV2 />
         </TabsContent>
 
         <TabsContent value="requests">
