@@ -134,6 +134,8 @@ export type Database = {
           email: string
           full_name: string
           id: string
+          is_partner_client: boolean | null
+          partner_id: string | null
           phone: string | null
           postcode: string | null
           updated_at: string
@@ -145,6 +147,8 @@ export type Database = {
           email: string
           full_name: string
           id?: string
+          is_partner_client?: boolean | null
+          partner_id?: string | null
           phone?: string | null
           postcode?: string | null
           updated_at?: string
@@ -156,12 +160,22 @@ export type Database = {
           email?: string
           full_name?: string
           id?: string
+          is_partner_client?: boolean | null
+          partner_id?: string | null
           phone?: string | null
           postcode?: string | null
           updated_at?: string
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "clients_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       engineer_audit_archive: {
         Row: {
