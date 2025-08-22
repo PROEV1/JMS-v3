@@ -34,7 +34,7 @@ interface Order {
     id: string;
     full_name: string;
     email: string;
-  };
+  } | null;
   engineer?: {
     id: string;
     name: string;
@@ -105,8 +105,8 @@ export default function AdminOrders() {
   const filteredOrders = orders.filter(order => {
     const matchesSearch = 
       order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.client.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.client.email.toLowerCase().includes(searchTerm.toLowerCase());
+      (order.client?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
+      (order.client?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false);
     
     const matchesStatus = statusFilter === 'all' || order.status_enhanced === statusFilter;
     
@@ -363,8 +363,12 @@ export default function AdminOrders() {
                           </TableCell>
                            <TableCell>
                              <div>
-                               <p className="font-medium">{order.client.full_name}</p>
-                               <p className="text-sm text-muted-foreground">{order.client.email}</p>
+                               <p className="font-medium">
+                                 {order.client?.full_name || 'Unknown Client'}
+                               </p>
+                               <p className="text-sm text-muted-foreground">
+                                 {order.client?.email || 'No email'}
+                               </p>
                                <div className="flex gap-1 mt-1">
                                  {order.is_partner_job && (
                                    <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700">
