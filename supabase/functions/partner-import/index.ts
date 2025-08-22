@@ -827,6 +827,13 @@ serve(async (req: Request): Promise<Response> => {
               cleanedItem.updated_at = new Date().toISOString();
               cleanedItem.created_at = new Date().toISOString();
               
+              // Debug log for date fields
+              console.log(`Record ${cleanedRecords.length + 1} dates:`, {
+                scheduled_install_date: cleanedItem.scheduled_install_date,
+                created_at: cleanedItem.created_at,
+                updated_at: cleanedItem.updated_at
+              });
+              
               return cleanedItem;
             });
             
