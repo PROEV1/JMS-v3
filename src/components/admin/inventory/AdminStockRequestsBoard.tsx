@@ -5,10 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CheckCircle, XCircle, Clock, Package, Truck, Calendar, MapPin, User } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { CheckCircle, XCircle, Clock, Package, Truck, Calendar, MapPin, User, Search, Plus, Filter } from 'lucide-react';
 import { useStockRequests, useUpdateStockRequestStatus } from '@/hooks/useStockRequests';
 import { StockRequestWithDetails, StockRequestStatus } from '@/types/stock-request';
 import { format } from 'date-fns';
+import { InventoryKpiTile } from './shared/InventoryKpiTile';
+import { QuickActionsBlock } from './shared/QuickActionsBlock';
 
 const statusIcons = {
   submitted: Clock,
@@ -63,8 +66,8 @@ const RequestCard: React.FC<RequestCardProps> = ({ request, onStatusChange }) =>
   const availableTransitions = getAvailableStatusTransitions(request.status);
 
   return (
-    <>
-      <Card className="hover:shadow-md transition-shadow">
+    <div className="mb-4">
+      <Card className="hover:shadow-md transition-all border-l-4 border-l-primary/20">{/* Added left border accent */}
         <CardHeader className="pb-2">
           <div className="flex items-start justify-between">
             <div className="space-y-1">
@@ -262,11 +265,15 @@ const RequestCard: React.FC<RequestCardProps> = ({ request, onStatusChange }) =>
           </div>
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   );
 };
 
 export const AdminStockRequestsBoard: React.FC = () => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<StockRequestStatus | 'all'>('all');
+  const [viewMode, setViewMode] = useState<'tiles' | 'board'>('tiles');
+  
   const { data: requests, isLoading } = useStockRequests();
   const updateStatus = useUpdateStockRequestStatus();
 
@@ -274,19 +281,71 @@ export const AdminStockRequestsBoard: React.FC = () => {
     updateStatus.mutate({ id, status, notes });
   };
 
+  // Calculate metrics
+  const metrics = React.useMemo(() => {
+    if (!requests) return {};
+    
+    const submitted = requests.filter(r => r.status === 'submitted').length;
+    const approved = requests.filter(r => r.status === 'approved').length;
+    const inPick = requests.filter(r => r.status === 'in_pick').length;
+    const inTransit = requests.filter(r => r.status === 'in_transit').length;
+    const delivered = requests.filter(r => r.status === 'delivered').length;
+    const rejected = requests.filter(r => r.status === 'rejected').length;
+    const total = requests.length;
+    
+    return { submitted, approved, inPick, inTransit, delivered, rejected, total };
+  }, [requests]);
+
+  // Filter requests
+  const filteredRequests = React.useMemo(() => {
+    if (!requests) return [];
+    
+    return requests.filter(request => {
+      const matchesSearch = searchQuery === '' || 
+        request.engineer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        request.destination_location.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        request.lines.some(line => line.item.name.toLowerCase().includes(searchQuery.toLowerCase()));
+      
+      const matchesStatus = statusFilter === 'all' || request.status === statusFilter;
+      
+      return matchesSearch && matchesStatus;
+    });
+  }, [requests, searchQuery, statusFilter]);
+
+  const quickActions = [
+    {
+      label: "New Request",
+      icon: Plus,
+      onClick: () => {/* TODO: Open create request modal */},
+      variant: 'default' as const
+    },
+    {
+      label: "Bulk Approve",
+      icon: CheckCircle,
+      onClick: () => {/* TODO: Bulk approve */},
+      variant: 'secondary' as const
+    },
+    {
+      label: "Export",
+      icon: Filter,
+      onClick: () => {/* TODO: Export requests */},
+      variant: 'secondary' as const
+    }
+  ];
+
   if (isLoading) {
     return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-center justify-center">
-            <div className="text-muted-foreground">Loading stock requests...</div>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="space-y-6">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="h-32 bg-muted/30 rounded-lg animate-pulse" />
+          ))}
+        </div>
+      </div>
     );
   }
 
-  const groupedRequests = requests?.reduce((acc, request) => {
+  const groupedRequests = filteredRequests?.reduce((acc, request) => {
     if (!acc[request.status]) {
       acc[request.status] = [];
     }
@@ -298,49 +357,162 @@ export const AdminStockRequestsBoard: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold">Stock Requests</h2>
-          <p className="text-muted-foreground">
-            Track and manage stock requests from engineers
-          </p>
+      {/* Header */}
+      <div>
+        <h2 className="text-2xl font-bold mb-2">Stock Requests</h2>
+        <p className="text-muted-foreground">
+          Track and manage stock requests from engineers
+        </p>
+      </div>
+
+      {/* KPI Tiles */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <InventoryKpiTile
+          title="Submitted"
+          value={metrics.submitted || 0}
+          icon={Clock}
+          variant={metrics.submitted > 0 ? "warning" : "neutral"}
+          onClick={() => setStatusFilter('submitted')}
+          subtitle="Awaiting approval"
+        />
+
+        <InventoryKpiTile
+          title="In Pick"
+          value={metrics.inPick || 0}
+          icon={Package}
+          variant="info"
+          onClick={() => setStatusFilter('in_pick')}
+          subtitle="Being prepared"
+        />
+
+        <InventoryKpiTile
+          title="In Transit"
+          value={metrics.inTransit || 0}
+          icon={Truck}
+          variant="info"
+          onClick={() => setStatusFilter('in_transit')}
+          subtitle="En route"
+        />
+
+        <InventoryKpiTile
+          title="Delivered"
+          value={metrics.delivered || 0}
+          icon={CheckCircle}
+          variant="success"
+          onClick={() => setStatusFilter('delivered')}
+          subtitle="Completed"
+        />
+      </div>
+
+      {/* Quick Actions */}
+      <QuickActionsBlock actions={quickActions} />
+
+      {/* Filters and View Toggle */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+            <Input
+              placeholder="Search requests..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 w-64"
+            />
+          </div>
+          
+          <Select value={statusFilter} onValueChange={(value: StockRequestStatus | 'all') => setStatusFilter(value)}>
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="All statuses" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Statuses</SelectItem>
+              <SelectItem value="submitted">Submitted</SelectItem>
+              <SelectItem value="approved">Approved</SelectItem>
+              <SelectItem value="in_pick">In Pick</SelectItem>
+              <SelectItem value="in_transit">In Transit</SelectItem>
+              <SelectItem value="delivered">Delivered</SelectItem>
+              <SelectItem value="rejected">Rejected</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-        <div className="text-sm text-muted-foreground">
-          {requests?.length || 0} total requests
+
+        <div className="flex items-center gap-2">
+          <Button
+            variant={viewMode === 'tiles' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setViewMode('tiles')}
+          >
+            List View
+          </Button>
+          <Button
+            variant={viewMode === 'board' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setViewMode('board')}
+          >
+            Board View
+          </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-        {statusOrder.map((status) => {
-          const requestsForStatus = groupedRequests[status] || [];
-          return (
-            <div key={status} className="space-y-3">
-              <div className="flex items-center gap-2">
-                <h3 className="font-medium text-sm capitalize">
-                  {formatStatus(status)}
-                </h3>
-                <Badge variant="secondary" className="text-xs">
-                  {requestsForStatus.length}
-                </Badge>
-              </div>
-              <div className="space-y-2">
-                {requestsForStatus.map((request) => (
+      {/* Content based on view mode */}
+      {viewMode === 'tiles' ? (
+        /* List View */
+        <Card>
+          <CardHeader>
+            <CardTitle>Stock Requests ({filteredRequests.length})</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {filteredRequests.length > 0 ? (
+              <div className="space-y-4">
+                {filteredRequests.map((request) => (
                   <RequestCard
                     key={request.id}
                     request={request}
                     onStatusChange={handleStatusChange}
                   />
                 ))}
-                {requestsForStatus.length === 0 && (
-                  <div className="p-3 text-center text-muted-foreground text-xs bg-muted/30 rounded-lg">
-                    No {status} requests
-                  </div>
-                )}
               </div>
-            </div>
-          );
-        })}
-      </div>
+            ) : (
+              <div className="text-center py-12 text-muted-foreground">
+                {searchQuery || statusFilter !== 'all' ? 'No requests match your filters' : 'No stock requests yet'}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ) : (
+        /* Board View */
+        <div className="grid grid-cols-1 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+          {statusOrder.map((status) => {
+            const requestsForStatus = groupedRequests[status] || [];
+            return (
+              <div key={status} className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-medium text-sm capitalize">
+                    {formatStatus(status)}
+                  </h3>
+                  <Badge variant="secondary" className="text-xs">
+                    {requestsForStatus.length}
+                  </Badge>
+                </div>
+                <div className="space-y-2">
+                  {requestsForStatus.map((request) => (
+                    <RequestCard
+                      key={request.id}
+                      request={request}
+                      onStatusChange={handleStatusChange}
+                    />
+                  ))}
+                  {requestsForStatus.length === 0 && (
+                    <div className="p-3 text-center text-muted-foreground text-xs bg-muted/30 rounded-lg">
+                      No {status} requests
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };
