@@ -548,6 +548,7 @@ serve(async (req: Request): Promise<Response> => {
                 partner_id: importProfile.partner_id,
                 partner_confirmed_externally: false,
                 external_confirmation_source: 'partner_import',
+                order_number: mappedData.order_number || 'TEMP',
                 // Only include client_id and quote_id if they exist
                 ...(mappedData.client_id && { client_id: mappedData.client_id }),
                 ...(mappedData.quote_id && { quote_id: mappedData.quote_id }),
@@ -775,15 +776,45 @@ serve(async (req: Request): Promise<Response> => {
           console.log(`First record to insert:`, JSON.stringify(recordsForInsert[0], null, 2));
           
           try {
+            // Remove any invalid enum values before insertion
+            const cleanedRecords = recordsForInsert.map(item => {
+              const cleanedItem = { ...item };
+              
+              // Ensure all required fields are present
+              if (!cleanedItem.order_number) {
+                cleanedItem.order_number = 'TEMP';
+              }
+              
+              // Set job_type to valid enum value
+              if (!cleanedItem.job_type) {
+                cleanedItem.job_type = 'installation';
+              }
+              
+              // Ensure status_enhanced is valid
+              const validStatuses = [
+                'quote_accepted', 'awaiting_payment', 'payment_received', 'awaiting_agreement', 
+                'agreement_signed', 'awaiting_install_booking', 'scheduled', 'in_progress',
+                'install_completed_pending_qa', 'completed', 'revisit_required', 'cancelled',
+                'needs_scheduling', 'date_offered', 'date_accepted', 'date_rejected', 
+                'offer_expired', 'on_hold_parts_docs', 'awaiting_final_payment'
+              ];
+              
+              if (!cleanedItem.status_enhanced || !validStatuses.includes(cleanedItem.status_enhanced)) {
+                cleanedItem.status_enhanced = 'awaiting_install_booking';
+              }
+              
+              // Set timestamps
+              cleanedItem.updated_at = new Date().toISOString();
+              cleanedItem.created_at = new Date().toISOString();
+              
+              return cleanedItem;
+            });
+            
+            console.log(`Cleaned first record:`, JSON.stringify(cleanedRecords[0], null, 2));
+            
             const { data: insertedData, error: insertError, count: insertCount } = await supabase
               .from('orders')
-              .insert(recordsForInsert.map(item => ({
-                ...item,
-                // Ensure order_number is set for partner jobs
-                order_number: item.order_number || 'TEMP',
-                updated_at: new Date().toISOString(),
-                created_at: new Date().toISOString()
-              })))
+              .insert(cleanedRecords)
               .select('id', { count: 'estimated' });
             
             if (insertError) {
