@@ -43,6 +43,7 @@ import ClientProfilePage from "./pages/ClientProfilePage";
 import ClientProfileSelf from "./pages/ClientProfileSelf";
 import EnhancedClientOrderView from "./pages/EnhancedClientOrderView";
 import EngineerDashboard from "./pages/EngineerDashboard";
+import EngineerJobs from "./pages/EngineerJobs";
 import EngineerJobDetail from "./pages/EngineerJobDetail";
 import EngineerProfile from "./pages/EngineerProfile";
 import EngineerStockRequests from "./pages/EngineerStockRequests";
@@ -115,6 +116,7 @@ function App() {
                     {/* Engineer Routes */}
                     <Route path="/engineer" element={<EngineerDashboard />} />
                     <Route path="/engineer/dashboard" element={<EngineerDashboard />} />
+                    <Route path="/engineer/jobs" element={<EngineerJobs />} />
                     <Route path="/engineer/jobs/:id" element={<EngineerJobDetail />} />
                     <Route path="/engineer/profile" element={<EngineerProfile />} />
                     <Route path="/engineer/stock-requests" element={<EngineerStockRequests />} />

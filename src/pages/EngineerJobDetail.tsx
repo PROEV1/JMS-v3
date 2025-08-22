@@ -123,6 +123,8 @@ export default function EngineerJobDetail() {
 
   const fetchJobDetails = async () => {
     try {
+      console.log('Fetching job details for jobId:', jobId);
+      
       const { data, error } = await supabase
         .from('orders')
         .select(`
@@ -130,7 +132,7 @@ export default function EngineerJobDetail() {
           order_number,
           status,
           status_enhanced,
-          
+          engineer_id,
           job_address,
           scheduled_install_date,
           total_amount,
@@ -138,11 +140,11 @@ export default function EngineerJobDetail() {
           engineer_signed_off_at,
           engineer_signature_data,
           admin_qa_notes,
-          quote:quotes!inner(
+          quote:quotes(
             product_details,
             warranty_period,
             special_instructions,
-            client:clients!inner(
+            client:clients(
               full_name,
               phone,
               email
@@ -150,23 +152,39 @@ export default function EngineerJobDetail() {
           )
         `)
         .eq('id', jobId)
-        .single();
+        .maybeSingle();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Database error fetching job details:', error);
+        throw error;
+      }
+
+      if (!data) {
+        console.error('No job found with id:', jobId);
+        toast({
+          title: "Job Not Found",
+          description: "The requested job could not be found",
+          variant: "destructive",
+        });
+        navigate('/engineer/jobs');
+        return;
+      }
+
+      console.log('Raw job data:', data);
 
       const formattedJob = {
         id: data.id,
         order_number: data.order_number,
-        client: data.quote.client,
+        client: data.quote?.client || { full_name: 'Unknown Client', phone: '', email: '' },
         job_address: data.job_address || 'Address not specified',
         scheduled_install_date: data.scheduled_install_date,
         status: data.status,
         status_enhanced: data.status_enhanced,
-        product_details: data.quote.product_details,
+        product_details: data.quote?.product_details || 'Product details not available',
         total_amount: data.total_amount,
         quote: {
-          warranty_period: data.quote.warranty_period,
-          special_instructions: data.quote.special_instructions
+          warranty_period: data.quote?.warranty_period || 'Not specified',
+          special_instructions: data.quote?.special_instructions
         },
         engineer_notes: data.engineer_notes,
         engineer_signed_off_at: data.engineer_signed_off_at,
@@ -174,6 +192,7 @@ export default function EngineerJobDetail() {
         admin_qa_notes: data.admin_qa_notes
       };
 
+      console.log('Formatted job data:', formattedJob);
       setJob(formattedJob);
       setEngineerNotes(formattedJob.engineer_notes || '');
       setIsCompleted(!!formattedJob.engineer_signed_off_at);

@@ -73,14 +73,7 @@ export function AppSidebar({ userRole }: AppSidebarProps) {
 
   const engineerMenuItems = [
     { icon: FileText, label: 'Dashboard', href: '/engineer', action: () => navigate('/engineer') },
-    { icon: FolderOpen, label: 'My Jobs', href: '/engineer', action: () => {
-      console.log('My Jobs clicked - refreshing engineer dashboard');
-      navigate('/engineer');
-      // Force a page refresh to reload all data
-      setTimeout(() => {
-        window.location.reload();
-      }, 100);
-    }},
+    { icon: FolderOpen, label: 'My Jobs', href: '/engineer/jobs', action: () => navigate('/engineer/jobs') },
     { icon: Package, label: 'Stock Requests', href: '/engineer/stock-requests', action: () => navigate('/engineer/stock-requests') },
     { icon: User, label: 'Profile', href: '/engineer/profile', action: () => navigate('/engineer/profile') },
   ];
