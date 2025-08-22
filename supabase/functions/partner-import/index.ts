@@ -538,7 +538,7 @@ serve(async (req: Request): Promise<Response> => {
               const { data: existingClient } = await supabase
                 .from('clients')
                 .select('id')
-                .or(`email.eq.${mappedData.client_email || 'no-email'},name.ilike.%${mappedData.client_name || 'no-name'}%`)
+                .or(`email.eq.${mappedData.client_email || 'no-email'},full_name.ilike.%${mappedData.client_name || 'no-name'}%`)
                 .limit(1)
                 .single();
 
@@ -547,7 +547,7 @@ serve(async (req: Request): Promise<Response> => {
               } else {
                 // Create new client
                 const clientData = {
-                  name: mappedData.client_name || 'Unknown Client',
+                  full_name: mappedData.client_name || 'Unknown Client',
                   email: mappedData.client_email || null,
                   phone: mappedData.client_phone || null,
                   address: consolidatedCustomerAddress || null,
