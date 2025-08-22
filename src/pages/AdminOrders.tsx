@@ -26,6 +26,7 @@ interface Order {
   agreement_signed_at: string | null;
   engineer_signed_off_at: string | null;
   is_partner_job: boolean;
+  partner_status: string | null;
   scheduling_suppressed: boolean;
   scheduling_suppressed_reason?: string;
   // Optional field that might not exist in database
@@ -336,25 +337,26 @@ export default function AdminOrders() {
               <CardContent className="p-0">
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead>Order Number</TableHead>
-                      <TableHead>Client</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Engineer Progress</TableHead>
-                      <TableHead>Total Amount</TableHead>
-                      <TableHead>Amount Paid</TableHead>
-                      <TableHead>Created</TableHead>
-                      <TableHead>Installation Date</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
+                     <TableRow>
+                       <TableHead>Order Number</TableHead>
+                       <TableHead>Client</TableHead>
+                       <TableHead>Status</TableHead>
+                       <TableHead>Partner Status</TableHead>
+                       <TableHead>Engineer Progress</TableHead>
+                       <TableHead>Total Amount</TableHead>
+                       <TableHead>Amount Paid</TableHead>
+                       <TableHead>Created</TableHead>
+                       <TableHead>Installation Date</TableHead>
+                       <TableHead>Actions</TableHead>
+                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredOrders.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                          No orders found
-                        </TableCell>
-                      </TableRow>
+                       <TableRow>
+                         <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                           No orders found
+                         </TableCell>
+                       </TableRow>
                     ) : (
                       filteredOrders.map((order) => (
                         <TableRow key={order.id}>
@@ -390,13 +392,22 @@ export default function AdminOrders() {
                                </div>
                              </div>
                            </TableCell>
-                          <TableCell>
-                            <Badge className={getStatusColor(order.status_enhanced)}>
-                              {order.status_enhanced === 'awaiting_payment' ? 'Awaiting Payment' : 
-                               order.status_enhanced === 'awaiting_install_booking' ? 'Awaiting Install Booking' :
-                               formatStatus(order.status_enhanced)}
-                            </Badge>
-                          </TableCell>
+                           <TableCell>
+                             <Badge className={getStatusColor(order.status_enhanced)}>
+                               {order.status_enhanced === 'awaiting_payment' ? 'Awaiting Payment' : 
+                                order.status_enhanced === 'awaiting_install_booking' ? 'Awaiting Install Booking' :
+                                formatStatus(order.status_enhanced)}
+                             </Badge>
+                           </TableCell>
+                           <TableCell>
+                             {order.is_partner_job && order.partner_status ? (
+                               <Badge variant="outline" className="text-xs bg-slate-100 text-slate-700">
+                                 {order.partner_status}
+                               </Badge>
+                             ) : (
+                               <span className="text-muted-foreground text-sm">-</span>
+                             )}
+                           </TableCell>
                           <TableCell>
                             <div className="text-sm">
                               {order.engineer ? (
