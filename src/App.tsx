@@ -45,7 +45,7 @@ import EnhancedClientOrderView from "./pages/EnhancedClientOrderView";
 import EngineerDashboard from "./pages/EngineerDashboard";
 import EngineerJobDetail from "./pages/EngineerJobDetail";
 import EngineerProfile from "./pages/EngineerProfile";
-import EngineerAvailability from "./pages/EngineerAvailability";
+import EngineerStockRequests from "./pages/EngineerStockRequests";
 import OrderDetail from "./pages/OrderDetail";
 import PublicQuoteView from "./pages/PublicQuoteView";
 import NotFound from "./pages/NotFound";
@@ -117,7 +117,7 @@ function App() {
                     <Route path="/engineer/dashboard" element={<EngineerDashboard />} />
                     <Route path="/engineer/jobs/:id" element={<EngineerJobDetail />} />
                     <Route path="/engineer/profile" element={<EngineerProfile />} />
-                    <Route path="/engineer/availability" element={<EngineerAvailability />} />
+                    <Route path="/engineer/stock-requests" element={<EngineerStockRequests />} />
                     
                     {/* Other authenticated routes */}
                     <Route path="/orders/:id" element={<OrderDetail />} />

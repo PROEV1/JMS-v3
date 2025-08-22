@@ -81,7 +81,7 @@ export function AppSidebar({ userRole }: AppSidebarProps) {
         window.location.reload();
       }, 100);
     }},
-    { icon: Clock, label: 'Availability', href: '/engineer/availability', action: () => navigate('/engineer/availability') },
+    { icon: Package, label: 'Stock Requests', href: '/engineer/stock-requests', action: () => navigate('/engineer/stock-requests') },
     { icon: User, label: 'Profile', href: '/engineer/profile', action: () => navigate('/engineer/profile') },
   ];
 

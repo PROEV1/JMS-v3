@@ -9,13 +9,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';  
 import { StockRequestButton } from '@/components/engineer/StockRequestButton';
 import { StockRequestHistory } from '@/components/engineer/StockRequestHistory';
+import { useStockRequests } from '@/hooks/useStockRequests';
 
 interface Job {
   id: string;
   order_number: string;
   client_id: string;
   job_address: string;
-  installation_date: string;
+  scheduled_install_date: string;
   time_window: string;
   status: string;
   job_type?: 'installation' | 'assessment' | 'service_call';
@@ -70,6 +71,10 @@ export default function EngineerDashboard() {
     enabled: !!user?.id
   });
 
+  // Get stock requests count
+  const { data: stockRequests } = useStockRequests(engineer?.id);
+
+
   // Get today's jobs
   const { data: todaysJobs } = useQuery({
     queryKey: ['todays-jobs', engineer?.id],
@@ -82,7 +87,8 @@ export default function EngineerDashboard() {
         .from('orders')
         .select('*')
         .eq('engineer_id', engineer.id)
-        .eq('installation_date', today)
+        .gte('scheduled_install_date', today)
+        .lt('scheduled_install_date', new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0])
         .limit(5);
 
       if (error) throw error;
@@ -97,14 +103,14 @@ export default function EngineerDashboard() {
     queryFn: async () => {
       if (!engineer?.id) return [];
 
-      const today = new Date().toISOString().split('T')[0];
+      const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
       const { data, error } = await supabase
         .from('orders')
         .select('*')
         .eq('engineer_id', engineer.id)
-        .gt('installation_date', today)
-        .order('installation_date', { ascending: true })
+        .gte('scheduled_install_date', tomorrow)
+        .order('scheduled_install_date', { ascending: true })
         .limit(5);
 
       if (error) throw error;
@@ -168,18 +174,17 @@ export default function EngineerDashboard() {
             <CardTitle>Stock Requests</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">5</div>
-            <p className="text-muted-foreground">Pending stock requests</p>
+            <div className="text-2xl font-bold">{stockRequests?.length || 0}</div>
+            <p className="text-muted-foreground">Stock requests</p>
           </CardContent>
         </Card>
       </div>
 
       <Tabs defaultValue="schedule" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="schedule">Today's Schedule</TabsTrigger>
           <TabsTrigger value="upcoming">Upcoming Jobs</TabsTrigger>
           <TabsTrigger value="stock">Stock Requests</TabsTrigger>
-          <TabsTrigger value="availability">Availability</TabsTrigger>
         </TabsList>
 
         <TabsContent value="schedule" className="space-y-4">
@@ -203,10 +208,10 @@ export default function EngineerDashboard() {
                       <MapPin className="h-4 w-4" />
                       <span>{job.job_address}</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4" />
-                      <span>{formatDate(job.installation_date)}</span>
-                    </div>
+                     <div className="flex items-center gap-2">
+                       <Calendar className="h-4 w-4" />
+                       <span>{formatDate(job.scheduled_install_date)}</span>
+                     </div>
                     <div className="flex items-center gap-2">
                       <Clock className="h-4 w-4" />
                       <span>{formatTime(job.time_window)}</span>
@@ -246,10 +251,10 @@ export default function EngineerDashboard() {
                       <MapPin className="h-4 w-4" />
                       <span>{job.job_address}</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4" />
-                      <span>{formatDate(job.installation_date)}</span>
-                    </div>
+                     <div className="flex items-center gap-2">
+                       <Calendar className="h-4 w-4" />
+                       <span>{formatDate(job.scheduled_install_date)}</span>
+                     </div>
                     <div className="flex items-center gap-2">
                       <Clock className="h-4 w-4" />
                       <span>{formatTime(job.time_window)}</span>
@@ -268,10 +273,6 @@ export default function EngineerDashboard() {
           )}
         </TabsContent>
 
-        <TabsContent value="availability">
-          <h2 className="text-xl font-semibold">Availability</h2>
-          <p>Manage your availability here.</p>
-        </TabsContent>
 
         <TabsContent value="stock" className="space-y-4">
           <div className="flex items-center justify-between">
