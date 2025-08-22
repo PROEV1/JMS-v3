@@ -42,11 +42,26 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
   const [urgencyFilter, setUrgencyFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<string>('date');
   
+  // DEBUGGING: Log props to console
+  console.log('ScheduleStatusListPage props:', { 
+    ordersCount: orders?.length, 
+    engineersCount: engineers?.length, 
+    title,
+    orders: orders?.slice(0, 2) // First 2 orders for debugging
+  });
+  
   // Fetch all job offers for the displayed orders
   const { offers, refetch: refetchOffers, releaseOffer, resendOffer } = useJobOffers();
 
   // Enhanced filtering logic with null safety
   const filteredAndSortedOrders = (() => {
+    console.log('Starting filtering with orders:', orders?.length);
+    
+    if (!orders || !Array.isArray(orders)) {
+      console.warn('Orders is not an array:', orders);
+      return [];
+    }
+    
     let filtered = orders.filter(order => {
       // CRITICAL: Filter out null/undefined orders first
       if (!order || !order.id) {
@@ -78,19 +93,31 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
       return matchesSearch && matchesJobType && matchesValue && matchesUrgency;
     });
 
-    // Sorting
+    console.log('After filtering:', filtered?.length);
+
+    // Sorting with null safety
     filtered.sort((a, b) => {
-      switch (sortBy) {
-        case 'value':
-          return (b.total_amount || 0) - (a.total_amount || 0);
-        case 'postcode':
-          return (getBestPostcode(a) || '').localeCompare(getBestPostcode(b) || '');
-        case 'date':
-        default:
-          return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+      try {
+        switch (sortBy) {
+          case 'value':
+            return (b.total_amount || 0) - (a.total_amount || 0);
+          case 'postcode':
+            const postcodeA = getBestPostcode(a) || '';
+            const postcodeB = getBestPostcode(b) || '';
+            return postcodeA.localeCompare(postcodeB);
+          case 'date':
+          default:
+            const dateA = new Date(a.created_at || 0).getTime();
+            const dateB = new Date(b.created_at || 0).getTime();
+            return dateB - dateA;
+        }
+      } catch (error) {
+        console.error('Error during sorting:', error);
+        return 0;
       }
     });
 
+    console.log('Final filtered and sorted orders:', filtered?.length);
     return filtered;
   })();
 
@@ -542,16 +569,20 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
     }
   };
 
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold">{title}</h2>
-          <p className="text-muted-foreground">
-            {filteredAndSortedOrders.length} job{filteredAndSortedOrders.length !== 1 ? 's' : ''}
-          </p>
-        </div>
+  // Main render with error boundary and debugging
+  console.log('About to render ScheduleStatusListPage with', filteredAndSortedOrders.length, 'orders');
+  
+  try {
+    return (
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold">{title}</h2>
+            <p className="text-muted-foreground">
+              {filteredAndSortedOrders.length} job{filteredAndSortedOrders.length !== 1 ? 's' : ''} | DEBUG: Original count: {orders?.length || 0}
+            </p>
+          </div>
         
         <div className="flex items-center gap-3">
           {showAutoSchedule && (
@@ -1208,6 +1239,22 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
           }}
         />
       )}
-    </div>
-  );
+      </div>
+    );
+  } catch (error) {
+    console.error('Error rendering ScheduleStatusListPage:', error);
+    return (
+      <div className="space-y-6">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <h3 className="text-lg font-semibold text-red-800">Error Loading {title}</h3>
+          <p className="text-red-600 mt-1">
+            There was an error loading the job list. Check the console for details.
+          </p>
+          <p className="text-sm text-red-500 mt-2">
+            Orders: {orders?.length || 0}, Engineers: {engineers?.length || 0}
+          </p>
+        </div>
+      </div>
+    );
+  }
 }

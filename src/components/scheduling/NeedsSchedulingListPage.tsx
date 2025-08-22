@@ -7,9 +7,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Calendar } from 'lucide-react';
 
 export function NeedsSchedulingListPage() {
-  const { data: orders = [], isLoading: ordersLoading } = useQuery({
+  console.log('NeedsSchedulingListPage: Starting component render');
+  
+  const { data: orders = [], isLoading: ordersLoading, error: ordersError } = useQuery({
     queryKey: ['orders', 'needs-scheduling'],
     queryFn: async () => {
+      console.log('NeedsSchedulingListPage: Fetching orders...');
       // First get orders that need scheduling (matching the count calculation)
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
@@ -24,7 +27,12 @@ export function NeedsSchedulingListPage() {
         .eq('scheduling_suppressed', false)
         .order('created_at', { ascending: false });
 
-      if (ordersError) throw ordersError;
+      if (ordersError) {
+        console.error('NeedsSchedulingListPage: Error fetching orders:', ordersError);
+        throw ordersError;
+      }
+      
+      console.log('NeedsSchedulingListPage: Got orders:', ordersData?.length);
       
       if (!ordersData?.length) return [];
 
@@ -38,24 +46,58 @@ export function NeedsSchedulingListPage() {
       const ordersWithActiveOffers = new Set(activeOffers?.map(offer => offer.order_id) || []);
       
       // Filter out orders that have active offers
-      return ordersData.filter(order => !ordersWithActiveOffers.has(order.id));
+      const filteredOrders = ordersData.filter(order => !ordersWithActiveOffers.has(order.id));
+      console.log('NeedsSchedulingListPage: Filtered orders:', filteredOrders.length);
+      return filteredOrders;
     }
   });
 
-  const { data: engineers = [], isLoading: engineersLoading } = useQuery({
+  const { data: engineers = [], isLoading: engineersLoading, error: engineersError } = useQuery({
     queryKey: ['engineers'],
     queryFn: async () => {
+      console.log('NeedsSchedulingListPage: Fetching engineers...');
       const { data, error } = await supabase
         .from('engineers')
         .select('*')
         .eq('availability', true)
         .order('name');
 
-      if (error) throw error;
+      if (error) {
+        console.error('NeedsSchedulingListPage: Error fetching engineers:', error);
+        throw error;
+      }
+      console.log('NeedsSchedulingListPage: Got engineers:', data?.length);
       return data || [];
     }
   });
 
+  console.log('NeedsSchedulingListPage - Orders count:', orders?.length, 'Engineers count:', engineers?.length);
+  
+  // Show errors if any
+  if (ordersError || engineersError) {
+    console.error('NeedsSchedulingListPage: Errors occurred:', { ordersError, engineersError });
+    return (
+      <div className="space-y-6">
+        <ScheduleStatusNavigation currentStatus="needs-scheduling" />
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-red-600">
+              <Calendar className="h-5 w-5" />
+              Needs Scheduling - Error Loading Data
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-red-600">
+              <p>Error loading data:</p>
+              {ordersError && <p>Orders: {ordersError.message}</p>}
+              {engineersError && <p>Engineers: {engineersError.message}</p>}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+  
   if (ordersLoading || engineersLoading) {
     return (
       <div className="flex items-center justify-center h-96">
