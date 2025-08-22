@@ -402,7 +402,7 @@ export default function AdminOrders() {
                            <TableCell>
                              {order.is_partner_job ? (
                                <Badge variant="outline" className="text-xs bg-slate-100 text-slate-700">
-                                 {order.partner_status || 'Imported'}
+                                 {order.partner_status || 'Legacy Import'}
                                </Badge>
                              ) : (
                                <span className="text-muted-foreground text-sm">-</span>

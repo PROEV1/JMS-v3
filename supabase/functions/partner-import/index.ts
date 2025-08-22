@@ -639,6 +639,7 @@ serve(async (req: Request): Promise<Response> => {
             job_address: mappedData.job_address || null,
             postcode: mappedData.postcode || null,
             status_enhanced: jmsStatus,
+            partner_status: originalPartnerStatus, // Store the original partner status
             is_partner_job: true,
             engineer_id: engineerId,
             job_type: (mappedData.job_type || mappedData.type || 'installation').toLowerCase(),
