@@ -20,7 +20,7 @@ export function NotInSchedulingListPage() {
           partners:partner_id(name)
         `)
         .eq('scheduling_suppressed', true)
-        .neq('status_enhanced', 'cancelled') // Don't show cancelled jobs here
+        .neq('status_enhanced', 'cancelled')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -48,7 +48,7 @@ export function NotInSchedulingListPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4">
+          <div className="grid gap-3">
             {orders.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <Eye className="h-12 w-12 mx-auto mb-4 opacity-50" />

@@ -1,27 +1,35 @@
-
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { ScheduleStatusNavigation } from './ScheduleStatusNavigation';
 import { EnhancedJobCard } from './EnhancedJobCard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Trophy } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 
-export function CompletedListPage() {
+export function OfferExpiredListPage() {
   const { data: orders = [], isLoading } = useQuery({
-    queryKey: ['orders', 'completed'],
+    queryKey: ['orders', 'offer-expired'],
     queryFn: async () => {
+      // Get orders with expired offers
+      const { data: expiredOffers } = await supabase
+        .from('job_offers')
+        .select('order_id')
+        .eq('status', 'expired');
+
+      if (!expiredOffers?.length) return [];
+
+      const uniqueOrderIds = [...new Set(expiredOffers.map(offer => offer.order_id))];
+
       const { data, error } = await supabase
         .from('orders')
         .select(`
           *,
-          clients:client_id(full_name, email, phone),
-          engineers:engineer_id(name, email),
-          partners:partner_id(name)
+          client:client_id(full_name, email, phone, postcode, address),
+          engineer:engineer_id(name, email, region),
+          partner:partner_id(name)
         `)
-        .eq('status_enhanced', 'completed')
-        .order('updated_at', { ascending: false })
-        .limit(100); // Limit for performance
+        .in('id', uniqueOrderIds)
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
       return data || [];
@@ -38,21 +46,21 @@ export function CompletedListPage() {
 
   return (
     <div className="space-y-6">
-      <ScheduleStatusNavigation currentStatus="completed" />
+      <ScheduleStatusNavigation currentStatus="offer-expired" />
       
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Trophy className="h-5 w-5" />
-            Completed Jobs ({orders.length})
+            <AlertTriangle className="h-5 w-5" />
+            Offer Expired ({orders.length})
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid gap-3">
             {orders.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                <Trophy className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>No completed jobs</p>
+                <AlertTriangle className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>No jobs with expired offers</p>
               </div>
             ) : (
               orders.map((order) => (
@@ -60,10 +68,10 @@ export function CompletedListPage() {
                   key={order.id}
                   order={{
                     ...order,
-                    clients: order.clients ? {
-                      name: order.clients.full_name,
-                      email: order.clients.email,
-                      phone: order.clients.phone
+                    clients: order.client ? {
+                      name: order.client.full_name,
+                      email: order.client.email,
+                      phone: order.client.phone
                     } : undefined
                   }}
                   onUpdate={() => {

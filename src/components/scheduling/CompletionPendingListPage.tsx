@@ -47,7 +47,7 @@ export function CompletionPendingListPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4">
+          <div className="grid gap-3">
             {orders.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <FileCheck className="h-12 w-12 mx-auto mb-4 opacity-50" />

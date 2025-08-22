@@ -224,7 +224,7 @@ export function ScheduleStatusNavigation({ currentStatus }: ScheduleStatusNaviga
             .from('orders')
             .select('*', { count: 'exact', head: true })
             .eq('scheduling_suppressed', true)
-            .eq('scheduling_suppressed_reason', 'awaiting_quotation')
+            .neq('status_enhanced', 'cancelled')
         ]);
 
         // For needs-scheduling, get count of orders with no engineer and no active offers
