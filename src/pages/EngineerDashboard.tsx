@@ -3,7 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calendar, Clock, MapPin, Package, User, Plus } from 'lucide-react';
+import { Calendar, Clock, MapPin, Package, User, Plus, Eye } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';  
@@ -52,6 +53,7 @@ const formatTime = (timeString: string): string => {
 
 export default function EngineerDashboard() {
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   // Get engineer profile
   const { data: engineer } = useQuery({
@@ -203,21 +205,31 @@ export default function EngineerDashboard() {
                        )}
                      </div>
                    </CardHeader>
-                  <CardContent className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4" />
-                      <span>{job.job_address}</span>
-                    </div>
+                   <CardContent className="space-y-2">
+                     <div className="flex items-center gap-2">
+                       <MapPin className="h-4 w-4" />
+                       <span>{job.job_address}</span>
+                     </div>
                      <div className="flex items-center gap-2">
                        <Calendar className="h-4 w-4" />
                        <span>{formatDate(job.scheduled_install_date)}</span>
                      </div>
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-4 w-4" />
-                      <span>{formatTime(job.time_window)}</span>
-                    </div>
-                    <Badge className={getStatusColor(job.status)}>{job.status}</Badge>
-                  </CardContent>
+                     <div className="flex items-center gap-2">
+                       <Clock className="h-4 w-4" />
+                       <span>{formatTime(job.time_window)}</span>
+                     </div>
+                     <div className="flex items-center justify-between mt-3">
+                       <Badge className={getStatusColor(job.status)}>{job.status}</Badge>
+                       <Button 
+                         size="sm" 
+                         onClick={() => navigate(`/engineer/jobs/${job.id}`)}
+                         className="ml-auto"
+                       >
+                         <Eye className="h-4 w-4 mr-1" />
+                         View Details
+                       </Button>
+                     </div>
+                   </CardContent>
                 </Card>
               ))}
             </div>
@@ -246,21 +258,31 @@ export default function EngineerDashboard() {
                        )}
                      </div>
                    </CardHeader>
-                  <CardContent className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4" />
-                      <span>{job.job_address}</span>
-                    </div>
+                   <CardContent className="space-y-2">
+                     <div className="flex items-center gap-2">
+                       <MapPin className="h-4 w-4" />
+                       <span>{job.job_address}</span>
+                     </div>
                      <div className="flex items-center gap-2">
                        <Calendar className="h-4 w-4" />
                        <span>{formatDate(job.scheduled_install_date)}</span>
                      </div>
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-4 w-4" />
-                      <span>{formatTime(job.time_window)}</span>
-                    </div>
-                    <Badge className={getStatusColor(job.status)}>{job.status}</Badge>
-                  </CardContent>
+                     <div className="flex items-center gap-2">
+                       <Clock className="h-4 w-4" />
+                       <span>{formatTime(job.time_window)}</span>
+                     </div>
+                     <div className="flex items-center justify-between mt-3">
+                       <Badge className={getStatusColor(job.status)}>{job.status}</Badge>
+                       <Button 
+                         size="sm" 
+                         onClick={() => navigate(`/engineer/jobs/${job.id}`)}
+                         className="ml-auto"
+                       >
+                         <Eye className="h-4 w-4 mr-1" />
+                         View Details
+                       </Button>
+                     </div>
+                   </CardContent>
                 </Card>
               ))}
             </div>
