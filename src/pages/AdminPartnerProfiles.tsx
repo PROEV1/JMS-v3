@@ -17,6 +17,7 @@ import { PartnerStatusMappingEditor } from '@/components/admin/PartnerStatusMapp
 import ImportRunModal from '@/components/admin/ImportRunModal';
 import { DeletePartnerJobsModal } from '@/components/admin/DeletePartnerJobsModal';
 import { ImportProfileActions } from '@/components/admin/ImportProfileActions';
+import { TestPartnerImport } from '@/components/TestPartnerImport';
 
 interface ImportProfile {
   id: string;
@@ -429,6 +430,7 @@ export default function AdminPartnerProfiles() {
 
   return (
     <div className="p-6 space-y-6">
+      <TestPartnerImport />
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold">Import Profiles</h1>
