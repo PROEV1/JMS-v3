@@ -10,6 +10,11 @@ import { Input } from '@/components/ui/input';
 import { AddItemModal } from './AddItemModal';
 import { InventoryKpiTile } from './shared/InventoryKpiTile';
 import { StatusChip } from './shared/StatusChip';
+import { AdvancedSearchModal } from './shared/AdvancedSearchModal';
+import { BulkActionsBar, inventoryBulkActions } from './shared/BulkActionsBar';
+import { InventoryViewSwitcher, useInventoryView, ViewMode } from './shared/InventoryViewSwitcher';
+import { MobileInventoryCard } from './shared/MobileInventoryCard';
+import { NotificationBanner, createStockNotification } from './shared/NotificationBanner';
 
 interface InventoryItem {
   id: string;
@@ -29,6 +34,9 @@ interface InventoryItem {
 export const InventoryItemsSimple: React.FC = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [searchFilters, setSearchFilters] = useState({});
+  const [viewMode, setViewMode] = useInventoryView('grid', 'inventory-items-view');
 
   const { data: items, isLoading } = useQuery({
     queryKey: ['inventory-items'],
@@ -59,10 +67,63 @@ export const InventoryItemsSimple: React.FC = () => {
     enabled: !!items
   });
 
-  const filteredItems = items?.filter(item =>
-    item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.sku.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Enhanced filtering with advanced search
+  const filteredItems = items?.filter(item => {
+    // Basic search
+    const matchesSearch = !searchTerm || 
+      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.sku.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    // Advanced filters
+    const matchesFilters = Object.entries(searchFilters).every(([key, value]) => {
+      if (!value || value === 'all' || value === '') return true;
+      
+      switch (key) {
+        case 'name':
+          return item.name.toLowerCase().includes((value as string).toLowerCase());
+        case 'sku':
+          return item.sku.toLowerCase().includes((value as string).toLowerCase());
+        case 'stockLevel':
+          const stockLevel = 50; // Mock stock level
+          if (value === 'low') return stockLevel <= item.reorder_point;
+          if (value === 'normal') return stockLevel > item.reorder_point && stockLevel < item.max_level * 0.8;
+          if (value === 'high') return stockLevel >= item.max_level * 0.8;
+          return true;
+        case 'isActive':
+          return item.is_active === value;
+        case 'isSerialized':
+          return item.is_serialized === value;
+        case 'costRange':
+          const [min, max] = value as [number, number];
+          return item.default_cost >= min && item.default_cost <= max;
+        default:
+          return true;
+      }
+    });
+    
+    return matchesSearch && matchesFilters;
+  });
+
+  // Mock notifications for low stock items
+  const notifications = items?.filter(item => 50 <= item.reorder_point).map(item => 
+    createStockNotification(item.name, 50, item.reorder_point)
+  ) || [];
+
+  const handleSelectAll = () => {
+    setSelectedIds(filteredItems?.map(item => item.id) || []);
+  };
+
+  const handleClearSelection = () => {
+    setSelectedIds([]);
+  };
+
+  const handleItemSelect = (itemId: string, selected: boolean) => {
+    setSelectedIds(prev => 
+      selected 
+        ? [...prev, itemId]
+        : prev.filter(id => id !== itemId)
+    );
+  };
 
   if (isLoading) {
     return (
@@ -74,6 +135,15 @@ export const InventoryItemsSimple: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Notifications */}
+      {notifications.length > 0 && (
+        <NotificationBanner 
+          notifications={notifications}
+          onDismiss={(id) => console.log('Dismiss:', id)}
+          maxDisplay={2}
+        />
+      )}
+
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-semibold">Inventory Items</h2>
@@ -119,89 +189,135 @@ export const InventoryItemsSimple: React.FC = () => {
         </div>
       )}
 
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search items..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
+      {/* Bulk Actions Bar */}
+      <BulkActionsBar
+        selectedIds={selectedIds}
+        totalCount={filteredItems?.length || 0}
+        onClearSelection={handleClearSelection}
+        onSelectAll={handleSelectAll}
+        actions={inventoryBulkActions}
+      />
+
+      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+        <div className="flex items-center gap-4 flex-1 min-w-0">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search items..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <AdvancedSearchModal
+            filters={searchFilters}
+            onFiltersChange={setSearchFilters}
+            onClear={() => setSearchFilters({})}
           />
         </div>
-        <div className="text-sm text-muted-foreground">
-          {filteredItems?.length || 0} items
-        </div>
+        
+        <InventoryViewSwitcher
+          currentView={viewMode}
+          onViewChange={setViewMode}
+          itemCount={filteredItems?.length}
+        />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {filteredItems?.map((item) => (
-          <Card key={item.id} className="hover:shadow-md transition-shadow">
-            <CardHeader className="pb-3">
-              <div className="flex items-start justify-between">
-                <div className="space-y-1">
-                  <CardTitle className="text-base">{item.name}</CardTitle>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="text-xs">
-                      {item.sku}
-                    </Badge>
-                    <span className="text-xs text-muted-foreground">
-                      {item.unit}
-                    </span>
+      {/* Items Display */}
+      {viewMode === 'grid' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {filteredItems?.map((item) => (
+            <div key={item.id} className="hidden md:block">
+              <Card className={`hover:shadow-md transition-shadow ${selectedIds.includes(item.id) ? 'ring-2 ring-primary' : ''}`}>
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <div className="space-y-1">
+                      <CardTitle className="text-base">{item.name}</CardTitle>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-xs">
+                          {item.sku}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">
+                          {item.unit}
+                        </span>
+                      </div>
+                    </div>
+                    <Package className="h-5 w-5 text-muted-foreground" />
                   </div>
-                </div>
-                <Package className="h-5 w-5 text-muted-foreground" />
-              </div>
-            </CardHeader>
+                </CardHeader>
 
-            <CardContent className="space-y-2">
-              {item.description && (
-                <p className="text-sm text-muted-foreground line-clamp-2">
-                  {item.description}
-                </p>
-              )}
-              
-              <div className="space-y-1 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Cost:</span>
-                  <span className="font-medium">£{item.default_cost}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Min/Max:</span>
-                  <span>{item.min_level}/{item.max_level}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Reorder:</span>
-                  <span>{item.reorder_point}</span>
-                </div>
-              </div>
+                <CardContent className="space-y-2">
+                  {item.description && (
+                    <p className="text-sm text-muted-foreground line-clamp-2">
+                      {item.description}
+                    </p>
+                  )}
+                  
+                  <div className="space-y-1 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Cost:</span>
+                      <span className="font-medium">£{item.default_cost}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Min/Max:</span>
+                      <span>{item.min_level}/{item.max_level}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Reorder:</span>
+                      <span>{item.reorder_point}</span>
+                    </div>
+                  </div>
 
-              <div className="flex items-center justify-between pt-2">
-                <StatusChip status={item.is_active ? "active" : "inactive"}>
-                  {item.is_active ? "Active" : "Inactive"}
-                </StatusChip>
-                {item.is_serialized && (
-                  <Badge variant="outline" className="text-xs">
-                    Serialized
-                  </Badge>
-                )}
-              </div>
-              
-              <div className="flex gap-1 pt-2">
-                <Button variant="outline" size="sm" className="text-xs h-7 px-2">
-                  Adjust
-                </Button>
-                <Button variant="outline" size="sm" className="text-xs h-7 px-2">
-                  Transfer
-                </Button>
-                <Button variant="outline" size="sm" className="text-xs h-7 px-2">
-                  View
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+                  <div className="flex items-center justify-between pt-2">
+                    <StatusChip status={item.is_active ? "active" : "inactive"}>
+                      {item.is_active ? "Active" : "Inactive"}
+                    </StatusChip>
+                    {item.is_serialized && (
+                      <Badge variant="outline" className="text-xs">
+                        Serialized
+                      </Badge>
+                    )}
+                  </div>
+                  
+                  <div className="flex gap-1 pt-2">
+                    <Button variant="outline" size="sm" className="text-xs h-7 px-2">
+                      Adjust
+                    </Button>
+                    <Button variant="outline" size="sm" className="text-xs h-7 px-2">
+                      Transfer
+                    </Button>
+                    <Button variant="outline" size="sm" className="text-xs h-7 px-2">
+                      View
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Mobile Grid View */}
+      {viewMode === 'grid' && (
+        <div className="grid grid-cols-1 gap-4 md:hidden">
+          {filteredItems?.map((item) => (
+            <MobileInventoryCard
+              key={item.id}
+              item={{
+                ...item,
+                current_stock: 50, // Mock stock level
+                supplier_name: 'Supplier A' // Mock supplier
+              }}
+              isSelected={selectedIds.includes(item.id)}
+              onSelect={(selected) => handleItemSelect(item.id, selected)}
+              showSelection={true}
+              onTransfer={() => console.log('Transfer', item.id)}
+              onAdjust={() => console.log('Adjust', item.id)}
+              onView={() => console.log('View', item.id)}
+            />
+          ))}
+        </div>
+      )}
 
       {filteredItems?.length === 0 && (
         <Card>
