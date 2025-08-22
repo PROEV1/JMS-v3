@@ -440,19 +440,19 @@ serve(async (req: Request): Promise<Response> => {
               jmsStatus = actionConfig.jms_status;
               console.log(`Using status action mapping: ${originalPartnerStatus} -> ${jmsStatus}`);
             } else {
-            // Default mappings for common partner statuses
-            const defaultPartnerMappings: Record<string, string> = {
-              'AWAITING_INSTALL_DATE': 'awaiting_install_booking',
-              'AWAITING_QUOTATION': 'awaiting_install_booking',
-              'CANCELLATION_REQUESTED': 'cancelled',
-              'CANCELLED': 'cancelled',
-              'COMPLETE': 'completed',
-              'INSTALL_DATE_CONFIRMED': 'scheduled',
-              'INSTALLED': 'install_completed_pending_qa',
-              'ON_HOLD': 'on_hold_parts_docs',
-              'SWITCH_JOB_SUB_TYPE_REQUESTED': 'awaiting_install_booking',
-              'UNKNOWN': 'awaiting_install_booking'
-            };
+              // Default mappings for common partner statuses
+              const defaultPartnerMappings: Record<string, string> = {
+                'AWAITING_INSTALL_DATE': 'awaiting_install_booking',
+                'AWAITING_QUOTATION': 'awaiting_install_booking',
+                'CANCELLATION_REQUESTED': 'cancelled',
+                'CANCELLED': 'cancelled',
+                'COMPLETE': 'completed',
+                'INSTALL_DATE_CONFIRMED': 'scheduled',
+                'INSTALLED': 'install_completed_pending_qa',
+                'ON_HOLD': 'on_hold_parts_docs',
+                'SWITCH_JOB_SUB_TYPE_REQUESTED': 'awaiting_install_booking',
+                'UNKNOWN': 'awaiting_install_booking'
+              };
               
               if (defaultPartnerMappings[originalPartnerStatus]) {
                 jmsStatus = defaultPartnerMappings[originalPartnerStatus];
