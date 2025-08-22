@@ -777,6 +777,8 @@ serve(async (req: Request): Promise<Response> => {
             .from('orders')
             .insert(recordsForInsert.map(item => ({
               ...item,
+              // Ensure order_number is set for partner jobs
+              order_number: item.order_number || 'TEMP',
               updated_at: new Date().toISOString(),
               created_at: new Date().toISOString()
             })))
