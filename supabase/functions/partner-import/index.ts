@@ -380,6 +380,8 @@ serve(async (req: Request): Promise<Response> => {
               internal_notes: row[columnMapping['internal_notes']]?.toString()?.trim() || null,
               customer_ref: row[columnMapping['customer_ref']]?.toString()?.trim() || null,
               partner_status: row[columnMapping['partner_status']]?.toString()?.trim() || null,
+              // Set is_partner_job early so validation can use it
+              is_partner_job: true,
             };
 
             if (!mappedData.partner_external_id) {
@@ -517,12 +519,13 @@ serve(async (req: Request): Promise<Response> => {
               }
             }
 
-            // Validate required fields for order creation
-            if (!mappedData.client_id || !mappedData.quote_id) {
+            // For partner jobs, we don't require client_id and quote_id
+            // Only validate these for non-partner orders
+            if (!mappedData.is_partner_job && (!mappedData.client_id || !mappedData.quote_id)) {
               if (createMissingOrders) {
                 results.warnings.push({
                   row: rowIndex + 1,
-                  message: `Missing required client_id or quote_id for new order creation. Skipping row.`,
+                  message: `Missing required client_id or quote_id for new non-partner order creation. Skipping row.`,
                   data: mappedData
                 });
                 results.skipped++;
@@ -691,6 +694,8 @@ serve(async (req: Request): Promise<Response> => {
         );
         
         console.log(`Records for update: ${recordsForUpdate.length}, Records for insert: ${recordsForInsert.length}`);
+        console.log(`createMissingOrders flag: ${createMissingOrders}`);
+        console.log(`Sample record for insert:`, recordsForInsert.length > 0 ? JSON.stringify(recordsForInsert[0], null, 2) : 'No records for insert');
         
         let totalUpdated = 0;
         let totalInserted = 0;
