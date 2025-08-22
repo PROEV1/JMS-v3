@@ -10,7 +10,8 @@ export function NeedsSchedulingListPage() {
   const { data: orders = [], isLoading: ordersLoading } = useQuery({
     queryKey: ['orders', 'needs-scheduling'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // First get orders that need scheduling (matching the count calculation)
+      const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
         .select(`
           *,
@@ -18,11 +19,26 @@ export function NeedsSchedulingListPage() {
           engineer:engineer_id(name, email, region),
           partner:partner_id(name)
         `)
-        .in('status_enhanced', ['awaiting_install_booking', 'needs_scheduling'])
+        .eq('status_enhanced', 'awaiting_install_booking')
+        .is('engineer_id', null)
+        .eq('scheduling_suppressed', false)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      return data || [];
+      if (ordersError) throw ordersError;
+      
+      if (!ordersData?.length) return [];
+
+      // Get active offers to exclude orders that have them
+      const { data: activeOffers } = await supabase
+        .from('job_offers')
+        .select('order_id')
+        .eq('status', 'pending')
+        .gt('expires_at', new Date().toISOString());
+
+      const ordersWithActiveOffers = new Set(activeOffers?.map(offer => offer.order_id) || []);
+      
+      // Filter out orders that have active offers
+      return ordersData.filter(order => !ordersWithActiveOffers.has(order.id));
     }
   });
 
