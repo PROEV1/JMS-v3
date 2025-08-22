@@ -292,7 +292,7 @@ serve(async (req) => {
         user_id: existingUserId,
         full_name: full_name.trim(),
         email: email.trim().toLowerCase(),
-        phone: phone?.trim() || null,
+        phone: normalizedPhone,
         address: address?.trim() || null,
         postcode: postcode?.trim() || null
       })
