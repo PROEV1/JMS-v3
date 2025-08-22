@@ -592,12 +592,12 @@ serve(async (req: Request): Promise<Response> => {
             status_enhanced: jmsStatus,
             is_partner_job: true,
             engineer_id: engineerId,
-            job_type: mappedData.job_type || mappedData.type || null,
-            job_notes: mappedData.job_notes || null,
+            job_type: (mappedData.job_type || mappedData.type || 'installation').toLowerCase(),
+            installation_notes: mappedData.job_notes || null,
             sub_partner: mappedData.sub_partner || null,
             total_amount: mappedData.quote_amount ? parseFloat(mappedData.quote_amount) : 0,
-            suppress_from_scheduling: suppressScheduling,
-            suppression_reason: suppressionReason
+            scheduling_suppressed: suppressScheduling,
+            scheduling_suppressed_reason: suppressionReason
           };
 
           // Handle scheduled date
