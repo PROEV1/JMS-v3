@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,11 +7,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { CalendarDays, Clock, User, Mail, MessageSquare, Send, CheckCircle } from 'lucide-react';
+import { CalendarDays, Clock, User, Mail, MessageSquare, Send, CheckCircle, AlertCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useQuery } from '@tanstack/react-query';
 import { Order, getOrderEstimatedHours } from '@/utils/schedulingUtils';
 import { getBestPostcode } from '@/utils/postcodeUtils';
+import { format, addDays, startOfDay, isBefore } from 'date-fns';
 
 interface Engineer {
   id: string;
@@ -44,8 +46,69 @@ export function SendOfferModal({
   const [deliveryChannel, setDeliveryChannel] = useState<'email' | 'sms' | 'whatsapp'>('email');
   const [customMessage, setCustomMessage] = useState('');
   const [sending, setSending] = useState(false);
+  const [availableDates, setAvailableDates] = useState<Date[]>([]);
 
   const selectedEngineer = engineers.find(e => e.id === selectedEngineerId);
+
+  // Fetch engineer availability when engineer is selected
+  const { data: engineerAvailability, isLoading: loadingAvailability } = useQuery({
+    queryKey: ['engineer-availability', selectedEngineerId],
+    queryFn: async () => {
+      if (!selectedEngineerId) return null;
+      
+      const { data, error } = await supabase
+        .from('engineers')
+        .select(`
+          *,
+          engineer_availability(*)
+        `)
+        .eq('id', selectedEngineerId)
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!selectedEngineerId
+  });
+
+  // Calculate available dates based on engineer availability
+  useEffect(() => {
+    if (!engineerAvailability?.engineer_availability) {
+      setAvailableDates([]);
+      return;
+    }
+
+    const availableDaysOfWeek = engineerAvailability.engineer_availability
+      .filter((avail: any) => avail.is_available)
+      .map((avail: any) => avail.day_of_week);
+
+    // Generate next 60 days and filter by engineer availability
+    const dates: Date[] = [];
+    const today = new Date();
+    
+    for (let i = 1; i <= 60; i++) { // Start from tomorrow
+      const date = addDays(today, i);
+      const dayOfWeek = date.getDay();
+      
+      if (availableDaysOfWeek.includes(dayOfWeek)) {
+        dates.push(date);
+      }
+    }
+    
+    setAvailableDates(dates);
+    
+    // Clear selected date if it's no longer available
+    if (selectedDate && !dates.some(d => d.toDateString() === selectedDate.toDateString())) {
+      setSelectedDate(undefined);
+    }
+  }, [engineerAvailability, selectedDate]);
+
+  // Reset form when engineer changes
+  useEffect(() => {
+    if (selectedEngineerId !== preselectedEngineerId) {
+      setSelectedDate(undefined);
+    }
+  }, [selectedEngineerId, preselectedEngineerId]);
 
   const handleSendOffer = async () => {
     if (!selectedEngineerId || !selectedDate) {
@@ -115,7 +178,6 @@ export function SendOfferModal({
     }
   };
 
-
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -129,21 +191,20 @@ export function SendOfferModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Order Details */}
+        <div className="grid gap-6">
+          {/* Order Summary */}
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Order Details</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="grid grid-cols-2 md:grid-cols-3 gap-4">
               <div>
                 <Label className="text-sm font-medium text-muted-foreground">Order Number</Label>
-                <p className="font-semibold">{order.order_number}</p>
+                <p className="text-sm">{order.order_number}</p>
               </div>
               <div>
                 <Label className="text-sm font-medium text-muted-foreground">Client</Label>
-                <p className="font-semibold">{order.client?.full_name}</p>
-                <p className="text-sm text-muted-foreground">{order.client?.email}</p>
+                <p className="text-sm">{order.client?.full_name || 'N/A'}</p>
               </div>
               <div>
                 <Label className="text-sm font-medium text-muted-foreground">Address</Label>
@@ -188,20 +249,56 @@ export function SendOfferModal({
                 <CalendarDays className="w-4 h-4" />
                 Installation Date
               </Label>
-              <div className="border rounded-md">
-                <Calendar
-                  mode="single"
-                  selected={selectedDate}
-                  onSelect={setSelectedDate}
-                  disabled={(date) => date < new Date()}
-                  className="p-3"
-                />
-              </div>
+              
+              {loadingAvailability ? (
+                <div className="flex items-center gap-2 p-4 bg-muted rounded-md">
+                  <AlertCircle className="h-4 w-4 text-muted-foreground animate-pulse" />
+                  <span className="text-sm text-muted-foreground">Loading available dates...</span>
+                </div>
+              ) : !selectedEngineerId ? (
+                <div className="flex items-center gap-2 p-4 bg-muted rounded-md">
+                  <AlertCircle className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">Select an engineer first to see available dates</span>
+                </div>
+              ) : availableDates.length === 0 ? (
+                <div className="flex items-center gap-2 p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+                  <AlertCircle className="h-4 w-4 text-yellow-600" />
+                  <span className="text-sm text-yellow-800">No available dates found for this engineer</span>
+                </div>
+              ) : (
+                <div className="border rounded-md">
+                  <Calendar
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={setSelectedDate}
+                    disabled={(date) => {
+                      // Disable past dates and dates not in available dates
+                      const today = startOfDay(new Date());
+                      return isBefore(date, today) || !availableDates.some(d => 
+                        d.toDateString() === date.toDateString()
+                      );
+                    }}
+                    className="p-3"
+                  />
+                </div>
+              )}
+              
+              {selectedDate && (
+                <p className="text-sm text-muted-foreground mt-2">
+                  Selected: {format(selectedDate, 'EEEE, MMMM d, yyyy')}
+                </p>
+              )}
+              
+              {availableDates.length > 0 && selectedEngineerId && (
+                <p className="text-sm text-green-600 mt-2">
+                  {availableDates.length} available dates found for this engineer
+                </p>
+              )}
             </div>
 
             {/* Time Window */}
             <div>
-              <Label htmlFor="timeWindow" className="flex items-center gap-2 mb-2">
+              <Label className="flex items-center gap-2 mb-2">
                 <Clock className="w-4 h-4" />
                 Time Window
               </Label>
@@ -210,17 +307,16 @@ export function SendOfferModal({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="AM (9:00 - 12:00)">Morning (9:00 - 12:00)</SelectItem>
-                  <SelectItem value="PM (12:00 - 17:00)">Afternoon (12:00 - 17:00)</SelectItem>
-                  <SelectItem value="All Day (9:00 - 17:00)">All Day (9:00 - 17:00)</SelectItem>
-                  <SelectItem value="To be confirmed">To be confirmed</SelectItem>
+                  <SelectItem value="AM (9:00 - 12:00)">Morning (9:00 AM - 12:00 PM)</SelectItem>
+                  <SelectItem value="PM (1:00 - 5:00)">Afternoon (1:00 PM - 5:00 PM)</SelectItem>
+                  <SelectItem value="Full Day (9:00 - 5:00)">Full Day (9:00 AM - 5:00 PM)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Delivery Channel */}
+            {/* Delivery Method */}
             <div>
-              <Label htmlFor="channel" className="flex items-center gap-2 mb-2">
+              <Label className="flex items-center gap-2 mb-2">
                 <Mail className="w-4 h-4" />
                 Delivery Method
               </Label>
@@ -229,7 +325,7 @@ export function SendOfferModal({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="email">Email (Recommended)</SelectItem>
+                  <SelectItem value="email">Email</SelectItem>
                   <SelectItem value="sms">SMS</SelectItem>
                   <SelectItem value="whatsapp">WhatsApp</SelectItem>
                 </SelectContent>
@@ -238,48 +334,38 @@ export function SendOfferModal({
 
             {/* Custom Message */}
             <div>
-              <Label htmlFor="message" className="flex items-center gap-2 mb-2">
+              <Label className="flex items-center gap-2 mb-2">
                 <MessageSquare className="w-4 h-4" />
                 Custom Message (Optional)
               </Label>
               <Textarea
-                id="message"
-                placeholder="Add a personal message to include with the offer..."
                 value={customMessage}
                 onChange={(e) => setCustomMessage(e.target.value)}
+                placeholder="Add any additional information for the client..."
                 rows={3}
               />
-              <p className="text-xs text-muted-foreground mt-1">
-                Leave empty to use the default template message
-              </p>
             </div>
           </div>
-        </div>
 
-        {/* Preview Section */}
-        {selectedDate && selectedEngineer && (
-          <Card className="bg-muted/30">
+        {/* Confirmation Summary */}
+        {selectedEngineerId && selectedDate && (
+          <Card className="bg-green-50 border-green-200">
             <CardHeader>
-              <CardTitle className="text-lg">Offer Preview</CardTitle>
+              <CardTitle className="flex items-center gap-2 text-green-800">
+                <CheckCircle className="w-5 h-5" />
+                Offer Summary
+              </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
+            <CardContent className="space-y-2 text-green-800">
+              <div>
                 <p className="text-sm">
-                  <strong>To:</strong> {order.client?.full_name} ({order.client?.email})
-                </p>
-                <p className="text-sm">
-                  <strong>Date:</strong> {selectedDate.toLocaleDateString('en-GB', {
-                    weekday: 'long',
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
-                  })}
+                  <strong>Date:</strong> {format(selectedDate, 'EEEE, MMMM d, yyyy')}
                 </p>
                 <p className="text-sm">
                   <strong>Time:</strong> {timeWindow}
                 </p>
                 <p className="text-sm">
-                  <strong>Engineer:</strong> {selectedEngineer.name}
+                  <strong>Engineer:</strong> {selectedEngineer?.name}
                 </p>
                 <p className="text-sm">
                   <strong>Method:</strong> {deliveryChannel.charAt(0).toUpperCase() + deliveryChannel.slice(1)}
@@ -288,7 +374,6 @@ export function SendOfferModal({
             </CardContent>
           </Card>
         )}
-
 
         {/* Actions */}
         <div className="flex justify-end gap-3 pt-4 border-t">
@@ -300,11 +385,13 @@ export function SendOfferModal({
             Cancel
           </Button>
           <Button 
-            onClick={handleSendOffer}
-            disabled={!selectedEngineerId || !selectedDate || sending}
+            onClick={handleSendOffer} 
+            disabled={sending || !selectedEngineerId || !selectedDate || loadingAvailability}
+            className="min-w-[120px]"
           >
-            {sending ? 'Sending...' : 'Send Offer'}
+            {sending ? 'Sending...' : loadingAvailability ? 'Loading...' : 'Send Offer'}
           </Button>
+        </div>
         </div>
       </DialogContent>
     </Dialog>
