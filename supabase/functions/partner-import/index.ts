@@ -667,9 +667,28 @@ serve(async (req: Request): Promise<Response> => {
         const sampleExternalIds = recordsWithExternalId.slice(0, 5).map(r => r.partner_external_id);
         console.log('Sample external IDs:', sampleExternalIds);
         
-        // Separate records with and without required fields
-        const recordsForUpdate = results.data.filter(item => item.partner_external_id);
-        const recordsForInsert = results.data.filter(item => item.client_id && item.quote_id);
+        // Check if existing orders exist to update
+        const existingOrdersQuery = await supabase
+          .from('orders')
+          .select('partner_external_id')
+          .eq('partner_id', importProfile.partner_id)
+          .not('partner_external_id', 'is', null);
+
+        const existingExternalIds = new Set(
+          (existingOrdersQuery.data || []).map(o => o.partner_external_id)
+        );
+
+        console.log(`Found ${existingExternalIds.size} existing partner orders in database`);
+
+        // Separate records for update vs insert based on whether they exist in database
+        const recordsForUpdate = results.data.filter(item => 
+          item.partner_external_id && existingExternalIds.has(item.partner_external_id)
+        );
+        
+        // For partner jobs, allow insertion without client_id/quote_id requirements
+        const recordsForInsert = results.data.filter(item => 
+          item.partner_external_id && !existingExternalIds.has(item.partner_external_id)
+        );
         
         console.log(`Records for update: ${recordsForUpdate.length}, Records for insert: ${recordsForInsert.length}`);
         
