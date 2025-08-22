@@ -169,7 +169,7 @@ Deno.serve(async (req) => {
           </div>
           
           <div style="text-align: center; margin: 30px 0;">
-            <a href="${Deno.env.get('SUPABASE_URL').replace('supabase.co', 'lovable.app')}" 
+            <a href="${Deno.env.get('APP_BASE_URL') || 'https://preview--pro-spaces-client-portal.lovable.app'}" 
                style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">
               View in ProSpaces Dashboard
             </a>

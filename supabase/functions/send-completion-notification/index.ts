@@ -124,7 +124,7 @@ const handler = async (req: Request): Promise<Response> => {
                         
                         <!-- CTA Button -->
                         <div style="text-align: center; margin: 30px 0;">
-                          <a href="https://preview--pro-spaces-client-portal.lovable.app/admin/orders/${orderId}" 
+                          <a href="${Deno.env.get('APP_BASE_URL') || 'https://preview--pro-spaces-client-portal.lovable.app'}/admin/orders/${orderId}" 
                              style="display: inline-block; padding: 16px 32px; background: linear-gradient(135deg, hsl(178, 33%, 69%) 0%, hsl(178, 33%, 59%) 100%); color: #ffffff; text-decoration: none; font-weight: 600; font-size: 16px; border-radius: 8px; box-shadow: 0 4px 12px hsla(178, 33%, 69%, 0.3);">
                             📊 View Order Details
                           </a>

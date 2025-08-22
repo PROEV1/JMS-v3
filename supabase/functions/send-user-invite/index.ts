@@ -143,8 +143,8 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Generate password reset link for the user with our custom redirect
     console.log('Generating password reset link for user:', userId);
-    const origin = req.headers.get('origin') || 'https://preview--pro-spaces-client-portal.lovable.app';
-    const redirectTo = `${origin}/auth/setup-password`;
+    const appBaseUrl = Deno.env.get('APP_BASE_URL') || 'https://preview--pro-spaces-client-portal.lovable.app';
+    const redirectTo = `${appBaseUrl}/auth/setup-password`;
     console.log('Using redirectTo URL:', redirectTo);
     
     const { data: resetData, error: resetError } = await supabase.auth.admin.generateLink({
@@ -210,7 +210,7 @@ const handler = async (req: Request): Promise<Response> => {
                   <!-- Header with Logo -->
                   <tr>
                     <td align="center" style="padding: 40px 40px 20px 40px; background: linear-gradient(135deg, hsl(178, 33%, 69%) 0%, hsl(178, 33%, 79%) 100%); border-radius: 12px 12px 0 0;">
-                      <img src="https://preview--pro-spaces-client-portal.lovable.app/lovable-uploads/3add86aa-4857-42e8-9672-5ea09a594bb2.png" 
+                      <img src="${Deno.env.get('APP_BASE_URL') || 'https://preview--pro-spaces-client-portal.lovable.app'}/lovable-uploads/3add86aa-4857-42e8-9672-5ea09a594bb2.png" 
                            alt="ProSpaces Logo" 
                            width="180" 
                            height="auto" 
