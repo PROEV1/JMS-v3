@@ -60,6 +60,51 @@ interface Results {
   errors: Array<{ row: number; message: string; data?: any }>;
 }
 
+function normalizePhone(phone: string | null | undefined): string | null {
+  if (!phone || typeof phone !== 'string') {
+    return null;
+  }
+
+  // Handle scientific notation (e.g., "4.41234567891E12" -> "441234567891")
+  let normalizedPhone = phone.toString();
+  if (normalizedPhone.includes('E') || normalizedPhone.includes('e')) {
+    try {
+      // Convert scientific notation to regular number string
+      const numValue = parseFloat(normalizedPhone);
+      if (!isNaN(numValue)) {
+        normalizedPhone = numValue.toFixed(0);
+      }
+    } catch (e) {
+      console.warn('Failed to parse scientific notation phone:', phone);
+    }
+  }
+
+  // Remove all non-digit characters
+  const digitsOnly = normalizedPhone.replace(/\D/g, '');
+  
+  if (!digitsOnly) {
+    return null;
+  }
+
+  // Handle UK phone numbers
+  if (digitsOnly.startsWith('44')) {
+    // Convert 44XXXXXXXXXX to 0XXXXXXXXXX (UK format)
+    const ukNumber = '0' + digitsOnly.substring(2);
+    if (ukNumber.length === 11) {
+      return ukNumber;
+    }
+  } else if (digitsOnly.length === 10) {
+    // Add leading 0 to 10-digit numbers (assuming UK)
+    return '0' + digitsOnly;
+  } else if (digitsOnly.length === 11 && digitsOnly.startsWith('0')) {
+    // Already correct UK format
+    return digitsOnly;
+  }
+
+  // Return as-is if it doesn't match common patterns
+  return digitsOnly.length >= 10 ? digitsOnly : null;
+}
+
 function parseDate(dateStr: string | null | undefined): string | null {
   if (!dateStr || dateStr.trim() === '') {
     return null;
@@ -656,10 +701,20 @@ serve(async (req: Request): Promise<Response> => {
                 clientId = existingClient.id;
               } else {
                 // Create new client
+                const normalizedPhone = normalizePhone(mappedData.client_phone);
+                if (mappedData.client_phone && !normalizedPhone) {
+                  results.warnings.push({
+                    row: rowIndex + 1,
+                    column: 'client_phone',
+                    message: `Invalid phone number format: '${mappedData.client_phone}'. Phone number skipped.`,
+                    data: { original_phone: mappedData.client_phone }
+                  });
+                }
+
                 const clientData = {
                   full_name: mappedData.client_name || 'Unknown Client',
                   email: mappedData.client_email || null,
-                  phone: mappedData.client_phone || null,
+                  phone: normalizedPhone,
                   address: consolidatedCustomerAddress || null,
                   postcode: mappedData.customer_address_post_code || mappedData.postcode || null,
                   is_partner_client: true,

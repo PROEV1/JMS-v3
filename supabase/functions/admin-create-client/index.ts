@@ -86,6 +86,54 @@ serve(async (req) => {
     // Get client data from request
     const { full_name, email, phone, address, postcode } = await req.json();
 
+    // Normalize phone number
+    function normalizePhone(phone: string | null | undefined): string | null {
+      if (!phone || typeof phone !== 'string') {
+        return null;
+      }
+
+      // Handle scientific notation (e.g., "4.41234567891E12" -> "441234567891")
+      let normalizedPhone = phone.toString();
+      if (normalizedPhone.includes('E') || normalizedPhone.includes('e')) {
+        try {
+          // Convert scientific notation to regular number string
+          const numValue = parseFloat(normalizedPhone);
+          if (!isNaN(numValue)) {
+            normalizedPhone = numValue.toFixed(0);
+          }
+        } catch (e) {
+          console.warn('Failed to parse scientific notation phone:', phone);
+        }
+      }
+
+      // Remove all non-digit characters
+      const digitsOnly = normalizedPhone.replace(/\D/g, '');
+      
+      if (!digitsOnly) {
+        return null;
+      }
+
+      // Handle UK phone numbers
+      if (digitsOnly.startsWith('44')) {
+        // Convert 44XXXXXXXXXX to 0XXXXXXXXXX (UK format)
+        const ukNumber = '0' + digitsOnly.substring(2);
+        if (ukNumber.length === 11) {
+          return ukNumber;
+        }
+      } else if (digitsOnly.length === 10) {
+        // Add leading 0 to 10-digit numbers (assuming UK)
+        return '0' + digitsOnly;
+      } else if (digitsOnly.length === 11 && digitsOnly.startsWith('0')) {
+        // Already correct UK format
+        return digitsOnly;
+      }
+
+      // Return as-is if it doesn't match common patterns
+      return digitsOnly.length >= 10 ? digitsOnly : null;
+    }
+
+    const normalizedPhone = normalizePhone(phone);
+
     // Validate required fields
     if (!full_name || !email) {
       return new Response(JSON.stringify({ error: "Full name and email are required" }), {
