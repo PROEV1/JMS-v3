@@ -342,7 +342,7 @@ export default function AdminOrders() {
                        <TableHead>Client</TableHead>
                        <TableHead>Status</TableHead>
                        <TableHead>Partner Status</TableHead>
-                       <TableHead>Engineer Progress</TableHead>
+                       <TableHead>Assigned Engineer</TableHead>
                        <TableHead>Total Amount</TableHead>
                        <TableHead>Amount Paid</TableHead>
                        <TableHead>Created</TableHead>
