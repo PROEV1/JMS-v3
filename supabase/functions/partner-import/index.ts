@@ -59,6 +59,44 @@ interface Results {
   skipped: number;
 }
 
+// Helper function to parse dates from DD/MM/YYYY format to ISO format
+function parseDate(dateStr: string | null | undefined): string | null {
+  if (!dateStr || dateStr.trim() === '') {
+    return null;
+  }
+  
+  const trimmed = dateStr.trim();
+  
+  // Check if it's already in ISO format
+  if (trimmed.match(/^\d{4}-\d{2}-\d{2}/)) {
+    return trimmed;
+  }
+  
+  // Parse DD/MM/YYYY format
+  const ddmmyyyyMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (ddmmyyyyMatch) {
+    const [, day, month, year] = ddmmyyyyMatch;
+    // Convert to ISO format YYYY-MM-DD
+    const isoDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    console.log(`Date conversion: ${trimmed} -> ${isoDate}`);
+    return isoDate;
+  }
+  
+  // Try other common formats
+  const mmddyyyyMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (mmddyyyyMatch) {
+    // Ambiguous - could be MM/DD/YYYY or DD/MM/YYYY
+    // Since the error showed "28/08/2025", assume DD/MM/YYYY
+    const [, first, second, year] = mmddyyyyMatch;
+    const isoDate = `${year}-${second.padStart(2, '0')}-${first.padStart(2, '0')}`;
+    console.log(`Date conversion (DD/MM/YYYY): ${trimmed} -> ${isoDate}`);
+    return isoDate;
+  }
+  
+  console.warn(`Unable to parse date: ${trimmed}`);
+  return null;
+}
+
 async function fetchImportProfile(supabase: any, partnerImportProfileId: string): Promise<ImportProfile | null> {
   const { data, error } = await supabase
     .from('partner_import_profiles')
@@ -361,7 +399,7 @@ serve(async (req: Request): Promise<Response> => {
               internal_install_notes: row[columnMapping['job_notes']]?.toString()?.trim() || null,
               partner_status: row[columnMapping['partner_status']]?.toString()?.trim() || null,
               sub_partner: row[columnMapping['sub_partner']]?.toString()?.trim() || null,
-              scheduled_install_date: row[columnMapping['scheduled_date']]?.toString()?.trim() || null,
+              scheduled_install_date: parseDate(row[columnMapping['scheduled_date']]?.toString()?.trim()),
               // Set is_partner_job early so validation can use it
               is_partner_job: true,
             };
