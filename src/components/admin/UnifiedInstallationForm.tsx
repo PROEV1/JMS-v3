@@ -36,6 +36,8 @@ interface UnifiedInstallationFormProps {
   } | null;
   paymentReceived: boolean;
   agreementSigned: boolean;
+  paymentRequired?: boolean;
+  agreementRequired?: boolean;
   onUpdate: () => void;
 }
 
@@ -50,6 +52,8 @@ export function UnifiedInstallationForm({
   engineer,
   paymentReceived,
   agreementSigned,
+  paymentRequired = true,
+  agreementRequired = true,
   onUpdate
 }: UnifiedInstallationFormProps) {
   const { toast } = useToast();
@@ -95,7 +99,7 @@ export function UnifiedInstallationForm({
     }
   };
 
-  const canEdit = paymentReceived && agreementSigned;
+  const canEdit = (paymentRequired ? paymentReceived : true) && (agreementRequired ? agreementSigned : true);
   const isScheduled = currentInstallDate && (engineer || currentEngineerId); // Check if scheduled (has date and engineer ID)
   const canClearSchedule = isScheduled; // Admins can always clear scheduled installations
   
@@ -368,11 +372,11 @@ export function UnifiedInstallationForm({
             Installation Management
           </CardTitle>
           <div className="flex gap-2">
-            <Badge variant={paymentReceived ? "default" : "secondary"}>
-              {paymentReceived ? "Payment ✓" : "Payment Pending"}
+            <Badge variant={paymentRequired && !paymentReceived ? "secondary" : "default"}>
+              {paymentRequired ? (paymentReceived ? "Payment ✓" : "Payment Pending") : "Payment Not Required"}
             </Badge>
-            <Badge variant={agreementSigned ? "default" : "secondary"}>
-              {agreementSigned ? "Agreement ✓" : "Agreement Pending"}
+            <Badge variant={agreementRequired && !agreementSigned ? "secondary" : "default"}>
+              {agreementRequired ? (agreementSigned ? "Agreement ✓" : "Agreement Pending") : "Agreement Not Required"}
             </Badge>
           </div>
         </div>
@@ -383,11 +387,17 @@ export function UnifiedInstallationForm({
           <Alert>
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>
-              {!paymentReceived && !agreementSigned ? 
-                "Cannot schedule installation until payment is received and agreement is signed." :
-                !paymentReceived ? 
-                "Cannot schedule installation until payment is received." :
-                "Cannot schedule installation until agreement is signed."}
+              {(!paymentRequired || paymentReceived) && (!agreementRequired || agreementSigned) ? 
+                "Installation can be scheduled." :
+                !paymentRequired && !agreementRequired ?
+                  "Installation can be scheduled." :
+                paymentRequired && !paymentReceived && agreementRequired && !agreementSigned ? 
+                  "Cannot schedule installation until payment is received and agreement is signed." :
+                paymentRequired && !paymentReceived ? 
+                  "Cannot schedule installation until payment is received." :
+                agreementRequired && !agreementSigned ?
+                  "Cannot schedule installation until agreement is signed." :
+                  "Installation can be scheduled."}
             </AlertDescription>
           </Alert>
         )}

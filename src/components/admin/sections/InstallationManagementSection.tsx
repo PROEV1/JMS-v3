@@ -13,7 +13,6 @@ interface Order {
   job_address: string | null;
   amount_paid: number;
   total_amount: number;
-  deposit_amount: number;
   agreement_signed_at: string | null;
   engineer?: {
     id: string;
@@ -25,13 +24,20 @@ interface Order {
 interface InstallationManagementSectionProps {
   order: Order;
   onUpdate: () => void;
+  paymentRequired?: boolean;
+  agreementRequired?: boolean;
 }
 
-export function InstallationManagementSection({ order, onUpdate }: InstallationManagementSectionProps) {
-  const paymentReceived = order.amount_paid >= order.deposit_amount;
+export function InstallationManagementSection({ 
+  order, 
+  onUpdate,
+  paymentRequired = true,
+  agreementRequired = true
+}: InstallationManagementSectionProps) {
+  const paymentReceived = order.amount_paid >= order.total_amount;
   const agreementSigned = !!order.agreement_signed_at;
-  const isScheduled = !!order.scheduled_install_date && !!order.engineer;
-  
+  const isScheduled = order.scheduled_install_date && order.engineer;
+
   return (
     <OrderSection 
       id="installation" 
@@ -52,6 +58,8 @@ export function InstallationManagementSection({ order, onUpdate }: InstallationM
           engineer={order.engineer}
           paymentReceived={paymentReceived}
           agreementSigned={agreementSigned}
+          paymentRequired={paymentRequired}
+          agreementRequired={agreementRequired}
           onUpdate={onUpdate}
         />
       </div>

@@ -91,6 +91,8 @@ interface Order {
   }>;
   partner?: {
     name: string;
+    client_payment_required?: boolean;
+    client_agreement_required?: boolean;
   } | null;
   is_partner_job: boolean;
   scheduling_suppressed: boolean;
@@ -197,7 +199,7 @@ export default function OrderDetail() {
             description,
             uploaded_at
           ),
-          partner:partner_id(name)
+          partner:partner_id(name, client_payment_required, client_agreement_required)
         `)
         .eq('id', orderId)
         .single();
@@ -657,6 +659,8 @@ export default function OrderDetail() {
             <InstallationManagementSection 
               order={order} 
               onUpdate={fetchOrder}
+              paymentRequired={order.partner?.client_payment_required ?? true}
+              agreementRequired={order.partner?.client_agreement_required ?? true}
             />
 
             {/* Offer Link Widget */}

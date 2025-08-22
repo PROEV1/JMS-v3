@@ -38,6 +38,8 @@ interface EnhancedInstallManagementProps {
   internalNotes?: string | null;
   paymentReceived: boolean;
   agreementSigned: boolean;
+  paymentRequired?: boolean;
+  agreementRequired?: boolean;
   onUpdate: () => void;
 }
 
@@ -50,6 +52,8 @@ export function EnhancedInstallManagement({
   internalNotes,
   paymentReceived,
   agreementSigned,
+  paymentRequired = true,
+  agreementRequired = true,
   onUpdate
 }: EnhancedInstallManagementProps) {
   const { toast } = useToast();
@@ -82,7 +86,7 @@ export function EnhancedInstallManagement({
     }
   };
 
-  const canBookInstall = paymentReceived && agreementSigned;
+  const canBookInstall = (paymentRequired ? paymentReceived : true) && (agreementRequired ? agreementSigned : true);
 
   const handleSave = async () => {
     // Validation: Don't allow engineer assignment without a date
@@ -234,11 +238,11 @@ export function EnhancedInstallManagement({
             </p>
           </div>
           <div className="flex gap-2">
-            <Badge variant={paymentReceived ? "default" : "secondary"}>
-              {paymentReceived ? "Payment ✓" : "Payment Pending"}
+            <Badge variant={paymentRequired && !paymentReceived ? "secondary" : "default"}>
+              {paymentRequired ? (paymentReceived ? "Payment ✓" : "Payment Pending") : "Payment Not Required"}
             </Badge>
-            <Badge variant={agreementSigned ? "default" : "secondary"}>
-              {agreementSigned ? "Agreement ✓" : "Agreement Pending"}
+            <Badge variant={agreementRequired && !agreementSigned ? "secondary" : "default"}>
+              {agreementRequired ? (agreementSigned ? "Agreement ✓" : "Agreement Pending") : "Agreement Not Required"}
             </Badge>
           </div>
         </div>
@@ -247,7 +251,15 @@ export function EnhancedInstallManagement({
           <Alert>
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>
-              Cannot schedule installation until payment is received and agreement is signed.
+              {canBookInstall ? 
+                "Installation can be scheduled." :
+                paymentRequired && !paymentReceived && agreementRequired && !agreementSigned ? 
+                  "Cannot schedule installation until payment is received and agreement is signed." :
+                paymentRequired && !paymentReceived ? 
+                  "Cannot schedule installation until payment is received." :
+                agreementRequired && !agreementSigned ?
+                  "Cannot schedule installation until agreement is signed." :
+                  "Installation can be scheduled."}
             </AlertDescription>
           </Alert>
         )}
