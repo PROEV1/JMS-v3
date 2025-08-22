@@ -381,11 +381,23 @@ export default function AdminPartnerProfiles() {
         body.csv_data = csvData;
       }
 
+      console.log('=== FRONTEND DEBUG ===');
+      console.log('Calling partner-import with body:', body);
+      console.log('ProfileId:', profileId);
+      console.log('DryRun:', dryRun);
+
       const { data, error } = await supabase.functions.invoke('partner-import', {
         body
       });
 
-      if (error) throw error;
+      console.log('=== FUNCTION RESPONSE ===');
+      console.log('Response data:', data);
+      console.log('Response error:', error);
+
+      if (error) {
+        console.error('Supabase function error:', error);
+        throw error;
+      }
 
       if (data.success) {
         toast({ 
