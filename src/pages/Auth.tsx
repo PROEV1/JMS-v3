@@ -25,7 +25,7 @@ export default function Auth() {
     if (user && !authLoading) {
       console.log('Auth: User authenticated, preparing redirect', { userId: user.id, email: user.email });
       
-      // Priority order: explicit redirect -> last authenticated path -> default
+      // Priority order: explicit redirect -> last authenticated path -> role-based default
       const explicitRedirect = sessionStorage.getItem('authRedirectPath');
       const lastAuthPath = sessionStorage.getItem('lastAuthenticatedPath');
       
@@ -37,6 +37,20 @@ export default function Auth() {
       } else if (lastAuthPath) {
         redirectTo = lastAuthPath;
         console.log('Auth: Using last authenticated path:', lastAuthPath);
+      } else {
+        // IMPROVED: Role-aware default fallback
+        const userEmail = user.email || '';
+        console.log('Auth: No saved paths, using role-aware default for:', userEmail);
+        
+        // Simple role detection based on common patterns
+        if (userEmail.includes('admin') || userEmail.includes('manager')) {
+          redirectTo = '/admin';
+        } else if (userEmail.includes('engineer') || userEmail.includes('tech')) {
+          redirectTo = '/engineer';
+        } else {
+          redirectTo = '/client';
+        }
+        console.log('Auth: Role-aware default redirect:', redirectTo);
       }
       
       console.log('Auth: Final redirect target:', redirectTo);

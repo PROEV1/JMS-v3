@@ -184,7 +184,7 @@ export default function Dashboard() {
       
       // Redirect to order page after a short delay
       setTimeout(() => {
-        window.location.href = `/order/${order.id}`;
+        window.location.href = `/orders/${order.id}`;
       }, 1500);
 
     } catch (error) {
@@ -339,7 +339,7 @@ export default function Dashboard() {
             <div className="space-y-4">
               {projects.filter(p => p.status !== 'completed').map((order) => (
                 <div key={order.id} className="flex items-center justify-between p-4 border rounded-lg cursor-pointer hover:bg-muted/50"
-                     onClick={() => window.location.href = `/order/${order.id}`}>
+                     onClick={() => window.location.href = `/orders/${order.id}`}>
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <span className="font-medium">Order {order.order_number || `ORD-${order.id.slice(0, 8)}`}</span>

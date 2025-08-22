@@ -24,11 +24,21 @@ export default function Layout({ children }: LayoutProps) {
     if (user) {
       const fullPath = location.pathname + location.search + location.hash;
       console.log('Layout: Persisting current authenticated path:', fullPath);
-      sessionStorage.setItem('lastAuthenticatedPath', fullPath);
+      
+      // HARDENED: Only persist if it's a meaningful deep path, not just section roots
+      const sectionRoots = ['/admin', '/client', '/engineer'];
+      const isNotJustSectionRoot = !sectionRoots.includes(location.pathname);
+      
+      if (isNotJustSectionRoot) {
+        console.log('Layout: Persisting deep path:', fullPath);
+        sessionStorage.setItem('lastAuthenticatedPath', fullPath);
+      } else {
+        console.log('Layout: Skipping section root persistence:', fullPath);
+      }
     }
   }, [location, user]);
 
-  // Self-heal mechanism: restore user to exact page after refresh redirect
+  // STRENGTHENED Self-heal mechanism: restore user to exact page after refresh redirect
   useEffect(() => {
     if (user && userRole) {
       const currentPath = location.pathname;
@@ -42,11 +52,16 @@ export default function Layout({ children }: LayoutProps) {
       const hasSavedDeepPath = savedPath && savedPath !== currentPath && savedPath.startsWith(currentPath + '/');
       
       if (isOnSectionRoot && hasSavedDeepPath) {
-        console.log('Layout: Self-heal detected - redirecting from', currentPath, 'to saved path:', savedPath);
-        // Clear the saved path to prevent loops
-        sessionStorage.removeItem('lastAuthenticatedPath');
+        console.log('Layout: STRENGTHENED Self-heal detected - redirecting from', currentPath, 'to saved path:', savedPath);
+        
         // Navigate to the saved deeper path
         navigate(savedPath, { replace: true });
+        
+        // Clear the saved path ONLY after successful navigation to prevent loops
+        setTimeout(() => {
+          console.log('Layout: Clearing lastAuthenticatedPath after successful navigation');
+          sessionStorage.removeItem('lastAuthenticatedPath');
+        }, 100);
       }
     }
   }, [user, userRole, location.pathname, navigate]);

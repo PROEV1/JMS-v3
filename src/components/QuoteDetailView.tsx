@@ -450,7 +450,7 @@ export const QuoteDetailView: React.FC<QuoteDetailViewProps> = ({ quote, onBack,
             )}
             {quote.status === 'accepted' && order && (
               <Button 
-                onClick={() => window.open(`/order/${order.id}`, '_blank')}
+                onClick={() => window.open(`/orders/${order.id}`, '_blank')}
                 className="bg-brand-blue hover:bg-brand-blue-dark text-white"
               >
                 <Eye className="h-4 w-4 mr-2" />
