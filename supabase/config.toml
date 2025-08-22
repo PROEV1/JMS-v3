@@ -21,3 +21,6 @@ verify_jwt = true
 
 [functions.test-partner-import]
 verify_jwt = false
+
+[functions.backfill-partner-clients]
+verify_jwt = false
