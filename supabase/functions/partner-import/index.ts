@@ -72,10 +72,28 @@ function parseDate(dateStr: string | null | undefined): string | null {
     return trimmed.split('T')[0]; // Remove time component if present
   }
   
-  // Try to parse DD/MM/YYYY format
+  // Try to parse DD/MM/YYYY format first
   const ddmmyyyyMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (ddmmyyyyMatch) {
     const [, day, month, year] = ddmmyyyyMatch;
+    
+    // Validate date components
+    const dayNum = parseInt(day, 10);
+    const monthNum = parseInt(month, 10);
+    
+    if (dayNum < 1 || dayNum > 31 || monthNum < 1 || monthNum > 12) {
+      return null;
+    }
+    
+    // Convert to YYYY-MM-DD format
+    const isoDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    return isoDate;
+  }
+  
+  // Fallback: try MM/DD/YYYY format
+  const mmddyyyyMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (mmddyyyyMatch) {
+    const [, month, day, year] = mmddyyyyMatch;
     
     // Validate date components
     const dayNum = parseInt(day, 10);
@@ -335,6 +353,18 @@ serve(async (req: Request): Promise<Response> => {
     }
 
     console.log(`Processing ${parsedData.length} rows...`);
+    
+    // Log first and last few Job IDs for reconciliation
+    if (parsedData.length > 0) {
+      const firstFewIds = parsedData.slice(0, 3).map((row, idx) => 
+        `Row ${idx + 1}: ${row['Job ID'] || 'N/A'}`
+      ).join(', ');
+      const lastFewIds = parsedData.slice(-3).map((row, idx) => 
+        `Row ${parsedData.length - 3 + idx + 1}: ${row['Job ID'] || 'N/A'}`
+      ).join(', ');
+      console.log(`Sheet reconciliation - First rows: ${firstFewIds}`);
+      console.log(`Sheet reconciliation - Last rows: ${lastFewIds}`);
+    }
 
     const results: Results = {
       inserted: [],
@@ -403,10 +433,29 @@ serve(async (req: Request): Promise<Response> => {
             mappedData.postcode = mappedData.customer_address_post_code;
           }
 
-          // Parse quote amount
+          // Parse and sanitize quote amount
+          let sanitizedQuoteAmount = 0;
           if (mappedData.quote_amount) {
-            mappedData.quote_amount = String(mappedData.quote_amount).replace(/[£,$]/g, '');
+            const cleanAmount = String(mappedData.quote_amount)
+              .replace(/[£,$\s]/g, '')  // Remove currency symbols, commas, and whitespace
+              .trim();
+            
+            const parsedAmount = parseFloat(cleanAmount);
+            
+            // Check if the parsed amount is a valid finite number
+            if (isFinite(parsedAmount) && !isNaN(parsedAmount)) {
+              sanitizedQuoteAmount = parsedAmount;
+            } else {
+              console.log(`Invalid quote amount '${mappedData.quote_amount}' -> setting to 0`);
+              results.warnings.push({
+                row: rowIndex + 1,
+                column: 'quote_amount',
+                message: `Invalid quote amount '${mappedData.quote_amount}' converted to 0`,
+                data: { original_amount: mappedData.quote_amount }
+              });
+            }
           }
+          mappedData.quote_amount = sanitizedQuoteAmount.toString();
 
           // Generate partner external ID if missing
           if (!mappedData.partner_external_id) {
@@ -595,7 +644,7 @@ serve(async (req: Request): Promise<Response> => {
             job_type: (mappedData.job_type || mappedData.type || 'installation').toLowerCase(),
             installation_notes: mappedData.job_notes || null,
             sub_partner: mappedData.sub_partner || null,
-            total_amount: mappedData.quote_amount ? parseFloat(mappedData.quote_amount) : 0,
+            total_amount: sanitizedQuoteAmount,
             scheduling_suppressed: suppressScheduling,
             scheduling_suppressed_reason: suppressionReason,
             order_number: `TEMP-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -613,7 +662,7 @@ serve(async (req: Request): Promise<Response> => {
               results.warnings.push({
                 row: rowIndex + 1,
                 column: 'scheduled_date',
-                message: `Invalid date format: '${mappedData.scheduled_date}'. Expected DD/MM/YYYY or YYYY-MM-DD`,
+                message: `Invalid date format: '${mappedData.scheduled_date}'. Expected DD/MM/YYYY, MM/DD/YYYY, or YYYY-MM-DD`,
                 data: { scheduled_date: mappedData.scheduled_date }
               });
             }
@@ -744,6 +793,16 @@ serve(async (req: Request): Promise<Response> => {
         skipped: results.skipped.length,
         warnings: results.warnings.length,
         errors: results.errors.length
+      },
+      // Add backward compatibility for UI
+      summary: {
+        processed: parsedData.length,
+        inserted_count: results.inserted.length,
+        updated_count: results.updated.length,
+        skipped_count: results.skipped.length,
+        errors: results.errors,
+        warnings: results.warnings,
+        dry_run: dryRun
       },
       details: {
         inserted: results.inserted,
