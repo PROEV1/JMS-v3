@@ -17,6 +17,7 @@ interface JobStatusCardProps {
     product_details: string;
     engineer_signed_off_at: string | null;
     upload_count?: number;
+    job_type?: 'installation' | 'assessment' | 'service_call';
   };
   onActionClick: (jobId: string, action: 'start' | 'continue' | 'upload' | 'view') => void;
 }
@@ -70,11 +71,16 @@ export function JobStatusCard({ job, onActionClick }: JobStatusCardProps) {
     <Card className={`border-l-4 ${statusConfig.color.replace('bg-', 'border-l-').replace('-100', '-500')}`}>
       <CardContent className="p-4">
         <div className="flex justify-between items-start mb-3">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Badge className={statusConfig.color} variant="secondary">
               <StatusIcon className="h-3 w-3 mr-1" />
               {statusConfig.label}
             </Badge>
+            {job.job_type && (
+              <Badge variant="secondary" className="text-xs bg-purple-100 text-purple-700">
+                {job.job_type.charAt(0).toUpperCase() + job.job_type.slice(1).replace('_', ' ')}
+              </Badge>
+            )}
             <span className="text-sm font-mono text-muted-foreground">
               {job.order_number}
             </span>

@@ -18,6 +18,7 @@ interface Job {
   installation_date: string;
   time_window: string;
   status: string;
+  job_type?: 'installation' | 'assessment' | 'service_call';
 }
 
 const getStatusColor = (status: string) => {
@@ -186,10 +187,17 @@ export default function EngineerDashboard() {
           {todaysJobs && todaysJobs.length > 0 ? (
             <div className="space-y-4">
               {todaysJobs.map((job) => (
-                <Card key={job.id}>
-                  <CardHeader>
-                    <CardTitle>{job.order_number}</CardTitle>
-                  </CardHeader>
+                 <Card key={job.id}>
+                   <CardHeader>
+                     <div className="flex items-center gap-2 flex-wrap">
+                       <CardTitle>{job.order_number}</CardTitle>
+                       {job.job_type && (
+                         <Badge variant="secondary" className="text-xs bg-purple-100 text-purple-700">
+                           {job.job_type.charAt(0).toUpperCase() + job.job_type.slice(1).replace('_', ' ')}
+                         </Badge>
+                       )}
+                     </div>
+                   </CardHeader>
                   <CardContent className="space-y-2">
                     <div className="flex items-center gap-2">
                       <MapPin className="h-4 w-4" />
@@ -222,10 +230,17 @@ export default function EngineerDashboard() {
           {upcomingJobs && upcomingJobs.length > 0 ? (
             <div className="space-y-4">
               {upcomingJobs.map((job) => (
-                <Card key={job.id}>
-                  <CardHeader>
-                    <CardTitle>{job.order_number}</CardTitle>
-                  </CardHeader>
+                 <Card key={job.id}>
+                   <CardHeader>
+                     <div className="flex items-center gap-2 flex-wrap">
+                       <CardTitle>{job.order_number}</CardTitle>
+                       {job.job_type && (
+                         <Badge variant="secondary" className="text-xs bg-purple-100 text-purple-700">
+                           {job.job_type.charAt(0).toUpperCase() + job.job_type.slice(1).replace('_', ' ')}
+                         </Badge>
+                       )}
+                     </div>
+                   </CardHeader>
                   <CardContent className="space-y-2">
                     <div className="flex items-center gap-2">
                       <MapPin className="h-4 w-4" />

@@ -17,6 +17,7 @@ interface Order {
   amount_paid: number;
   created_at: string;
   scheduled_install_date: string | null;
+  job_type?: 'installation' | 'assessment' | 'service_call';
 }
 
 export default function ClientOrders() {
@@ -182,8 +183,13 @@ export default function ClientOrders() {
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between mb-4">
                       <div className="space-y-3">
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 flex-wrap">
                           <h3 className="font-semibold text-lg">{order.order_number}</h3>
+                          {order.job_type && (
+                            <Badge variant="secondary" className="text-xs bg-purple-100 text-purple-700">
+                              {order.job_type.charAt(0).toUpperCase() + order.job_type.slice(1).replace('_', ' ')}
+                            </Badge>
+                          )}
                           <Badge className={getStatusColor(order.status_enhanced)}>
                             Step {getStepNumber(order.status_enhanced)}: {formatStatus(order.status_enhanced)}
                           </Badge>

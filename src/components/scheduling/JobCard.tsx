@@ -172,7 +172,14 @@ export function JobCard({
             {/* Header */}
             <div className="flex items-start justify-between">
               <div className="flex-1 min-w-0">
-                <h4 className="font-medium text-sm">{order.order_number}</h4>
+                <div className="flex items-center gap-2 flex-wrap mb-1">
+                  <h4 className="font-medium text-sm">{order.order_number}</h4>
+                  {order.job_type && (
+                    <Badge variant="secondary" className="text-xs bg-purple-100 text-purple-700">
+                      {order.job_type.charAt(0).toUpperCase() + order.job_type.slice(1).replace('_', ' ')}
+                    </Badge>
+                  )}
+                </div>
                 <p className="text-xs text-muted-foreground truncate">
                   {order.client?.full_name}
                 </p>
