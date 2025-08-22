@@ -772,29 +772,44 @@ serve(async (req: Request): Promise<Response> => {
         // Handle inserts for records with complete data
         if (recordsForInsert.length > 0 && createMissingOrders) {
           console.log('Inserting new orders...');
+          console.log(`First record to insert:`, JSON.stringify(recordsForInsert[0], null, 2));
           
-          const { error: insertError, count: insertCount } = await supabase
-            .from('orders')
-            .insert(recordsForInsert.map(item => ({
-              ...item,
-              // Ensure order_number is set for partner jobs
-              order_number: item.order_number || 'TEMP',
-              updated_at: new Date().toISOString(),
-              created_at: new Date().toISOString()
-            })))
-            .select('id', { count: 'estimated' });
-          
-          if (insertError) {
-            console.error('Database insert error:', {
-              message: insertError.message,
-              details: insertError.details,
-              hint: insertError.hint,
-              code: insertError.code
+          try {
+            const { data: insertedData, error: insertError, count: insertCount } = await supabase
+              .from('orders')
+              .insert(recordsForInsert.map(item => ({
+                ...item,
+                // Ensure order_number is set for partner jobs
+                order_number: item.order_number || 'TEMP',
+                updated_at: new Date().toISOString(),
+                created_at: new Date().toISOString()
+              })))
+              .select('id', { count: 'estimated' });
+            
+            if (insertError) {
+              console.error('Database insert error:', {
+                message: insertError.message,
+                details: insertError.details,
+                hint: insertError.hint,
+                code: insertError.code
+              });
+              results.errors.push({
+                row: 0,
+                message: `Database insert failed: ${insertError.message}${insertError.hint ? ' (' + insertError.hint + ')' : ''}`,
+                data: { error_code: insertError.code, error_details: insertError.details }
+              });
+            } else {
+              totalInserted = insertCount || recordsForInsert.length;
+              console.log(`Successfully inserted ${totalInserted} orders`);
+            }
+          } catch (insertException) {
+            console.error('Exception during insert:', insertException);
+            results.errors.push({
+              row: 0,
+              message: `Exception during insert: ${insertException.message}`,
+              data: { exception: insertException.toString() }
             });
-            throw new Error(`Database insert failed: ${insertError.message}${insertError.hint ? ' (' + insertError.hint + ')' : ''}`);
           }
-          
-          totalInserted = insertCount || recordsForInsert.length;
         }
         
         console.log(`Import completed - Updated: ${totalUpdated}, Inserted: ${totalInserted}`);
