@@ -27,3 +27,6 @@ verify_jwt = false
 
 [functions.google-sheets-preview]
 verify_jwt = true
+
+[functions.seed-scheduling-data-v2]
+verify_jwt = false
