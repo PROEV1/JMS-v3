@@ -597,7 +597,11 @@ serve(async (req: Request): Promise<Response> => {
             sub_partner: mappedData.sub_partner || null,
             total_amount: mappedData.quote_amount ? parseFloat(mappedData.quote_amount) : 0,
             scheduling_suppressed: suppressScheduling,
-            scheduling_suppressed_reason: suppressionReason
+            scheduling_suppressed_reason: suppressionReason,
+            order_number: `TEMP-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            status: 'awaiting_payment',
+            deposit_amount: 0,
+            amount_paid: 0
           };
 
           // Handle scheduled date

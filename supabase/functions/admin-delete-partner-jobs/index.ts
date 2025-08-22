@@ -92,7 +92,16 @@ serve(async (req) => {
     const orderIds = orders?.map(o => o.id) || []
     const clientIds = orders?.map(o => o.client_id) || []
     
-    console.log(`Found ${orderIds.length} orders to process`)
+    // Also find standalone partner clients (clients created but no orders)
+    const { data: standalonePartnerClients } = await supabase
+      .from('clients')
+      .select('id')
+      .eq('partner_id', partner_id)
+      .eq('is_partner_client', true);
+
+    const standaloneClientIds = standalonePartnerClients?.map(c => c.id) || [];
+    
+    console.log(`Found ${orderIds.length} orders and ${standaloneClientIds.length} standalone partner clients to process`)
 
     if (orderIds.length === 0) {
       return new Response(JSON.stringify({
@@ -155,6 +164,9 @@ serve(async (req) => {
         orphanedClientsCount = clientIds.filter(id => !stillUsedClientIds.has(id)).length;
       }
 
+      // Add standalone partner clients
+      const totalClientsToDelete = orphanedClientsCount + standaloneClientIds.length;
+
       stats = {
         orders: orderIds.length,
         job_offers: jobOffersCount.count || 0,
@@ -163,7 +175,7 @@ serve(async (req) => {
         engineer_uploads: uploadsCount.count || 0,
         order_payments: paymentsCount.count || 0,
         quotes: quotesCount.count || 0,
-        clients: orphanedClientsCount
+        clients: totalClientsToDelete
       }
 
       console.log('Dry run complete:', stats)
@@ -274,6 +286,23 @@ serve(async (req) => {
 
       const batchTime = performance.now() - batchStartTime
       console.log(`Batch ${i + 1} completed in ${Math.round(batchTime)}ms`)
+    }
+
+    // After all order-related deletions, delete standalone partner clients
+    if (standaloneClientIds.length > 0) {
+      console.log(`Deleting ${standaloneClientIds.length} standalone partner clients...`);
+      
+      const { error: standaloneClientsError } = await supabase
+        .from('clients')
+        .delete()
+        .in('id', standaloneClientIds);
+      
+      if (standaloneClientsError) {
+        console.error('Standalone clients deletion error:', standaloneClientsError);
+      } else {
+        totalStats.clients += standaloneClientIds.length;
+        console.log(`Deleted ${standaloneClientIds.length} standalone partner clients`);
+      }
     }
 
     const totalTime = performance.now() - startTime
