@@ -1,12 +1,13 @@
 import React from 'react';
-import Layout from '@/components/Layout';
+import { BrandPage, BrandContainer, BrandHeading1, BrandLoading } from '@/components/brand';
 import { StockRequestButton } from '@/components/engineer/StockRequestButton';
 import { StockRequestHistory } from '@/components/engineer/StockRequestHistory';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useAuth } from '@/hooks/useAuth';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus } from 'lucide-react';
+import { Plus, Package, ShieldAlert } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
 
 export default function EngineerStockRequests() {
   const { role: userRole, loading } = useUserRole();
@@ -32,55 +33,85 @@ export default function EngineerStockRequests() {
 
   if (loading) {
     return (
-      <Layout>
-        <div className="flex items-center justify-center h-96">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-        </div>
-      </Layout>
+      <BrandPage>
+        <BrandContainer>
+          <BrandLoading />
+        </BrandContainer>
+      </BrandPage>
     );
   }
 
   if (userRole !== 'engineer') {
     return (
-      <Layout>
-        <div className="text-center py-12">
-          <h1 className="text-2xl font-bold text-destructive mb-4">Access Denied</h1>
-          <p className="text-muted-foreground">
-            This page is only available to engineers.
-          </p>
-        </div>
-      </Layout>
+      <BrandPage>
+        <BrandContainer>
+          <Card className="border-destructive/20 bg-destructive/5">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 rounded-lg bg-destructive/10">
+                  <ShieldAlert className="h-5 w-5 text-destructive" />
+                </div>
+                <div>
+                  <h1 className="text-lg font-semibold text-destructive">Access Denied</h1>
+                  <p className="text-sm text-muted-foreground">
+                    This page is only available to engineers.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </BrandContainer>
+      </BrandPage>
     );
   }
 
   if (!engineer) {
     return (
-      <Layout>
-        <div className="flex items-center justify-center h-96">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-        </div>
-      </Layout>
+      <BrandPage>
+        <BrandContainer>
+          <BrandLoading />
+        </BrandContainer>
+      </BrandPage>
     );
   }
 
   return (
-    <Layout>
-      <div className="container mx-auto py-6 max-w-6xl">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-3xl font-bold">Stock Requests</h1>
-            <p className="text-muted-foreground">Manage your stock requests and track their status</p>
+    <BrandPage>
+      <BrandContainer>
+        <div className="space-y-6">
+          {/* Header Section */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <Package className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <BrandHeading1 className="text-2xl sm:text-3xl">Stock Requests</BrandHeading1>
+                </div>
+              </div>
+              <p className="text-sm sm:text-base text-muted-foreground">
+                Manage your stock requests and track their status
+              </p>
+            </div>
+            
+            <div className="flex-shrink-0 w-full sm:w-auto">
+              <StockRequestButton 
+                engineerId={engineer.id}
+                variant="default"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                New Stock Request
+              </StockRequestButton>
+            </div>
           </div>
-          <StockRequestButton 
-            engineerId={engineer.id}
-            variant="default"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            New Stock Request
-          </StockRequestButton>
+
+          {/* Content Section */}
+          <div className="space-y-6">
+            <StockRequestHistory engineerId={engineer.id} />
+          </div>
         </div>
-        <StockRequestHistory engineerId={engineer.id} />
-      </div>
-    </Layout>
+      </BrandContainer>
+    </BrandPage>
   );
 }
