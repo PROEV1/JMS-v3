@@ -316,7 +316,7 @@ export function ScheduleStatusNavigation({ currentStatus }: ScheduleStatusNaviga
 
   if (loading) {
     return (
-      <div className="flex items-center gap-4 overflow-x-auto pb-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-6 gap-4 overflow-visible pb-2">
         {statusTiles.map(tile => (
           <Card key={tile.id} className="min-w-[140px] min-h-[88px] animate-pulse">
             <CardContent className="p-3">
@@ -330,7 +330,7 @@ export function ScheduleStatusNavigation({ currentStatus }: ScheduleStatusNaviga
 
   return (
     <div className="mb-6">
-      <div className="flex items-center gap-4 overflow-x-auto overflow-y-visible pt-1 pb-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-6 gap-4 overflow-visible pt-1 pb-2">
         {statusTiles.map(tile => (
           <StatusNavTile
             key={tile.id}
