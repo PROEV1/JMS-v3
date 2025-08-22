@@ -1,50 +1,24 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { getCorsHeaders } from '../_shared/cors.ts'
-import { parse } from "https://deno.land/std@0.192.0/csv/parse.ts"
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { serve } from 'https://deno.land/std@0.208.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+import { parse } from 'https://deno.land/std@0.208.0/csv/mod.ts';
+import { getCorsHeaders } from '../_shared/cors.ts';
 
 interface ImportProfile {
   id: string;
   partner_id: string;
-  name: string;
+  gsheet_id?: string;
+  gsheet_sheet_name?: string;
   source_type: 'csv' | 'gsheet';
-  gsheet_id: string | null;
-  gsheet_sheet_name: string | null;
   column_mappings: Record<string, string>;
   status_mappings: Record<string, string>;
-  status_override_rules: Record<string, string>;
   status_actions: Record<string, any>;
-  engineer_mapping_rules: Array<{ partner_identifier: string; engineer_id: string }>;
-  created_at: string;
-  updated_at: string;
+  engineer_mapping_rules: Array<{
+    partner_identifier: string;
+    engineer_id: string;
+  }>;
 }
 
 interface MappedData {
-  partner_external_id: string;
-  status?: string;
-  job_type?: string;
-  postcode?: string;
-  job_address?: string;
-  internal_install_notes?: string;
-  engineer_id?: string;
-  is_partner_job?: boolean;
-  partner_id?: string;
-  partner_status?: string;
-  partner_confirmed_externally?: boolean;
-  partner_confirmed_at?: string;
-  external_confirmation_source?: string;
-  scheduling_suppressed?: boolean;
-  scheduling_suppressed_reason?: string;
-  status_enhanced?: string;
-  sub_partner?: string;
-  order_number?: string;
-  scheduled_install_date?: string;
-  total_amount?: number;
-  deposit_amount?: number;
-  amount_paid?: number;
-  created_at?: string;
-  updated_at?: string;
-  // Additional client-related fields from UI mapping
   client_name?: string;
   client_email?: string;
   client_phone?: string;
@@ -52,28 +26,40 @@ interface MappedData {
   customer_address_line_2?: string;
   customer_address_city?: string;
   customer_address_post_code?: string;
-  engineer_identifier?: string;
+  job_address?: string;
+  postcode?: string;
+  partner_status?: string;
+  status?: string;
+  partner_external_id?: string;
   partner_external_url?: string;
-  type?: string; // maps to job_type
-  quote_amount?: number; // maps to total_amount
-  client_id?: string;
   quote_id?: string;
+  quote_amount?: string;
+  client_id?: string;
+  engineer_identifier?: string;
+  engineer_name?: string;
+  engineer_email?: string;
+  is_partner_job?: boolean;
+  sub_partner?: string;
+  scheduled_date?: string;
+  job_notes?: string;
+  job_type?: string;
+  type?: string;
 }
 
 interface ProcessedRow {
-  success: boolean;
-  data?: MappedData;
-  error?: string;
+  type: 'insert' | 'update' | 'skip';
+  data: any;
+  reason?: string;
 }
 
 interface Results {
-  data: MappedData[];
-  errors: { row: number; message: string; data: any }[];
-  warnings: { row: number; message: string; data: any }[];
-  skipped: number;
+  inserted: ProcessedRow[];
+  updated: ProcessedRow[];
+  skipped: ProcessedRow[];
+  warnings: Array<{ row: number; column?: string; message: string; data?: any }>;
+  errors: Array<{ row: number; message: string; data?: any }>;
 }
 
-// Helper function to parse dates from DD/MM/YYYY format to ISO format
 function parseDate(dateStr: string | null | undefined): string | null {
   if (!dateStr || dateStr.trim() === '') {
     return null;
@@ -81,32 +67,29 @@ function parseDate(dateStr: string | null | undefined): string | null {
   
   const trimmed = dateStr.trim();
   
-  // Check if it's already in ISO format
+  // If already in YYYY-MM-DD format, return as is
   if (trimmed.match(/^\d{4}-\d{2}-\d{2}/)) {
-    return trimmed;
+    return trimmed.split('T')[0]; // Remove time component if present
   }
   
-  // Parse DD/MM/YYYY format
+  // Try to parse DD/MM/YYYY format
   const ddmmyyyyMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (ddmmyyyyMatch) {
     const [, day, month, year] = ddmmyyyyMatch;
     
-    // Validate day and month ranges
+    // Validate date components
     const dayNum = parseInt(day, 10);
     const monthNum = parseInt(month, 10);
     
     if (dayNum < 1 || dayNum > 31 || monthNum < 1 || monthNum > 12) {
-      console.warn(`Invalid date values: day=${dayNum}, month=${monthNum} for ${trimmed}`);
       return null;
     }
     
-    // Convert to ISO format YYYY-MM-DD
+    // Convert to YYYY-MM-DD format
     const isoDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-    console.log(`Date conversion: ${trimmed} -> ${isoDate}`);
     return isoDate;
   }
   
-  console.warn(`Unable to parse date: ${trimmed}`);
   return null;
 }
 
@@ -140,7 +123,6 @@ async function fetchPartner(supabase: any, partnerId: string) {
   return data;
 }
 
-// Helper function to fetch Google Sheets data
 async function fetchGoogleSheetData(sheetId: string, sheetName: string) {
   const serviceAccountKey = Deno.env.get('GOOGLE_SERVICE_ACCOUNT_KEY');
   if (!serviceAccountKey) {
@@ -148,71 +130,67 @@ async function fetchGoogleSheetData(sheetId: string, sheetName: string) {
   }
 
   const credentials = JSON.parse(serviceAccountKey);
-  console.log('Google Sheets: Using service account email:', credentials.client_email);
-  
-  // Get access token
-  console.log('Google Sheets: Creating JWT for authentication...');
+  console.log('Google credentials parsed successfully, client_email:', credentials.client_email);
+
   const jwt = await createJWT(credentials);
-  
-  console.log('Google Sheets: Requesting access token...');
+  console.log('JWT generated successfully');
+
   const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
       grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-      assertion: jwt,
-    }),
+      assertion: jwt
+    })
   });
-  
+
   if (!tokenResponse.ok) {
     const errorText = await tokenResponse.text();
-    console.error('Google Sheets: Token request failed:', tokenResponse.status, errorText);
-    throw new Error(`Failed to get Google access token: ${tokenResponse.status} - ${errorText}`);
+    throw new Error(`Failed to get access token: ${errorText}`);
   }
-  
+
   const tokenData = await tokenResponse.json();
   if (!tokenData.access_token) {
-    console.error('Google Sheets: No access token in response:', tokenData);
-    throw new Error('No access token received from Google');
+    throw new Error('No access token received');
   }
-  
-  console.log('Google Sheets: Access token obtained, fetching sheet data...');
-  
-  // Fetch sheet data
+  console.log('Access token obtained successfully');
+
+  // Fetch sheet data with proper range
+  const range = `${sheetName}!A1:ZZ1000`;
   const sheetResponse = await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${sheetName}?valueRenderOption=FORMATTED_VALUE`,
-    { headers: { Authorization: `Bearer ${tokenData.access_token}` } }
+    `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(range)}`,
+    {
+      headers: { 'Authorization': `Bearer ${tokenData.access_token}` }
+    }
   );
-  
+
   if (!sheetResponse.ok) {
     const errorText = await sheetResponse.text();
-    console.error('Google Sheets: Sheet fetch failed:', sheetResponse.status, errorText);
-    
+    console.error('Sheets API error:', errorText);
     if (sheetResponse.status === 403) {
-      throw new Error(`Access denied to Google Sheet. Please ensure the sheet is shared with the service account email: ${credentials.client_email}`);
+      throw new Error('Permission denied accessing Google Sheet. Check service account permissions.');
     } else if (sheetResponse.status === 404) {
-      throw new Error(`Google Sheet not found. Please check the Sheet ID: ${sheetId}`);
+      throw new Error(`Sheet not found: ${sheetId}/${sheetName}`);
     } else {
-      throw new Error(`Failed to fetch Google Sheet: ${sheetResponse.status} - ${errorText}`);
+      throw new Error(`Failed to fetch sheet data: ${errorText}`);
     }
   }
-  
+
   const sheetData = await sheetResponse.json();
   console.log('Google Sheets: Raw response:', { 
-    hasValues: !!sheetData.values, 
-    rowCount: sheetData.values?.length || 0 
+    range: sheetData.range, 
+    majorDimension: sheetData.majorDimension,
+    rowCount: sheetData.values?.length || 0
   });
-  
+
   const rows = sheetData.values || [];
-  
   if (rows.length === 0) {
-    console.warn('Google Sheets: No data found in sheet');
-    return [];
+    throw new Error('No data found in the sheet');
   }
-  
-  console.log('Google Sheets: Processing', rows.length, 'rows (including header)');
-  
-  // Convert to objects with header keys
+
+  console.log('Sheet data fetched successfully, rows:', rows.length);
+
+  // Convert to objects
   const headers = rows[0];
   const dataRows = rows.slice(1).map((row: any[]) => {
     const obj: Record<string, string> = {};
@@ -221,12 +199,10 @@ async function fetchGoogleSheetData(sheetId: string, sheetName: string) {
     });
     return obj;
   });
-  
-  console.log('Google Sheets: Successfully processed', dataRows.length, 'data rows');
+
   return dataRows;
 }
 
-// Helper function to create JWT for Google API
 async function createJWT(credentials: any) {
   const header = { alg: 'RS256', typ: 'JWT' };
   const now = Math.floor(Date.now() / 1000);
@@ -235,57 +211,54 @@ async function createJWT(credentials: any) {
     scope: 'https://www.googleapis.com/auth/spreadsheets.readonly',
     aud: 'https://oauth2.googleapis.com/token',
     exp: now + 3600,
-    iat: now,
+    iat: now
   };
-  
+
   const encoder = new TextEncoder();
   const headerBytes = encoder.encode(JSON.stringify(header));
   const payloadBytes = encoder.encode(JSON.stringify(payload));
-  
+
   const headerB64 = btoa(String.fromCharCode(...headerBytes)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
   const payloadB64 = btoa(String.fromCharCode(...payloadBytes)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-  
+
   const message = `${headerB64}.${payloadB64}`;
   const messageBytes = encoder.encode(message);
-  
-  // Import private key and sign
+
+  // Import the private key
   const pemKey = credentials.private_key.replace(/\\n/g, '\n');
   const keyData = pemKey.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\n/g, '');
   const keyBytes = Uint8Array.from(atob(keyData), c => c.charCodeAt(0));
-  
+
   const cryptoKey = await crypto.subtle.importKey(
     'pkcs8',
     keyBytes,
-    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+    {
+      name: 'RSASSA-PKCS1-v1_5',
+      hash: 'SHA-256'
+    },
     false,
     ['sign']
   );
-  
+
   const signature = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', cryptoKey, messageBytes);
   const signatureB64 = btoa(String.fromCharCode(...new Uint8Array(signature)))
     .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-  
+
   return `${message}.${signatureB64}`;
 }
 
 serve(async (req: Request): Promise<Response> => {
-  console.log('=== PARTNER IMPORT DEBUG START ===');
-  console.log('Request method:', req.method);
-  console.log('Request URL:', req.url);
   const corsHeaders = getCorsHeaders(req.headers.get('origin'));
-  
+
   if (req.method === 'OPTIONS') {
-    console.log('OPTIONS request - returning CORS headers');
-    return new Response('ok', { headers: corsHeaders })
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    console.log('=== PROCESSING POST REQUEST ===');
+    console.log('Processing partner import request...');
     const requestBody = await req.json();
-    console.log('Request body keys:', Object.keys(requestBody));
-    console.log('Full request body:', JSON.stringify(requestBody, null, 2));
-    
-    // Support both camelCase and snake_case parameters
+    console.log('Request data received');
+
     const profileId = requestBody.profile_id || requestBody.partnerImportProfileId;
     const csvData = requestBody.csv_data || requestBody.csvData;
     const dryRun = requestBody.dry_run ?? requestBody.dryRun ?? true;
@@ -294,36 +267,30 @@ serve(async (req: Request): Promise<Response> => {
     if (!profileId) {
       return new Response(JSON.stringify({ error: 'Missing profile_id or partnerImportProfileId' }), {
         status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
-    console.log('=== CREATING SUPABASE CLIENT ===');
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    console.log('Supabase URL exists:', !!supabaseUrl);
-    console.log('Service role key exists:', !!supabaseKey);
-    
+
+    console.log('Creating Supabase client...');
     const supabase = createClient(
-      supabaseUrl ?? '',
-      supabaseKey ?? '',
+      supabaseUrl!,
+      supabaseKey!,
       {
         global: {
-          headers: { Authorization: `Bearer ${supabaseKey}` },
-        },
+          headers: { Authorization: `Bearer ${supabaseKey}` }
+        }
       }
-    )
+    );
 
-    console.log('=== FETCHING IMPORT PROFILE ===');
-    console.log('Profile ID:', profileId);
+    console.log('Fetching import profile...');
     const importProfile = await fetchImportProfile(supabase, profileId);
-    console.log('Profile fetched:', !!importProfile);
     if (!importProfile) {
-      console.log('=== PROFILE ERROR ===');
-      console.log('Import profile not found for ID:', profileId);
       return new Response(JSON.stringify({ error: 'Import profile not found' }), {
         status: 404,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
@@ -331,159 +298,130 @@ serve(async (req: Request): Promise<Response> => {
     if (!partner) {
       return new Response(JSON.stringify({ error: 'Partner not found' }), {
         status: 404,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
     console.log('Import profile:', {
       id: importProfile.id,
+      partner_id: importProfile.partner_id,
       source_type: importProfile.source_type,
-      gsheet_id: importProfile.gsheet_id,
-      status_actions_count: Object.keys(importProfile.status_actions || {}).length
+      column_mappings_count: Object.keys(importProfile.column_mappings || {}).length,
+      status_mappings_count: Object.keys(importProfile.status_mappings || {}).length
     });
 
-    // Get data source - either CSV or Google Sheets
     let parsedData: any[] = [];
-    
+
+    // Fetch data based on source type
     if (importProfile.source_type === 'gsheet' && !csvData) {
       if (!importProfile.gsheet_id) {
         return new Response(JSON.stringify({ error: 'Google Sheet ID not configured for this profile' }), {
           status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
-      
-      console.log('Fetching Google Sheet data:', importProfile.gsheet_id, importProfile.gsheet_sheet_name);
+      console.log('Fetching Google Sheet data...');
       parsedData = await fetchGoogleSheetData(importProfile.gsheet_id, importProfile.gsheet_sheet_name || 'Sheet1');
-      console.log('Fetched', parsedData.length, 'rows from Google Sheets');
     } else if (csvData) {
       parsedData = parse(csvData, {
         skipFirstRow: true,
-        header: true,
-      });
-      console.log('Parsed', parsedData.length, 'rows from CSV');
+        columns: undefined
+      }) as any[];
     } else {
       return new Response(JSON.stringify({ error: 'No data source provided' }), {
         status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
+    console.log(`Processing ${parsedData.length} rows...`);
+
     const results: Results = {
-      data: [],
-      errors: [],
+      inserted: [],
+      updated: [],
+      skipped: [],
       warnings: [],
-      skipped: 0,
+      errors: []
     };
 
-    const columnMapping = importProfile.column_mappings || {};
-    const statusMapping = importProfile.status_mappings || {};
-    const statusOverrideRules = importProfile.status_override_rules || {};
+    const columnMappings = importProfile.column_mappings || {};
+    const statusMappings = importProfile.status_mappings || {};
     const statusActions = importProfile.status_actions || {};
-    
-    // Build engineer mapping from rules
     const engineerMapping: Record<string, string> = {};
+
+    // Build engineer mapping from rules
     if (importProfile.engineer_mapping_rules) {
       for (const rule of importProfile.engineer_mapping_rules) {
         if (rule.partner_identifier && rule.engineer_id) {
-          engineerMapping[rule.partner_identifier] = rule.engineer_id;
+          engineerMapping[rule.partner_identifier.toLowerCase()] = rule.engineer_id;
         }
       }
     }
-    
-    // Pre-fetch all engineers to check for unmapped ones
-    const unmappedEngineers = new Set<string>();
 
+    // Process data in batches
     const batchSize = 100;
     for (let batchStart = 0; batchStart < parsedData.length; batchStart += batchSize) {
       const batch = parsedData.slice(batchStart, batchStart + batchSize);
-
+      
       for (const [index, row] of batch.entries()) {
-        const actualRowIndex = batchStart + index;
+        const rowIndex = batchStart + index;
         
         const processRow = (row: any, rowIndex: number): ProcessedRow => {
           try {
-            // Extract all mapped fields from the row
-            const mappedData: MappedData = {
-              partner_external_id: row[columnMapping['partner_external_id']]?.toString()?.trim() || null,
-              status: row[columnMapping['status']]?.toString()?.trim() || null,
-              job_type: row[columnMapping['job_type']] || row[columnMapping['type']]?.toString()?.trim() || null,
-              postcode: row[columnMapping['postcode']]?.toString()?.trim() || null,
-              job_address: row[columnMapping['address']]?.toString()?.trim() || null,
-              internal_install_notes: row[columnMapping['job_notes']]?.toString()?.trim() || null,
-              partner_status: row[columnMapping['partner_status']]?.toString()?.trim() || null,
-              sub_partner: row[columnMapping['sub_partner']]?.toString()?.trim() || null,
-              scheduled_install_date: parseDate(row[columnMapping['scheduled_date']]?.toString()?.trim()),
-              // Extract client-related fields
-              client_name: row[columnMapping['client_name']]?.toString()?.trim() || null,
-              client_email: row[columnMapping['client_email']]?.toString()?.trim() || null,
-              client_phone: row[columnMapping['client_phone']]?.toString()?.trim() || null,
-              customer_address_line_1: row[columnMapping['customer_address_line_1']]?.toString()?.trim() || null,
-              customer_address_line_2: row[columnMapping['customer_address_line_2']]?.toString()?.trim() || null,
-              customer_address_city: row[columnMapping['customer_address_city']]?.toString()?.trim() || null,
-              customer_address_post_code: row[columnMapping['customer_address_post_code']]?.toString()?.trim() || null,
-              engineer_identifier: row[columnMapping['engineer_identifier']]?.toString()?.trim() || null,
-              partner_external_url: row[columnMapping['partner_external_url']]?.toString()?.trim() || null,
-              quote_amount: row[columnMapping['quote_amount']] ? parseFloat(row[columnMapping['quote_amount']]) : null,
-              // Set is_partner_job early so validation can use it
-              is_partner_job: true,
-            };
+            // Map columns based on configuration
+            const mappedData: MappedData = {};
+            
+            for (const [dbField, csvColumn] of Object.entries(columnMappings)) {
+              if (csvColumn && row[csvColumn] !== undefined) {
+                (mappedData as any)[dbField] = row[csvColumn];
+              }
+            }
 
-            // Build consolidated address from customer address fields
-            const customerAddressParts = [
+            // Build consolidated customer address
+            const addressParts = [
               mappedData.customer_address_line_1,
               mappedData.customer_address_line_2,
               mappedData.customer_address_city
             ].filter(Boolean);
-            const consolidatedCustomerAddress = customerAddressParts.length > 0 ? customerAddressParts.join(', ') : null;
+            const consolidatedCustomerAddress = addressParts.length > 0 ? addressParts.join(', ') : null;
 
-            // Use consolidated address if no job_address is provided
+            // Set job_address if not provided but customer address is available
             if (!mappedData.job_address && consolidatedCustomerAddress) {
               mappedData.job_address = consolidatedCustomerAddress;
             }
 
-            // Use customer postcode if no main postcode
+            // Set postcode from customer fields if not provided
             if (!mappedData.postcode && mappedData.customer_address_post_code) {
               mappedData.postcode = mappedData.customer_address_post_code;
             }
 
-            // Map quote_amount to total_amount
+            // Parse quote amount
             if (mappedData.quote_amount) {
-              mappedData.total_amount = mappedData.quote_amount;
+              mappedData.quote_amount = String(mappedData.quote_amount).replace(/[£,$]/g, '');
             }
 
+            // Generate partner external ID if missing
             if (!mappedData.partner_external_id) {
-              results.skipped++;
-              return { success: false, error: 'Missing partner_external_id' };
+              mappedData.partner_external_id = `${partner.name}-${rowIndex + 1}-${Date.now()}`;
             }
 
-            let mappedStatus = mappedData.status || 'unknown';
-            
-            // Apply status mapping from profile
-            const statusMapping = importProfile.status_mappings || {};
-            if (statusMapping[mappedStatus]) {
-              mappedStatus = statusMapping[mappedStatus];
-            }
-            
-            // Apply status override rules
-            const statusOverrides = importProfile.status_override_rules || {};
-            if (statusOverrides[mappedStatus]) {
-              mappedStatus = statusOverrides[mappedStatus];
-            }
+            // Set partner job flag
+            mappedData.is_partner_job = true;
 
-            // Get partner status from mapped data (prioritize partner_status column)
+            // Map status
             const partnerStatusFromColumn = mappedData.partner_status || mappedData.status;
             const originalPartnerStatus = partnerStatusFromColumn ? String(partnerStatusFromColumn).trim().toUpperCase() : 'UNKNOWN';
-            
+            const mappedStatus = statusMappings[originalPartnerStatus] || originalPartnerStatus.toLowerCase();
+
             console.log(`Processing row ${rowIndex + 1}: Partner Status = '${originalPartnerStatus}'`);
-            
+
             // Use status actions as primary mapping
             const actionConfig = statusActions[originalPartnerStatus] || {};
             
-            let jmsStatus = mappedStatus; // fallback to old mapping
+            let jmsStatus = mappedStatus;
             let suppressScheduling = false;
             let suppressionReason = null;
-            
+
             // Prefer status_actions over old status_mappings
             if (actionConfig.jms_status) {
               jmsStatus = actionConfig.jms_status;
@@ -553,505 +491,271 @@ serve(async (req: Request): Promise<Response> => {
               
               results.warnings.push({
                 row: rowIndex + 1,
-                message: `Invalid mapped status '${jmsStatus}' - using default '${defaultStatus}' instead`,
-                data: mappedData
+                column: 'status',
+                message: `Invalid status '${jmsStatus}' mapped to '${defaultStatus}'`,
+                data: { original_status: originalPartnerStatus, mapped_status: jmsStatus }
               });
               
               jmsStatus = defaultStatus;
             }
 
-            console.log(`Status flow: ${originalPartnerStatus} -> JMS: ${jmsStatus}, Suppressed: ${suppressScheduling}`);
-
-            let mappedEngineerId: string | null = null;
-            
-            // Check for engineer mapping - prioritize engineer_identifier, then fallback to name/email
-            const engineerIdentifier = mappedData.engineer_identifier ||
-                                     row[columnMapping['engineer_name']] || 
-                                     row[columnMapping['engineer_email']] ||
-                                     row['engineer_name'] || 
-                                     row['engineer_email'] ||
-                                     null;
+            // Map engineer
+            let engineerId = null;
+            const engineerIdentifier = mappedData.engineer_identifier || mappedData.engineer_name || mappedData.engineer_email;
             
             if (engineerIdentifier) {
-              const engineerKey = engineerIdentifier.toString().trim();
+              const engineerKey = String(engineerIdentifier).toLowerCase().trim();
               
               if (engineerMapping[engineerKey]) {
-                mappedEngineerId = engineerMapping[engineerKey];
-                console.log(`Mapped engineer: ${engineerKey} -> ${mappedEngineerId}`);
+                engineerId = engineerMapping[engineerKey];
               } else {
-                unmappedEngineers.add(engineerKey);
-                console.warn(`Unmapped engineer: ${engineerKey}`);
+                console.log(`No engineer mapping found for: '${engineerKey}'`);
+                
                 results.warnings.push({
                   row: rowIndex + 1,
-                  message: `Engineer '${engineerKey}' not mapped to internal engineer`,
-                  data: mappedData
+                  column: 'engineer_identifier',
+                  message: `No engineer mapping found for identifier: '${engineerIdentifier}'`,
+                  data: { engineer_identifier: engineerIdentifier }
                 });
               }
             }
 
-            // For partner jobs, create placeholder client if missing client_id
+            // Create placeholder client if needed
             let clientId = mappedData.client_id;
             if (mappedData.is_partner_job && !clientId && createMissingOrders && !dryRun) {
-              // Create placeholder client for partner order (only if not dry run)
-              const partnerName = partner?.name || 'Partner';
-              
-              // Use client fields if available, otherwise use partner name
-              const clientName = mappedData.client_name || `${partnerName} Customer`;
-              const clientEmail = mappedData.client_email || `placeholder-${Date.now()}-${Math.random().toString(36).substr(2, 9)}@${partnerName.toLowerCase().replace(/\s+/g, '')}.example`;
+              console.log(`Creating placeholder client for row ${rowIndex + 1}`);
               
               const placeholderClient = {
-                full_name: clientName,
-                email: clientEmail,
-                phone: mappedData.client_phone || null,
-                address: consolidatedCustomerAddress || mappedData.job_address || null,
-                postcode: mappedData.customer_address_post_code || mappedData.postcode || null,
-                user_id: null, // No user account for placeholder clients
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString()
+                name: mappedData.client_name || 'Unknown Client',
+                email: mappedData.client_email || `placeholder-${Date.now()}@example.com`,
+                phone: mappedData.client_phone || '',
+                address: consolidatedCustomerAddress || mappedData.job_address || '',
+                postcode: mappedData.customer_address_post_code || mappedData.postcode || '',
+                partner_id: partner.id,
+                created_via: 'partner_import'
               };
-              
-              console.log(`Creating placeholder client for partner order: ${JSON.stringify(placeholderClient)}`);
-              
+
               const { data: newClient, error: clientError } = await supabase
                 .from('clients')
-                .insert(placeholderClient)
+                .insert([placeholderClient])
                 .select('id')
                 .single();
-              
+
               if (clientError) {
-                console.error('Failed to create placeholder client:', clientError);
+                console.error('Error creating placeholder client:', clientError);
                 results.warnings.push({
                   row: rowIndex + 1,
                   message: `Failed to create placeholder client: ${clientError.message}`,
-                  data: mappedData
+                  data: placeholderClient
                 });
               } else {
                 clientId = newClient.id;
                 console.log(`Created placeholder client with ID: ${clientId}`);
               }
             }
-            
-            // For non-partner jobs, still require client_id and quote_id  
+
+            // Skip non-partner jobs without client/quote
             if (!mappedData.is_partner_job && (!clientId || !mappedData.quote_id)) {
               if (createMissingOrders) {
                 results.warnings.push({
                   row: rowIndex + 1,
-                  message: `Missing required client_id or quote_id for new non-partner order creation. Skipping row.`,
+                  message: 'Skipping non-partner job without client_id or quote_id',
                   data: mappedData
                 });
-                results.skipped++;
-                return { success: false, error: 'Missing required client_id or quote_id' };
+              }
+              
+              return {
+                type: 'skip',
+                data: mappedData,
+                reason: 'Non-partner job without required client_id or quote_id'
+              };
+            }
+
+            // Build the order data
+            const orderData: any = {
+              client_id: clientId,
+              quote_id: mappedData.quote_id || null,
+              partner_id: partner.id,
+              partner_external_id: mappedData.partner_external_id,
+              partner_external_url: mappedData.partner_external_url || null,
+              job_address: mappedData.job_address || '',
+              postcode: mappedData.postcode || '',
+              status_enhanced: jmsStatus,
+              job_type: mappedData.job_type || mappedData.type || 'installation',
+              engineer_id: engineerId,
+              is_partner_job: true,
+              partner_status: originalPartnerStatus,
+              sub_partner: mappedData.sub_partner || null,
+              job_notes: mappedData.job_notes || null,
+              suppress_scheduling: suppressScheduling,
+              suppression_reason: suppressionReason
+            };
+
+            // Handle quote amount
+            if (mappedData.quote_amount && !isNaN(parseFloat(mappedData.quote_amount))) {
+              orderData.total_amount = parseFloat(mappedData.quote_amount);
+            }
+
+            // Handle scheduled date
+            if (mappedData.scheduled_date) {
+              const parsedDate = parseDate(mappedData.scheduled_date);
+              if (parsedDate) {
+                orderData.scheduled_install_date = parsedDate;
               } else {
-                // For updates only, we can proceed without client_id/quote_id if we're updating existing orders
-                console.log(`Row ${rowIndex + 1}: Missing client_id/quote_id but proceeding for update-only mode`);
+                results.warnings.push({
+                  row: rowIndex + 1,
+                  column: 'scheduled_date',
+                  message: `Invalid date format: '${mappedData.scheduled_date}'. Expected DD/MM/YYYY or YYYY-MM-DD`,
+                  data: { scheduled_date: mappedData.scheduled_date }
+                });
               }
             }
 
             return {
-              success: true,
-              data: {
-                ...mappedData,
-                status_enhanced: jmsStatus,
-                status: 'awaiting_payment', // Set required status field
-                scheduling_suppressed: suppressScheduling,
-                scheduling_suppressed_reason: suppressionReason,
-                engineer_id: mappedEngineerId,
-                is_partner_job: true,
-                partner_id: importProfile.partner_id,
-                partner_confirmed_externally: false,
-                external_confirmation_source: 'partner_import',
-                order_number: mappedData.order_number || 'TEMP',
-                client_id: clientId, // Use the clientId (either existing or newly created)
-                partner_external_url: mappedData.partner_external_url || null, // Persist partner external URL
-                ...(mappedData.quote_id && { quote_id: mappedData.quote_id }),
-              }
+              type: 'insert',
+              data: orderData
             };
 
           } catch (error) {
-            console.error('Error processing row:', error);
+            console.error(`Error processing row ${rowIndex + 1}:`, error);
             results.errors.push({
               row: rowIndex + 1,
-              message: error.message,
-              data: row,
+              message: `Processing error: ${error.message}`,
+              data: row
             });
-            return { success: false, error: error.message };
+            return {
+              type: 'skip',
+              data: row,
+              reason: `Processing error: ${error.message}`
+            };
           }
         };
 
-        try {
-          const processedRow = processRow(row, actualRowIndex);
-
-          if (processedRow.success && processedRow.data) {
-            results.data.push(processedRow.data);
-          } else {
-            results.errors.push({
-              row: actualRowIndex + 1,
-              message: processedRow.error || 'Unknown error',
-              data: row,
-            });
-          }
-        } catch (rowError) {
-          console.error(`Error processing row ${actualRowIndex + 1}:`, rowError);
-          results.errors.push({
-            row: actualRowIndex + 1,
-            message: `Row processing failed: ${rowError.message}`,
-            data: row,
-          });
-        }
-      }
-    }
-
-    // Check for unmapped engineers and block if found
-    if (unmappedEngineers.size > 0) {
-      console.log('Found unmapped engineers, blocking import:', Array.from(unmappedEngineers));
-      return new Response(
-        JSON.stringify({
-          success: false,
-          unmapped_engineers: Array.from(unmappedEngineers),
-          summary: {
-            processed: results.data.length,
-            inserted_count: 0,
-            updated_count: 0,
-            skipped_count: results.skipped,
-            errors: results.errors,
-            warnings: results.warnings,
-          }
-        }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
-
-    // Build response
-    const totalProcessed = results.data.length;
-    let insertCount = 0;
-    let updateCount = 0;
-    const preview: any = { updates: [], inserts: [], skips: [] };
-
-    if (dryRun) {
-      console.log('=== DRY RUN MODE - NO DATABASE WRITES ===');
-      // For dry run, check which orders already exist (read-only operation)
-      const externalIds = results.data.map(d => d.partner_external_id).filter(Boolean);
-      
-      if (externalIds.length > 0) {
-        const { data: existingOrders } = await supabase
-          .from('orders')
-          .select('partner_external_id, status_enhanced, partner_status')
-          .eq('partner_id', importProfile.partner_id)
-          .in('partner_external_id', externalIds);
-
-        const existingMap = new Map(existingOrders?.map(o => [o.partner_external_id, o]) || []);
+        const processedRow = processRow(row, rowIndex);
         
-        results.data.forEach((item, index) => {
-          const existing = existingMap.get(item.partner_external_id);
-          if (existing) {
-            updateCount++;
-            preview.updates.push({
-              row: index + 1,
-              external_id: item.partner_external_id,
-              current_status: existing.status_enhanced,
-              new_status: item.status_enhanced,
-              reason: `Status update from ${existing.partner_status || 'unknown'} to ${item.partner_status || 'unknown'}`,
-              data: item
-            });
-          } else if (createMissingOrders) {
-            insertCount++;
-            preview.inserts.push({
-              row: index + 1,
-              external_id: item.partner_external_id,
-              status: item.status_enhanced,
-              reason: `New order for partner status: ${item.partner_status || 'unknown'}`,
-              data: item
-            });
-          } else {
-            preview.skips.push({
-              row: index + 1,
-              external_id: item.partner_external_id,
-              reason: 'Order does not exist and create_missing_orders is disabled',
-              data: item
-            });
-          }
-        });
-      } else {
-        insertCount = createMissingOrders ? results.data.length : 0;
-      }
-      
-      // Add unmapped engineers to preview  
-      const unmappedEngineersArray = Array.from(unmappedEngineers);
-      if (unmappedEngineersArray.length > 0) {
-        console.log('=== DRY RUN: Found unmapped engineers ===', unmappedEngineersArray);
-        preview.unmapped_engineers = unmappedEngineersArray;
-      }
-      
-      console.log('=== DRY RUN COMPLETE - PREVIEW GENERATED ===');
-    } else {
-      // Live import
-      console.log(`Starting live import with ${results.data.length} records`);
-      
-      if (results.data.length > 0) {
-        // Log first record for debugging
-        console.log('First record to upsert:', JSON.stringify(results.data[0], null, 2));
-        console.log('Available fields in first record:', Object.keys(results.data[0]));
-        
-        // Check if we have external IDs to work with
-        const recordsWithExternalId = results.data.filter(item => item.partner_external_id);
-        console.log(`Records with external ID: ${recordsWithExternalId.length}/${results.data.length}`);
-        
-        // Log some sample external IDs
-        const sampleExternalIds = recordsWithExternalId.slice(0, 5).map(r => r.partner_external_id);
-        console.log('Sample external IDs:', sampleExternalIds);
-        
-        // Check if existing orders exist to update
-        const existingOrdersQuery = await supabase
-          .from('orders')
-          .select('partner_external_id')
-          .eq('partner_id', importProfile.partner_id)
-          .not('partner_external_id', 'is', null);
+        if (processedRow.type === 'insert' && !dryRun) {
+          try {
+            // Check for existing order with same partner_external_id
+            const { data: existingOrder } = await supabase
+              .from('orders')
+              .select('id, partner_external_id')
+              .eq('partner_external_id', processedRow.data.partner_external_id)
+              .eq('partner_id', partner.id)
+              .single();
 
-        const existingExternalIds = new Set(
-          (existingOrdersQuery.data || []).map(o => o.partner_external_id)
-        );
+            if (existingOrder) {
+              // Update existing order
+              const { error: updateError } = await supabase
+                .from('orders')
+                .update(processedRow.data)
+                .eq('id', existingOrder.id);
 
-        console.log(`Found ${existingExternalIds.size} existing partner orders in database`);
-
-        // Separate records for update vs insert based on whether they exist in database
-        const recordsForUpdate = results.data.filter(item => 
-          item.partner_external_id && existingExternalIds.has(item.partner_external_id)
-        );
-        
-        // For partner jobs, allow insertion without client_id/quote_id requirements
-        const recordsForInsert = results.data.filter(item => 
-          item.partner_external_id && !existingExternalIds.has(item.partner_external_id)
-        );
-        
-        console.log(`Records for update: ${recordsForUpdate.length}, Records for insert: ${recordsForInsert.length}`);
-        console.log(`createMissingOrders flag: ${createMissingOrders}`);
-        console.log(`Sample record for insert:`, recordsForInsert.length > 0 ? JSON.stringify(recordsForInsert[0], null, 2) : 'No records for insert');
-        
-        let totalUpdated = 0;
-        let totalInserted = 0;
-        
-        // Handle updates first - update existing orders by partner_external_id
-        if (recordsForUpdate.length > 0) {
-          console.log('Updating existing orders...');
-          
-          // Get existing orders to update
-          const externalIds = recordsForUpdate.map(r => r.partner_external_id).filter(Boolean);
-          console.log(`Looking for existing orders with external IDs:`, externalIds.slice(0, 5), `... (${externalIds.length} total)`);
-          
-          const { data: existingOrders, error: queryError } = await supabase
-            .from('orders')
-            .select('id, partner_external_id')
-            .eq('partner_id', importProfile.partner_id)
-            .in('partner_external_id', externalIds);
-          
-          if (queryError) {
-            console.error('Error querying existing orders:', queryError);
-            throw new Error(`Failed to query existing orders: ${queryError.message}`);
-          }
-          
-          console.log(`Found ${existingOrders?.length || 0} existing orders to update`);
-          
-          if (existingOrders && existingOrders.length > 0) {
-            const existingMap = new Map(existingOrders.map(o => [o.partner_external_id, o.id]));
-            console.log('Existing order mapping:', Array.from(existingMap.entries()).slice(0, 3));
-            
-            // Update each existing order individually  
-            for (const record of recordsForUpdate) {
-              const orderId = existingMap.get(record.partner_external_id);
-              if (orderId) {
-                console.log(`Updating order ${orderId} with external ID: ${record.partner_external_id}`);
-                
-                try {
-                  const { error: updateError } = await supabase
-                    .from('orders')
-                    .update({
-                      ...record,
-                      updated_at: new Date().toISOString()
-                    })
-                    .eq('id', orderId);
-                  
-                  if (updateError) {
-                    console.error(`Error updating order ${orderId}:`, updateError);
-                    results.errors.push({
-                      row: 0,
-                      message: `Failed to update order ${record.partner_external_id}: ${updateError.message}`,
-                      data: record
-                    });
-                  } else {
-                    console.log(`Successfully updated order ${orderId}`);
-                    totalUpdated++;
-                  }
-                } catch (updateException) {
-                  console.error(`Exception updating order ${orderId}:`, updateException);
-                  results.errors.push({
-                    row: 0,
-                    message: `Exception updating order ${record.partner_external_id}: ${updateException.message}`,
-                    data: record
-                  });
-                }
+              if (updateError) {
+                results.errors.push({
+                  row: rowIndex + 1,
+                  message: `Update failed: ${updateError.message}`,
+                  data: processedRow.data
+                });
               } else {
-                console.log(`No existing order found for external ID: ${record.partner_external_id}`);
-                results.warnings.push({
-                  row: 0,
-                  message: `No existing order found for external ID: ${record.partner_external_id}`,
-                  data: record
+                results.updated.push({
+                  type: 'update',
+                  data: { ...processedRow.data, id: existingOrder.id }
+                });
+              }
+            } else {
+              // Insert new order
+              const { data: newOrder, error: insertError } = await supabase
+                .from('orders')
+                .insert([processedRow.data])
+                .select('id, partner_external_id')
+                .single();
+
+              if (insertError) {
+                results.errors.push({
+                  row: rowIndex + 1,
+                  message: `Insert failed: ${insertError.message}`,
+                  data: processedRow.data
+                });
+              } else {
+                results.inserted.push({
+                  type: 'insert',
+                  data: { ...processedRow.data, id: newOrder.id }
                 });
               }
             }
-          } else {
-            console.log('No existing orders found for any external IDs');
-            results.warnings.push({
-              row: 0,
-              message: `No existing orders found for partner ${importProfile.partner_id} with provided external IDs`,
-              data: { partner_id: importProfile.partner_id, external_ids_sample: externalIds.slice(0, 5) }
-            });
-          }
-        }
-        
-        // Handle inserts for records with complete data
-        if (recordsForInsert.length > 0 && createMissingOrders) {
-          console.log('Inserting new orders...');
-          console.log(`First record to insert:`, JSON.stringify(recordsForInsert[0], null, 2));
-          
-          try {
-            // Remove any invalid enum values before insertion
-            const cleanedRecords = recordsForInsert.map(item => {
-              const cleanedItem = { ...item };
-              
-              // Ensure all required fields are present
-              if (!cleanedItem.order_number) {
-                cleanedItem.order_number = 'TEMP';
-              }
-              
-              // Set job_type to valid enum value
-              if (!cleanedItem.job_type) {
-                cleanedItem.job_type = 'installation';
-              }
-              
-              // Ensure status_enhanced is valid
-              const validStatuses = [
-                'quote_accepted', 'awaiting_payment', 'payment_received', 'awaiting_agreement', 
-                'agreement_signed', 'awaiting_install_booking', 'scheduled', 'in_progress',
-                'install_completed_pending_qa', 'completed', 'revisit_required', 'cancelled',
-                'needs_scheduling', 'date_offered', 'date_accepted', 'date_rejected', 
-                'offer_expired', 'on_hold_parts_docs', 'awaiting_final_payment'
-              ];
-              
-              if (!cleanedItem.status_enhanced || !validStatuses.includes(cleanedItem.status_enhanced)) {
-                cleanedItem.status_enhanced = 'awaiting_install_booking';
-              }
-              
-              // Set the required status field (maps to legacy status field)
-              if (!cleanedItem.status) {
-                cleanedItem.status = 'awaiting_payment';
-              }
-              
-              // Set timestamps
-              cleanedItem.updated_at = new Date().toISOString();
-              cleanedItem.created_at = new Date().toISOString();
-              
-              // Debug log for date fields
-              console.log(`Processing record dates:`, {
-                scheduled_install_date: cleanedItem.scheduled_install_date,
-                created_at: cleanedItem.created_at,
-                updated_at: cleanedItem.updated_at
-              });
-              
-              return cleanedItem;
-            });
-            
-            console.log(`Cleaned first record:`, JSON.stringify(cleanedRecords[0], null, 2));
-            
-            console.log('=== ATTEMPTING DATABASE INSERT ===');
-            console.log(`Inserting ${cleanedRecords.length} records`);
-            
-            const { data: insertedData, error: insertError, count: insertCount } = await supabase
-              .from('orders')
-              .insert(cleanedRecords)
-              .select('id', { count: 'estimated' });
-            
-            console.log('=== INSERT RESULT ===');
-            console.log('Insert error:', insertError);
-            console.log('Insert count:', insertCount);
-            console.log('Inserted data length:', insertedData?.length);
-            
-            if (insertError) {
-              console.error('Database insert error:', {
-                message: insertError.message,
-                details: insertError.details,
-                hint: insertError.hint,
-                code: insertError.code
-              });
-              results.errors.push({
-                row: 0,
-                message: `Database insert failed: ${insertError.message}${insertError.hint ? ' (' + insertError.hint + ')' : ''}`,
-                data: { error_code: insertError.code, error_details: insertError.details }
-              });
-            } else {
-              totalInserted = insertCount || recordsForInsert.length;
-              console.log(`Successfully inserted ${totalInserted} orders`);
-            }
-          } catch (insertException) {
-            console.error('Exception during insert:', insertException);
+          } catch (dbError) {
             results.errors.push({
-              row: 0,
-              message: `Exception during insert: ${insertException.message}`,
-              data: { exception: insertException.toString() }
+              row: rowIndex + 1,
+              message: `Database error: ${dbError.message}`,
+              data: processedRow.data
             });
           }
+        } else {
+          // Add to appropriate result array
+          if (processedRow.type === 'insert') {
+            results.inserted.push(processedRow);
+          } else if (processedRow.type === 'update') {
+            results.updated.push(processedRow);
+          } else {
+            results.skipped.push(processedRow);
+          }
         }
-        
-        console.log(`Import completed - Updated: ${totalUpdated}, Inserted: ${totalInserted}`);
-        updateCount = totalUpdated;
-        insertCount = totalInserted;
       }
     }
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        summary: {
-          processed: totalProcessed,
-          inserted_count: insertCount,
-          updated_count: updateCount,
-          skipped_count: results.skipped,
-          errors: results.errors,
-          warnings: results.warnings,
-          dry_run: dryRun,
-          ...(dryRun ? { preview_inserted_count: insertCount, preview_updated_count: updateCount } : {})
-        },
-        ...(dryRun ? { preview } : {})
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    const summary = {
+      total_rows: parsedData.length,
+      inserted_count: results.inserted.length,
+      updated_count: results.updated.length,
+      skipped_count: results.skipped.length,
+      warning_count: results.warnings.length,
+      error_count: results.errors.length,
+      dry_run: dryRun,
+      created_missing_orders: createMissingOrders
+    };
+
+    console.log('Import completed:', summary);
+
+    return new Response(JSON.stringify({
+      success: true,
+      summary,
+      results: {
+        inserted: results.inserted.slice(0, 10), // Limit preview
+        updated: results.updated.slice(0, 10),
+        skipped: results.skipped.slice(0, 10),
+        warnings: results.warnings,
+        errors: results.errors
       }
-    )
+    }), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+
   } catch (error) {
-    console.error('=== CRITICAL ERROR ===')
-    console.error('Error type:', typeof error)
-    console.error('Error name:', error?.name)
-    console.error('Error message:', error?.message)
-    console.error('Error stack:', error?.stack)
-    console.error('Full error object:', error)
+    console.error('Partner import error:', error);
     
-    return new Response(JSON.stringify({ 
+    return new Response(JSON.stringify({
       success: false,
-      error: error.message,
-      errorType: typeof error,
-      errorName: error?.name,
+      error: error.message || 'Unknown error occurred',
+      details: error.stack,
       summary: {
-        processed: 0,
+        total_rows: 0,
         inserted_count: 0,
         updated_count: 0,
         skipped_count: 0,
-        errors: [{ row: 0, error: error.message, stack: error?.stack }],
-        warnings: []
+        warning_count: 0,
+        error_count: 1
+      },
+      results: {
+        inserted: [],
+        updated: [],
+        skipped: [],
+        warnings: [],
+        errors: [{ row: 0, message: error.message || 'Unknown error', data: null }]
       }
     }), {
       status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
   }
 });
