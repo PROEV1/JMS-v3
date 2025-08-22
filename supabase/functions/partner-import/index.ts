@@ -822,6 +822,11 @@ serve(async (req: Request): Promise<Response> => {
                 cleanedItem.status_enhanced = 'awaiting_install_booking';
               }
               
+              // Set the required status field (maps to legacy status field)
+              if (!cleanedItem.status) {
+                cleanedItem.status = 'awaiting_payment';
+              }
+              
               // Set timestamps
               cleanedItem.updated_at = new Date().toISOString();
               cleanedItem.created_at = new Date().toISOString();
