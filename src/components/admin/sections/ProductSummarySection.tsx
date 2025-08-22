@@ -85,6 +85,7 @@ export function ProductSummarySection({ order, onUpdate }: ProductSummaryProps) 
   };
 
   const calculateOrderTotal = () => {
+    if (!order.quote?.quote_items) return 0;
     return order.quote.quote_items.reduce((total, item) => total + item.total_price, 0);
   };
 
@@ -166,7 +167,7 @@ export function ProductSummarySection({ order, onUpdate }: ProductSummaryProps) 
       <div className="space-y-4">
         {/* Header with edit toggle */}
         <div className="flex items-center justify-between">
-          <h4 className="font-medium">Order Items ({order.quote.quote_items.length})</h4>
+          <h4 className="font-medium">Order Items ({order.quote?.quote_items?.length || 0})</h4>
           <div className="flex gap-2">
             {!isEditing ? (
               <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
@@ -189,47 +190,57 @@ export function ProductSummarySection({ order, onUpdate }: ProductSummaryProps) 
 
         {/* Product Items */}
         <div className="space-y-3">
-          {order.quote.quote_items.map((item, index) => (
-            <Card key={item.id} className="relative">
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <h5 className="font-medium">{item.product_name}</h5>
-                      <Badge variant="outline">Qty: {item.quantity}</Badge>
+          {order.quote?.quote_items?.length ? (
+            order.quote.quote_items.map((item, index) => (
+              <Card key={item.id} className="relative">
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <h5 className="font-medium">{item.product_name}</h5>
+                        <Badge variant="outline">Qty: {item.quantity}</Badge>
+                      </div>
+                      
+                      {formatConfiguration(item.configuration) && (
+                        <div className="text-sm text-muted-foreground mb-2">
+                          {formatConfiguration(item.configuration)}
+                        </div>
+                      )}
+                      
+                      <div className="flex items-center gap-4 text-sm">
+                        <span className="text-muted-foreground">
+                          Unit Price: {formatCurrency(item.unit_price)}
+                        </span>
+                        <span className="font-semibold">
+                          Total: {formatCurrency(item.total_price)}
+                        </span>
+                      </div>
                     </div>
-                    
-                    {formatConfiguration(item.configuration) && (
-                      <div className="text-sm text-muted-foreground mb-2">
-                        {formatConfiguration(item.configuration)}
+
+                    {isEditing && (
+                      <div className="flex gap-2">
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => handleRemoveItem(item.id)}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
                       </div>
                     )}
-                    
-                    <div className="flex items-center gap-4 text-sm">
-                      <span className="text-muted-foreground">
-                        Unit Price: {formatCurrency(item.unit_price)}
-                      </span>
-                      <span className="font-semibold">
-                        Total: {formatCurrency(item.total_price)}
-                      </span>
-                    </div>
                   </div>
-
-                  {isEditing && (
-                    <div className="flex gap-2">
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={() => handleRemoveItem(item.id)}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            ))
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>No products in this order</p>
+              {isEditing && (
+                <p className="text-sm mt-2">Click "Add Product from Library" to add items</p>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Add New Product */}

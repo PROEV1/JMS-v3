@@ -647,7 +647,7 @@ serve(async (req: Request): Promise<Response> => {
             total_amount: sanitizedQuoteAmount,
             scheduling_suppressed: suppressScheduling,
             scheduling_suppressed_reason: suppressionReason,
-            order_number: `TEMP-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            order_number: 'TEMP', // Will be replaced by trigger
             status: 'awaiting_payment',
             deposit_amount: 0,
             amount_paid: 0

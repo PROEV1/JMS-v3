@@ -117,6 +117,7 @@ export function AgreementSigningModal({
           <ul>
             ${order?.quote?.quote_items?.map(item => 
               `<li>${item.product_name} (Qty: ${item.quantity}) - £${item.total_price}</li>`
+            ).join('') || '<li>No items</li>'}
             ).join('') || '<li>Product details not available</li>'}
           </ul>
           

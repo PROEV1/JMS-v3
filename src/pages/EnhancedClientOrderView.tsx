@@ -913,8 +913,10 @@ export default function EnhancedClientOrderView() {
             
             <div className="space-y-3">
               <div>
-                <span className="text-sm text-muted-foreground">Products Ordered:</span>
-                {order.quote.quote_items.map((item, index) => (
+                {order.quote?.quote_items?.length ? (
+                  <span className="text-sm text-muted-foreground">Products Ordered:</span>
+                ) : null}
+                {order.quote?.quote_items?.map((item, index) => (
                   <div key={index} className="flex justify-between">
                     <span>{item.product_name} (Qty: {item.quantity})</span>
                     <span>{formatCurrency(item.total_price)}</span>
