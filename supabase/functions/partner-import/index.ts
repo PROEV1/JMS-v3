@@ -233,14 +233,21 @@ async function createJWT(credentials: any) {
 }
 
 serve(async (req: Request): Promise<Response> => {
+  console.log('=== PARTNER IMPORT DEBUG START ===');
+  console.log('Request method:', req.method);
+  console.log('Request URL:', req.url);
   const corsHeaders = getCorsHeaders(req.headers.get('origin'));
   
   if (req.method === 'OPTIONS') {
+    console.log('OPTIONS request - returning CORS headers');
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
+    console.log('=== PROCESSING POST REQUEST ===');
     const requestBody = await req.json();
+    console.log('Request body keys:', Object.keys(requestBody));
+    console.log('Full request body:', JSON.stringify(requestBody, null, 2));
     
     // Support both camelCase and snake_case parameters
     const profileId = requestBody.profile_id || requestBody.partnerImportProfileId;
@@ -255,18 +262,29 @@ serve(async (req: Request): Promise<Response> => {
       })
     }
 
+    console.log('=== CREATING SUPABASE CLIENT ===');
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    console.log('Supabase URL exists:', !!supabaseUrl);
+    console.log('Service role key exists:', !!supabaseKey);
+    
     const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      supabaseUrl ?? '',
+      supabaseKey ?? '',
       {
         global: {
-          headers: { Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}` },
+          headers: { Authorization: `Bearer ${supabaseKey}` },
         },
       }
     )
 
+    console.log('=== FETCHING IMPORT PROFILE ===');
+    console.log('Profile ID:', profileId);
     const importProfile = await fetchImportProfile(supabase, profileId);
+    console.log('Profile fetched:', !!importProfile);
     if (!importProfile) {
+      console.log('=== PROFILE ERROR ===');
+      console.log('Import profile not found for ID:', profileId);
       return new Response(JSON.stringify({ error: 'Import profile not found' }), {
         status: 404,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -812,10 +830,18 @@ serve(async (req: Request): Promise<Response> => {
             
             console.log(`Cleaned first record:`, JSON.stringify(cleanedRecords[0], null, 2));
             
+            console.log('=== ATTEMPTING DATABASE INSERT ===');
+            console.log(`Inserting ${cleanedRecords.length} records`);
+            
             const { data: insertedData, error: insertError, count: insertCount } = await supabase
               .from('orders')
               .insert(cleanedRecords)
               .select('id', { count: 'estimated' });
+            
+            console.log('=== INSERT RESULT ===');
+            console.log('Insert error:', insertError);
+            console.log('Insert count:', insertCount);
+            console.log('Inserted data length:', insertedData?.length);
             
             if (insertError) {
               console.error('Database insert error:', {
@@ -869,16 +895,24 @@ serve(async (req: Request): Promise<Response> => {
       }
     )
   } catch (error) {
-    console.error('Partner Import Error:', error)
+    console.error('=== CRITICAL ERROR ===')
+    console.error('Error type:', typeof error)
+    console.error('Error name:', error?.name)
+    console.error('Error message:', error?.message)
+    console.error('Error stack:', error?.stack)
+    console.error('Full error object:', error)
+    
     return new Response(JSON.stringify({ 
       success: false,
       error: error.message,
+      errorType: typeof error,
+      errorName: error?.name,
       summary: {
         processed: 0,
         inserted_count: 0,
         updated_count: 0,
         skipped_count: 0,
-        errors: [{ row: 0, error: error.message }],
+        errors: [{ row: 0, error: error.message, stack: error?.stack }],
         warnings: []
       }
     }), {
