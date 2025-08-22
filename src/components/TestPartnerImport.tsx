@@ -55,18 +55,47 @@ export function TestPartnerImport() {
     }
   };
 
+  const runActualImport = async () => {
+    setLoading(true);
+    setResult(null);
+    
+    try {
+      console.log('Running ACTUAL partner import (not dry run)...');
+      
+      const { data, error } = await supabase.functions.invoke('partner-import', {
+        body: { 
+          profile_id: '0d0366e0-e24d-4bb4-ada3-0c6b4ff50ee1',
+          dry_run: false,  // THIS WILL ACTUALLY IMPORT DATA
+          create_missing_orders: true
+        }
+      });
+
+      console.log('Actual import result:', { data, error });
+      setResult({ data, error, success: !error });
+      
+    } catch (error: any) {
+      console.error('Actual import failed:', error);
+      setResult({ error: error.message, success: false });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Card className="m-4">
       <CardHeader>
         <CardTitle>Partner Import Debug</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Button onClick={testFunction} disabled={loading}>
             Test Function
           </Button>
-          <Button onClick={testRealImport} disabled={loading}>
-            Test Real Import
+          <Button onClick={testRealImport} disabled={loading} variant="outline">
+            Test Import (Dry Run)
+          </Button>
+          <Button onClick={runActualImport} disabled={loading} variant="destructive">
+            🚨 RUN ACTUAL IMPORT 🚨
           </Button>
         </div>
         
