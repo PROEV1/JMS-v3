@@ -11,7 +11,7 @@ interface StatusCounts {
   completed: number;
   cancelled: number;
   onHold: number;
-  notInScheduling: number;
+  
   unavailableEngineers: number;
 }
 
@@ -26,7 +26,7 @@ export function useScheduleStatusCounts() {
     completed: 0,
     cancelled: 0,
     onHold: 0,
-    notInScheduling: 0,
+    
     unavailableEngineers: 0
   });
   const [loading, setLoading] = useState(true);
@@ -90,7 +90,6 @@ export function useScheduleStatusCounts() {
         completedResult,
         cancelledResult,
         onHoldResult,
-        notInSchedulingResult,
         unavailableEngineersResult
       ] = await Promise.all([
         supabase.from('orders').select('*', { count: 'exact', head: true })
@@ -104,10 +103,6 @@ export function useScheduleStatusCounts() {
           .eq('status_enhanced', 'cancelled'),
         supabase.from('orders').select('*', { count: 'exact', head: true })
           .eq('status_enhanced', 'on_hold_parts_docs'),
-        supabase.from('orders').select('*', { count: 'exact', head: true })
-          .eq('scheduling_suppressed', true)
-          .neq('status_enhanced', 'cancelled')
-          .neq('status_enhanced', 'on_hold_parts_docs'), // Exclude already counted on-hold jobs
         supabase.from('engineers').select('*', { count: 'exact', head: true })
           .eq('availability', false)
       ]);
@@ -177,7 +172,6 @@ export function useScheduleStatusCounts() {
         completed: completedResult.count || 0,
         cancelled: cancelledResult.count || 0,
         onHold: onHoldResult.count || 0,
-        notInScheduling: notInSchedulingResult.count || 0,
         unavailableEngineers: unavailableEngineersResult.count || 0
       });
     } catch (error) {

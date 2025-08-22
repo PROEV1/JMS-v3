@@ -5,7 +5,7 @@ import { ScheduleStatusListPage } from '@/components/scheduling/ScheduleStatusLi
 import { CompletionPendingListPage } from '@/components/scheduling/CompletionPendingListPage';
 import { CompletedListPage } from '@/components/scheduling/CompletedListPage';
 import { CancelledListPage } from '@/components/scheduling/CancelledListPage';
-import { NotInSchedulingListPage } from '@/components/scheduling/NotInSchedulingListPage';
+
 import { ScheduleStatusNavigation } from '@/components/scheduling/ScheduleStatusNavigation';
 import { NeedsSchedulingListPage } from '@/components/scheduling/NeedsSchedulingListPage';
 import { ScheduledListPage } from '@/components/scheduling/ScheduledListPage';
@@ -43,8 +43,6 @@ export default function AdminScheduleStatus() {
             return <DateRejectedListPage />;
           case 'offer-expired':
             return <OfferExpiredListPage />;
-          case 'not-in-scheduling':
-            return <NotInSchedulingListPage />;
           default:
             return <NeedsSchedulingListPage />;
         }

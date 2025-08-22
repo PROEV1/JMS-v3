@@ -99,14 +99,6 @@ const statusTiles: StatusTile[] = [
     route: '/admin/schedule/status/offer-expired',
     statusKey: 'offer-expired'
   },
-  {
-    id: 'not_in_scheduling',
-    title: 'Not in Scheduling',
-    icon: Eye,
-    colorClass: 'bg-gradient-to-br from-gray-50 to-gray-100 border-gray-200 hover:border-gray-300',
-    route: '/admin/schedule/status/not-in-scheduling',
-    statusKey: 'not-in-scheduling'
-  }
 ];
 
 function StatusNavTile({ tile, count, isActive, navigate }: {
@@ -196,8 +188,7 @@ export function ScheduleStatusNavigation({ currentStatus }: ScheduleStatusNaviga
           onHoldResult, 
           completionPendingResult,
           completedResult,
-          cancelledResult,
-          notInSchedulingResult
+          cancelledResult
         ] = await Promise.all([
           supabase
             .from('orders')
@@ -219,12 +210,7 @@ export function ScheduleStatusNavigation({ currentStatus }: ScheduleStatusNaviga
           supabase
             .from('orders')
             .select('*', { count: 'exact', head: true })
-            .eq('status_enhanced', 'cancelled'),
-          supabase
-            .from('orders')
-            .select('*', { count: 'exact', head: true })
-            .eq('scheduling_suppressed', true)
-            .neq('status_enhanced', 'cancelled')
+            .eq('status_enhanced', 'cancelled')
         ]);
 
         // For needs-scheduling, get count of orders with no engineer and no active offers
@@ -292,8 +278,7 @@ export function ScheduleStatusNavigation({ currentStatus }: ScheduleStatusNaviga
           'completion-pending': completionPendingResult.count || 0,
           'completed': completedResult.count || 0,
           'on-hold': onHoldResult.count || 0,
-          'cancelled': cancelledResult.count || 0,
-          'not-in-scheduling': notInSchedulingResult.count || 0
+          'cancelled': cancelledResult.count || 0
         });
       } catch (error) {
         console.error('Error fetching status counts:', error);
