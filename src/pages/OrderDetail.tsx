@@ -142,6 +142,17 @@ export default function OrderDetail() {
   }, [userRole]);
 
   const fetchOrder = async () => {
+    if (!orderId) {
+      console.error('No orderId provided');
+      toast({
+        title: "Error",
+        description: "Invalid order ID",
+        variant: "destructive",
+      });
+      navigate('/admin/orders');
+      return;
+    }
+
     try {
       const { data, error } = await supabase
         .from('orders')

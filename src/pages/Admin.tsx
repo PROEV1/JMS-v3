@@ -493,7 +493,7 @@ export default function Admin() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => navigate(`/admin/client/${client.id}`)}
+                        onClick={() => navigate(`/admin/clients/${client.id}`)}
                       >
                         <Eye className="h-4 w-4 mr-1" />
                         View
