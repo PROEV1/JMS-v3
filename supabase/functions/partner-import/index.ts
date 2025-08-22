@@ -44,6 +44,20 @@ interface MappedData {
   amount_paid?: number;
   created_at?: string;
   updated_at?: string;
+  // Additional client-related fields from UI mapping
+  client_name?: string;
+  client_email?: string;
+  client_phone?: string;
+  customer_address_line_1?: string;
+  customer_address_line_2?: string;
+  customer_address_city?: string;
+  customer_address_post_code?: string;
+  engineer_identifier?: string;
+  partner_external_url?: string;
+  type?: string; // maps to job_type
+  quote_amount?: number; // maps to total_amount
+  client_id?: string;
+  quote_id?: string;
 }
 
 interface ProcessedRow {
@@ -389,19 +403,54 @@ serve(async (req: Request): Promise<Response> => {
         
         const processRow = (row: any, rowIndex: number): ProcessedRow => {
           try {
+            // Extract all mapped fields from the row
             const mappedData: MappedData = {
               partner_external_id: row[columnMapping['partner_external_id']]?.toString()?.trim() || null,
               status: row[columnMapping['status']]?.toString()?.trim() || null,
-              job_type: row[columnMapping['job_type']]?.toString()?.trim() || null,
+              job_type: row[columnMapping['job_type']] || row[columnMapping['type']]?.toString()?.trim() || null,
               postcode: row[columnMapping['postcode']]?.toString()?.trim() || null,
               job_address: row[columnMapping['address']]?.toString()?.trim() || null,
               internal_install_notes: row[columnMapping['job_notes']]?.toString()?.trim() || null,
               partner_status: row[columnMapping['partner_status']]?.toString()?.trim() || null,
               sub_partner: row[columnMapping['sub_partner']]?.toString()?.trim() || null,
               scheduled_install_date: parseDate(row[columnMapping['scheduled_date']]?.toString()?.trim()),
+              // Extract client-related fields
+              client_name: row[columnMapping['client_name']]?.toString()?.trim() || null,
+              client_email: row[columnMapping['client_email']]?.toString()?.trim() || null,
+              client_phone: row[columnMapping['client_phone']]?.toString()?.trim() || null,
+              customer_address_line_1: row[columnMapping['customer_address_line_1']]?.toString()?.trim() || null,
+              customer_address_line_2: row[columnMapping['customer_address_line_2']]?.toString()?.trim() || null,
+              customer_address_city: row[columnMapping['customer_address_city']]?.toString()?.trim() || null,
+              customer_address_post_code: row[columnMapping['customer_address_post_code']]?.toString()?.trim() || null,
+              engineer_identifier: row[columnMapping['engineer_identifier']]?.toString()?.trim() || null,
+              partner_external_url: row[columnMapping['partner_external_url']]?.toString()?.trim() || null,
+              quote_amount: row[columnMapping['quote_amount']] ? parseFloat(row[columnMapping['quote_amount']]) : null,
               // Set is_partner_job early so validation can use it
               is_partner_job: true,
             };
+
+            // Build consolidated address from customer address fields
+            const customerAddressParts = [
+              mappedData.customer_address_line_1,
+              mappedData.customer_address_line_2,
+              mappedData.customer_address_city
+            ].filter(Boolean);
+            const consolidatedCustomerAddress = customerAddressParts.length > 0 ? customerAddressParts.join(', ') : null;
+
+            // Use consolidated address if no job_address is provided
+            if (!mappedData.job_address && consolidatedCustomerAddress) {
+              mappedData.job_address = consolidatedCustomerAddress;
+            }
+
+            // Use customer postcode if no main postcode
+            if (!mappedData.postcode && mappedData.customer_address_post_code) {
+              mappedData.postcode = mappedData.customer_address_post_code;
+            }
+
+            // Map quote_amount to total_amount
+            if (mappedData.quote_amount) {
+              mappedData.total_amount = mappedData.quote_amount;
+            }
 
             if (!mappedData.partner_external_id) {
               results.skipped++;
@@ -515,8 +564,9 @@ serve(async (req: Request): Promise<Response> => {
 
             let mappedEngineerId: string | null = null;
             
-            // Check for engineer mapping - use multiple possible fields
-            const engineerIdentifier = row[columnMapping['engineer_name']] || 
+            // Check for engineer mapping - prioritize engineer_identifier, then fallback to name/email
+            const engineerIdentifier = mappedData.engineer_identifier ||
+                                     row[columnMapping['engineer_name']] || 
                                      row[columnMapping['engineer_email']] ||
                                      row['engineer_name'] || 
                                      row['engineer_email'] ||
@@ -527,6 +577,7 @@ serve(async (req: Request): Promise<Response> => {
               
               if (engineerMapping[engineerKey]) {
                 mappedEngineerId = engineerMapping[engineerKey];
+                console.log(`Mapped engineer: ${engineerKey} -> ${mappedEngineerId}`);
               } else {
                 unmappedEngineers.add(engineerKey);
                 console.warn(`Unmapped engineer: ${engineerKey}`);
@@ -540,14 +591,20 @@ serve(async (req: Request): Promise<Response> => {
 
             // For partner jobs, create placeholder client if missing client_id
             let clientId = mappedData.client_id;
-            if (mappedData.is_partner_job && !clientId && createMissingOrders) {
-              // Create placeholder client for partner order
+            if (mappedData.is_partner_job && !clientId && createMissingOrders && !dryRun) {
+              // Create placeholder client for partner order (only if not dry run)
               const partnerName = partner?.name || 'Partner';
+              
+              // Use client fields if available, otherwise use partner name
+              const clientName = mappedData.client_name || `${partnerName} Customer`;
+              const clientEmail = mappedData.client_email || `placeholder-${Date.now()}-${Math.random().toString(36).substr(2, 9)}@${partnerName.toLowerCase().replace(/\s+/g, '')}.example`;
+              
               const placeholderClient = {
-                full_name: `${partnerName} Customer`,
-                email: `placeholder-${Date.now()}@${partnerName.toLowerCase().replace(/\s+/g, '')}.example`,
-                address: mappedData.job_address || null,
-                postcode: mappedData.postcode || null,
+                full_name: clientName,
+                email: clientEmail,
+                phone: mappedData.client_phone || null,
+                address: consolidatedCustomerAddress || mappedData.job_address || null,
+                postcode: mappedData.customer_address_post_code || mappedData.postcode || null,
                 user_id: null, // No user account for placeholder clients
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString()
@@ -605,6 +662,7 @@ serve(async (req: Request): Promise<Response> => {
                 external_confirmation_source: 'partner_import',
                 order_number: mappedData.order_number || 'TEMP',
                 client_id: clientId, // Use the clientId (either existing or newly created)
+                partner_external_url: mappedData.partner_external_url || null, // Persist partner external URL
                 ...(mappedData.quote_id && { quote_id: mappedData.quote_id }),
               }
             };
@@ -620,14 +678,23 @@ serve(async (req: Request): Promise<Response> => {
           }
         };
 
-        const processedRow = processRow(row, actualRowIndex);
+        try {
+          const processedRow = processRow(row, actualRowIndex);
 
-        if (processedRow.success && processedRow.data) {
-          results.data.push(processedRow.data);
-        } else {
+          if (processedRow.success && processedRow.data) {
+            results.data.push(processedRow.data);
+          } else {
+            results.errors.push({
+              row: actualRowIndex + 1,
+              message: processedRow.error || 'Unknown error',
+              data: row,
+            });
+          }
+        } catch (rowError) {
+          console.error(`Error processing row ${actualRowIndex + 1}:`, rowError);
           results.errors.push({
             row: actualRowIndex + 1,
-            message: processedRow.error || 'Unknown error',
+            message: `Row processing failed: ${rowError.message}`,
             data: row,
           });
         }
@@ -663,7 +730,8 @@ serve(async (req: Request): Promise<Response> => {
     const preview: any = { updates: [], inserts: [], skips: [] };
 
     if (dryRun) {
-      // For dry run, check which orders already exist
+      console.log('=== DRY RUN MODE - NO DATABASE WRITES ===');
+      // For dry run, check which orders already exist (read-only operation)
       const externalIds = results.data.map(d => d.partner_external_id).filter(Boolean);
       
       if (externalIds.length > 0) {
@@ -708,6 +776,15 @@ serve(async (req: Request): Promise<Response> => {
       } else {
         insertCount = createMissingOrders ? results.data.length : 0;
       }
+      
+      // Add unmapped engineers to preview  
+      const unmappedEngineersArray = Array.from(unmappedEngineers);
+      if (unmappedEngineersArray.length > 0) {
+        console.log('=== DRY RUN: Found unmapped engineers ===', unmappedEngineersArray);
+        preview.unmapped_engineers = unmappedEngineersArray;
+      }
+      
+      console.log('=== DRY RUN COMPLETE - PREVIEW GENERATED ===');
     } else {
       // Live import
       console.log(`Starting live import with ${results.data.length} records`);
@@ -780,30 +857,39 @@ serve(async (req: Request): Promise<Response> => {
             const existingMap = new Map(existingOrders.map(o => [o.partner_external_id, o.id]));
             console.log('Existing order mapping:', Array.from(existingMap.entries()).slice(0, 3));
             
-            // Update each existing order individually
+            // Update each existing order individually  
             for (const record of recordsForUpdate) {
               const orderId = existingMap.get(record.partner_external_id);
               if (orderId) {
                 console.log(`Updating order ${orderId} with external ID: ${record.partner_external_id}`);
                 
-                const { error: updateError } = await supabase
-                  .from('orders')
-                  .update({
-                    ...record,
-                    updated_at: new Date().toISOString()
-                  })
-                  .eq('id', orderId);
-                
-                if (updateError) {
-                  console.error(`Error updating order ${orderId}:`, updateError);
+                try {
+                  const { error: updateError } = await supabase
+                    .from('orders')
+                    .update({
+                      ...record,
+                      updated_at: new Date().toISOString()
+                    })
+                    .eq('id', orderId);
+                  
+                  if (updateError) {
+                    console.error(`Error updating order ${orderId}:`, updateError);
+                    results.errors.push({
+                      row: 0,
+                      message: `Failed to update order ${record.partner_external_id}: ${updateError.message}`,
+                      data: record
+                    });
+                  } else {
+                    console.log(`Successfully updated order ${orderId}`);
+                    totalUpdated++;
+                  }
+                } catch (updateException) {
+                  console.error(`Exception updating order ${orderId}:`, updateException);
                   results.errors.push({
                     row: 0,
-                    message: `Failed to update order ${record.partner_external_id}: ${updateError.message}`,
+                    message: `Exception updating order ${record.partner_external_id}: ${updateException.message}`,
                     data: record
                   });
-                } else {
-                  console.log(`Successfully updated order ${orderId}`);
-                  totalUpdated++;
                 }
               } else {
                 console.log(`No existing order found for external ID: ${record.partner_external_id}`);

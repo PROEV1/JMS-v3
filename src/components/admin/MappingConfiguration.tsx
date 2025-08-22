@@ -412,6 +412,9 @@ export default function MappingConfiguration({
       <Card>
         <CardHeader>
           <CardTitle>Column Mappings</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Map external data columns to internal system fields. Customer address fields will be automatically combined into a single address field in the database.
+          </p>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
