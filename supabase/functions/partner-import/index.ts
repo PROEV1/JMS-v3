@@ -76,20 +76,19 @@ function parseDate(dateStr: string | null | undefined): string | null {
   const ddmmyyyyMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (ddmmyyyyMatch) {
     const [, day, month, year] = ddmmyyyyMatch;
+    
+    // Validate day and month ranges
+    const dayNum = parseInt(day, 10);
+    const monthNum = parseInt(month, 10);
+    
+    if (dayNum < 1 || dayNum > 31 || monthNum < 1 || monthNum > 12) {
+      console.warn(`Invalid date values: day=${dayNum}, month=${monthNum} for ${trimmed}`);
+      return null;
+    }
+    
     // Convert to ISO format YYYY-MM-DD
     const isoDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
     console.log(`Date conversion: ${trimmed} -> ${isoDate}`);
-    return isoDate;
-  }
-  
-  // Try other common formats
-  const mmddyyyyMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (mmddyyyyMatch) {
-    // Ambiguous - could be MM/DD/YYYY or DD/MM/YYYY
-    // Since the error showed "28/08/2025", assume DD/MM/YYYY
-    const [, first, second, year] = mmddyyyyMatch;
-    const isoDate = `${year}-${second.padStart(2, '0')}-${first.padStart(2, '0')}`;
-    console.log(`Date conversion (DD/MM/YYYY): ${trimmed} -> ${isoDate}`);
     return isoDate;
   }
   
