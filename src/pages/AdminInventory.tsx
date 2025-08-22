@@ -6,6 +6,8 @@ import { LocationsList } from "@/components/admin/inventory/LocationsList";
 import { SuppliersList } from "@/components/admin/inventory/SuppliersList";
 import { TransactionsListV2 } from "@/components/admin/inventory/TransactionsListV2";
 import { AdminStockRequestsBoard } from "@/components/admin/inventory/AdminStockRequestsBoard";
+import { PurchaseOrdersList } from "@/components/admin/inventory/PurchaseOrdersList";
+import { ReturnsRmasList } from "@/components/admin/inventory/ReturnsRmasList";
 import { useState } from "react";
 
 const AdminInventory = () => {
@@ -25,13 +27,15 @@ const AdminInventory = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-8">
           <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
           <TabsTrigger value="items">Items</TabsTrigger>
           <TabsTrigger value="locations">Locations</TabsTrigger>
           <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
+          <TabsTrigger value="purchase-orders">Purchase Orders</TabsTrigger>
           <TabsTrigger value="transactions">Transactions</TabsTrigger>
           <TabsTrigger value="requests">Stock Requests</TabsTrigger>
+          <TabsTrigger value="returns">Returns & RMAs</TabsTrigger>
         </TabsList>
 
         <TabsContent value="dashboard">
@@ -50,12 +54,20 @@ const AdminInventory = () => {
           <SuppliersList />
         </TabsContent>
 
+        <TabsContent value="purchase-orders">
+          <PurchaseOrdersList />
+        </TabsContent>
+
         <TabsContent value="transactions">
           <TransactionsListV2 />
         </TabsContent>
 
         <TabsContent value="requests">
           <AdminStockRequestsBoard />
+        </TabsContent>
+
+        <TabsContent value="returns">
+          <ReturnsRmasList />
         </TabsContent>
       </Tabs>
     </div>

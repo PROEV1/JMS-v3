@@ -20,12 +20,17 @@ import {
 import { InventoryKpiTile } from './shared/InventoryKpiTile';
 import { QuickActionsBlock } from './shared/QuickActionsBlock';
 import { StatusChip } from './shared/StatusChip';
+import { StockTransferModal } from './StockTransferModal';
+import { StockAdjustmentModal } from './StockAdjustmentModal';
 
 interface InventoryDashboardV2Props {
   onSwitchTab: (tab: string) => void;
 }
 
 export function InventoryDashboardV2({ onSwitchTab }: InventoryDashboardV2Props) {
+  const [transferModalOpen, setTransferModalOpen] = useState(false);
+  const [adjustmentModalOpen, setAdjustmentModalOpen] = useState(false);
+
   // Main KPI stats
   const { data: kpiStats, isLoading: kpiLoading } = useQuery({
     queryKey: ['inventory-kpi-stats'],
@@ -127,13 +132,13 @@ export function InventoryDashboardV2({ onSwitchTab }: InventoryDashboardV2Props)
     {
       label: "Transfer Stock",
       icon: ArrowUpDown,
-      onClick: () => {/* TODO: Transfer modal */},
+      onClick: () => setTransferModalOpen(true),
       variant: 'secondary' as const
     },
     {
       label: "Stock Adjustment",
       icon: Wrench,
-      onClick: () => {/* TODO: Adjustment modal */},
+      onClick: () => setAdjustmentModalOpen(true),
       variant: 'secondary' as const
     },
     {
@@ -315,6 +320,10 @@ export function InventoryDashboardV2({ onSwitchTab }: InventoryDashboardV2Props)
           </CardContent>
         </Card>
       </div>
+
+      {/* Modals */}
+      <StockTransferModal open={transferModalOpen} onOpenChange={setTransferModalOpen} />
+      <StockAdjustmentModal open={adjustmentModalOpen} onOpenChange={setAdjustmentModalOpen} />
     </div>
   );
 }
