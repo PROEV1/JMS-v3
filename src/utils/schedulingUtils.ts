@@ -37,6 +37,9 @@ export interface Order {
   installation_notes?: string;
   scheduling_conflicts?: any; // Allow Json or any[]
   is_partner_job?: boolean;
+  partner_status?: string;
+  sub_partner?: string;
+  partner_external_url?: string;
   job_type?: 'installation' | 'assessment' | 'service_call'; // Updated to match enum
   created_at?: string; // Added created_at field
   client?: {

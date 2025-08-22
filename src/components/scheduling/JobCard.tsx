@@ -207,6 +207,11 @@ export function JobCard({
                 >
                   {order.status_enhanced.replace('_', ' ')}
                 </Badge>
+                {order.is_partner_job && order.partner_status && (
+                  <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                    P: {order.partner_status.replace('AWAITING_', '').replace('_', ' ')}
+                  </Badge>
+                )}
                 <Button
                   variant="ghost"
                   size="sm"
