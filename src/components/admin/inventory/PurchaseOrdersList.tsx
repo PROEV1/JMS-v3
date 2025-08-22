@@ -14,6 +14,7 @@ import {
   AlertTriangle,
   CheckCircle
 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import { InventoryKpiTile } from './shared/InventoryKpiTile';
 import { StatusChip } from './shared/StatusChip';
 import { EmptyState } from './shared/EmptyState';
@@ -25,13 +26,30 @@ export function PurchaseOrdersList() {
   const { data: metrics } = useQuery({
     queryKey: ['po-metrics'],
     queryFn: async () => {
-      // Placeholder data - would normally come from purchase_orders table
-      return {
-        openPOs: 12,
-        dueThisWeek: 3,
-        overdue: 1,
-        receivedThisWeek: 8
-      };
+      const { data: poData } = await supabase
+        .from('purchase_orders')
+        .select('id, status, expected_delivery_date, created_at');
+
+      const openPOs = poData?.filter(po => po.status !== 'received' && po.status !== 'cancelled').length || 0;
+      const dueThisWeek = poData?.filter(po => {
+        if (!po.expected_delivery_date) return false;
+        const dueDate = new Date(po.expected_delivery_date);
+        const now = new Date();
+        const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+        return dueDate >= now && dueDate <= weekFromNow;
+      }).length || 0;
+      const overdue = poData?.filter(po => {
+        if (!po.expected_delivery_date) return false;
+        return new Date(po.expected_delivery_date) < new Date() && po.status !== 'received';
+      }).length || 0;
+      const receivedThisWeek = poData?.filter(po => {
+        if (po.status !== 'received') return false;
+        const createdDate = new Date(po.created_at);
+        const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+        return createdDate >= weekAgo;
+      }).length || 0;
+
+      return { openPOs, dueThisWeek, overdue, receivedThisWeek };
     }
   });
 
@@ -39,42 +57,34 @@ export function PurchaseOrdersList() {
   const { data: purchaseOrders } = useQuery({
     queryKey: ['purchase-orders', searchQuery],
     queryFn: async () => {
-      // Placeholder data - would normally query purchase_orders table
-      return [
-        {
-          id: '1',
-          po_number: 'PO-2024-001',
-          supplier: { name: 'TechSupply Ltd' },
-          status: 'pending',
-          eta: '2024-01-15',
-          line_count: 5,
-          total_amount: 2450.00,
-          created_by: { name: 'Admin User' },
-          created_at: '2024-01-10'
-        },
-        {
-          id: '2',
-          po_number: 'PO-2024-002',
-          supplier: { name: 'ElectroComponents' },
-          status: 'received',
-          eta: '2024-01-12',
-          line_count: 3,
-          total_amount: 890.50,
-          created_by: { name: 'Admin User' },
-          created_at: '2024-01-08'
-        }
-      ];
+      let query = supabase
+        .from('purchase_orders')
+        .select(`
+          id, po_number, status, order_date, expected_delivery_date, total_amount, notes, created_at,
+          inventory_suppliers(name),
+          profiles!purchase_orders_created_by_fkey(full_name),
+          purchase_order_lines(id)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (searchQuery) {
+        query = query.or(`po_number.ilike.%${searchQuery}%,inventory_suppliers.name.ilike.%${searchQuery}%`);
+      }
+
+      const { data } = await query;
+      return data || [];
     }
   });
 
   const filteredPOs = purchaseOrders?.filter(po => 
     po.po_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    po.supplier.name.toLowerCase().includes(searchQuery.toLowerCase())
+    po.inventory_suppliers?.name?.toLowerCase().includes(searchQuery.toLowerCase())
   ) || [];
 
   const getStatusVariant = (status: string) => {
     switch (status) {
       case 'pending': return 'pending';
+      case 'approved': return 'approved';
       case 'received': return 'delivered';
       case 'cancelled': return 'cancelled';
       default: return 'pending';
@@ -164,10 +174,10 @@ export function PurchaseOrdersList() {
                       </StatusChip>
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      {po.supplier.name} • {po.line_count} items • £{po.total_amount.toFixed(2)}
+                      {po.inventory_suppliers?.name || 'No supplier'} • {po.purchase_order_lines?.length || 0} items • £{po.total_amount?.toFixed(2) || '0.00'}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      ETA: {po.eta} • Created: {po.created_at}
+                      ETA: {po.expected_delivery_date || 'TBD'} • Created: {new Date(po.created_at).toLocaleDateString()}
                     </div>
                   </div>
                   

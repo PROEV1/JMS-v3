@@ -13,6 +13,7 @@ import {
   Clock,
   AlertTriangle
 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import { InventoryKpiTile } from './shared/InventoryKpiTile';
 import { StatusChip } from './shared/StatusChip';
 import { EmptyState } from './shared/EmptyState';
@@ -24,12 +25,21 @@ export function ReturnsRmasList() {
   const { data: metrics } = useQuery({
     queryKey: ['rma-metrics'],
     queryFn: async () => {
-      // Placeholder data - would normally come from returns_rmas table
-      return {
-        openRMAs: 3,
-        inTransitToSupplier: 1,
-        waitingReplacement: 2
-      };
+      const { data: rmaData } = await supabase
+        .from('returns_rmas')
+        .select('id, status');
+
+      const openRMAs = rmaData?.filter(rma => 
+        rma.status !== 'closed' && rma.status !== 'cancelled'
+      ).length || 0;
+      const inTransitToSupplier = rmaData?.filter(rma => 
+        rma.status === 'in_transit'
+      ).length || 0;
+      const waitingReplacement = rmaData?.filter(rma => 
+        rma.status === 'replacement_sent'
+      ).length || 0;
+
+      return { openRMAs, inTransitToSupplier, waitingReplacement };
     }
   });
 
@@ -37,35 +47,29 @@ export function ReturnsRmasList() {
   const { data: returns } = useQuery({
     queryKey: ['returns-rmas', searchQuery],
     queryFn: async () => {
-      // Placeholder data - would normally query returns_rmas table
-      return [
-        {
-          id: '1',
-          serial_number: 'CHG-001-2024',
-          item: { name: 'EV Charger Type 2', sku: 'CHG-T2-001' },
-          status: 'pending_return',
-          opened_on: '2024-01-10',
-          supplier: { name: 'ChargePoint Ltd' },
-          return_reason: 'Defective unit - not charging',
-          replacement_serial: null
-        },
-        {
-          id: '2',
-          serial_number: 'CBL-002-2024',
-          item: { name: 'Charging Cable 32A', sku: 'CBL-32A-002' },
-          status: 'replacement_received',
-          opened_on: '2024-01-08',
-          supplier: { name: 'TechSupply Ltd' },
-          return_reason: 'Customer damaged',
-          replacement_serial: 'CBL-003-2024'
-        }
-      ];
+      let query = supabase
+        .from('returns_rmas')
+        .select(`
+          id, rma_number, serial_number, status, return_reason, return_date, 
+          replacement_serial_number, created_at,
+          inventory_items(name, sku),
+          inventory_suppliers(name)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (searchQuery) {
+        query = query.or(`rma_number.ilike.%${searchQuery}%,serial_number.ilike.%${searchQuery}%,inventory_items.name.ilike.%${searchQuery}%`);
+      }
+
+      const { data } = await query;
+      return data || [];
     }
   });
 
   const filteredReturns = returns?.filter(rma => 
-    rma.serial_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    rma.item.name.toLowerCase().includes(searchQuery.toLowerCase())
+    rma.rma_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    rma.serial_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    rma.inventory_items?.name?.toLowerCase().includes(searchQuery.toLowerCase())
   ) || [];
 
   const getStatusVariant = (status: string) => {
@@ -147,23 +151,23 @@ export function ReturnsRmasList() {
                 <div key={rma.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/30 transition-colors">
                   <div className="flex-1 space-y-1">
                     <div className="flex items-center gap-3">
-                      <span className="font-medium">{rma.serial_number}</span>
+                      <span className="font-medium">{rma.rma_number}</span>
                       <StatusChip status={getStatusVariant(rma.status) as any}>
                         {rma.status.replace('_', ' ')}
                       </StatusChip>
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      {rma.item.name} ({rma.item.sku})
+                      {rma.inventory_items?.name} ({rma.inventory_items?.sku})
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      Supplier: {rma.supplier.name} • Opened: {rma.opened_on}
+                      Serial: {rma.serial_number || 'N/A'} • Supplier: {rma.inventory_suppliers?.name || 'N/A'}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      Reason: {rma.return_reason}
+                      Opened: {new Date(rma.created_at).toLocaleDateString()} • Reason: {rma.return_reason}
                     </div>
-                    {rma.replacement_serial && (
+                    {rma.replacement_serial_number && (
                       <div className="text-xs text-green-600">
-                        Replacement: {rma.replacement_serial}
+                        Replacement: {rma.replacement_serial_number}
                       </div>
                     )}
                   </div>

@@ -2072,6 +2072,179 @@ export type Database = {
           },
         ]
       }
+      purchase_order_lines: {
+        Row: {
+          created_at: string
+          id: string
+          item_id: string
+          line_total: number | null
+          purchase_order_id: string
+          quantity: number
+          received_quantity: number
+          unit_cost: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          item_id: string
+          line_total?: number | null
+          purchase_order_id: string
+          quantity: number
+          received_quantity?: number
+          unit_cost?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          item_id?: string
+          line_total?: number | null
+          purchase_order_id?: string
+          quantity?: number
+          received_quantity?: number
+          unit_cost?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_order_lines_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_order_lines_purchase_order_id_fkey"
+            columns: ["purchase_order_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      purchase_orders: {
+        Row: {
+          actual_delivery_date: string | null
+          created_at: string
+          created_by: string | null
+          expected_delivery_date: string | null
+          id: string
+          notes: string | null
+          order_date: string
+          po_number: string
+          status: Database["public"]["Enums"]["purchase_order_status"]
+          supplier_id: string | null
+          total_amount: number
+          updated_at: string
+        }
+        Insert: {
+          actual_delivery_date?: string | null
+          created_at?: string
+          created_by?: string | null
+          expected_delivery_date?: string | null
+          id?: string
+          notes?: string | null
+          order_date?: string
+          po_number: string
+          status?: Database["public"]["Enums"]["purchase_order_status"]
+          supplier_id?: string | null
+          total_amount?: number
+          updated_at?: string
+        }
+        Update: {
+          actual_delivery_date?: string | null
+          created_at?: string
+          created_by?: string | null
+          expected_delivery_date?: string | null
+          id?: string
+          notes?: string | null
+          order_date?: string
+          po_number?: string
+          status?: Database["public"]["Enums"]["purchase_order_status"]
+          supplier_id?: string | null
+          total_amount?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_orders_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      purchase_receipts: {
+        Row: {
+          created_at: string
+          id: string
+          location_id: string
+          notes: string | null
+          po_line_id: string
+          purchase_order_id: string
+          quantity_received: number
+          received_by: string | null
+          received_date: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          location_id: string
+          notes?: string | null
+          po_line_id: string
+          purchase_order_id: string
+          quantity_received: number
+          received_by?: string | null
+          received_date?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          location_id?: string
+          notes?: string | null
+          po_line_id?: string
+          purchase_order_id?: string
+          quantity_received?: number
+          received_by?: string | null
+          received_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_receipts_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_receipts_po_line_id_fkey"
+            columns: ["po_line_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_order_lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_receipts_purchase_order_id_fkey"
+            columns: ["purchase_order_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_receipts_received_by_fkey"
+            columns: ["received_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       quote_items: {
         Row: {
           configuration: Json | null
@@ -2196,6 +2369,127 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      returns_rma_lines: {
+        Row: {
+          condition_notes: string | null
+          created_at: string
+          id: string
+          item_id: string
+          quantity: number
+          rma_id: string
+          serial_numbers: string[] | null
+        }
+        Insert: {
+          condition_notes?: string | null
+          created_at?: string
+          id?: string
+          item_id: string
+          quantity: number
+          rma_id: string
+          serial_numbers?: string[] | null
+        }
+        Update: {
+          condition_notes?: string | null
+          created_at?: string
+          id?: string
+          item_id?: string
+          quantity?: number
+          rma_id?: string
+          serial_numbers?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "returns_rma_lines_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "returns_rma_lines_rma_id_fkey"
+            columns: ["rma_id"]
+            isOneToOne: false
+            referencedRelation: "returns_rmas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      returns_rmas: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          item_id: string
+          notes: string | null
+          replacement_expected_date: string | null
+          replacement_received_date: string | null
+          replacement_serial_number: string | null
+          return_date: string | null
+          return_reason: string
+          rma_number: string
+          serial_number: string | null
+          status: Database["public"]["Enums"]["return_rma_status"]
+          supplier_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          item_id: string
+          notes?: string | null
+          replacement_expected_date?: string | null
+          replacement_received_date?: string | null
+          replacement_serial_number?: string | null
+          return_date?: string | null
+          return_reason: string
+          rma_number: string
+          serial_number?: string | null
+          status?: Database["public"]["Enums"]["return_rma_status"]
+          supplier_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          item_id?: string
+          notes?: string | null
+          replacement_expected_date?: string | null
+          replacement_received_date?: string | null
+          replacement_serial_number?: string | null
+          return_date?: string | null
+          return_reason?: string
+          rma_number?: string
+          serial_number?: string | null
+          status?: Database["public"]["Enums"]["return_rma_status"]
+          supplier_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "returns_rmas_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "returns_rmas_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "returns_rmas_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_suppliers"
             referencedColumns: ["id"]
           },
         ]
@@ -2599,6 +2893,20 @@ export type Database = {
         | "soft_hold"
         | "confirmed"
         | "blocked"
+      purchase_order_status:
+        | "draft"
+        | "pending"
+        | "approved"
+        | "received"
+        | "cancelled"
+      return_rma_status:
+        | "pending_return"
+        | "in_transit"
+        | "received_by_supplier"
+        | "replacement_sent"
+        | "replacement_received"
+        | "closed"
+        | "cancelled"
       user_role:
         | "admin"
         | "client"
@@ -2761,6 +3069,22 @@ export const Constants = {
         "soft_hold",
         "confirmed",
         "blocked",
+      ],
+      purchase_order_status: [
+        "draft",
+        "pending",
+        "approved",
+        "received",
+        "cancelled",
+      ],
+      return_rma_status: [
+        "pending_return",
+        "in_transit",
+        "received_by_supplier",
+        "replacement_sent",
+        "replacement_received",
+        "closed",
+        "cancelled",
       ],
       user_role: [
         "admin",
