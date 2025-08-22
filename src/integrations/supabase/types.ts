@@ -2427,6 +2427,10 @@ export type Database = {
             }
         Returns: string
       }
+      test_partner_import_connectivity: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       user_can_view_client: {
         Args: { client_uuid: string }
         Returns: boolean
