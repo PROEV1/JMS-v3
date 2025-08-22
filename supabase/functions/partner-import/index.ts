@@ -25,30 +25,7 @@ interface MappedData {
   job_type?: string;
   postcode?: string;
   job_address?: string;
-  city?: string;
-  county?: string;
-  country?: string;
-  client_name?: string;
-  client_email?: string;
-  client_phone?: string;
-  engineer_name?: string;
-  engineer_email?: string;
-  fault_description?: string;
-  reported_fault?: string;
-  job_notes?: string;
-  created_at?: string;
-  scheduled_date?: string;
-  product_description?: string;
-  product_model?: string;
-  serial_number?: string;
-  warranty_status?: string;
-  purchase_date?: string;
-  supplier?: string;
-  sub_partner?: string;
-  priority?: string;
-  contact_method?: string;
-  internal_notes?: string;
-  customer_ref?: string;
+  internal_install_notes?: string;
   engineer_id?: string;
   is_partner_job?: boolean;
   partner_id?: string;
@@ -59,6 +36,14 @@ interface MappedData {
   scheduling_suppressed?: boolean;
   scheduling_suppressed_reason?: string;
   status_enhanced?: string;
+  sub_partner?: string;
+  order_number?: string;
+  scheduled_install_date?: string;
+  total_amount?: number;
+  deposit_amount?: number;
+  amount_paid?: number;
+  created_at?: string;
+  updated_at?: string;
 }
 
 interface ProcessedRow {
@@ -373,31 +358,10 @@ serve(async (req: Request): Promise<Response> => {
               job_type: row[columnMapping['job_type']]?.toString()?.trim() || null,
               postcode: row[columnMapping['postcode']]?.toString()?.trim() || null,
               job_address: row[columnMapping['address']]?.toString()?.trim() || null,
-              city: row[columnMapping['city']]?.toString()?.trim() || null,
-              county: row[columnMapping['county']]?.toString()?.trim() || null,
-              country: row[columnMapping['country']]?.toString()?.trim() || null,
-              client_name: row[columnMapping['client_name']]?.toString()?.trim() || null,
-              client_email: row[columnMapping['client_email']]?.toString()?.trim() || null,
-              client_phone: row[columnMapping['client_phone']]?.toString()?.trim() || null,
-              engineer_name: row[columnMapping['engineer_name']]?.toString()?.trim() || null,
-              engineer_email: row[columnMapping['engineer_email']]?.toString()?.trim() || null,
-              fault_description: row[columnMapping['fault_description']]?.toString()?.trim() || null,
-              reported_fault: row[columnMapping['reported_fault']]?.toString()?.trim() || null,
-              job_notes: row[columnMapping['job_notes']]?.toString()?.trim() || null,
-              created_at: row[columnMapping['created_at']]?.toString()?.trim() || null,
-              scheduled_date: row[columnMapping['scheduled_date']]?.toString()?.trim() || null,
-              product_description: row[columnMapping['product_description']]?.toString()?.trim() || null,
-              product_model: row[columnMapping['product_model']]?.toString()?.trim() || null,
-              serial_number: row[columnMapping['serial_number']]?.toString()?.trim() || null,
-              warranty_status: row[columnMapping['warranty_status']]?.toString()?.trim() || null,
-              purchase_date: row[columnMapping['purchase_date']]?.toString()?.trim() || null,
-              supplier: row[columnMapping['supplier']]?.toString()?.trim() || null,
-              sub_partner: row[columnMapping['sub_partner']]?.toString()?.trim() || null,
-              priority: row[columnMapping['priority']]?.toString()?.trim() || null,
-              contact_method: row[columnMapping['contact_method']]?.toString()?.trim() || null,
-              internal_notes: row[columnMapping['internal_notes']]?.toString()?.trim() || null,
-              customer_ref: row[columnMapping['customer_ref']]?.toString()?.trim() || null,
+              internal_install_notes: row[columnMapping['job_notes']]?.toString()?.trim() || null,
               partner_status: row[columnMapping['partner_status']]?.toString()?.trim() || null,
+              sub_partner: row[columnMapping['sub_partner']]?.toString()?.trim() || null,
+              scheduled_install_date: row[columnMapping['scheduled_date']]?.toString()?.trim() || null,
               // Set is_partner_job early so validation can use it
               is_partner_job: true,
             };
