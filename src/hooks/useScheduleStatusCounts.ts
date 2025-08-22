@@ -106,7 +106,8 @@ export function useScheduleStatusCounts() {
           .eq('status_enhanced', 'on_hold_parts_docs'),
         supabase.from('orders').select('*', { count: 'exact', head: true })
           .eq('scheduling_suppressed', true)
-          .neq('status_enhanced', 'cancelled'),
+          .neq('status_enhanced', 'cancelled')
+          .neq('status_enhanced', 'on_hold_parts_docs'), // Exclude already counted on-hold jobs
         supabase.from('engineers').select('*', { count: 'exact', head: true })
           .eq('availability', false)
       ]);
