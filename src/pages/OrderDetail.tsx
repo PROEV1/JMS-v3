@@ -153,13 +153,14 @@ export default function OrderDetail() {
       return;
     }
 
+    console.log('Fetching order with ID:', orderId);
     try {
       const { data, error } = await supabase
         .from('orders')
         .select(`
           *,
-          client:clients(id, full_name, email, address, postcode, phone),
-          quote:quotes(
+          client:client_id(id, full_name, email, address, postcode, phone),
+          quote:quote_id(
             id,
             quote_number,
             total_cost,
@@ -183,7 +184,7 @@ export default function OrderDetail() {
             paid_at,
             created_at
           ),
-          engineer:engineers(
+          engineer:engineer_id(
             id,
             name,
             email
@@ -196,12 +197,17 @@ export default function OrderDetail() {
             description,
             uploaded_at
           ),
-          partner:partners(name)
+          partner:partner_id(name)
         `)
         .eq('id', orderId)
         .single();
 
       if (error) throw error;
+      
+      console.log('Order data fetched:', data);
+      console.log('Client data:', data.client);
+      console.log('Quote data:', data.quote);
+      
       setOrder(data as any);
     } catch (error) {
       console.error('Error fetching order:', error);
@@ -569,6 +575,8 @@ export default function OrderDetail() {
 
   // Redirect to auth if not authenticated
   if (!userRole) {
+    // Store the current path for redirect after login
+    sessionStorage.setItem('authRedirectPath', window.location.pathname);
     navigate('/auth');
     return <BrandLoading />;
   }
@@ -632,10 +640,12 @@ export default function OrderDetail() {
             />
 
             {/* Product Summary */}
-            <ProductSummarySection 
-              order={order} 
-              onUpdate={fetchOrder}
-            />
+            {order.quote && (
+              <ProductSummarySection 
+                order={order} 
+                onUpdate={fetchOrder}
+              />
+            )}
 
             {/* Payment Management */}
             <PaymentSection order={order} />

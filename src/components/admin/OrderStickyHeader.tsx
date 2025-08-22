@@ -11,9 +11,9 @@ interface Order {
   is_partner_job: boolean;
   scheduling_suppressed: boolean;
   job_type?: 'installation' | 'assessment' | 'service_call';
-  client: {
+  client?: {
     full_name: string;
-  };
+  } | null;
   engineer?: {
     name: string;
   } | null;
@@ -44,7 +44,7 @@ export function OrderStickyHeader({ order, isSticky }: OrderStickyHeaderProps) {
       <div className="px-6 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4 text-sm">
-            <span className="font-semibold">{order.client.full_name}</span>
+            <span className="font-semibold">{order.client?.full_name || 'No Client'}</span>
             <span className="text-muted-foreground">|</span>
             <span className="font-mono text-muted-foreground">{order.order_number}</span>
             {order.job_type && (
