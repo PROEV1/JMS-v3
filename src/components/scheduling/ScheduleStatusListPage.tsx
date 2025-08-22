@@ -45,13 +45,19 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
   // Fetch all job offers for the displayed orders
   const { offers, refetch: refetchOffers, releaseOffer, resendOffer } = useJobOffers();
 
-  // Enhanced filtering logic
+  // Enhanced filtering logic with null safety
   const filteredAndSortedOrders = (() => {
     let filtered = orders.filter(order => {
-      // Text search
-      const matchesSearch = order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        order.client?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        order.client?.email?.toLowerCase().includes(searchTerm.toLowerCase());
+      // CRITICAL: Filter out null/undefined orders first
+      if (!order || !order.id) {
+        console.warn('Found null/undefined order, filtering out:', order);
+        return false;
+      }
+      
+      // Text search with null safety
+      const matchesSearch = (order.order_number || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (order.client?.full_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (order.client?.email || '').toLowerCase().includes(searchTerm.toLowerCase());
       
       // Job type filter
       const matchesJobType = jobTypeFilter === 'all' || order.job_type === jobTypeFilter;
@@ -657,6 +663,12 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
         ) : (
           <div className="space-y-1">
             {filteredAndSortedOrders.map((order, index) => {
+              // CRITICAL: Additional null safety check before rendering
+              if (!order || !order.id) {
+                console.warn('Skipping render for null/undefined order at index:', index);
+                return null;
+              }
+              
               const isEven = index % 2 === 0;
               const jobStatus = getJobStatusChip(order);
               const assignmentStatus = getAssignmentChip(order);
@@ -745,6 +757,9 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                       <div className="col-span-2">
                         <div className="flex gap-2 justify-end">
                           {(() => {
+                            // CRITICAL: Null safety check before accessing order.id
+                            if (!order || !order.id) return null;
+                            
                             const activeOffer = getActiveOfferForOrder(order.id);
                             const latestOffer = getLatestOfferForOrder(order.id);
                             
@@ -960,9 +975,12 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                         )}
                       </div>
 
-                       <div className="flex gap-2 pt-2 border-t">
-                         {(() => {
-                           const activeOffer = getActiveOfferForOrder(order.id);
+                        <div className="flex gap-2 pt-2 border-t">
+                          {(() => {
+                            // CRITICAL: Null safety check before accessing order.id
+                            if (!order || !order.id) return null;
+                            
+                            const activeOffer = getActiveOfferForOrder(order.id);
                            
                            if (title === 'Ready to Book') {
                              return (
