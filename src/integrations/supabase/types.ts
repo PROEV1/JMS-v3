@@ -1216,7 +1216,7 @@ export type Database = {
           agreement_document_url: string | null
           agreement_signed_at: string | null
           amount_paid: number
-          client_id: string
+          client_id: string | null
           created_at: string
           deposit_amount: number
           engineer_id: string | null
@@ -1244,7 +1244,7 @@ export type Database = {
           partner_status: string | null
           partner_status_raw: string | null
           postcode: string | null
-          quote_id: string
+          quote_id: string | null
           scheduled_install_date: string | null
           scheduling_conflicts: Json | null
           scheduling_suppressed: boolean
@@ -1264,7 +1264,7 @@ export type Database = {
           agreement_document_url?: string | null
           agreement_signed_at?: string | null
           amount_paid?: number
-          client_id: string
+          client_id?: string | null
           created_at?: string
           deposit_amount?: number
           engineer_id?: string | null
@@ -1292,7 +1292,7 @@ export type Database = {
           partner_status?: string | null
           partner_status_raw?: string | null
           postcode?: string | null
-          quote_id: string
+          quote_id?: string | null
           scheduled_install_date?: string | null
           scheduling_conflicts?: Json | null
           scheduling_suppressed?: boolean
@@ -1312,7 +1312,7 @@ export type Database = {
           agreement_document_url?: string | null
           agreement_signed_at?: string | null
           amount_paid?: number
-          client_id?: string
+          client_id?: string | null
           created_at?: string
           deposit_amount?: number
           engineer_id?: string | null
@@ -1340,7 +1340,7 @@ export type Database = {
           partner_status?: string | null
           partner_status_raw?: string | null
           postcode?: string | null
-          quote_id?: string
+          quote_id?: string | null
           scheduled_install_date?: string | null
           scheduling_conflicts?: Json | null
           scheduling_suppressed?: boolean
