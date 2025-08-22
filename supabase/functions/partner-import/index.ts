@@ -67,13 +67,16 @@ function parseDate(dateStr: string | null | undefined): string | null {
   
   const trimmed = dateStr.trim();
   
-  // If already in YYYY-MM-DD format, return as is
+  // If already in YYYY-MM-DD format, return as is (remove time if present)
   if (trimmed.match(/^\d{4}-\d{2}-\d{2}/)) {
-    return trimmed.split('T')[0]; // Remove time component if present
+    return trimmed.split('T')[0].split(' ')[0]; // Remove time component if present
   }
   
-  // Try to parse DD/MM/YYYY format first
-  const ddmmyyyyMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  // Strip time component from various formats (e.g., "22/08/2025 14:00" -> "22/08/2025")
+  const dateOnly = trimmed.split(' ')[0];
+  
+  // Try to parse DD/MM/YYYY format first (UK format - preferred)
+  const ddmmyyyyMatch = dateOnly.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (ddmmyyyyMatch) {
     const [, day, month, year] = ddmmyyyyMatch;
     
@@ -87,11 +90,20 @@ function parseDate(dateStr: string | null | undefined): string | null {
     
     // Convert to YYYY-MM-DD format
     const isoDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    
+    // Validate the final date is actually valid
+    const testDate = new Date(isoDate);
+    if (testDate.getFullYear() != parseInt(year) || 
+        testDate.getMonth() + 1 != monthNum || 
+        testDate.getDate() != dayNum) {
+      return null;
+    }
+    
     return isoDate;
   }
   
-  // Fallback: try MM/DD/YYYY format
-  const mmddyyyyMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  // Try MM/DD/YYYY format (US format - fallback)
+  const mmddyyyyMatch = dateOnly.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (mmddyyyyMatch) {
     const [, month, day, year] = mmddyyyyMatch;
     
@@ -103,8 +115,57 @@ function parseDate(dateStr: string | null | undefined): string | null {
       return null;
     }
     
+    // For ambiguous dates (like 01/02/2025), prefer DD/MM unless it's clearly MM/DD
+    // If day > 12, it must be DD/MM format, so this is MM/DD
+    if (monthNum > 12) {
+      return null; // Invalid month in MM/DD format
+    }
+    
     // Convert to YYYY-MM-DD format
     const isoDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    
+    // Validate the final date is actually valid
+    const testDate = new Date(isoDate);
+    if (testDate.getFullYear() != parseInt(year) || 
+        testDate.getMonth() + 1 != monthNum || 
+        testDate.getDate() != dayNum) {
+      return null;
+    }
+    
+    return isoDate;
+  }
+  
+  // Try other common formats like DD-MM-YYYY or MM-DD-YYYY
+  const dashMatch = dateOnly.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  if (dashMatch) {
+    const [, first, second, year] = dashMatch;
+    const firstNum = parseInt(first, 10);
+    const secondNum = parseInt(second, 10);
+    
+    // Assume DD-MM-YYYY if first > 12, otherwise treat as MM-DD-YYYY
+    let day, month;
+    if (firstNum > 12) {
+      day = firstNum;
+      month = secondNum;
+    } else {
+      month = firstNum;
+      day = secondNum;
+    }
+    
+    if (day < 1 || day > 31 || month < 1 || month > 12) {
+      return null;
+    }
+    
+    const isoDate = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+    
+    // Validate the final date
+    const testDate = new Date(isoDate);
+    if (testDate.getFullYear() != parseInt(year) || 
+        testDate.getMonth() + 1 != month || 
+        testDate.getDate() != day) {
+      return null;
+    }
+    
     return isoDate;
   }
   
@@ -494,7 +555,7 @@ serve(async (req: Request): Promise<Response> => {
               'INSTALL_DATE_CONFIRMED': 'scheduled',
               'INSTALLED': 'install_completed_pending_qa',
               'ON_HOLD': 'on_hold_parts_docs',
-              'SWITCH_JOB_SUB_TYPE_REQUESTED': 'awaiting_install_booking',
+              'SWITCH_JOB_SUB_TYPE_REQUESTED': 'on_hold_parts_docs',
               'UNKNOWN': 'awaiting_install_booking'
             };
             
@@ -659,11 +720,19 @@ serve(async (req: Request): Promise<Response> => {
             const parsedDate = parseDate(mappedData.scheduled_date);
             if (parsedDate) {
               orderData.scheduled_install_date = parsedDate;
+              
+              // If both engineer and date are assigned, force status to 'scheduled'
+              if (engineerId && !suppressScheduling) {
+                console.log(`Row ${rowIndex + 1}: Both engineer and date assigned, forcing status to 'scheduled'`);
+                orderData.status_enhanced = 'scheduled';
+                orderData.scheduling_suppressed = false;
+                orderData.scheduling_suppressed_reason = null;
+              }
             } else {
               results.warnings.push({
                 row: rowIndex + 1,
                 column: 'scheduled_date',
-                message: `Invalid date format: '${mappedData.scheduled_date}'. Expected DD/MM/YYYY, MM/DD/YYYY, or YYYY-MM-DD`,
+                message: `Invalid date format: '${mappedData.scheduled_date}'. Expected DD/MM/YYYY HH:MM, MM/DD/YYYY HH:MM, or YYYY-MM-DD formats. Time component will be ignored.`,
                 data: { scheduled_date: mappedData.scheduled_date }
               });
             }

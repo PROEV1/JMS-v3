@@ -182,7 +182,7 @@ export function SchedulePipelineDashboard({ orders }: SchedulePipelineDashboardP
   useEffect(() => {
     const fetchOfferCounts = async () => {
       try {
-        // Filter job offers by installation job type only
+        // Count job offers for all job types
         const [pendingResult, acceptedResult, rejectedResult, expiredResult] = await Promise.all([
           (async () => {
             const { data: offers } = await supabase
@@ -197,7 +197,6 @@ export function SchedulePipelineDashboard({ orders }: SchedulePipelineDashboardP
             const { count } = await supabase
               .from('orders')
               .select('*', { count: 'exact', head: true })
-              .eq('job_type', 'installation')
               .in('id', orderIds);
               
             return { count: count || 0 };
@@ -214,7 +213,6 @@ export function SchedulePipelineDashboard({ orders }: SchedulePipelineDashboardP
             const { count } = await supabase
               .from('orders')
               .select('*', { count: 'exact', head: true })
-              .eq('job_type', 'installation')
               .in('id', orderIds);
               
             return { count: count || 0 };
@@ -231,7 +229,6 @@ export function SchedulePipelineDashboard({ orders }: SchedulePipelineDashboardP
             const { count } = await supabase
               .from('orders')
               .select('*', { count: 'exact', head: true })
-              .eq('job_type', 'installation')
               .in('id', orderIds);
               
             return { count: count || 0 };
@@ -248,7 +245,6 @@ export function SchedulePipelineDashboard({ orders }: SchedulePipelineDashboardP
             const { count } = await supabase
               .from('orders')
               .select('*', { count: 'exact', head: true })
-              .eq('job_type', 'installation')
               .in('id', orderIds);
               
             return { count: count || 0 };
@@ -271,19 +267,18 @@ export function SchedulePipelineDashboard({ orders }: SchedulePipelineDashboardP
     fetchOfferCounts();
   }, []);
 
-  // Stats calculation for summary badges (installations only)
-  const installationOrders = orders.filter(o => o.job_type === 'installation');
-  const totalJobs = installationOrders.length;
-  const needsScheduling = installationOrders.filter(o => 
+  // Stats calculation for summary badges (all job types)
+  const totalJobs = orders.length;
+  const needsScheduling = orders.filter(o => 
     ['needs_scheduling', 'awaiting_install_booking'].includes(o.status_enhanced)
   ).length;
-  const inProgress = installationOrders.filter(o => 
+  const inProgress = orders.filter(o => 
     ['date_offered', 'date_accepted', 'scheduled', 'in_progress'].includes(o.status_enhanced)
   ).length;
-  const issues = installationOrders.filter(o => 
+  const issues = orders.filter(o => 
     ['date_rejected', 'offer_expired', 'on_hold_parts_docs'].includes(o.status_enhanced)
   ).length;
-  const completed = installationOrders.filter(o => o.status_enhanced === 'completed').length;
+  const completed = orders.filter(o => o.status_enhanced === 'completed').length;
 
   return (
     <div className="space-y-6">
@@ -292,7 +287,7 @@ export function SchedulePipelineDashboard({ orders }: SchedulePipelineDashboardP
         <h2 className="text-2xl font-bold mb-4">Scheduling Pipeline</h2>
           <div className="flex flex-wrap gap-3">
             <Badge variant="outline" className="px-3 py-1">
-              {totalJobs} Total Installations
+              {totalJobs} Total Jobs
             </Badge>
           <Badge variant="secondary" className="px-3 py-1">
             {needsScheduling} Need Scheduling
@@ -317,7 +312,7 @@ export function SchedulePipelineDashboard({ orders }: SchedulePipelineDashboardP
           <StatusTile
             key={tile.id}
             tile={tile}
-            orders={installationOrders}
+            orders={orders}
             totalJobs={totalJobs}
             navigate={navigate}
             offerCounts={offerCounts}
