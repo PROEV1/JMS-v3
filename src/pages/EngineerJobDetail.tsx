@@ -31,7 +31,7 @@ import {
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import JobStatusUpdater from '@/components/engineer/JobStatusUpdater';
 import CompletionChecklist from '@/components/engineer/CompletionChecklist';
-import { SimpleMaterialsUsed } from '@/components/engineer/SimpleMaterialsUsed';
+import { EngineerMaterialsUsed } from '@/components/engineer/EngineerMaterialsUsed';
 
 interface JobDetails {
   id: string;
@@ -689,7 +689,7 @@ export default function EngineerJobDetail() {
 
           {/* Materials Used */}
           {!job.engineer_signed_off_at && (
-            <SimpleMaterialsUsed 
+            <EngineerMaterialsUsed 
               orderId={job.id} 
               engineerId={engineerInfo?.id || ""} 
             />

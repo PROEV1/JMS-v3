@@ -272,6 +272,80 @@ export type Database = {
           },
         ]
       }
+      engineer_materials_used: {
+        Row: {
+          created_at: string
+          engineer_id: string
+          id: string
+          item_id: string | null
+          item_name: string
+          location_id: string | null
+          notes: string | null
+          order_id: string
+          quantity: number
+          serial_number: string | null
+          updated_at: string
+          used_at: string
+        }
+        Insert: {
+          created_at?: string
+          engineer_id: string
+          id?: string
+          item_id?: string | null
+          item_name: string
+          location_id?: string | null
+          notes?: string | null
+          order_id: string
+          quantity?: number
+          serial_number?: string | null
+          updated_at?: string
+          used_at?: string
+        }
+        Update: {
+          created_at?: string
+          engineer_id?: string
+          id?: string
+          item_id?: string | null
+          item_name?: string
+          location_id?: string | null
+          notes?: string | null
+          order_id?: string
+          quantity?: number
+          serial_number?: string | null
+          updated_at?: string
+          used_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "engineer_materials_used_engineer_id_fkey"
+            columns: ["engineer_id"]
+            isOneToOne: false
+            referencedRelation: "engineers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "engineer_materials_used_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "engineer_materials_used_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "engineer_materials_used_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       engineer_service_areas: {
         Row: {
           created_at: string
@@ -2444,6 +2518,24 @@ export type Database = {
               p_target_user_id: string
             }
         Returns: string
+      }
+      record_material_usage: {
+        Args: {
+          p_deduct_stock?: boolean
+          p_engineer_id: string
+          p_item_id: string
+          p_item_name: string
+          p_location_id?: string
+          p_notes?: string
+          p_order_id: string
+          p_quantity: number
+          p_serial_number?: string
+        }
+        Returns: string
+      }
+      revoke_material_usage: {
+        Args: { p_restore_stock?: boolean; p_usage_id: string }
+        Returns: boolean
       }
       test_partner_import_connectivity: {
         Args: Record<PropertyKey, never>
