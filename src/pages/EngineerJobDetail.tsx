@@ -42,6 +42,8 @@ interface JobDetails {
     email: string;
   };
   job_address: string;
+  postcode: string;
+  fullAddress: string;
   scheduled_install_date: string | null;
   status: string;
   status_enhanced: string;
@@ -125,7 +127,8 @@ export default function EngineerJobDetail() {
     try {
       console.log('Fetching job details for jobId:', jobId);
       
-      const { data, error } = await supabase
+      // First, fetch the order with direct client relationship
+      const { data: orderData, error: orderError } = await supabase
         .from('orders')
         .select(`
           id,
@@ -133,7 +136,9 @@ export default function EngineerJobDetail() {
           status,
           status_enhanced,
           engineer_id,
+          client_id,
           job_address,
+          postcode,
           scheduled_install_date,
           total_amount,
           engineer_notes,
@@ -143,24 +148,19 @@ export default function EngineerJobDetail() {
           quote:quotes(
             product_details,
             warranty_period,
-            special_instructions,
-            client:clients(
-              full_name,
-              phone,
-              email
-            )
+            special_instructions
           )
         `)
         .eq('id', jobId)
         .maybeSingle();
 
-      if (error) {
-        console.error('Database error fetching job details:', error);
-        throw error;
+      if (orderError) {
+        console.error('Database error fetching order details:', orderError);
+        throw orderError;
       }
 
-      if (!data) {
-        console.error('No job found with id:', jobId);
+      if (!orderData) {
+        console.error('No order found with id:', jobId);
         toast({
           title: "Job Not Found",
           description: "The requested job could not be found",
@@ -170,26 +170,68 @@ export default function EngineerJobDetail() {
         return;
       }
 
-      console.log('Raw job data:', data);
+      // Fetch client details if client_id exists
+      let clientData = null;
+      if (orderData.client_id) {
+        const { data, error: clientError } = await supabase
+          .from('clients')
+          .select('full_name, email, phone, address, postcode')
+          .eq('id', orderData.client_id)
+          .maybeSingle();
+
+        if (clientError) {
+          console.error('Error fetching client details:', clientError);
+          toast({
+            title: "Warning",
+            description: "Could not load complete client information",
+            variant: "default",
+          });
+        } else {
+          clientData = data;
+        }
+      }
+
+      console.log('Raw order data:', orderData);
+      console.log('Client data:', clientData);
+
+      // Construct full address using available data
+      const constructFullAddress = () => {
+        const jobAddress = orderData.job_address;
+        const orderPostcode = orderData.postcode;
+        const clientAddress = clientData?.address;
+        const clientPostcode = clientData?.postcode;
+
+        // Prioritize job address with order postcode, fallback to client data
+        const address = jobAddress || clientAddress || 'Address not specified';
+        const postcode = orderPostcode || clientPostcode || '';
+        
+        return postcode ? `${address}, ${postcode}` : address;
+      };
 
       const formattedJob = {
-        id: data.id,
-        order_number: data.order_number,
-        client: data.quote?.client || { full_name: 'Unknown Client', phone: '', email: '' },
-        job_address: data.job_address || 'Address not specified',
-        scheduled_install_date: data.scheduled_install_date,
-        status: data.status,
-        status_enhanced: data.status_enhanced,
-        product_details: data.quote?.product_details || 'Product details not available',
-        total_amount: data.total_amount,
-        quote: {
-          warranty_period: data.quote?.warranty_period || 'Not specified',
-          special_instructions: data.quote?.special_instructions
+        id: orderData.id,
+        order_number: orderData.order_number,
+        client: {
+          full_name: clientData?.full_name || 'Unknown Client',
+          phone: clientData?.phone || 'Not provided',
+          email: clientData?.email || 'Not provided'
         },
-        engineer_notes: data.engineer_notes,
-        engineer_signed_off_at: data.engineer_signed_off_at,
-        engineer_signature_data: data.engineer_signature_data,
-        admin_qa_notes: data.admin_qa_notes
+        job_address: orderData.job_address || clientData?.address || 'Address not specified',
+        postcode: orderData.postcode || clientData?.postcode || '',
+        fullAddress: constructFullAddress(),
+        scheduled_install_date: orderData.scheduled_install_date,
+        status: orderData.status,
+        status_enhanced: orderData.status_enhanced,
+        product_details: orderData.quote?.product_details || 'Product details not available',
+        total_amount: orderData.total_amount,
+        quote: {
+          warranty_period: orderData.quote?.warranty_period || 'Not specified',
+          special_instructions: orderData.quote?.special_instructions
+        },
+        engineer_notes: orderData.engineer_notes,
+        engineer_signed_off_at: orderData.engineer_signed_off_at,
+        engineer_signature_data: orderData.engineer_signature_data,
+        admin_qa_notes: orderData.admin_qa_notes
       };
 
       console.log('Formatted job data:', formattedJob);
@@ -529,8 +571,8 @@ export default function EngineerJobDetail() {
                 <div className="flex items-center space-x-3">
                   <MapPin className="h-5 w-5 text-muted-foreground" />
                   <div>
-                    <p className="font-medium">{job.job_address}</p>
-                    <p className="text-sm text-muted-foreground">Job Address</p>
+                    <p className="font-medium">{job.fullAddress}</p>
+                    <p className="text-sm text-muted-foreground">Full Address</p>
                   </div>
                 </div>
                 
