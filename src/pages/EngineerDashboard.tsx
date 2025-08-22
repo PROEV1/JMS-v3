@@ -2,15 +2,14 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calendar, Clock, MapPin, Package, User, Plus, Eye } from 'lucide-react';
+import { Calendar, Clock, MapPin, Package, User, Plus, Eye, Play, ArrowRight, FileText } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';  
 import { StockRequestButton } from '@/components/engineer/StockRequestButton';
-import { StockRequestHistory } from '@/components/engineer/StockRequestHistory';
 import { useStockRequests } from '@/hooks/useStockRequests';
+import { useToast } from '@/hooks/use-toast';
 
 interface Job {
   id: string;
@@ -21,39 +20,56 @@ interface Job {
   time_window: string;
   status: string;
   job_type?: 'installation' | 'assessment' | 'service_call';
+  estimated_duration_hours?: number;
+  postcode?: string;
+  client?: {
+    full_name: string;
+  };
 }
 
 const getStatusColor = (status: string) => {
   switch (status) {
-    case 'scheduled': return 'bg-blue-100 text-blue-800';
-    case 'in_progress': return 'bg-yellow-100 text-yellow-800';
-    case 'completed': return 'bg-green-100 text-green-800';
-    case 'cancelled': return 'bg-red-100 text-red-800';
-    default: return 'bg-gray-100 text-gray-800';
+    case 'scheduled': return 'status-pending';
+    case 'in_progress': return 'status-sent';
+    case 'completed': return 'status-accepted';
+    case 'cancelled': return 'status-rejected';
+    default: return 'badge-cream';
+  }
+};
+
+const getStockRequestStatusColor = (status: string) => {
+  switch (status) {
+    case 'submitted': 
+    case 'pending': return 'status-pending';
+    case 'approved': 
+    case 'delivered': return 'status-accepted';
+    case 'rejected': 
+    case 'cancelled': return 'status-rejected';
+    case 'in_pick':
+    case 'in_transit': return 'status-sent';
+    default: return 'badge-cream';
   }
 };
 
 const formatDate = (dateString: string): string => {
   const date = new Date(dateString);
-  return date.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
+  return date.toLocaleDateString('en-GB', {
+    weekday: 'short',
+    month: 'short',
     day: 'numeric',
   });
 };
 
-const formatTime = (timeString: string): string => {
-  const date = new Date(`1970-01-01T${timeString}`);
-  return date.toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  });
+const formatTime = (timeString: string | null): string => {
+  if (!timeString) return 'Time TBA';
+  return timeString;
 };
 
 export default function EngineerDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   // Get engineer profile
   const { data: engineer } = useQuery({
@@ -74,24 +90,56 @@ export default function EngineerDashboard() {
   });
 
   // Get stock requests count
-  const { data: stockRequests } = useStockRequests(engineer?.id);
+  const { data: stockRequests } = useStockRequests(engineer?.id, 3);
 
+  // Start job mutation
+  const startJobMutation = useMutation({
+    mutationFn: async (jobId: string) => {
+      const { error } = await supabase
+        .from('orders')
+        .update({ status: 'in_progress' })
+        .eq('id', jobId);
+        
+      if (error) throw error;
+      return jobId;
+    },
+    onSuccess: (jobId) => {
+      queryClient.invalidateQueries({ queryKey: ['todays-jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['upcoming-jobs'] });
+      toast({
+        title: "Job Started",
+        description: "Job status updated to in progress.",
+      });
+      navigate(`/engineer/jobs/${jobId}`);
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to start job. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
 
-  // Get today's jobs
+  // Get today's jobs with client info
   const { data: todaysJobs } = useQuery({
     queryKey: ['todays-jobs', engineer?.id],
     queryFn: async () => {
       if (!engineer?.id) return [];
 
       const today = new Date().toISOString().split('T')[0];
+      const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
       const { data, error } = await supabase
         .from('orders')
-        .select('*')
+        .select(`
+          *,
+          client:clients(full_name)
+        `)
         .eq('engineer_id', engineer.id)
         .gte('scheduled_install_date', today)
-        .lt('scheduled_install_date', new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0])
-        .limit(5);
+        .lt('scheduled_install_date', tomorrow)
+        .order('scheduled_install_date', { ascending: true });
 
       if (error) throw error;
       return data as Job[];
@@ -99,21 +147,26 @@ export default function EngineerDashboard() {
     enabled: !!engineer?.id,
   });
 
-  // Get upcoming jobs
+  // Get upcoming jobs (3-5 day horizon)
   const { data: upcomingJobs } = useQuery({
     queryKey: ['upcoming-jobs', engineer?.id],
     queryFn: async () => {
       if (!engineer?.id) return [];
 
       const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const fiveDaysFromNow = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
       const { data, error } = await supabase
         .from('orders')
-        .select('*')
+        .select(`
+          *,
+          client:clients(full_name)
+        `)
         .eq('engineer_id', engineer.id)
         .gte('scheduled_install_date', tomorrow)
+        .lt('scheduled_install_date', fiveDaysFromNow)
         .order('scheduled_install_date', { ascending: true })
-        .limit(5);
+        .limit(8);
 
       if (error) throw error;
       return data as Job[];
@@ -123,187 +176,312 @@ export default function EngineerDashboard() {
 
   if (!engineer) {
     return (
-      <div className="p-6">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Engineer Dashboard</h1>
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="min-h-screen bg-muted/30 p-4 md:p-6 space-y-6">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Welcome back, {engineer.name}</h1>
-          <p className="text-muted-foreground">Here's what's happening today</p>
-        </div>
-        <div className="flex gap-2">
-          <StockRequestButton 
-            engineerId={engineer.id}
-            variant="outline"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            New Stock Request
-          </StockRequestButton>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">
+            Welcome back, {engineer.name}
+          </h1>
+          <p className="text-muted-foreground text-sm md:text-base">
+            {todaysJobs?.length ? `You have ${todaysJobs.length} job${todaysJobs.length === 1 ? '' : 's'} today` : 'No jobs today - enjoy your day off!'}
+          </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>Today's Jobs</CardTitle>
+      {/* Large Info Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Today's Jobs Card */}
+        <Card className="relative overflow-hidden bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-blue-500 rounded-lg text-white">
+                  <Calendar className="h-5 w-5" />
+                </div>
+                <CardTitle className="text-lg">Today's Jobs</CardTitle>
+              </div>
+              <div className="text-3xl font-bold text-blue-600">
+                {todaysJobs?.length || 0}
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{todaysJobs?.length || 0}</div>
-            <p className="text-muted-foreground">Jobs scheduled for today</p>
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-blue-700">Jobs scheduled for today</p>
+              <Button 
+                size="sm" 
+                variant="outline" 
+                onClick={() => navigate('/engineer/jobs')}
+                className="border-blue-300 text-blue-600 hover:bg-blue-50"
+              >
+                View All
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Upcoming Jobs</CardTitle>
+        {/* Upcoming Jobs Card */}
+        <Card className="relative overflow-hidden bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-orange-500 rounded-lg text-white">
+                  <Clock className="h-5 w-5" />
+                </div>
+                <CardTitle className="text-lg">Upcoming Jobs</CardTitle>
+              </div>
+              <div className="text-3xl font-bold text-orange-600">
+                {upcomingJobs?.length || 0}
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{upcomingJobs?.length || 0}</div>
-            <p className="text-muted-foreground">Jobs in the next few days</p>
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-orange-700">Next 5 days</p>
+              <Button 
+                size="sm" 
+                variant="outline"
+                onClick={() => navigate('/engineer/jobs')}
+                className="border-orange-300 text-orange-600 hover:bg-orange-50"
+              >
+                View All
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Stock Requests</CardTitle>
+        {/* Stock Requests Card */}
+        <Card className="relative overflow-hidden bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-green-500 rounded-lg text-white">
+                  <Package className="h-5 w-5" />
+                </div>
+                <CardTitle className="text-lg">Stock Requests</CardTitle>
+              </div>
+              <div className="text-3xl font-bold text-green-600">
+                {stockRequests?.length || 0}
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stockRequests?.length || 0}</div>
-            <p className="text-muted-foreground">Stock requests</p>
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-green-700">Recent requests</p>
+              <StockRequestButton 
+                engineerId={engineer.id}
+                size="sm"
+                variant="outline"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                New Request
+              </StockRequestButton>
+            </div>
           </CardContent>
         </Card>
       </div>
 
-      <Tabs defaultValue="schedule" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="schedule">Today's Schedule</TabsTrigger>
-          <TabsTrigger value="upcoming">Upcoming Jobs</TabsTrigger>
-          <TabsTrigger value="stock">Stock Requests</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="schedule" className="space-y-4">
-          <h2 className="text-xl font-semibold">Today's Schedule</h2>
-          {todaysJobs && todaysJobs.length > 0 ? (
-            <div className="space-y-4">
-              {todaysJobs.map((job) => (
-                 <Card key={job.id}>
-                   <CardHeader>
-                     <div className="flex items-center gap-2 flex-wrap">
-                       <CardTitle>{job.order_number}</CardTitle>
-                       {job.job_type && (
-                         <Badge variant="secondary" className="text-xs bg-purple-100 text-purple-700">
-                           {job.job_type.charAt(0).toUpperCase() + job.job_type.slice(1).replace('_', ' ')}
-                         </Badge>
-                       )}
-                     </div>
-                   </CardHeader>
-                   <CardContent className="space-y-2">
-                     <div className="flex items-center gap-2">
-                       <MapPin className="h-4 w-4" />
-                       <span>{job.job_address}</span>
-                     </div>
-                     <div className="flex items-center gap-2">
-                       <Calendar className="h-4 w-4" />
-                       <span>{formatDate(job.scheduled_install_date)}</span>
-                     </div>
-                     <div className="flex items-center gap-2">
-                       <Clock className="h-4 w-4" />
-                       <span>{formatTime(job.time_window)}</span>
-                     </div>
-                     <div className="flex items-center justify-between mt-3">
-                       <Badge className={getStatusColor(job.status)}>{job.status}</Badge>
-                       <Button 
-                         size="sm" 
-                         onClick={() => navigate(`/engineer/jobs/${job.id}`)}
-                         className="ml-auto"
-                       >
-                         <Eye className="h-4 w-4 mr-1" />
-                         View Details
-                       </Button>
-                     </div>
-                   </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <Card>
-              <CardContent>
-                <p className="text-muted-foreground">No jobs scheduled for today.</p>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-
-        <TabsContent value="upcoming" className="space-y-4">
-          <h2 className="text-xl font-semibold">Upcoming Jobs</h2>
-          {upcomingJobs && upcomingJobs.length > 0 ? (
-            <div className="space-y-4">
-              {upcomingJobs.map((job) => (
-                 <Card key={job.id}>
-                   <CardHeader>
-                     <div className="flex items-center gap-2 flex-wrap">
-                       <CardTitle>{job.order_number}</CardTitle>
-                       {job.job_type && (
-                         <Badge variant="secondary" className="text-xs bg-purple-100 text-purple-700">
-                           {job.job_type.charAt(0).toUpperCase() + job.job_type.slice(1).replace('_', ' ')}
-                         </Badge>
-                       )}
-                     </div>
-                   </CardHeader>
-                   <CardContent className="space-y-2">
-                     <div className="flex items-center gap-2">
-                       <MapPin className="h-4 w-4" />
-                       <span>{job.job_address}</span>
-                     </div>
-                     <div className="flex items-center gap-2">
-                       <Calendar className="h-4 w-4" />
-                       <span>{formatDate(job.scheduled_install_date)}</span>
-                     </div>
-                     <div className="flex items-center gap-2">
-                       <Clock className="h-4 w-4" />
-                       <span>{formatTime(job.time_window)}</span>
-                     </div>
-                     <div className="flex items-center justify-between mt-3">
-                       <Badge className={getStatusColor(job.status)}>{job.status}</Badge>
-                       <Button 
-                         size="sm" 
-                         onClick={() => navigate(`/engineer/jobs/${job.id}`)}
-                         className="ml-auto"
-                       >
-                         <Eye className="h-4 w-4 mr-1" />
-                         View Details
-                       </Button>
-                     </div>
-                   </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <Card>
-              <CardContent>
-                <p className="text-muted-foreground">No upcoming jobs scheduled.</p>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-
-
-        <TabsContent value="stock" className="space-y-4">
+      {/* Today's Jobs Section */}
+      {todaysJobs && todaysJobs.length > 0 && (
+        <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold">Stock Requests</h2>
-            <StockRequestButton engineerId={engineer.id} />
+            <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
+              <Calendar className="h-5 w-5 text-blue-500" />
+              Today's Schedule
+            </h2>
           </div>
-          <StockRequestHistory engineerId={engineer.id} />
-        </TabsContent>
-      </Tabs>
+          <div className="grid gap-4">
+            {todaysJobs.map((job) => (
+              <Card key={job.id} className="hover:shadow-md transition-all duration-200">
+                <CardContent className="p-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                    <div className="flex-1 space-y-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-semibold text-lg">{job.client?.full_name || 'Unknown Client'}</h3>
+                        <Badge className={getStatusColor(job.status)}>
+                          {job.status}
+                        </Badge>
+                        {job.job_type && (
+                          <Badge variant="secondary" className="text-xs">
+                            {job.job_type.charAt(0).toUpperCase() + job.job_type.slice(1).replace('_', ' ')}
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-1">
+                          <MapPin className="h-4 w-4" />
+                          <span>{job.job_address}</span>
+                          {job.postcode && <span className="text-xs">({job.postcode})</span>}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Clock className="h-4 w-4" />
+                          <span>{formatTime(job.time_window)}</span>
+                        </div>
+                        {job.estimated_duration_hours && (
+                          <div className="text-xs bg-muted px-2 py-1 rounded">
+                            {job.estimated_duration_hours}h duration
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      {job.status === 'scheduled' && (
+                        <Button 
+                          size="sm"
+                          onClick={() => startJobMutation.mutate(job.id)}
+                          disabled={startJobMutation.isPending}
+                          className="bg-green-600 hover:bg-green-700"
+                        >
+                          <Play className="h-4 w-4 mr-1" />
+                          Start Job
+                        </Button>
+                      )}
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => navigate(`/engineer/jobs/${job.id}`)}
+                      >
+                        <Eye className="h-4 w-4 mr-1" />
+                        View Details
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Empty State for Today's Jobs */}
+      {(!todaysJobs || todaysJobs.length === 0) && (
+        <Card className="text-center py-12 bg-gradient-to-br from-blue-50 to-indigo-50">
+          <CardContent>
+            <Calendar className="h-16 w-16 mx-auto text-blue-300 mb-4" />
+            <h3 className="text-lg font-semibold text-blue-900 mb-2">No jobs today</h3>
+            <p className="text-blue-600 mb-4">Enjoy your day off! Check back tomorrow for new assignments.</p>
+            <Button 
+              variant="outline" 
+              onClick={() => navigate('/engineer/jobs')}
+              className="border-blue-300 text-blue-600 hover:bg-blue-50"
+            >
+              View All Jobs
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Upcoming Jobs Section */}
+      {upcomingJobs && upcomingJobs.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
+              <Clock className="h-5 w-5 text-orange-500" />
+              Upcoming Jobs (Next 5 Days)
+            </h2>
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={() => navigate('/engineer/jobs')}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              View All <ArrowRight className="h-4 w-4 ml-1" />
+            </Button>
+          </div>
+          <div className="grid gap-3 max-h-96 overflow-y-auto">
+            {upcomingJobs.map((job) => (
+              <Card key={job.id} className="hover:shadow-sm transition-all duration-200">
+                <CardContent className="p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="font-medium truncate">{job.client?.full_name || 'Unknown Client'}</h4>
+                        <Badge className={getStatusColor(job.status)}>
+                          {job.status}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          {formatDate(job.scheduled_install_date)}
+                        </span>
+                        <span className="flex items-center gap-1 truncate">
+                          <MapPin className="h-3 w-3" />
+                          {job.job_address}
+                        </span>
+                      </div>
+                    </div>
+                    <Button 
+                      size="sm" 
+                      variant="ghost"
+                      onClick={() => navigate(`/engineer/jobs/${job.id}`)}
+                      className="shrink-0"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Stock Requests Preview */}
+      {stockRequests && stockRequests.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
+              <Package className="h-5 w-5 text-green-500" />
+              Recent Stock Requests
+            </h2>
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={() => navigate('/engineer/stock-requests')}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              View All <ArrowRight className="h-4 w-4 ml-1" />
+            </Button>
+          </div>
+          <div className="grid gap-3">
+            {stockRequests.slice(0, 3).map((request) => (
+              <Card key={request.id} className="hover:shadow-sm transition-all duration-200">
+                <CardContent className="p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="font-medium">
+                          {request.lines?.length || 0} item{request.lines?.length === 1 ? '' : 's'}
+                        </h4>
+                        <Badge className={getStockRequestStatusColor(request.status)}>
+                          {request.status}
+                        </Badge>
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {request.destination_location?.name} • {formatDate(request.created_at)}
+                      </div>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {request.priority === 'high' && '🔴'} 
+                      {request.priority === 'medium' && '🟡'} 
+                      {request.priority === 'low' && '🟢'}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
