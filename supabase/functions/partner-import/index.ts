@@ -24,7 +24,7 @@ interface MappedData {
   status?: string;
   job_type?: string;
   postcode?: string;
-  address?: string;
+  job_address?: string;
   city?: string;
   county?: string;
   country?: string;
@@ -372,7 +372,7 @@ serve(async (req: Request): Promise<Response> => {
               status: row[columnMapping['status']]?.toString()?.trim() || null,
               job_type: row[columnMapping['job_type']]?.toString()?.trim() || null,
               postcode: row[columnMapping['postcode']]?.toString()?.trim() || null,
-              address: row[columnMapping['address']]?.toString()?.trim() || null,
+              job_address: row[columnMapping['address']]?.toString()?.trim() || null,
               city: row[columnMapping['city']]?.toString()?.trim() || null,
               county: row[columnMapping['county']]?.toString()?.trim() || null,
               country: row[columnMapping['country']]?.toString()?.trim() || null,
