@@ -7,8 +7,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const resend = new Resend(Deno.env.get('RESEND_API_KEY'))
-
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -148,51 +146,87 @@ Deno.serve(async (req) => {
 
     console.log('Message saved successfully:', message.id)
 
+    // Check if message notifications are suppressed
+    const checkSuppression = async () => {
+      try {
+        const { data, error } = await supabaseAdmin
+          .from('admin_settings')
+          .select('setting_value')
+          .eq('setting_key', 'communication_suppression')
+          .single();
+
+        if (error || !data) return false;
+        
+        const settings = data.setting_value as Record<string, unknown>;
+        return (
+          settings.test_mode_active === true || 
+          settings.suppress_message_emails === true ||
+          settings.suppress_client_emails === true
+        );
+      } catch (error) {
+        console.error('Error checking suppression settings:', error);
+        return false;
+      }
+    };
+
+    const isEmailSuppressed = await checkSuppression();
+
     // Send email notification if recipient email is available
     if (recipientEmail) {
-      const emailSubject = profile.role === 'admin' 
-        ? `New message from ProSpaces Team`
-        : `New message from ${senderName}`
+      if (isEmailSuppressed) {
+        console.log('Message email notification is suppressed - logging without sending');
+        
+        // Log the suppressed email for audit purposes
+        console.log('Would have sent email notification to:', recipientEmail, 'for message:', message.id);
+        
+      } else {
+        // Initialize Resend only when we need to send email and suppression is off
+        const resend = new Resend(Deno.env.get('RESEND_API_KEY')!);
+        
+        const emailSubject = profile.role === 'admin' 
+          ? `New message from ProSpaces Team`
+          : `New message from ${senderName}`
 
-      const emailBody = `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <h2 style="color: #2563eb; border-bottom: 2px solid #2563eb; padding-bottom: 10px;">
-            ProSpaces Message
-          </h2>
-          
-          <p><strong>From:</strong> ${senderName}</p>
-          <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
-          
-          <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <h3 style="margin-top: 0;">Message:</h3>
-            <p style="white-space: pre-wrap;">${content}</p>
+        const emailBody = `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <h2 style="color: #2563eb; border-bottom: 2px solid #2563eb; padding-bottom: 10px;">
+              ProSpaces Message
+            </h2>
+            
+            <p><strong>From:</strong> ${senderName}</p>
+            <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+            
+            <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
+              <h3 style="margin-top: 0;">Message:</h3>
+              <p style="white-space: pre-wrap;">${content}</p>
+            </div>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${Deno.env.get('APP_BASE_URL') || 'https://preview--pro-spaces-client-portal.lovable.app'}" 
+                 style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">
+                View in ProSpaces Dashboard
+              </a>
+            </div>
+            
+            <p style="color: #6b7280; font-size: 14px;">
+              This message was sent through the ProSpaces client management system.
+            </p>
           </div>
-          
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="${Deno.env.get('APP_BASE_URL') || 'https://preview--pro-spaces-client-portal.lovable.app'}" 
-               style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">
-              View in ProSpaces Dashboard
-            </a>
-          </div>
-          
-          <p style="color: #6b7280; font-size: 14px;">
-            This message was sent through the ProSpaces client management system.
-          </p>
-        </div>
-      `
+        `
 
-      try {
-        const emailResponse = await resend.emails.send({
+        try {
+          const emailResponse = await resend.emails.send({
           from: "ProSpaces <onboarding@resend.dev>",
           to: [recipientEmail],
           subject: emailSubject,
           html: emailBody,
         })
 
-        console.log('Email notification sent successfully:', emailResponse)
-      } catch (emailError) {
-        console.error('Error sending email notification:', emailError)
-        // Don't fail the entire request if email fails
+          console.log('Email notification sent successfully:', emailResponse)
+        } catch (emailError) {
+          console.error('Error sending email notification:', emailError)
+          // Don't fail the entire request if email fails
+        }
       }
     }
 

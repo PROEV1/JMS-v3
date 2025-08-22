@@ -12,8 +12,6 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 );
 
-const resend = new Resend(Deno.env.get('RESEND_API_KEY')!);
-
 interface SendOfferRequest {
   order_id: string;
   engineer_id: string;
@@ -327,7 +325,25 @@ serve(async (req: Request) => {
         .update({ delivery_details: deliveryDetails })
         .eq('id', jobOffer.id);
 
+      // Log the suppressed email activity
+      await supabase.rpc('log_order_activity', {
+        p_order_id: order_id,
+        p_activity_type: 'email_suppressed',
+        p_description: `Offer email suppressed - would have sent to ${order.client.email}`,
+        p_details: {
+          suppressed_at: new Date().toISOString(),
+          suppressed_reason: 'Test mode - communications suppressed',
+          would_have_sent_to: order.client.email,
+          offer_url: offerUrl,
+          engineer_name: engineer.name,
+          offered_date: templateData.offered_date
+        }
+      });
+
     } else {
+      // Initialize Resend only when we need to send email and suppression is off
+      const resend = new Resend(Deno.env.get('RESEND_API_KEY')!);
+      
       // Send via email (primary channel)
       if (delivery_channel === 'email' || offerConfig.auto_fallback_email) {
         let emailSent = false;

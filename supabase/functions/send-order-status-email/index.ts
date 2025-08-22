@@ -7,9 +7,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Initialize Resend with API key from environment
-const resend = new Resend(Deno.env.get('RESEND_API_KEY'))
-
 // Initialize Supabase client with service role key for admin operations
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL') ?? '',
@@ -257,6 +254,9 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
+    // Initialize Resend only when we need to send email and suppression is off
+    const resend = new Resend(Deno.env.get('RESEND_API_KEY')!);
+    
     // Send the email if not suppressed
     let emailBody = template.body;
     
