@@ -66,8 +66,18 @@ export function SendOfferModal({
         }
       });
 
-      if (error || data?.error) {
-        throw new Error(data?.error || 'Failed to send offer');
+      // Handle structured error responses from the backend
+      if (error) {
+        console.error('Supabase function error:', error);
+        throw new Error('Network error occurred');
+      }
+
+      if (data?.error) {
+        if (data.error === 'engineer_not_available' && data.details) {
+          const { message, details } = data;
+          throw new Error(`${message}. Available days: ${details.available_days.join(', ')}`);
+        }
+        throw new Error(data.message || data.error || 'Failed to send offer');
       }
 
        toast.success('Installation offer sent successfully!');
@@ -83,9 +93,13 @@ export function SendOfferModal({
     } catch (err: any) {
       console.error('Error sending offer:', err);
       
-      // Handle capacity-specific errors with more detail
+      // Handle specific error types
       const errorMessage = err.message || 'Failed to send offer';
-      if (errorMessage.includes('at capacity') || errorMessage.includes('exceed') || errorMessage.includes('not available')) {
+      
+      // Special handling for engineer availability errors
+      if (errorMessage.includes('not available on')) {
+        toast.error(errorMessage, { duration: 6000 });
+      } else if (errorMessage.includes('at capacity') || errorMessage.includes('exceed')) {
         toast.error(errorMessage);
       } else {
         toast.error('Failed to send offer. Please try again.');

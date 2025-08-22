@@ -148,7 +148,31 @@ serve(async (req: Request) => {
     if (!workingHour) {
       console.error(`Engineer ${engineer.name} (${engineer_id}) not available on day ${dayOfWeek}. Available days:`, 
         engineer.engineer_availability?.filter((wh: any) => wh.is_available).map((wh: any) => wh.day_of_week));
-      throw new Error('Engineer not available on this day of the week');
+      
+      // Get available days for better error message
+      const availableDays = engineer.engineer_availability?.filter((wh: any) => wh.is_available).map((wh: any) => {
+        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        return dayNames[wh.day_of_week];
+      }) || [];
+      
+      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const requestedDayName = dayNames[dayOfWeek];
+      
+      return new Response(
+        JSON.stringify({
+          error: 'engineer_not_available',
+          message: `Engineer ${engineer.name} is not available on ${requestedDayName}`,
+          details: {
+            requested_day: requestedDayName,
+            available_days: availableDays,
+            engineer_name: engineer.name
+          }
+        }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
     }
 
     // Check engineer's daily capacity including existing offers
