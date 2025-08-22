@@ -657,6 +657,15 @@ serve(async (req: Request): Promise<Response> => {
       if (results.data.length > 0) {
         // Log first record for debugging
         console.log('First record to upsert:', JSON.stringify(results.data[0], null, 2));
+        console.log('Available fields in first record:', Object.keys(results.data[0]));
+        
+        // Check if we have external IDs to work with
+        const recordsWithExternalId = results.data.filter(item => item.partner_external_id);
+        console.log(`Records with external ID: ${recordsWithExternalId.length}/${results.data.length}`);
+        
+        // Log some sample external IDs
+        const sampleExternalIds = recordsWithExternalId.slice(0, 5).map(r => r.partner_external_id);
+        console.log('Sample external IDs:', sampleExternalIds);
         
         // Separate records with and without required fields
         const recordsForUpdate = results.data.filter(item => item.partner_external_id);
