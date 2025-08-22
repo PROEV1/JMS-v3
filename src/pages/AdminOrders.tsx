@@ -363,9 +363,16 @@ export default function AdminOrders() {
                           </TableCell>
                            <TableCell>
                              <div>
-                               <p className="font-medium">
-                                 {order.client?.full_name || 'Unknown Client'}
-                               </p>
+                               <div className="flex items-center gap-2">
+                                 <p className="font-medium">
+                                   {order.client?.full_name || 'Unknown Client'}
+                                 </p>
+                                 {order.client?.email?.includes('placeholder-') && (
+                                   <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200">
+                                     Placeholder
+                                   </Badge>
+                                 )}
+                               </div>
                                <p className="text-sm text-muted-foreground">
                                  {order.client?.email || 'No email'}
                                </p>

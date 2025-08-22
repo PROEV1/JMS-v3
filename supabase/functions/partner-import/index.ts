@@ -440,19 +440,19 @@ serve(async (req: Request): Promise<Response> => {
               jmsStatus = actionConfig.jms_status;
               console.log(`Using status action mapping: ${originalPartnerStatus} -> ${jmsStatus}`);
             } else {
-              // Default mappings for common partner statuses
-              const defaultPartnerMappings: Record<string, string> = {
-                'AWAITING_INSTALL_DATE': 'needs_scheduling',
-                'AWAITING_QUOTATION': 'awaiting_install_booking',
-                'CANCELLATION_REQUESTED': 'cancelled',
-                'CANCELLED': 'cancelled',
-                'COMPLETE': 'completed',
-                'INSTALL_DATE_CONFIRMED': 'scheduled',
-                'INSTALLED': 'install_completed_pending_qa',
-                'ON_HOLD': 'on_hold_parts_docs',
-                'SWITCH_JOB_SUB_TYPE_REQUESTED': 'awaiting_install_booking',
-                'UNKNOWN': 'awaiting_install_booking'
-              };
+            // Default mappings for common partner statuses
+            const defaultPartnerMappings: Record<string, string> = {
+              'AWAITING_INSTALL_DATE': 'awaiting_install_booking',
+              'AWAITING_QUOTATION': 'awaiting_install_booking',
+              'CANCELLATION_REQUESTED': 'cancelled',
+              'CANCELLED': 'cancelled',
+              'COMPLETE': 'completed',
+              'INSTALL_DATE_CONFIRMED': 'scheduled',
+              'INSTALLED': 'install_completed_pending_qa',
+              'ON_HOLD': 'on_hold_parts_docs',
+              'SWITCH_JOB_SUB_TYPE_REQUESTED': 'awaiting_install_booking',
+              'UNKNOWN': 'awaiting_install_booking'
+            };
               
               if (defaultPartnerMappings[originalPartnerStatus]) {
                 jmsStatus = defaultPartnerMappings[originalPartnerStatus];
@@ -538,9 +538,44 @@ serve(async (req: Request): Promise<Response> => {
               }
             }
 
-            // For partner jobs, we don't require client_id and quote_id
-            // Only validate these for non-partner orders
-            if (!mappedData.is_partner_job && (!mappedData.client_id || !mappedData.quote_id)) {
+            // For partner jobs, create placeholder client if missing client_id
+            let clientId = mappedData.client_id;
+            if (mappedData.is_partner_job && !clientId && createMissingOrders) {
+              // Create placeholder client for partner order
+              const partnerName = partner?.name || 'Partner';
+              const placeholderClient = {
+                full_name: `${partnerName} Customer`,
+                email: `placeholder-${Date.now()}@${partnerName.toLowerCase().replace(/\s+/g, '')}.example`,
+                address: mappedData.job_address || null,
+                postcode: mappedData.postcode || null,
+                user_id: null, // No user account for placeholder clients
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              };
+              
+              console.log(`Creating placeholder client for partner order: ${JSON.stringify(placeholderClient)}`);
+              
+              const { data: newClient, error: clientError } = await supabase
+                .from('clients')
+                .insert(placeholderClient)
+                .select('id')
+                .single();
+              
+              if (clientError) {
+                console.error('Failed to create placeholder client:', clientError);
+                results.warnings.push({
+                  row: rowIndex + 1,
+                  message: `Failed to create placeholder client: ${clientError.message}`,
+                  data: mappedData
+                });
+              } else {
+                clientId = newClient.id;
+                console.log(`Created placeholder client with ID: ${clientId}`);
+              }
+            }
+            
+            // For non-partner jobs, still require client_id and quote_id  
+            if (!mappedData.is_partner_job && (!clientId || !mappedData.quote_id)) {
               if (createMissingOrders) {
                 results.warnings.push({
                   row: rowIndex + 1,
@@ -560,6 +595,7 @@ serve(async (req: Request): Promise<Response> => {
               data: {
                 ...mappedData,
                 status_enhanced: jmsStatus,
+                status: 'awaiting_payment', // Set required status field
                 scheduling_suppressed: suppressScheduling,
                 scheduling_suppressed_reason: suppressionReason,
                 engineer_id: mappedEngineerId,
@@ -568,8 +604,7 @@ serve(async (req: Request): Promise<Response> => {
                 partner_confirmed_externally: false,
                 external_confirmation_source: 'partner_import',
                 order_number: mappedData.order_number || 'TEMP',
-                // Only include client_id and quote_id if they exist
-                ...(mappedData.client_id && { client_id: mappedData.client_id }),
+                client_id: clientId, // Use the clientId (either existing or newly created)
                 ...(mappedData.quote_id && { quote_id: mappedData.quote_id }),
               }
             };

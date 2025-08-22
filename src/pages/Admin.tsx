@@ -13,6 +13,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import { ProEVLogo } from '@/components/ProEVLogo';
+import { TestPartnerImport } from '@/components/TestPartnerImport';
+import TestBackfillClients from '@/components/TestBackfillClients';
 
 interface Client {
   id: string;
@@ -526,6 +528,20 @@ export default function Admin() {
               )}
             </TableBody>
           </Table>
+        </CardContent>
+      </Card>
+
+      {/* Development Tools */}
+      <Card className="border-border">
+        <CardHeader className="bg-muted/30">
+          <CardTitle className="heading-semibold">Development Tools</CardTitle>
+          <CardDescription className="body-text">Partner import and backfill utilities</CardDescription>
+        </CardHeader>
+        <CardContent className="p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <TestPartnerImport />
+            <TestBackfillClients />
+          </div>
         </CardContent>
       </Card>
 
