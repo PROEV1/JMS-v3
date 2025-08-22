@@ -766,29 +766,32 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                              if (title === 'Ready to Book') {
                                return (
                                  <div className="flex gap-2">
-                                   <Button
-                                     size="sm"
-                                     onClick={() => handleConfirmAndSchedule(order.id)}
-                                     className="text-xs px-3 py-1 h-7"
-                                   >
-                                     Confirm & Schedule
-                                   </Button>
-                                   <Button
-                                     size="sm"
-                                     variant="outline"
-                                     onClick={() => handleCancelAndRestart(order.id)}
-                                     className="text-xs px-3 py-1 h-7"
-                                   >
-                                     Cancel
-                                   </Button>
-                                   <Button
-                                     size="sm"
-                                     variant="outline"
-                                      onClick={() => navigate(`/orders/${order.id}`)}
-                                     className="text-xs px-3 py-1 h-7"
-                                   >
-                                     View Job
-                                   </Button>
+                                    <Button
+                                      size="sm"
+                                      onClick={() => order?.id && handleConfirmAndSchedule(order.id)}
+                                      className="text-xs px-3 py-1 h-7"
+                                      disabled={!order?.id}
+                                    >
+                                      Confirm & Schedule
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => order?.id && handleCancelAndRestart(order.id)}
+                                      className="text-xs px-3 py-1 h-7"
+                                      disabled={!order?.id}
+                                    >
+                                      Cancel
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => order?.id && navigate(`/orders/${order.id}`)}
+                                      className="text-xs px-3 py-1 h-7"
+                                      disabled={!order?.id}
+                                    >
+                                      View Job
+                                    </Button>
                                  </div>
                                );
                              } else if (activeOffer && title === 'Date Offered') {
@@ -799,106 +802,116 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                                      Expires: {timeRemaining}
                                    </div>
                                    <div className="flex gap-2">
-                                     <Button
-                                       size="sm"
-                                       onClick={() => handleAcceptOffer(order.id)}
-                                       className="text-xs px-3 py-1 h-7 bg-green-600 hover:bg-green-700"
-                                     >
-                                       Accept
-                                     </Button>
-                                     <Button
-                                       size="sm"
-                                       variant="destructive"
-                                       onClick={() => handleRejectOffer(order.id)}
-                                       className="text-xs px-3 py-1 h-7"
-                                     >
-                                       Reject
-                                     </Button>
-                                     <Button
-                                       size="sm"
-                                       variant="outline"
-                                        onClick={() => navigate(`/orders/${order.id}`)}
-                                       className="text-xs px-3 py-1 h-7"
-                                     >
-                                       View Job
-                                     </Button>
+                                      <Button
+                                        size="sm"
+                                        onClick={() => order?.id && handleAcceptOffer(order.id)}
+                                        className="text-xs px-3 py-1 h-7 bg-green-600 hover:bg-green-700"
+                                        disabled={!order?.id}
+                                      >
+                                        Accept
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="destructive"
+                                        onClick={() => order?.id && handleRejectOffer(order.id)}
+                                        className="text-xs px-3 py-1 h-7"
+                                        disabled={!order?.id}
+                                      >
+                                        Reject
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => order?.id && navigate(`/orders/${order.id}`)}
+                                        className="text-xs px-3 py-1 h-7"
+                                        disabled={!order?.id}
+                                      >
+                                        View Job
+                                      </Button>
                                    </div>
                                  </div>
                                );
                              } else if (title === 'Date Rejected') {
                                return (
                                  <div className="flex gap-2">
-                                   <Button
-                                     onClick={() => handleSmartAssign(order)}
-                                     size="sm"
-                                     className="text-xs px-3 py-1 h-7"
-                                   >
-                                     Smart Assign
-                                   </Button>
-                                   <Button
-                                     variant="outline"
-                                     size="sm"
-                                      onClick={() => navigate(`/orders/${order.id}`)}
-                                     className="text-xs px-3 py-1 h-7"
-                                   >
-                                     View Job
-                                   </Button>
-                                 </div>
-                               );
-                            } else if (order.status_enhanced === 'awaiting_install_booking') {
-                              if (activeOffer) {
-                                return (
-                                  <>
                                     <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => handleResendOffer(order.id)}
-                                      className="text-xs px-3 py-1 h-7"
-                                    >
-                                      Resend
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => handleReleaseOffer(order.id)}
-                                      className="text-xs px-3 py-1 h-7"
-                                    >
-                                      Release
-                                    </Button>
-                                  </>
-                                );
-                              } else {
-                                return (
-                                  <>
-                                    <Button
-                                      onClick={() => handleSmartAssign(order)}
+                                      onClick={() => order && handleSmartAssign(order)}
                                       size="sm"
                                       className="text-xs px-3 py-1 h-7"
+                                      disabled={!order}
                                     >
                                       Smart Assign
                                     </Button>
                                     <Button
                                       variant="outline"
                                       size="sm"
-                                       onClick={() => navigate(`/orders/${order.id}`)}
+                                      onClick={() => order?.id && navigate(`/orders/${order.id}`)}
                                       className="text-xs px-3 py-1 h-7"
+                                      disabled={!order?.id}
                                     >
                                       View Job
                                     </Button>
+                                 </div>
+                               );
+                            } else if (order.status_enhanced === 'awaiting_install_booking') {
+                              if (activeOffer) {
+                                return (
+                                  <>
+                                     <Button
+                                       size="sm"
+                                       variant="outline"
+                                       onClick={() => order?.id && handleResendOffer(order.id)}
+                                       className="text-xs px-3 py-1 h-7"
+                                       disabled={!order?.id}
+                                     >
+                                       Resend
+                                     </Button>
+                                     <Button
+                                       size="sm"
+                                       variant="outline"
+                                       onClick={() => order?.id && handleReleaseOffer(order.id)}
+                                       className="text-xs px-3 py-1 h-7"
+                                       disabled={!order?.id}
+                                     >
+                                       Release
+                                     </Button>
+                                  </>
+                                );
+                              } else {
+                                return (
+                                  <>
+                                     <Button
+                                       onClick={() => order && handleSmartAssign(order)}
+                                       size="sm"
+                                       className="text-xs px-3 py-1 h-7"
+                                       disabled={!order}
+                                     >
+                                       Smart Assign
+                                     </Button>
+                                     <Button
+                                       variant="outline"
+                                       size="sm"
+                                       onClick={() => order?.id && navigate(`/orders/${order.id}`)}
+                                       className="text-xs px-3 py-1 h-7"
+                                       disabled={!order?.id}
+                                     >
+                                       View Job
+                                     </Button>
                                   </>
                                 );
                               }
                             } else {
-                              return (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                   onClick={() => navigate(`/orders/${order.id}`)}
-                                  className="text-xs px-3 py-1 h-7"
-                                >
-                                  View Job
-                                </Button>
-                              );
+                               return (
+                                 <Button
+                                   size="sm"
+                                   variant="outline"
+                                   onClick={() => order?.id && navigate(`/orders/${order.id}`)}
+                                   className="text-xs px-3 py-1 h-7"
+                                   disabled={!order?.id}
+                                 >
+                                   View Job
+                                 </Button>
+                               );
                             }
                           })()}
                         </div>
@@ -985,29 +998,32 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                            if (title === 'Ready to Book') {
                              return (
                                <>
-                                 <Button
-                                   size="sm"
-                                   onClick={() => handleConfirmAndSchedule(order.id)}
-                                   className="flex-1 text-xs h-7"
-                                 >
-                                   Confirm & Schedule
-                                 </Button>
-                                 <Button
-                                   size="sm"
-                                   variant="outline"
-                                   onClick={() => handleCancelAndRestart(order.id)}
-                                   className="flex-1 text-xs h-7"
-                                 >
-                                   Cancel
-                                 </Button>
-                                 <Button
-                                   size="sm"
-                                   variant="outline"
-                                    onClick={() => navigate(`/orders/${order.id}`)}
-                                   className="flex-1 text-xs h-7"
-                                 >
-                                   View Job
-                                 </Button>
+                                  <Button
+                                    size="sm"
+                                    onClick={() => order?.id && handleConfirmAndSchedule(order.id)}
+                                    className="flex-1 text-xs h-7"
+                                    disabled={!order?.id}
+                                  >
+                                    Confirm & Schedule
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => order?.id && handleCancelAndRestart(order.id)}
+                                    className="flex-1 text-xs h-7"
+                                    disabled={!order?.id}
+                                  >
+                                    Cancel
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => order?.id && navigate(`/orders/${order.id}`)}
+                                    className="flex-1 text-xs h-7"
+                                    disabled={!order?.id}
+                                  >
+                                    View Job
+                                  </Button>
                                </>
                              );
                             } else if (activeOffer && title === 'Date Offered') {
@@ -1019,46 +1035,51 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                                       Expires in: {timeRemaining}
                                     </div>
                                   </div>
-                                  <Button
-                                    size="sm"
-                                    onClick={() => handleAcceptOffer(order.id)}
-                                    className="flex-1 text-xs h-7 bg-green-600 hover:bg-green-700"
-                                  >
-                                    Accept
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="destructive"
-                                    onClick={() => handleRejectOffer(order.id)}
-                                    className="flex-1 text-xs h-7"
-                                  >
-                                    Reject
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                     onClick={() => navigate(`/orders/${order.id}`)}
-                                    className="flex-1 text-xs h-7"
-                                  >
-                                    View Job
-                                  </Button>
+                                    <Button
+                                      onClick={() => order?.id && handleAcceptOffer(order.id)}
+                                      size="sm"
+                                      className="flex-1 text-xs h-7 bg-green-600 hover:bg-green-700"
+                                      disabled={!order?.id}
+                                    >
+                                      Accept
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="destructive"
+                                      onClick={() => order?.id && handleRejectOffer(order.id)}
+                                      className="flex-1 text-xs h-7"
+                                      disabled={!order?.id}
+                                    >
+                                      Reject
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => order?.id && navigate(`/orders/${order.id}`)}
+                                      className="flex-1 text-xs h-7"
+                                      disabled={!order?.id}
+                                    >
+                                      View Job
+                                    </Button>
                                 </>
                               );
                             } else if (title === 'Date Rejected') {
                               return (
                                 <>
                                   <Button
-                                    onClick={() => handleSmartAssign(order)}
+                                    onClick={() => order && handleSmartAssign(order)}
                                     size="sm"
                                     className="flex-1 text-xs h-7"
+                                    disabled={!order}
                                   >
                                     Smart Assign
                                   </Button>
                                   <Button
                                     variant="outline"
                                     size="sm"
-                                     onClick={() => navigate(`/orders/${order.id}`)}
+                                    onClick={() => order?.id && navigate(`/orders/${order.id}`)}
                                     className="flex-1 text-xs h-7"
+                                    disabled={!order?.id}
                                   >
                                     View Job
                                   </Button>
@@ -1068,64 +1089,70 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                              if (activeOffer) {
                                return (
                                  <>
-                                   <Button
-                                     size="sm"
-                                     variant="outline"
-                                     onClick={() => handleResendOffer(order.id)}
-                                     className="flex-1 text-xs h-7"
-                                   >
-                                     Resend
-                                   </Button>
-                                   <Button
-                                     size="sm"
-                                     variant="outline"
-                                     onClick={() => handleReleaseOffer(order.id)}
-                                     className="flex-1 text-xs h-7"
-                                   >
-                                     Release
-                                   </Button>
-                                   <Button
-                                     size="sm"
-                                     variant="outline"
-                                      onClick={() => navigate(`/orders/${order.id}`)}
-                                     className="flex-1 text-xs h-7"
-                                   >
-                                     View Job
-                                   </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => order?.id && handleResendOffer(order.id)}
+                                      className="flex-1 text-xs h-7"
+                                      disabled={!order?.id}
+                                    >
+                                      Resend
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => order?.id && handleReleaseOffer(order.id)}
+                                      className="flex-1 text-xs h-7"
+                                      disabled={!order?.id}
+                                    >
+                                      Release
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => order?.id && navigate(`/orders/${order.id}`)}
+                                      className="flex-1 text-xs h-7"
+                                      disabled={!order?.id}
+                                    >
+                                      View Job
+                                    </Button>
                                  </>
                                );
                              } else {
                                return (
                                  <>
-                                   <Button
-                                     onClick={() => handleSmartAssign(order)}
-                                     size="sm"
-                                     className="flex-1 text-xs h-7"
-                                   >
-                                     Smart Assign
-                                   </Button>
-                                   <Button
-                                     variant="outline"
-                                     size="sm"
-                                      onClick={() => navigate(`/orders/${order.id}`)}
-                                     className="flex-1 text-xs h-7"
-                                   >
-                                     View Job
-                                   </Button>
+                                    <Button
+                                      onClick={() => order && handleSmartAssign(order)}
+                                      size="sm"
+                                      className="flex-1 text-xs h-7"
+                                      disabled={!order}
+                                    >
+                                      Smart Assign
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => order?.id && navigate(`/orders/${order.id}`)}
+                                      className="flex-1 text-xs h-7"
+                                      disabled={!order?.id}
+                                    >
+                                      View Job
+                                    </Button>
                                  </>
                                );
                              }
                            } else {
-                             return (
-                               <Button
-                                 size="sm"
-                                 variant="outline"
-                                 onClick={() => navigate(`/orders/${order.id}`)}
-                                 className="w-full text-xs h-7"
-                               >
-                                 View Job
-                               </Button>
-                             );
+                              return (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => order?.id && navigate(`/orders/${order.id}`)}
+                                  className="w-full text-xs h-7"
+                                  disabled={!order?.id}
+                                >
+                                  View Job
+                                </Button>
+                              );
                            }
                          })()}
                       </div>
