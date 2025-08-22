@@ -127,11 +127,11 @@ function StatusNavTile({ tile, count, isActive, navigate }: {
       onClick={() => navigate(tile.route)}
     >
       <CardContent className="p-3 flex flex-col justify-between">
-        <div className="flex items-center gap-2 mb-2">
-          <div className="p-1.5 bg-white/60 rounded-md">
+        <div className="flex items-start gap-2 mb-2">
+          <div className="p-1.5 bg-white/60 rounded-md flex-shrink-0">
             <IconComponent className="h-3.5 w-3.5 text-foreground" />
           </div>
-          <h3 className="font-medium text-xs text-foreground truncate">{tile.title}</h3>
+          <h3 className="font-medium text-xs text-foreground leading-tight min-h-[2.5rem] flex items-center">{tile.title}</h3>
         </div>
         
         <div className="text-center">

@@ -7,16 +7,14 @@ import { CompletedListPage } from '@/components/scheduling/CompletedListPage';
 import { CancelledListPage } from '@/components/scheduling/CancelledListPage';
 import { NotInSchedulingListPage } from '@/components/scheduling/NotInSchedulingListPage';
 import { ScheduleStatusNavigation } from '@/components/scheduling/ScheduleStatusNavigation';
+import { NeedsSchedulingListPage } from '@/components/scheduling/NeedsSchedulingListPage';
 
 export default function AdminScheduleStatus() {
   const { status } = useParams<{ status: string }>();
 
   return (
     <div className="space-y-6">
-      {/* Always show the bucket navigation tiles */}
-      <ScheduleStatusNavigation currentStatus={status} />
-      
-      {/* Render the appropriate status page */}
+      {/* Render the appropriate status page (each includes its own navigation) */}
       {(() => {
         switch (status) {
           case 'completion-pending':
@@ -27,8 +25,9 @@ export default function AdminScheduleStatus() {
             return <CancelledListPage />;
           case 'not-in-scheduling':
             return <NotInSchedulingListPage />;
+          case 'needs-scheduling':
           default:
-            return <ScheduleStatusListPage orders={[]} engineers={[]} title="Schedule Status" />;
+            return <NeedsSchedulingListPage />;
         }
       })()}
     </div>
