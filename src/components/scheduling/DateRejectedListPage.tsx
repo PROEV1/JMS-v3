@@ -2,22 +2,25 @@ import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { ScheduleStatusNavigation } from './ScheduleStatusNavigation';
-import { EnhancedJobCard } from './EnhancedJobCard';
+import { ScheduleStatusListPage } from './ScheduleStatusListPage';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { XCircle } from 'lucide-react';
 
 export function DateRejectedListPage() {
-  const { data: orders = [], isLoading } = useQuery({
+  const { data: orders = [], isLoading: ordersLoading } = useQuery({
     queryKey: ['orders', 'date-rejected'],
     queryFn: async () => {
-      // Get orders with rejected offers but no active offers
-      const { data: rejectedOffers } = await supabase
+      // Get rejected offers
+      const { data: rejectedOffers, error: rejectedError } = await supabase
         .from('job_offers')
         .select('order_id')
         .eq('status', 'rejected');
 
+      if (rejectedError) throw rejectedError;
+      
       if (!rejectedOffers?.length) return [];
 
+      // Get active offers to exclude orders that have them
       const { data: activeOffers } = await supabase
         .from('job_offers')
         .select('order_id')
@@ -30,7 +33,8 @@ export function DateRejectedListPage() {
 
       if (!uniqueRejectedOrderIds.length) return [];
 
-      const { data, error } = await supabase
+      // Fetch orders
+      const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
         .select(`
           *,
@@ -41,12 +45,26 @@ export function DateRejectedListPage() {
         .in('id', uniqueRejectedOrderIds)
         .order('created_at', { ascending: false });
 
+      if (ordersError) throw ordersError;
+      return ordersData || [];
+    }
+  });
+
+  const { data: engineers = [], isLoading: engineersLoading } = useQuery({
+    queryKey: ['engineers'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('engineers')
+        .select('*')
+        .eq('availability', true)
+        .order('name');
+
       if (error) throw error;
       return data || [];
     }
   });
 
-  if (isLoading) {
+  if (ordersLoading || engineersLoading) {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -66,31 +84,12 @@ export function DateRejectedListPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-3">
-            {orders.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <XCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>No jobs with rejected dates</p>
-              </div>
-            ) : (
-              orders.map((order) => (
-                <EnhancedJobCard
-                  key={order.id}
-                  order={{
-                    ...order,
-                    clients: order.client ? {
-                      name: order.client.full_name,
-                      email: order.client.email,
-                      phone: order.client.phone
-                    } : undefined
-                  }}
-                  onUpdate={() => {
-                    // Refresh the data
-                  }}
-                />
-              ))
-            )}
-          </div>
+          <ScheduleStatusListPage 
+            orders={orders}
+            engineers={engineers}
+            title="Date Rejected"
+            showAutoSchedule={true}
+          />
         </CardContent>
       </Card>
     </div>
