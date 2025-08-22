@@ -14,9 +14,9 @@ export function NeedsSchedulingListPage() {
         .from('orders')
         .select(`
           *,
-          clients:client_id(full_name, email, phone, postcode, address),
-          engineers:engineer_id(name, email, region),
-          partners:partner_id(name)
+          client:client_id(full_name, email, phone, postcode, address),
+          engineer:engineer_id(name, email, region),
+          partner:partner_id(name)
         `)
         .in('status_enhanced', ['awaiting_install_booking', 'needs_scheduling'])
         .order('created_at', { ascending: false });
