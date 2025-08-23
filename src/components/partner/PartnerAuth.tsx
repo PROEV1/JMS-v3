@@ -100,7 +100,7 @@ export function PartnerAuth() {
               </Button>
             </form>
 
-            <div className="mt-4 text-center">
+            <div className="mt-4 text-center space-y-2">
               <Button
                 variant="link"
                 onClick={() => navigate('/auth')}
@@ -108,6 +108,19 @@ export function PartnerAuth() {
               >
                 Not a partner? Sign in to main portal
               </Button>
+              <div className="text-xs text-muted-foreground">
+                Already a partner but need main portal? 
+                <Button
+                  variant="link"
+                  onClick={() => {
+                    sessionStorage.setItem('forceMainPortal', 'true');
+                    navigate('/auth');
+                  }}
+                  className="text-xs h-auto p-0 ml-1 text-primary hover:underline"
+                >
+                  Click here
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>

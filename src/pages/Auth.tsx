@@ -61,12 +61,15 @@ export default function Auth() {
 
             console.log('Auth: Partner user check result:', { partnerUser, partnerError });
 
-            if (partnerUser) {
+            if (partnerUser && !sessionStorage.getItem('forceMainPortal')) {
               console.log('Auth: User IS a partner user, redirecting to partner portal');
               redirectTo = '/partner';
               navigate(redirectTo, { replace: true });
               return;
-            } 
+            } else if (sessionStorage.getItem('forceMainPortal')) {
+              console.log('Auth: Partner user forced to main portal');
+              sessionStorage.removeItem('forceMainPortal');
+            }
 
             console.log('Auth: User is NOT a partner user, checking profile role');
             
