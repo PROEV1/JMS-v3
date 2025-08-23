@@ -16,6 +16,7 @@ import { AgreementSection } from '@/components/admin/sections/AgreementSection';
 import { JobStatusTimelineSection } from '@/components/admin/sections/JobStatusTimelineSection';
 import { ActivityHistorySection } from '@/components/admin/sections/ActivityHistorySection';
 import { EngineerUploadsSection } from '@/components/admin/sections/EngineerUploadsSection';
+import { SurveySection } from '@/components/admin/sections/SurveySection';
 import { ClientBlockedDatesSection } from '@/components/admin/sections/ClientBlockedDatesSection';
 import { OrderStatusEnhanced } from '@/components/admin/EnhancedJobStatusBadge';
 import { Button } from '@/components/ui/button';
@@ -682,6 +683,10 @@ export default function OrderDetail() {
                 onDataChange={fetchOrder}
               />
             )}
+
+            
+            {/* Survey Section */}
+            <SurveySection orderId={orderId!} />
 
             {/* Engineer Uploads & Completion */}
             <EngineerUploadsSection 

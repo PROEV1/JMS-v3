@@ -201,11 +201,66 @@ serve(async (req) => {
       console.log('Quote accepted successfully')
     }
 
+    // Generate survey token and send survey email for non-partner jobs
+    let surveyEmailSent = false;
+    if (orderCreated || quote.status !== 'accepted') {
+      try {
+        // Check if order needs survey
+        const { data: orderData } = await supabaseAdmin
+          .from('orders')
+          .select('survey_required, order_number')
+          .eq('id', orderId)
+          .single();
+
+        if (orderData?.survey_required) {
+          // Generate survey token
+          const surveyToken = crypto.randomUUID().replace(/-/g, '');
+          const expiresAt = new Date();
+          expiresAt.setDate(expiresAt.getDate() + 30); // 30 days expiry
+
+          // Update order with survey token
+          const { error: tokenError } = await supabaseAdmin
+            .from('orders')
+            .update({
+              survey_token: surveyToken,
+              survey_token_expires_at: expiresAt.toISOString()
+            })
+            .eq('id', orderId);
+
+          if (tokenError) {
+            console.error('Failed to update order with survey token:', tokenError);
+          } else {
+            // Send survey email (ProEV only - no partner branding for direct quotes)
+            const { error: emailError } = await supabaseClient.functions.invoke('send-survey-email', {
+              body: {
+                orderId: orderId,
+                clientEmail: user.email,
+                clientName: client.full_name || user.email,
+                orderNumber: orderData.order_number,
+                surveyToken: surveyToken,
+                partnerBrand: null // Direct quote - no partner branding
+              }
+            });
+
+            if (emailError) {
+              console.error('Failed to send survey email:', emailError);
+            } else {
+              surveyEmailSent = true;
+              console.log('Survey email sent successfully for order:', orderId);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error in survey setup:', error);
+      }
+    }
+
     return new Response(
       JSON.stringify({ 
         orderId, 
         orderCreated,
-        message: orderCreated ? 'Quote accepted and order created' : 'Quote accepted, order already exists'
+        message: orderCreated ? 'Quote accepted and order created' : 'Quote accepted, order already exists',
+        surveyEmailSent: surveyEmailSent
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )

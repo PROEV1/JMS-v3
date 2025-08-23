@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
+import { SurveyStatusBadge } from '@/components/survey/SurveyStatusBadge';
 
 interface PartnerUser {
   id: string;
@@ -29,6 +30,12 @@ export function PartnerJobsList({ partnerUser, statusFilter }: PartnerJobsListPr
             full_name,
             email,
             phone
+          ),
+          client_surveys!left(
+            id,
+            status,
+            submitted_at,
+            reviewed_at
           )
         `)
         .eq('is_partner_job', true)
@@ -133,9 +140,10 @@ export function PartnerJobsList({ partnerUser, statusFilter }: PartnerJobsListPr
                   <TableHead>Client</TableHead>
                   <TableHead>Address</TableHead>
                   <TableHead>Type</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead>Scheduled</TableHead>
+                   <TableHead>Status</TableHead>
+                   <TableHead>Survey</TableHead>
+                   <TableHead>Created</TableHead>
+                   <TableHead>Scheduled</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -162,7 +170,25 @@ export function PartnerJobsList({ partnerUser, statusFilter }: PartnerJobsListPr
                       <Badge variant={getStatusColor(job.status_enhanced || job.status)}>
                         {formatStatus(job.status_enhanced || job.status)}
                       </Badge>
-                    </TableCell>
+                     </TableCell>
+                     <TableCell>
+                       {job.survey_required ? (
+                         job.client_surveys && job.client_surveys.length > 0 ? (
+                           <SurveyStatusBadge 
+                             status={job.client_surveys[0].status} 
+                             compact={true}
+                           />
+                         ) : (
+                           <Badge variant="outline" className="bg-slate-100 text-slate-600">
+                             Pending
+                           </Badge>
+                         )
+                       ) : (
+                         <Badge variant="secondary" className="bg-gray-100 text-gray-500">
+                           N/A
+                         </Badge>
+                       )}
+                     </TableCell>
                     <TableCell>
                       {format(new Date(job.created_at), 'MMM d, yyyy')}
                     </TableCell>
