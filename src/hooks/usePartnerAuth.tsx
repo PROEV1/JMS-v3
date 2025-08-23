@@ -32,35 +32,50 @@ export function usePartnerAuth() {
           return;
         }
 
-        const { data, error } = await supabase
+        // First get partner user
+        const { data: partnerUserData, error: partnerUserError } = await supabase
           .from('partner_users')
-          .select(`
-            *,
-            partners!inner(
-              id,
-              name,
-              partner_type,
-              logo_url,
-              brand_colors,
-              parent_partner_id
-            )
-          `)
+          .select('*')
           .eq('user_id', user.id)
           .eq('is_active', true)
           .maybeSingle();
 
-        console.log('usePartnerAuth: Query result:', { data, error });
-
-        if (error) {
-          console.error('Error fetching partner user:', error);
+        if (partnerUserError) {
+          console.error('Error fetching partner user:', partnerUserError);
           setPartnerUser(null);
-        } else if (data) {
-          console.log('Found partner user:', data);
-          setPartnerUser(data as any);
-        } else {
+          setLoading(false);
+          return;
+        }
+
+        if (!partnerUserData) {
           console.log('User is authenticated but has no partner_users record. User ID:', user.id);
           setPartnerUser(null);
+          setLoading(false);
+          return;
         }
+
+        // Then get partner details
+        const { data: partnerData, error: partnerError } = await supabase
+          .from('partners')
+          .select('id, name, partner_type, logo_url, brand_colors, parent_partner_id')
+          .eq('id', partnerUserData.partner_id)
+          .single();
+
+        if (partnerError) {
+          console.error('Error fetching partner:', partnerError);
+          setPartnerUser(null);
+          setLoading(false);
+          return;
+        }
+
+        // Combine the data
+        const data = {
+          ...partnerUserData,
+          partner: partnerData
+        };
+
+        console.log('Found partner user:', data);
+        setPartnerUser(data as any);
       } catch (error) {
         console.error('Error in fetchPartnerUser:', error);
         setPartnerUser(null);
