@@ -232,11 +232,11 @@ export function SmartAssignmentModal({
                               <p className="text-xs text-muted-foreground">
                                 {suggestion.engineer.region}
                               </p>
-                              {suggestion.availableDate && (
+                               {suggestion.availableDate && (
                                 <p className="text-xs text-primary font-medium">
-                                  Available: {new Date(suggestion.availableDate).toLocaleDateString()}
+                                  Suggested date: {new Date(suggestion.availableDate).toLocaleDateString()}
                                 </p>
-                              )}
+                               )}
                             </div>
                             <Badge variant="default">
                               Score: {Math.round(suggestion.score)}
