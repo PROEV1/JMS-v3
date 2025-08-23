@@ -698,6 +698,7 @@ export type Database = {
           address: string | null
           code: string | null
           created_at: string
+          engineer_id: string | null
           id: string
           is_active: boolean
           name: string
@@ -708,6 +709,7 @@ export type Database = {
           address?: string | null
           code?: string | null
           created_at?: string
+          engineer_id?: string | null
           id?: string
           is_active?: boolean
           name: string
@@ -718,13 +720,22 @@ export type Database = {
           address?: string | null
           code?: string | null
           created_at?: string
+          engineer_id?: string | null
           id?: string
           is_active?: boolean
           name?: string
           type?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "inventory_locations_engineer_id_fkey"
+            columns: ["engineer_id"]
+            isOneToOne: false
+            referencedRelation: "engineers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       inventory_suppliers: {
         Row: {
