@@ -39,20 +39,33 @@ serve(async (req) => {
 
     console.log('Looking up postcode:', postcode, 'with house number:', houseNumber)
 
-    // Normalize postcode (remove spaces, uppercase)
-    const normalizedPostcode = postcode.replace(/\s/g, '').toUpperCase()
+    // Normalize postcode (remove extra spaces, uppercase, then format properly)
+    const cleanPostcode = postcode.replace(/\s+/g, '').toUpperCase()
     
-    // Build search query
-    const searchQuery = houseNumber 
-      ? `${houseNumber} ${normalizedPostcode}` 
-      : normalizedPostcode
+    // Format UK postcode properly (e.g., MK179JU -> MK17 9JU)
+    const formattedPostcode = cleanPostcode.replace(/^([A-Z]{1,2}\d{1,2}[A-Z]?)(\d[A-Z]{2})$/, '$1 $2')
+    
+    console.log('Formatted postcode:', formattedPostcode)
 
-    // Use Mapbox Geocoding API to find addresses for the postcode
-    const mapboxUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchQuery)}.json?` +
-      `access_token=${mapboxToken}&` +
-      'country=GB&' +
-      'types=address&' +
-      'limit=10'
+    // For UK postcodes, search differently based on whether we have a house number
+    let mapboxUrl: string;
+    
+    if (houseNumber) {
+      // Search for specific address with house number
+      const searchQuery = `${houseNumber} ${formattedPostcode}`
+      mapboxUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchQuery)}.json?` +
+        `access_token=${mapboxToken}&` +
+        'country=GB&' +
+        'types=address&' +
+        'limit=10'
+    } else {
+      // Search just the postcode to get area results
+      mapboxUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(formattedPostcode)}.json?` +
+        `access_token=${mapboxToken}&` +
+        'country=GB&' +
+        'types=postcode,address&' +
+        'limit=10'
+    }
 
     console.log('Mapbox request URL:', mapboxUrl)
 
@@ -73,19 +86,28 @@ serve(async (req) => {
       const placeName = feature.place_name || ''
       const context = feature.context || []
       
-      // Extract postcode from context
+      // Extract postcode from context or use formatted one
       const postcodeContext = context.find((c: any) => c.id?.startsWith('postcode'))
-      const extractedPostcode = postcodeContext?.text || normalizedPostcode
+      const extractedPostcode = postcodeContext?.text || formattedPostcode
       
-      // Clean up the address - remove country and sometimes region
+      // Clean up the address - remove country 
       let cleanAddress = placeName
         .replace(/, United Kingdom$/, '')
         .replace(/, UK$/, '')
+        .trim()
       
-      // If we have a specific house number search, use the place_name as is
-      // Otherwise, try to extract just the street/area info
-      if (!houseNumber && feature.properties?.address) {
-        cleanAddress = `${feature.properties.address}, ${cleanAddress.split(',').slice(-2, -1).join(',').trim()}`
+      // For postcode-only searches, create readable address options
+      if (!houseNumber && feature.place_type?.includes('postcode')) {
+        // This is a postcode result, create generic street options
+        const addressParts = cleanAddress.split(', ')
+        if (addressParts.length >= 2) {
+          cleanAddress = `${addressParts[0]}, ${addressParts[1]}`
+        }
+      }
+      
+      // If it's an address result, use it directly
+      if (feature.place_type?.includes('address')) {
+        cleanAddress = cleanAddress.split(',').slice(0, 2).join(',').trim()
       }
 
       return {
@@ -94,6 +116,17 @@ serve(async (req) => {
         postcode: extractedPostcode
       }
     }) || []
+
+    // If no results and no house number specified, try to provide generic options
+    if (addresses.length === 0 && !houseNumber) {
+      // Create some generic street suggestions for the postcode area
+      const postcodeArea = formattedPostcode.split(' ')[0] // e.g., "MK17"
+      addresses.push({
+        address: `${formattedPostcode} Area`,
+        full_address: `${formattedPostcode} Area, United Kingdom`,
+        postcode: formattedPostcode
+      })
+    }
 
     // Filter out duplicates based on address
     const uniqueAddresses = addresses.filter((addr, index, self) => 
@@ -105,7 +138,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        postcode: normalizedPostcode,
+        postcode: formattedPostcode,
         addresses: uniqueAddresses
       }),
       { 
