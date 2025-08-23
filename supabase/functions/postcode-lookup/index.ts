@@ -96,23 +96,32 @@ serve(async (req) => {
         .replace(/, UK$/, '')
         .trim()
       
-      // For postcode-only searches, create readable address options
+      // For postcode searches, provide more detailed address information
       if (!houseNumber && feature.place_type?.includes('postcode')) {
-        // This is a postcode result, create generic street options
+        // For postcode results, show the full postcode with area
         const addressParts = cleanAddress.split(', ')
-        if (addressParts.length >= 2) {
-          cleanAddress = `${addressParts[0]}, ${addressParts[1]}`
+        if (addressParts.length >= 3) {
+          // Show postcode, area, and region
+          cleanAddress = `${extractedPostcode} - ${addressParts[1]}, ${addressParts[2]}`
+        } else if (addressParts.length >= 2) {
+          cleanAddress = `${extractedPostcode} - ${addressParts[1]}`
+        } else {
+          cleanAddress = `${extractedPostcode} Area`
         }
       }
       
-      // If it's an address result, use it directly
+      // If it's an address result with house number, show full street address
       if (feature.place_type?.includes('address')) {
-        cleanAddress = cleanAddress.split(',').slice(0, 2).join(',').trim()
+        const addressParts = cleanAddress.split(',')
+        if (addressParts.length >= 3) {
+          // Show street address with area
+          cleanAddress = `${addressParts[0]}, ${addressParts[1]}`
+        }
       }
 
       return {
         address: cleanAddress,
-        full_address: placeName,
+        full_address: placeName.replace(/, United Kingdom$/, '').replace(/, UK$/, ''),
         postcode: extractedPostcode
       }
     }) || []
