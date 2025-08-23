@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CalendarDays, Clock, User, Mail, MessageSquare, Send, CheckCircle, AlertCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Order, getOrderEstimatedHours } from '@/utils/schedulingUtils';
 import { getBestPostcode } from '@/utils/postcodeUtils';
 import { format, addDays, startOfDay, isBefore } from 'date-fns';
@@ -40,6 +40,7 @@ export function SendOfferModal({
   preselectedDate,
   onOfferSent
 }: SendOfferModalProps) {
+  const queryClient = useQueryClient();
   const [selectedEngineerId, setSelectedEngineerId] = useState(preselectedEngineerId || '');
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(preselectedDate);
   const [timeWindow, setTimeWindow] = useState('AM (9:00 - 12:00)');
@@ -144,6 +145,11 @@ export function SendOfferModal({
       }
 
        toast.success('Installation offer sent successfully!');
+       
+       // Invalidate all order-related queries to refresh the UI
+       await queryClient.invalidateQueries({ queryKey: ['orders'] });
+       await queryClient.invalidateQueries({ queryKey: ['schedule-counts'] });
+       
        onOfferSent?.();
        // Trigger refresh for status tiles
        window.dispatchEvent(new CustomEvent('scheduling:refresh'));
