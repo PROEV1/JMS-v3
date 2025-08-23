@@ -114,6 +114,8 @@ export default function Auth() {
 
   const handleForgotPassword = async () => {
     if (!email) {
+      console.log('Password reset: No email provided');
+      alert('Please enter your email address first');
       toast({
         title: "Email required",
         description: "Please enter your email address first",
@@ -133,6 +135,8 @@ export default function Auth() {
 
       if (error) {
         console.error('Password reset error:', error);
+        // Show detailed error in alert for debugging
+        alert(`Password reset failed: ${error.message}\nError code: ${error.status || 'unknown'}`);
         toast({
           title: "Error sending reset link",
           description: error.message,
@@ -140,6 +144,8 @@ export default function Auth() {
         });
       } else {
         console.log('Password reset sent successfully');
+        // Show success in alert for debugging
+        alert('Password reset email sent! Check your email for a reset link.');
         toast({
           title: "Reset link sent!",
           description: "Check your email for a password reset link",
@@ -147,6 +153,8 @@ export default function Auth() {
       }
     } catch (error) {
       console.error('Unexpected password reset error:', error);
+      // Show detailed error in alert for debugging
+      alert(`Unexpected error: ${error instanceof Error ? error.message : 'Unknown error'}`);
       toast({
         title: "Error",
         description: "An unexpected error occurred",
