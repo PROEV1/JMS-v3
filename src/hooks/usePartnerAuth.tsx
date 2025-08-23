@@ -47,15 +47,19 @@ export function usePartnerAuth() {
           `)
           .eq('user_id', user.id)
           .eq('is_active', true)
-          .single();
+          .maybeSingle();
+
+        console.log('usePartnerAuth: Query result:', { data, error });
 
         if (error) {
           console.error('Error fetching partner user:', error);
-          console.log('User is authenticated but has no partner_users record. User ID:', user.id);
           setPartnerUser(null);
-        } else {
+        } else if (data) {
           console.log('Found partner user:', data);
           setPartnerUser(data as any);
+        } else {
+          console.log('User is authenticated but has no partner_users record. User ID:', user.id);
+          setPartnerUser(null);
         }
       } catch (error) {
         console.error('Error in fetchPartnerUser:', error);

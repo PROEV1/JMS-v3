@@ -50,7 +50,7 @@ export function PartnerDashboard({ partnerUser }: PartnerDashboardProps) {
     }
   };
 
-  const brandColors = partnerUser.partner.brand_colors;
+  const brandColors = partnerUser.partner.brand_colors || { primary: '#3b82f6', secondary: '#1e293b' };
 
   return (
     <div className="min-h-screen bg-background">
