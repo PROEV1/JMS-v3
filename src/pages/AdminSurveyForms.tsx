@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Edit, Eye } from 'lucide-react';
+import { Plus, Edit, Eye, Settings } from 'lucide-react';
 import { useSurveyForms, useCreateSurveyForm } from '@/hooks/useSurveyForms';
 import { DEFAULT_EV_INSTALL_TEMPLATE } from '@/types/survey-forms';
 import { useToast } from '@/hooks/use-toast';
@@ -47,10 +47,19 @@ export default function AdminSurveyForms() {
           <h1 className="text-2xl font-semibold">Survey Forms</h1>
           <p className="text-muted-foreground">Manage survey forms and versions</p>
         </div>
-        <Button onClick={handleCreateForm}>
-          <Plus className="w-4 h-4 mr-2" />
-          Create Form
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline"
+            onClick={() => navigate('/admin/survey-form-mappings')}
+          >
+            <Settings className="w-4 h-4 mr-2" />
+            Survey Mappings
+          </Button>
+          <Button onClick={handleCreateForm}>
+            <Plus className="w-4 h-4 mr-2" />
+            Create Form
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-4">
