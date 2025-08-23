@@ -11,6 +11,53 @@ interface AddressResult {
   postcode: string;
 }
 
+// Extract addresses helper function
+function extractAddresses(data: any, formattedPostcode: string, houseNumber: string | null): AddressResult[] {
+  return data.features?.map((feature: any) => {
+    const placeName = feature.place_name || ''
+    const context = feature.context || []
+    
+    // Extract postcode from context or use formatted one
+    const postcodeContext = context.find((c: any) => c.id?.startsWith('postcode'))
+    const extractedPostcode = postcodeContext?.text || formattedPostcode
+    
+    // Clean up the address - remove country 
+    let cleanAddress = placeName
+      .replace(/, United Kingdom$/, '')
+      .replace(/, UK$/, '')
+      .trim()
+    
+    // For postcode searches, provide more detailed address information
+    if (!houseNumber && feature.place_type?.includes('postcode')) {
+      // For postcode results, show the full postcode with area
+      const addressParts = cleanAddress.split(', ')
+      if (addressParts.length >= 3) {
+        // Show postcode, area, and region
+        cleanAddress = `${extractedPostcode} - ${addressParts[1]}, ${addressParts[2]}`
+      } else if (addressParts.length >= 2) {
+        cleanAddress = `${extractedPostcode} - ${addressParts[1]}`
+      } else {
+        cleanAddress = `${extractedPostcode} Area`
+      }
+    }
+    
+    // If it's an address result with house number, show full street address
+    if (feature.place_type?.includes('address')) {
+      const addressParts = cleanAddress.split(',')
+      if (addressParts.length >= 3) {
+        // Show street address with area
+        cleanAddress = `${addressParts[0]}, ${addressParts[1]}`
+      }
+    }
+
+    return {
+      address: cleanAddress,
+      full_address: placeName.replace(/, United Kingdom$/, '').replace(/, UK$/, ''),
+      postcode: extractedPostcode
+    }
+  }) || []
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -57,92 +104,95 @@ serve(async (req) => {
     
     console.log('Formatted postcode:', formattedPostcode)
 
-    // For UK postcodes, search differently based on whether we have a house number
-    let mapboxUrl: string;
+    let addresses: AddressResult[] = [];
     
+    // Strategy 1: If we have a house number, try searching with it
     if (houseNumber) {
-      // Search for specific address with house number
+      console.log('Trying search with house number...')
       const searchQuery = `${houseNumber} ${formattedPostcode}`
-      mapboxUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchQuery)}.json?` +
+      const mapboxUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchQuery)}.json?` +
         `access_token=${mapboxToken}&` +
         'country=GB&' +
         'types=address&' +
         'limit=10'
-    } else {
-      // Search just the postcode to get area results
-      mapboxUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(formattedPostcode)}.json?` +
+      
+      console.log('Mapbox request URL (with house):', mapboxUrl)
+      
+      try {
+        const response1 = await fetch(mapboxUrl)
+        if (response1.ok) {
+          const data1 = await response1.json()
+          console.log('Mapbox response (with house number):', JSON.stringify(data1, null, 2))
+          addresses = extractAddresses(data1, formattedPostcode, houseNumber)
+        }
+      } catch (error) {
+        console.log('House number search failed:', error)
+      }
+    }
+    
+    // Strategy 2: If no results or no house number, search just the postcode
+    if (addresses.length === 0) {
+      console.log('Trying postcode-only search...')
+      const mapboxUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(formattedPostcode)}.json?` +
         `access_token=${mapboxToken}&` +
         'country=GB&' +
-        'types=postcode,address&' +
+        'types=postcode,place&' +
         'limit=10'
+      
+      console.log('Mapbox request URL (postcode only):', mapboxUrl)
+      
+      try {
+        const response2 = await fetch(mapboxUrl)
+        if (response2.ok) {
+          const data2 = await response2.json()
+          console.log('Mapbox response (postcode only):', JSON.stringify(data2, null, 2))
+          const postcodeAddresses = extractAddresses(data2, formattedPostcode, null)
+          addresses.push(...postcodeAddresses)
+          
+          // If we found postcode area, create generic address options
+          if (postcodeAddresses.length > 0) {
+            addresses.push({
+              address: `${formattedPostcode} - Enter full address manually`,
+              full_address: `${formattedPostcode}, United Kingdom`,
+              postcode: formattedPostcode
+            })
+          }
+        }
+      } catch (error) {
+        console.log('Postcode search failed:', error)
+      }
     }
-
-    console.log('Mapbox request URL:', mapboxUrl)
-
-    const response = await fetch(mapboxUrl)
     
-    if (!response.ok) {
-      console.error('Mapbox API error:', response.status, await response.text())
-      return new Response(
-        JSON.stringify({ error: 'Failed to lookup addresses' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+    // Strategy 3: UK Postcode API fallback (if still no results)
+    if (addresses.length === 0) {
+      console.log('Trying UK Postcode API fallback...')
+      try {
+        const ukApiUrl = `https://api.postcodes.io/postcodes/${encodeURIComponent(formattedPostcode)}`
+        const ukResponse = await fetch(ukApiUrl)
+        
+        if (ukResponse.ok) {
+          const ukData = await ukResponse.json()
+          console.log('UK Postcodes API response:', JSON.stringify(ukData, null, 2))
+          
+          if (ukData.status === 200 && ukData.result) {
+            const result = ukData.result
+            addresses.push({
+              address: `${formattedPostcode} - ${result.admin_district || result.parish || 'Area'}`,
+              full_address: `${formattedPostcode}, ${result.admin_district || result.parish || result.country}, United Kingdom`,
+              postcode: formattedPostcode
+            })
+          }
+        }
+      } catch (error) {
+        console.log('UK Postcodes API failed:', error)
+      }
     }
-
-    const data = await response.json()
-    console.log('Mapbox response:', JSON.stringify(data, null, 2))
-
-    const addresses: AddressResult[] = data.features?.map((feature: any) => {
-      const placeName = feature.place_name || ''
-      const context = feature.context || []
-      
-      // Extract postcode from context or use formatted one
-      const postcodeContext = context.find((c: any) => c.id?.startsWith('postcode'))
-      const extractedPostcode = postcodeContext?.text || formattedPostcode
-      
-      // Clean up the address - remove country 
-      let cleanAddress = placeName
-        .replace(/, United Kingdom$/, '')
-        .replace(/, UK$/, '')
-        .trim()
-      
-      // For postcode searches, provide more detailed address information
-      if (!houseNumber && feature.place_type?.includes('postcode')) {
-        // For postcode results, show the full postcode with area
-        const addressParts = cleanAddress.split(', ')
-        if (addressParts.length >= 3) {
-          // Show postcode, area, and region
-          cleanAddress = `${extractedPostcode} - ${addressParts[1]}, ${addressParts[2]}`
-        } else if (addressParts.length >= 2) {
-          cleanAddress = `${extractedPostcode} - ${addressParts[1]}`
-        } else {
-          cleanAddress = `${extractedPostcode} Area`
-        }
-      }
-      
-      // If it's an address result with house number, show full street address
-      if (feature.place_type?.includes('address')) {
-        const addressParts = cleanAddress.split(',')
-        if (addressParts.length >= 3) {
-          // Show street address with area
-          cleanAddress = `${addressParts[0]}, ${addressParts[1]}`
-        }
-      }
-
-      return {
-        address: cleanAddress,
-        full_address: placeName.replace(/, United Kingdom$/, '').replace(/, UK$/, ''),
-        postcode: extractedPostcode
-      }
-    }) || []
-
-    // If no results and no house number specified, try to provide generic options
-    if (addresses.length === 0 && !houseNumber) {
-      // Create some generic street suggestions for the postcode area
-      const postcodeArea = formattedPostcode.split(' ')[0] // e.g., "MK17"
+    
+    // Strategy 4: Always provide manual entry option as fallback
+    if (addresses.length === 0) {
       addresses.push({
-        address: `${formattedPostcode} Area`,
-        full_address: `${formattedPostcode} Area, United Kingdom`,
+        address: `${formattedPostcode} - Manual Entry Required`,
+        full_address: `Please enter full address for ${formattedPostcode}`,
         postcode: formattedPostcode
       })
     }
