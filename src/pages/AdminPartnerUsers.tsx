@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Edit, Trash2, ArrowLeft, Building2 } from 'lucide-react';
+import { Plus, Edit, Trash2, ArrowLeft, Building2, UserPlus, RotateCcw } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
@@ -157,6 +157,58 @@ export default function AdminPartnerUsers() {
     },
     onError: (error) => {
       toast({ title: 'Error deleting partner user', description: error.message, variant: 'destructive' });
+    }
+  });
+
+  const createUserAccountMutation = useMutation({
+    mutationFn: async (user: PartnerUser) => {
+      if (!user.email) throw new Error('No email found for user');
+      
+      const { error } = await supabase.functions.invoke('send-user-invite', {
+        body: {
+          email: user.email,
+          full_name: user.email.split('@')[0], // Use email prefix as name
+          role: user.role
+        }
+      });
+      
+      if (error) throw error;
+    },
+    onSuccess: (_, user) => {
+      toast({ 
+        title: 'User account created', 
+        description: `Password setup email sent to ${user.email}` 
+      });
+    },
+    onError: (error) => {
+      toast({ 
+        title: 'Error creating user account', 
+        description: error.message, 
+        variant: 'destructive' 
+      });
+    }
+  });
+
+  const resetPasswordMutation = useMutation({
+    mutationFn: async (email: string) => {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/setup-password`
+      });
+      
+      if (error) throw error;
+    },
+    onSuccess: (_, email) => {
+      toast({ 
+        title: 'Password reset sent', 
+        description: `Password reset email sent to ${email}` 
+      });
+    },
+    onError: (error) => {
+      toast({ 
+        title: 'Error sending password reset', 
+        description: error.message, 
+        variant: 'destructive' 
+      });
     }
   });
 
@@ -383,6 +435,28 @@ export default function AdminPartnerUsers() {
                 </div>
               </div>
               <div className="flex space-x-2">
+                {!user.user_id && user.email && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => createUserAccountMutation.mutate(user)}
+                    disabled={createUserAccountMutation.isPending}
+                  >
+                    <UserPlus className="h-4 w-4 mr-1" />
+                    Create Account
+                  </Button>
+                )}
+                {user.user_id && user.email && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => resetPasswordMutation.mutate(user.email!)}
+                    disabled={resetPasswordMutation.isPending}
+                  >
+                    <RotateCcw className="h-4 w-4 mr-1" />
+                    Reset Password
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   size="sm"
