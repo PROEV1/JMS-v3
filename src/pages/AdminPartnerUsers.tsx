@@ -172,6 +172,19 @@ export default function AdminPartnerUsers() {
       });
       
       if (error) throw error;
+      
+      // Update the partner_users record with the auth user_id
+      if (data?.user?.id) {
+        const { error: updateError } = await supabase
+          .from('partner_users')
+          .update({ user_id: data.user.id })
+          .eq('id', user.id);
+          
+        if (updateError) {
+          console.error('Failed to update partner user with user_id:', updateError);
+        }
+      }
+      
       return data;
     },
     onSuccess: (_, user) => {

@@ -41,6 +41,39 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log('Creating user account for:', email);
 
+    // First, check if user already exists
+    const { data: existingUser, error: getUserError } = await supabaseAdmin.auth.admin.getUserByEmail(email);
+
+    if (existingUser && existingUser.user) {
+      console.log('User already exists:', existingUser.user.id);
+      
+      // User exists, just send a password reset email
+      const { error: resetError } = await supabaseAdmin.auth.admin.generateLink({
+        type: 'recovery',
+        email: email,
+        options: {
+          redirectTo: `${req.headers.get('origin') || 'http://localhost:3000'}/setup-password`
+        }
+      });
+
+      if (resetError) {
+        console.error('Error sending password setup email:', resetError);
+      }
+
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          user: existingUser.user,
+          message: 'User account already exists. Password setup instructions sent via email.',
+          userExists: true
+        }),
+        { 
+          status: 200, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
     // Create user with temporary password
     const { data: userData, error: userError } = await supabaseAdmin.auth.admin.createUser({
       email,
