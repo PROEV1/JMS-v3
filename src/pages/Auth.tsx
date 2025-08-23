@@ -173,6 +173,8 @@ export default function Auth() {
 
       if (error) {
         console.error('Sign in error:', error);
+        // Show detailed error in alert for debugging
+        alert(`Sign in failed: ${error.message}\nError code: ${error.status || 'unknown'}`);
         toast({
           title: "Error signing in",
           description: error.message,
@@ -190,6 +192,8 @@ export default function Auth() {
       }
     } catch (error) {
       console.error('Unexpected sign in error:', error);
+      // Show detailed error in alert for debugging
+      alert(`Unexpected error: ${error instanceof Error ? error.message : 'Unknown error'}`);
       toast({
         title: "Error",
         description: "An unexpected error occurred",
