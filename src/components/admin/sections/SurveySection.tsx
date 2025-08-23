@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CheckCircle, XCircle, FileText, Image, Video, Eye } from 'lucide-react';
+import { CheckCircle, XCircle, FileText, Image, Video, Eye, Copy, ExternalLink, Send, Link } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -20,24 +20,48 @@ export function SurveySection({ orderId }: SurveySectionProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: survey, isLoading } = useQuery({
-    queryKey: ['survey', orderId],
+  const { data: surveyData, isLoading } = useQuery({
+    queryKey: ['survey-with-order', orderId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('client_surveys')
-        .select(`
-          *,
-          client_survey_media (*)
-        `)
-        .eq('order_id', orderId)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
+      // Fetch both survey and order data
+      const [surveyResult, orderResult] = await Promise.all([
+        supabase
+          .from('client_surveys')
+          .select(`
+            *,
+            client_survey_media (*)
+          `)
+          .eq('order_id', orderId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from('orders')
+          .select(`
+            survey_token,
+            survey_token_expires_at,
+            survey_required,
+            order_number,
+            is_partner_job,
+            partner_id,
+            client:clients(full_name, email)
+          `)
+          .eq('id', orderId)
+          .single()
+      ]);
 
-      if (error && error.code !== 'PGRST116') throw error;
-      return data;
+      if (surveyResult.error && surveyResult.error.code !== 'PGRST116') throw surveyResult.error;
+      if (orderResult.error) throw orderResult.error;
+
+      return {
+        survey: surveyResult.data,
+        order: orderResult.data
+      };
     },
   });
+
+  const survey = surveyData?.survey;
+  const order = surveyData?.order;
 
   const approveMutation = useMutation({
     mutationFn: async () => {
@@ -56,7 +80,7 @@ export function SurveySection({ orderId }: SurveySectionProps) {
     },
     onSuccess: () => {
       toast({ title: 'Survey approved successfully' });
-      queryClient.invalidateQueries({ queryKey: ['survey', orderId] });
+      queryClient.invalidateQueries({ queryKey: ['survey-with-order', orderId] });
       queryClient.invalidateQueries({ queryKey: ['orders'] });
     },
     onError: (error) => {
@@ -91,7 +115,7 @@ export function SurveySection({ orderId }: SurveySectionProps) {
     },
     onSuccess: () => {
       toast({ title: 'Rework request sent to client' });
-      queryClient.invalidateQueries({ queryKey: ['survey', orderId] });
+      queryClient.invalidateQueries({ queryKey: ['survey-with-order', orderId] });
       queryClient.invalidateQueries({ queryKey: ['orders'] });
     },
     onError: (error) => {
@@ -99,6 +123,93 @@ export function SurveySection({ orderId }: SurveySectionProps) {
       toast({ title: 'Error requesting rework', variant: 'destructive' });
     },
   });
+
+  // Generate survey link mutation
+  const generateLinkMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc('generate_survey_token');
+      if (error) throw error;
+
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 30); // 30 days from now
+
+      const { error: updateError } = await supabase
+        .from('orders')
+        .update({
+          survey_token_expires_at: expiresAt.toISOString()
+        })
+        .eq('id', orderId);
+
+      if (updateError) throw updateError;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Survey Link Generated",
+        description: "A new survey link has been generated and is ready to share.",
+      });
+      queryClient.invalidateQueries({ queryKey: ['survey-with-order', orderId] });
+    },
+    onError: (error) => {
+      console.error('Error generating survey link:', error);
+      toast({
+        title: "Error",
+        description: "Failed to generate survey link",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Resend survey email mutation
+  const resendEmailMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.functions.invoke('send-survey-email', {
+        body: {
+          order_id: orderId,
+          client_name: order?.client.full_name,
+          client_email: order?.client.email,
+          order_number: order?.order_number,
+          survey_token: order?.survey_token
+        }
+      });
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Survey Email Sent",
+        description: "Survey email has been resent to the client.",
+      });
+    },
+    onError: (error) => {
+      console.error('Error resending survey email:', error);
+      toast({
+        title: "Error",
+        description: "Failed to resend survey email",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast({
+        title: "Copied to clipboard",
+        description: "Survey link copied successfully",
+      });
+    } catch (error) {
+      toast({
+        title: "Failed to copy",
+        description: "Please copy the link manually",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const getSurveyLink = () => {
+    if (!order?.survey_token) return null;
+    return `${window.location.origin}/survey/${orderId}?token=${order.survey_token}`;
+  };
 
   if (isLoading) {
     return (
@@ -146,6 +257,73 @@ export function SurveySection({ orderId }: SurveySectionProps) {
 
   return (
     <div className="space-y-6">
+      {/* Survey Access Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Link className="h-5 w-5" />
+            Survey Access
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {order?.survey_token ? (
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Shareable Survey Link</label>
+                <div className="flex items-center gap-2 mt-1">
+                  <div className="flex-1 p-2 bg-muted rounded border text-sm font-mono break-all">
+                    {getSurveyLink()}
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => copyToClipboard(getSurveyLink()!)}
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => window.open(getSurveyLink(), '_blank')}
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              
+              {order.survey_token_expires_at && (
+                <div className="text-sm text-muted-foreground">
+                  Expires: {new Date(order.survey_token_expires_at).toLocaleDateString()}
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => resendEmailMutation.mutate()}
+                  disabled={resendEmailMutation.isPending}
+                >
+                  <Send className="h-4 w-4 mr-2" />
+                  {resendEmailMutation.isPending ? 'Sending...' : 'Resend Email'}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-4">
+              <p className="text-muted-foreground mb-3">No survey link generated yet</p>
+              <Button
+                onClick={() => generateLinkMutation.mutate()}
+                disabled={generateLinkMutation.isPending}
+              >
+                <Link className="h-4 w-4 mr-2" />
+                {generateLinkMutation.isPending ? 'Generating...' : 'Generate Survey Link'}
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Survey Status and Actions */}
       <Card>
         <CardHeader>
@@ -155,7 +333,7 @@ export function SurveySection({ orderId }: SurveySectionProps) {
               {getStatusBadge(survey.status)}
             </div>
             
-            {survey.status === 'submitted' || survey.status === 'resubmitted' ? (
+            {survey && (survey.status === 'submitted' || survey.status === 'resubmitted') ? (
               <div className="flex space-x-3">
                 <Button
                   variant="outline"
@@ -175,12 +353,22 @@ export function SurveySection({ orderId }: SurveySectionProps) {
                   <CheckCircle className="h-4 w-4 mr-2" />
                   Approve
                 </Button>
+                {order?.survey_token && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => window.open(getSurveyLink(), '_blank')}
+                  >
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    View Survey
+                  </Button>
+                )}
               </div>
             ) : null}
           </div>
         </CardHeader>
         
-        {(survey.status === 'submitted' || survey.status === 'resubmitted') && (
+        {survey && (survey.status === 'submitted' || survey.status === 'resubmitted') && (
           <CardContent className="space-y-4">
             <Tabs defaultValue="approve" className="w-full">
               <TabsList>
@@ -216,13 +404,14 @@ export function SurveySection({ orderId }: SurveySectionProps) {
       </Card>
 
       {/* Survey Responses */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Survey Responses</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Property Details */}
-          {responses.propertyDetails && (
+      {survey ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Survey Responses</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Property Details */}
+            {responses.propertyDetails && (
             <div>
               <h4 className="font-medium text-slate-900 mb-2">Property Details</h4>
               <div className="bg-slate-50 rounded-lg p-4 space-y-2">
@@ -254,12 +443,85 @@ export function SurveySection({ orderId }: SurveySectionProps) {
             </div>
           )}
 
-          {/* Add other response sections... */}
+          {/* Enhanced Survey Responses */}
+          {responses.parkingAccess && (
+            <div>
+              <h4 className="font-medium text-slate-900 mb-2">Parking Access</h4>
+              <div className="bg-slate-50 rounded-lg p-4">
+                <div className="text-sm">
+                  <span className="text-slate-600">Access:</span>
+                  <span className="ml-2 font-medium">{responses.parkingAccess}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Charger Location */}
+          {responses.chargerLocation && (
+            <div>
+              <h4 className="font-medium text-slate-900 mb-2">Charger Location</h4>
+              <div className="bg-slate-50 rounded-lg p-4">
+                <div className="text-sm">
+                  <span className="text-slate-600">Location:</span>
+                  <span className="ml-2 font-medium">{responses.chargerLocation}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Consumer Unit */}
+          {responses.consumerUnit && (
+            <div>
+              <h4 className="font-medium text-slate-900 mb-2">Consumer Unit</h4>
+              <div className="bg-slate-50 rounded-lg p-4 space-y-2">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  {Object.entries(responses.consumerUnit).map(([key, value]) => (
+                    <div key={key}>
+                      <span className="text-slate-600 capitalize">{key.replace(/([A-Z])/g, ' $1')}:</span>
+                      <span className="ml-2 font-medium">{String(value)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Video Summary */}
+          {responses.videoSummary && (
+            <div>
+              <h4 className="font-medium text-slate-900 mb-2">Video Summary</h4>
+              <div className="bg-slate-50 rounded-lg p-4">
+                <p className="text-sm">{responses.videoSummary}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Raw data fallback for other fields */}
+          <details className="border rounded-lg">
+            <summary className="p-3 cursor-pointer font-medium">View All Raw Data</summary>
+            <div className="p-3 pt-0">
+              <pre className="text-xs bg-muted p-3 rounded overflow-auto">
+                {JSON.stringify(responses, null, 2)}
+              </pre>
+            </div>
+          </details>
         </CardContent>
       </Card>
+      ) : (
+        <Card>
+          <CardContent className="flex items-center justify-center h-40">
+            <div className="text-center">
+              <FileText className="h-12 w-12 text-slate-300 mx-auto mb-2" />
+              <div className="text-slate-500">
+                {order?.survey_required === false ? 'Survey not required for this order' : 'No survey submitted yet'}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Media Gallery */}
-      {media.length > 0 && (
+      {survey && media.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle>Uploaded Media</CardTitle>

@@ -22,7 +22,8 @@ import {
   User,
   MapPin,
   XCircle,
-  AlertCircle
+  AlertCircle,
+  Clipboard
 } from "lucide-react";
 import { AgreementSigningModal } from "@/components/AgreementSigningModal";
 import { RejectOfferModal } from "@/components/RejectOfferModal";
@@ -51,6 +52,7 @@ interface ClientOrder {
   scheduled_install_date: string | null;
   created_at: string;
   status: string;
+  survey_required?: boolean;
   client: {
     full_name: string;
     email: string;
@@ -71,6 +73,12 @@ interface ClientOrder {
   } | null;
 }
 
+interface SurveyData {
+  id: string;
+  status: 'draft' | 'submitted' | 'under_review' | 'approved' | 'rework_requested' | 'resubmitted';
+  created_at: string;
+}
+
 export default function EnhancedClientOrderView() {
   const { id: orderId } = useParams();
   const navigate = useNavigate();
@@ -85,6 +93,7 @@ export default function EnhancedClientOrderView() {
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
   const [selectedOfferId, setSelectedOfferId] = useState<string | null>(null);
   const [selectedOfferDate, setSelectedOfferDate] = useState<string>('');
+  const [latestSurvey, setLatestSurvey] = useState<SurveyData | null>(null);
   const { lastStatus } = useOrderStatusSync(orderId!);
 
   useEffect(() => {
@@ -205,6 +214,19 @@ export default function EnhancedClientOrderView() {
         `)
         .eq('id', orderId)
         .maybeSingle();
+
+      // Also fetch survey data
+      if (data) {
+        const { data: surveyData } = await supabase
+          .from('client_surveys')
+          .select('id, status, created_at')
+          .eq('order_id', orderId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        
+        setLatestSurvey(surveyData);
+      }
 
       console.log('Order fetch result:', { data, error });
 
@@ -379,6 +401,8 @@ export default function EnhancedClientOrderView() {
   const getProgressSteps = () => {
     if (!order) return [];
 
+    const surveyRequired = order.survey_required !== false;
+    const surveyCompleted = !surveyRequired || (latestSurvey?.status === 'approved');
     const depositComplete = order.amount_paid >= (order.deposit_amount || order.total_amount * 0.25);
     const paymentComplete = order.amount_paid >= order.total_amount;
     const agreementSigned = !!order.agreement_signed_at;
@@ -387,13 +411,28 @@ export default function EnhancedClientOrderView() {
 
     return [
       {
+        id: 'survey',
+        title: 'Complete Survey',
+        subtitle: surveyRequired ? 'Required pre-installation survey' : 'Survey not required',
+        completed: surveyCompleted,
+        icon: Clipboard,
+        details: surveyCompleted 
+          ? (surveyRequired ? 'Survey approved' : 'Survey not required') 
+          : latestSurvey?.status === 'rework_requested' 
+            ? 'Rework requested - please resubmit'
+            : latestSurvey?.status === 'submitted' || latestSurvey?.status === 'under_review' || latestSurvey?.status === 'resubmitted'
+              ? 'Under review'
+              : 'Survey required',
+        isActive: surveyRequired && !surveyCompleted
+      },
+      {
         id: 'payment',
         title: 'Make Payment',
         subtitle: 'Make payment to move forward',
         completed: depositComplete,
         icon: CreditCard,
         details: depositComplete ? 'Deposit received' : `Deposit ${formatCurrency((order.deposit_amount || order.total_amount * 0.25))} required`,
-        isActive: !depositComplete
+        isActive: surveyCompleted && !depositComplete
       },
       {
         id: 'agreement',
@@ -404,7 +443,7 @@ export default function EnhancedClientOrderView() {
         details: agreementSigned 
           ? `Signed on ${format(new Date(order.agreement_signed_at!), 'PPP')}` 
           : 'Pending signature',
-        isActive: depositComplete && !agreementSigned
+        isActive: surveyCompleted && depositComplete && !agreementSigned
       },
       {
         id: 'scheduling',
@@ -415,7 +454,7 @@ export default function EnhancedClientOrderView() {
         details: installScheduled 
           ? `Scheduled for ${format(new Date(order.scheduled_install_date!), 'PPP')}${order.engineer ? ` with ${order.engineer.name}` : ''}`
           : 'Awaiting scheduling',
-        isActive: depositComplete && agreementSigned && !installScheduled
+        isActive: surveyCompleted && depositComplete && agreementSigned && !installScheduled
       },
       {
         id: 'completion',
@@ -663,7 +702,76 @@ export default function EnhancedClientOrderView() {
               <div className="mb-6">
                 <div className="flex items-center justify-between mb-2">
                   <h2 className="text-xl font-semibold text-blue-600">
-                    Step 1 of 4 - Make Payment
+                    Step 1 of 5 - Complete Survey
+                  </h2>
+                  <Badge variant="secondary" className={
+                    progressSteps[0]?.completed ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700"
+                  }>
+                    {progressSteps[0]?.completed ? 'Completed' : 'Active'}
+                  </Badge>
+                </div>
+                <p className="text-muted-foreground">
+                  {order?.survey_required === false 
+                    ? 'Survey not required for this order' 
+                    : 'Please complete the pre-installation survey'}
+                </p>
+              </div>
+
+              {order?.survey_required === false ? (
+                <div className="text-center py-8">
+                  <CheckCircle className="h-16 w-16 text-green-600 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-green-800 mb-2">Survey Not Required</h3>
+                  <p className="text-muted-foreground">
+                    No survey is required for this installation
+                  </p>
+                </div>
+              ) : progressSteps[0]?.completed ? (
+                <div className="text-center py-8">
+                  <CheckCircle className="h-16 w-16 text-green-600 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-green-800 mb-2">Survey Approved!</h3>
+                  <p className="text-muted-foreground">
+                    Your survey has been reviewed and approved
+                  </p>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Clipboard className="h-16 w-16 text-blue-600 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">
+                    {latestSurvey?.status === 'rework_requested' 
+                      ? 'Survey Rework Required'
+                      : latestSurvey?.status === 'submitted' || latestSurvey?.status === 'under_review' || latestSurvey?.status === 'resubmitted'
+                        ? 'Survey Under Review'
+                        : 'Complete Your Survey'
+                    }
+                  </h3>
+                  <p className="text-muted-foreground mb-6">
+                    {latestSurvey?.status === 'rework_requested' 
+                      ? 'Please review feedback and resubmit your survey'
+                      : latestSurvey?.status === 'submitted' || latestSurvey?.status === 'under_review' || latestSurvey?.status === 'resubmitted'
+                        ? 'We are reviewing your submitted survey'
+                        : 'Help us prepare for your installation by completing our survey'
+                    }
+                  </p>
+                  {(latestSurvey?.status === 'rework_requested' || !latestSurvey || latestSurvey?.status === 'draft') && (
+                    <Button 
+                      onClick={() => navigate(`/survey/${orderId}`)}
+                      className="w-full sm:w-auto"
+                    >
+                      <Clipboard className="h-4 w-4 mr-2" />
+                      {latestSurvey?.status === 'rework_requested' ? 'Resume Survey' : 'Start Survey'}
+                    </Button>
+                  )}
+                </div>
+              )}
+            </Card>
+          )}
+
+          {activeStep === 1 && (
+            <Card className="p-6">
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-2">
+                  <h2 className="text-xl font-semibold text-blue-600">
+                    Step 2 of 5 - Make Payment
                   </h2>
                   <Badge variant="secondary" className="bg-blue-100 text-blue-700">
                     Active
@@ -717,11 +825,11 @@ export default function EnhancedClientOrderView() {
             </Card>
           )}
 
-          {activeStep === 1 && (
+          {activeStep === 2 && (
             <Card className="p-6">
               <div className="mb-6">
                 <h2 className="text-xl font-semibold text-blue-600">
-                  Step 2 of 4 - Sign Agreement
+                  Step 3 of 5 - Sign Agreement
                 </h2>
                 <p className="text-muted-foreground">Sign to lock in your booking</p>
               </div>
@@ -750,13 +858,13 @@ export default function EnhancedClientOrderView() {
             </Card>
           )}
 
-          {activeStep === 2 && (
+          {activeStep === 3 && (
             <div className="space-y-6">
               {/* Main Scheduling Card */}
               <Card className="p-6">
                 <div className="mb-6">
                   <h2 className="text-xl font-semibold text-blue-600">
-                    Step 3 of 4 - Submit Install Preferences
+                    Step 4 of 5 - Submit Install Preferences
                   </h2>
                   <p className="text-muted-foreground">Awaiting scheduling confirmation</p>
                 </div>
@@ -868,11 +976,11 @@ export default function EnhancedClientOrderView() {
             </div>
           )}
 
-          {activeStep === 3 && (
+          {activeStep === 4 && (
             <Card className="p-6">
               <div className="mb-6">
                 <h2 className="text-xl font-semibold text-blue-600">
-                  Step 4 of 4 - Install Confirmed
+                  Step 5 of 5 - Install Confirmed
                 </h2>
                 <p className="text-muted-foreground">We'll confirm install shortly</p>
               </div>
