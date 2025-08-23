@@ -33,6 +33,11 @@ interface PartnerDashboardProps {
 export function PartnerDashboard({ partnerUser }: PartnerDashboardProps) {
   const [activeTab, setActiveTab] = useState('overview');
 
+  // Debug log to see the exact structure
+  console.log('PartnerDashboard: Received partnerUser:', JSON.stringify(partnerUser, null, 2));
+  console.log('PartnerDashboard: partnerUser.partner:', partnerUser?.partner);
+  console.log('PartnerDashboard: brand_colors:', partnerUser?.partner?.brand_colors);
+
   const handleSignOut = async () => {
     await supabase.auth.signOut();
   };
@@ -50,7 +55,13 @@ export function PartnerDashboard({ partnerUser }: PartnerDashboardProps) {
     }
   };
 
-  const brandColors = partnerUser.partner.brand_colors || { primary: '#3b82f6', secondary: '#1e293b' };
+  // Safe access to brand colors with fallbacks
+  const brandColors = partnerUser?.partner?.brand_colors || { primary: '#3b82f6', secondary: '#1e293b' };
+  const partnerName = partnerUser?.partner?.name || 'Partner';
+  const logoUrl = partnerUser?.partner?.logo_url;
+  const partnerType = partnerUser?.partner?.partner_type || 'Partner';
+
+  console.log('PartnerDashboard: Using brandColors:', brandColors);
 
   return (
     <div className="min-h-screen bg-background">
@@ -64,16 +75,16 @@ export function PartnerDashboard({ partnerUser }: PartnerDashboardProps) {
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              {partnerUser.partner.logo_url && (
+              {logoUrl && (
                 <img 
-                  src={partnerUser.partner.logo_url} 
-                  alt={`${partnerUser.partner.name} logo`}
+                  src={logoUrl} 
+                  alt={`${partnerName} logo`}
                   className="h-10 w-auto"
                 />
               )}
               <div>
                 <h1 className="text-2xl font-bold text-foreground">
-                  {partnerUser.partner.name}
+                  {partnerName}
                 </h1>
                 <p className="text-sm text-muted-foreground">
                   Powered by ProEV
@@ -88,7 +99,7 @@ export function PartnerDashboard({ partnerUser }: PartnerDashboardProps) {
                 </p>
                 <Badge variant="secondary" className="text-xs">
                   <Building2 className="mr-1 h-3 w-3" />
-                  {partnerUser.partner.partner_type}
+                  {partnerType}
                 </Badge>
               </div>
               <Button variant="outline" onClick={handleSignOut}>
