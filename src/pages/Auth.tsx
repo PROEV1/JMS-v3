@@ -22,6 +22,8 @@ export default function Auth() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    console.log('Auth useEffect triggered:', { user: user?.email, authLoading });
+    
     if (user && !authLoading) {
       console.log('Auth: User authenticated, preparing redirect', { userId: user.id, email: user.email });
       
@@ -34,9 +36,15 @@ export default function Auth() {
       if (explicitRedirect) {
         redirectTo = explicitRedirect;
         console.log('Auth: Using explicit redirect path:', explicitRedirect);
+        // Clear saved paths
+        sessionStorage.removeItem('authRedirectPath');
+        // Navigate immediately
+        navigate(redirectTo, { replace: true });
       } else if (lastAuthPath) {
         redirectTo = lastAuthPath;
         console.log('Auth: Using last authenticated path:', lastAuthPath);
+        // Navigate immediately
+        navigate(redirectTo, { replace: true });
       } else {
         // Check user's actual role in database
         const checkUserRoleAndRedirect = async () => {
@@ -44,41 +52,46 @@ export default function Auth() {
             console.log('Auth: Checking user role in database for:', user.email);
             
             // Check if user is a partner user
-            const { data: partnerUser } = await supabase
+            const { data: partnerUser, error: partnerError } = await supabase
               .from('partner_users')
               .select('partner_id, role')
               .eq('user_id', user.id)
               .eq('is_active', true)
-              .single();
+              .maybeSingle();
+
+            console.log('Auth: Partner user check result:', { partnerUser, partnerError });
 
             if (partnerUser) {
-              console.log('Auth: User is partner user, redirecting to partner portal');
+              console.log('Auth: User IS a partner user, redirecting to partner portal');
               redirectTo = '/partner';
+              navigate(redirectTo, { replace: true });
+              return;
+            } 
+
+            console.log('Auth: User is NOT a partner user, checking profile role');
+            
+            // Check profile role
+            const { data: profile, error: profileError } = await supabase
+              .from('profiles')
+              .select('role')
+              .eq('user_id', user.id)
+              .maybeSingle();
+
+            console.log('Auth: Profile check result:', { profile, profileError });
+
+            const userRole = profile?.role || 'client';
+            console.log('Auth: User profile role:', userRole);
+
+            // Role-based redirect
+            if (userRole === 'admin' || userRole === 'manager') {
+              redirectTo = '/admin';
+            } else if (userRole === 'engineer') {
+              redirectTo = '/engineer';
             } else {
-              // Check profile role
-              const { data: profile } = await supabase
-                .from('profiles')
-                .select('role')
-                .eq('user_id', user.id)
-                .single();
-
-              const userRole = profile?.role || 'client';
-              console.log('Auth: User profile role:', userRole);
-
-              // Role-based redirect
-              if (userRole === 'admin' || userRole === 'manager') {
-                redirectTo = '/admin';
-              } else if (userRole === 'engineer') {
-                redirectTo = '/engineer';
-              } else {
-                redirectTo = '/client';
-              }
+              redirectTo = '/client';
             }
 
             console.log('Auth: Final redirect target:', redirectTo);
-            
-            // Clear saved paths
-            sessionStorage.removeItem('authRedirectPath');
             
             // Navigate to the determined route
             navigate(redirectTo, { replace: true });
@@ -91,16 +104,7 @@ export default function Auth() {
         };
 
         checkUserRoleAndRedirect();
-        return; // Exit early since we're handling redirect asynchronously
       }
-      
-      console.log('Auth: Final redirect target:', redirectTo);
-      
-      // Clear saved paths
-      sessionStorage.removeItem('authRedirectPath');
-      
-      // Immediate redirect without timeout
-      navigate(redirectTo, { replace: true });
     }
   }, [user, authLoading, navigate]);
 
