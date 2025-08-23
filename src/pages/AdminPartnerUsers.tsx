@@ -106,6 +106,7 @@ export default function AdminPartnerUsers() {
       toast({ title: 'Partner user created successfully' });
     },
     onError: (error) => {
+      console.error('Create user error:', error);
       toast({ title: 'Error creating partner user', description: error.message, variant: 'destructive' });
     }
   });
@@ -192,6 +193,14 @@ export default function AdminPartnerUsers() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('Form submitted with data:', formData);
+    console.log('editingUser:', editingUser);
+    
+    if (!formData.role) {
+      toast({ title: 'Error', description: 'Please select a role', variant: 'destructive' });
+      return;
+    }
+    
     if (editingUser) {
       updateUserMutation.mutate({ id: editingUser.id, ...formData });
     } else {
