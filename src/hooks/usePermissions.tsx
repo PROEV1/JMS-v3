@@ -25,6 +25,18 @@ export function usePermissions() {
         return;
       }
 
+      // Handle partner role separately - partners have their own access control through partner_users table
+      if (role === 'partner') {
+        console.log('usePermissions: User is partner, setting basic partner permissions');
+        setPermissions({
+          'partner.view': true,
+          'partner.manage_jobs': true,
+          'partner.upload_data': true
+        });
+        setLoading(false);
+        return;
+      }
+
       console.log('usePermissions: Fetching permissions for role:', role);
 
       try {

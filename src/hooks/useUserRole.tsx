@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 
-export type UserRole = 'admin' | 'client' | 'engineer' | 'manager' | 'standard_office_user' | null;
+export type UserRole = 'admin' | 'client' | 'engineer' | 'manager' | 'standard_office_user' | 'partner' | null;
 
 export function useUserRole() {
   const { user } = useAuth();
@@ -25,13 +25,33 @@ export function useUserRole() {
 
       try {
         console.log('useUserRole: Fetching role for user ID:', user.id);
+        
+        // First check if user is a partner user
+        const { data: partnerUser, error: partnerError } = await supabase
+          .from('partner_users')
+          .select('partner_id, role')
+          .eq('user_id', user.id)
+          .eq('is_active', true)
+          .maybeSingle();
+
+        console.log('useUserRole: Partner user check:', { partnerUser, partnerError });
+
+        // If they're a partner user, return 'partner' role
+        if (partnerUser) {
+          console.log('useUserRole: User is a partner, setting role to partner');
+          setRole('partner');
+          setLoading(false);
+          return;
+        }
+
+        // Otherwise check their profile role
         const { data, error } = await supabase
           .from('profiles')
           .select('role, status')
           .eq('user_id', user.id)
           .maybeSingle();
 
-        console.log('useUserRole: Query result:', { data, error });
+        console.log('useUserRole: Profile query result:', { data, error });
 
         if (error) {
           console.error('useUserRole: Database error:', error);

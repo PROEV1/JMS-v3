@@ -91,6 +91,10 @@ export function AppSidebar({ userRole }: AppSidebarProps) {
   } else if (userRole === 'engineer') {
     menuItems = engineerMenuItems;
     groupLabel = 'Engineer';
+  } else if (userRole === 'partner') {
+    // Partner users don't use the sidebar - they have their own portal interface
+    menuItems = [];
+    groupLabel = 'Partner';
   }
 
   const isActive = (item: any) => {
