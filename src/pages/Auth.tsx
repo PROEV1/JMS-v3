@@ -124,23 +124,29 @@ export default function Auth() {
 
     setLoading(true);
     try {
+      console.log('Sending password reset for:', email);
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/setup-password`
       });
 
+      console.log('Password reset response:', { error });
+
       if (error) {
+        console.error('Password reset error:', error);
         toast({
           title: "Error sending reset link",
           description: error.message,
           variant: "destructive",
         });
       } else {
+        console.log('Password reset sent successfully');
         toast({
           title: "Reset link sent!",
           description: "Check your email for a password reset link",
         });
       }
     } catch (error) {
+      console.error('Unexpected password reset error:', error);
       toast({
         title: "Error",
         description: "An unexpected error occurred",
@@ -157,18 +163,23 @@ export default function Auth() {
     setLoading(true);
 
     try {
+      console.log('Attempting to sign in with email:', email);
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
+      console.log('Sign in response:', { data, error });
+
       if (error) {
+        console.error('Sign in error:', error);
         toast({
           title: "Error signing in",
           description: error.message,
           variant: "destructive",
         });
       } else if (data.user) {
+        console.log('Sign in successful:', data.user.email);
         toast({
           title: "Success!",
           description: "Signed in successfully",
@@ -178,6 +189,7 @@ export default function Auth() {
         console.log('Auth: Login successful, useEffect will handle redirect');
       }
     } catch (error) {
+      console.error('Unexpected sign in error:', error);
       toast({
         title: "Error",
         description: "An unexpected error occurred",
