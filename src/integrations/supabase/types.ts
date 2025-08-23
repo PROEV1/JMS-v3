@@ -127,6 +127,136 @@ export type Database = {
           },
         ]
       }
+      client_survey_media: {
+        Row: {
+          file_name: string | null
+          file_size: number | null
+          file_url: string
+          id: string
+          is_main: boolean
+          media_type: Database["public"]["Enums"]["survey_media_type"]
+          order_id: string
+          position: number
+          survey_id: string
+          uploaded_at: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          file_name?: string | null
+          file_size?: number | null
+          file_url: string
+          id?: string
+          is_main?: boolean
+          media_type: Database["public"]["Enums"]["survey_media_type"]
+          order_id: string
+          position?: number
+          survey_id: string
+          uploaded_at?: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          file_name?: string | null
+          file_size?: number | null
+          file_url?: string
+          id?: string
+          is_main?: boolean
+          media_type?: Database["public"]["Enums"]["survey_media_type"]
+          order_id?: string
+          position?: number
+          survey_id?: string
+          uploaded_at?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_survey_media_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_survey_media_survey_id_fkey"
+            columns: ["survey_id"]
+            isOneToOne: false
+            referencedRelation: "client_surveys"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_surveys: {
+        Row: {
+          client_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          order_id: string
+          partner_id: string | null
+          responses: Json
+          resubmitted_at: string | null
+          review_notes: string | null
+          reviewed_at: string | null
+          rework_reason: string | null
+          status: Database["public"]["Enums"]["survey_status"]
+          submitted_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          order_id: string
+          partner_id?: string | null
+          responses?: Json
+          resubmitted_at?: string | null
+          review_notes?: string | null
+          reviewed_at?: string | null
+          rework_reason?: string | null
+          status?: Database["public"]["Enums"]["survey_status"]
+          submitted_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          order_id?: string
+          partner_id?: string | null
+          responses?: Json
+          resubmitted_at?: string | null
+          review_notes?: string | null
+          reviewed_at?: string | null
+          rework_reason?: string | null
+          status?: Database["public"]["Enums"]["survey_status"]
+          submitted_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_surveys_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_surveys_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_surveys_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           address: string | null
@@ -1353,6 +1483,7 @@ export type Database = {
             | Database["public"]["Enums"]["order_status_enhanced"]
             | null
           sub_partner: string | null
+          survey_required: boolean
           time_window: string | null
           total_amount: number
           travel_time_minutes: number | null
@@ -1401,6 +1532,7 @@ export type Database = {
             | Database["public"]["Enums"]["order_status_enhanced"]
             | null
           sub_partner?: string | null
+          survey_required?: boolean
           time_window?: string | null
           total_amount?: number
           travel_time_minutes?: number | null
@@ -1449,6 +1581,7 @@ export type Database = {
             | Database["public"]["Enums"]["order_status_enhanced"]
             | null
           sub_partner?: string | null
+          survey_required?: boolean
           time_window?: string | null
           total_amount?: number
           travel_time_minutes?: number | null
@@ -3037,6 +3170,10 @@ export type Database = {
         | "offer_expired"
         | "on_hold_parts_docs"
         | "awaiting_final_payment"
+        | "awaiting_survey_submission"
+        | "awaiting_survey_review"
+        | "survey_approved"
+        | "survey_rework_requested"
       partner_calendar_status:
         | "available"
         | "soft_hold"
@@ -3056,6 +3193,14 @@ export type Database = {
         | "replacement_received"
         | "closed"
         | "cancelled"
+      survey_media_type: "image" | "video"
+      survey_status:
+        | "draft"
+        | "submitted"
+        | "under_review"
+        | "rework_requested"
+        | "resubmitted"
+        | "approved"
       user_role:
         | "admin"
         | "client"
@@ -3212,6 +3357,10 @@ export const Constants = {
         "offer_expired",
         "on_hold_parts_docs",
         "awaiting_final_payment",
+        "awaiting_survey_submission",
+        "awaiting_survey_review",
+        "survey_approved",
+        "survey_rework_requested",
       ],
       partner_calendar_status: [
         "available",
@@ -3234,6 +3383,15 @@ export const Constants = {
         "replacement_received",
         "closed",
         "cancelled",
+      ],
+      survey_media_type: ["image", "video"],
+      survey_status: [
+        "draft",
+        "submitted",
+        "under_review",
+        "rework_requested",
+        "resubmitted",
+        "approved",
       ],
       user_role: [
         "admin",

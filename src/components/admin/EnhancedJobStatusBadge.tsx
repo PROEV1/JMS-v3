@@ -8,6 +8,10 @@ export type OrderStatusEnhanced =
   | 'awaiting_agreement'
   | 'agreement_signed'
   | 'awaiting_install_booking'
+  | 'awaiting_survey_submission'
+  | 'awaiting_survey_review'
+  | 'survey_approved'
+  | 'survey_rework_requested'
   | 'scheduled'
   | 'in_progress'
   | 'install_completed_pending_qa'
@@ -51,6 +55,26 @@ const statusConfig = {
     label: "Needs Scheduling",
     color: "bg-purple-100 text-purple-800 border-purple-200",
     icon: "📅"
+  },
+  awaiting_survey_submission: {
+    label: "Awaiting Survey",
+    color: "bg-amber-100 text-amber-800 border-amber-200",
+    icon: "📋"
+  },
+  awaiting_survey_review: {
+    label: "Survey Under Review",
+    color: "bg-purple-100 text-purple-800 border-purple-200",
+    icon: "👁️"
+  },
+  survey_approved: {
+    label: "Survey Approved",
+    color: "bg-green-100 text-green-800 border-green-200",
+    icon: "✅"
+  },
+  survey_rework_requested: {
+    label: "Survey Rework Needed",
+    color: "bg-red-100 text-red-800 border-red-200",
+    icon: "⚠️"
   },
   scheduled: {
     label: "Scheduled",
