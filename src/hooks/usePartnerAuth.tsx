@@ -47,8 +47,7 @@ export function usePartnerAuth() {
           `)
           .eq('user_id', user.id)
           .eq('is_active', true)
-          .limit(1)
-          .single();
+          .maybeSingle();
 
         console.log('usePartnerAuth: Query result:', { data, error });
 
