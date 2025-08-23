@@ -51,8 +51,10 @@ export function usePartnerAuth() {
 
         if (error) {
           console.error('Error fetching partner user:', error);
+          console.log('User is authenticated but has no partner_users record. User ID:', user.id);
           setPartnerUser(null);
         } else {
+          console.log('Found partner user:', data);
           setPartnerUser(data as any);
         }
       } catch (error) {
