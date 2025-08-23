@@ -5,8 +5,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { MapPin, Warehouse, Truck, Building, User, DollarSign, Hash, Plus } from "lucide-react";
+import { MapPin, Warehouse, Truck, Building, User, DollarSign, Hash, Plus, Edit } from "lucide-react";
 import { AddLocationModal } from './AddLocationModal';
+import { EditLocationModal } from './EditLocationModal';
 import { LocationStockModal } from './LocationStockModal';
 import { InventoryKpiTile } from './shared/InventoryKpiTile';
 import { StatusChip } from './shared/StatusChip';
@@ -23,6 +24,7 @@ interface Location {
 
 export function LocationsList() {
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [showStockModal, setShowStockModal] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<any>(null);
   const { data: locations = [], isLoading, error } = useQuery({
@@ -53,7 +55,7 @@ export function LocationsList() {
 
   // Header metrics
   const { data: metrics } = useQuery({
-    queryKey: ['location-metrics'],
+    queryKey: ['location-metrics', locations],
     queryFn: async () => {
       if (!locations) return null;
       
@@ -169,7 +171,17 @@ export function LocationsList() {
                 </div>
               )}
 
-              <div className="flex justify-end pt-2">
+              <div className="flex justify-between gap-2 pt-2">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => {
+                    setSelectedLocation(location);
+                    setShowEditModal(true);
+                  }}
+                >
+                  <Edit className="w-4 h-4" />
+                </Button>
                 <Button 
                   variant="outline" 
                   size="sm"
@@ -195,6 +207,12 @@ export function LocationsList() {
       <AddLocationModal
         open={showAddModal}
         onOpenChange={setShowAddModal}
+      />
+      
+      <EditLocationModal
+        open={showEditModal}
+        onOpenChange={setShowEditModal}
+        location={selectedLocation}
       />
       
       <LocationStockModal
