@@ -30,6 +30,9 @@ import AdminEngineers from "./pages/AdminEngineers";
 import AdminSchedule from "./pages/AdminSchedule";
 import AdminScheduleStatus from "./pages/AdminScheduleStatus";
 import AdminInventory from "./pages/AdminInventory";
+import AdminSurveyForms from "./pages/AdminSurveyForms";
+import AdminSurveyFormEdit from "./pages/AdminSurveyFormEdit";
+import AdminSurveyFormMappings from "./pages/AdminSurveyFormMappings";
 import ClientDashboard from "./pages/ClientDashboard";
 import ClientQuotes from "./pages/ClientQuotes";
 import ClientQuoteDetail from "./pages/ClientQuoteDetail";
@@ -105,6 +108,9 @@ function App() {
                     <Route path="/admin/schedule/status/:status" element={<AdminScheduleStatus />} />
                     <Route path="/admin/schedule-status" element={<AdminScheduleStatus />} />
                     <Route path="/admin/inventory" element={<AdminInventory />} />
+                    <Route path="/admin/survey-forms" element={<AdminSurveyForms />} />
+                    <Route path="/admin/survey-forms/:versionId/edit" element={<AdminSurveyFormEdit />} />
+                    <Route path="/admin/survey-form-mappings" element={<AdminSurveyFormMappings />} />
                     
                     {/* Client Routes */}
                     <Route path="/client" element={<ClientDashboard />} />
