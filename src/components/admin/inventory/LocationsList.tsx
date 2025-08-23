@@ -103,6 +103,10 @@ export function LocationsList() {
           <h2 className="text-2xl font-semibold">Stock Locations</h2>
           <p className="text-muted-foreground">Manage warehouses, vans, and storage locations</p>
         </div>
+        <Button onClick={() => setShowAddModal(true)} className="flex items-center gap-2">
+          <Plus className="w-4 h-4" />
+          Add Location
+        </Button>
       </div>
 
       {/* Header Metrics */}
