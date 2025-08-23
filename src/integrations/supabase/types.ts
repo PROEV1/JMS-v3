@@ -129,6 +129,7 @@ export type Database = {
       }
       client_survey_media: {
         Row: {
+          field_key: string | null
           file_name: string | null
           file_size: number | null
           file_url: string
@@ -142,6 +143,7 @@ export type Database = {
           uploaded_by: string | null
         }
         Insert: {
+          field_key?: string | null
           file_name?: string | null
           file_size?: number | null
           file_url: string
@@ -155,6 +157,7 @@ export type Database = {
           uploaded_by?: string | null
         }
         Update: {
+          field_key?: string | null
           file_name?: string | null
           file_size?: number | null
           file_url?: string
@@ -189,6 +192,7 @@ export type Database = {
           client_id: string
           created_at: string
           created_by: string | null
+          form_version_id: string | null
           id: string
           order_id: string
           partner_id: string | null
@@ -205,6 +209,7 @@ export type Database = {
           client_id: string
           created_at?: string
           created_by?: string | null
+          form_version_id?: string | null
           id?: string
           order_id: string
           partner_id?: string | null
@@ -221,6 +226,7 @@ export type Database = {
           client_id?: string
           created_at?: string
           created_by?: string | null
+          form_version_id?: string | null
           id?: string
           order_id?: string
           partner_id?: string | null
@@ -239,6 +245,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_surveys_form_version_id_fkey"
+            columns: ["form_version_id"]
+            isOneToOne: false
+            referencedRelation: "survey_form_versions"
             referencedColumns: ["id"]
           },
           {
@@ -2912,6 +2925,112 @@ export type Database = {
         }
         Relationships: []
       }
+      survey_form_mappings: {
+        Row: {
+          context_type: string
+          form_version_id: string
+          id: string
+          is_active: boolean
+          mapped_at: string
+          mapped_by: string | null
+        }
+        Insert: {
+          context_type: string
+          form_version_id: string
+          id?: string
+          is_active?: boolean
+          mapped_at?: string
+          mapped_by?: string | null
+        }
+        Update: {
+          context_type?: string
+          form_version_id?: string
+          id?: string
+          is_active?: boolean
+          mapped_at?: string
+          mapped_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "survey_form_mappings_form_version_id_fkey"
+            columns: ["form_version_id"]
+            isOneToOne: false
+            referencedRelation: "survey_form_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      survey_form_versions: {
+        Row: {
+          created_at: string
+          form_id: string
+          id: string
+          published_at: string | null
+          published_by: string | null
+          schema: Json
+          status: string
+          updated_at: string
+          version_number: number
+        }
+        Insert: {
+          created_at?: string
+          form_id: string
+          id?: string
+          published_at?: string | null
+          published_by?: string | null
+          schema?: Json
+          status?: string
+          updated_at?: string
+          version_number: number
+        }
+        Update: {
+          created_at?: string
+          form_id?: string
+          id?: string
+          published_at?: string | null
+          published_by?: string | null
+          schema?: Json
+          status?: string
+          updated_at?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "survey_form_versions_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "survey_forms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      survey_forms: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_audit_log: {
         Row: {
           action_type: string
@@ -3016,6 +3135,16 @@ export type Database = {
       generate_survey_token: {
         Args: Record<PropertyKey, never>
         Returns: string
+      }
+      get_active_survey_form: {
+        Args: { p_context_type: string }
+        Returns: {
+          form_id: string
+          form_name: string
+          schema: Json
+          version_id: string
+          version_number: number
+        }[]
       }
       get_engineer_daily_time_with_holds: {
         Args: { p_date: string; p_engineer_id: string }
