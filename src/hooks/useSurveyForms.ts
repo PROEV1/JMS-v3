@@ -160,7 +160,7 @@ export function usePublishSurveyFormVersion() {
   });
 }
 
-export function useCreateSurveyFormVersion() {
+export function useCreateNewDraftVersion() {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -168,32 +168,37 @@ export function useCreateSurveyFormVersion() {
       formId: string; 
       schema: SurveyFormSchema;
     }) => {
-      // Get highest version number
-      const { data: versions } = await supabase
+      // Get the current max version number for this form
+      const { data: versions, error: versionsError } = await supabase
         .from('survey_form_versions')
         .select('version_number')
         .eq('form_id', formId)
         .order('version_number', { ascending: false })
         .limit(1);
 
-      const nextVersion = (versions?.[0]?.version_number ?? 0) + 1;
+      if (versionsError) throw versionsError;
 
-      const { data, error } = await supabase
+      const nextVersionNumber = versions.length > 0 ? versions[0].version_number + 1 : 1;
+
+      // Create new version
+      const { data: version, error: versionError } = await supabase
         .from('survey_form_versions')
         .insert({
           form_id: formId,
-          version_number: nextVersion,
-          schema: schema as any
+          version_number: nextVersionNumber,
+          schema: schema as any,
+          status: 'draft'
         })
         .select()
         .single();
 
-      if (error) throw error;
-      return data;
+      if (versionError) throw versionError;
+
+      return version;
     },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['survey-form-versions', data.form_id] });
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['survey-forms'] });
+      queryClient.invalidateQueries({ queryKey: ['survey-form-versions'] });
     }
   });
 }

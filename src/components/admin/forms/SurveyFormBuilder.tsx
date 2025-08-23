@@ -161,7 +161,6 @@ export function SurveyFormBuilder({
           <Button
             variant="outline"
             onClick={handleAddFromTemplate}
-            disabled={isPublished}
           >
             Add from Template
           </Button>
@@ -198,7 +197,6 @@ export function SurveyFormBuilder({
               <Button
                 size="sm"
                 onClick={handleAddStep}
-                disabled={isPublished}
               >
                 <Plus className="w-4 h-4" />
               </Button>
