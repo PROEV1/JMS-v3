@@ -1,4 +1,5 @@
 import React from 'react';
+import { useLocation } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { CheckCircle, Clock, ArrowRight } from 'lucide-react';
 import { DualBrandHeader } from '@/components/survey/DualBrandHeader';
@@ -12,7 +13,9 @@ interface SurveySuccessProps {
   };
 }
 
-export function SurveySuccess({ orderNumber, partnerBrand }: SurveySuccessProps) {
+export default function SurveySuccess() {
+  const location = useLocation();
+  const { orderNumber, partnerBrand } = location.state || {};
   return (
     <div className="min-h-screen bg-background">
       <DualBrandHeader partnerBrand={partnerBrand} />

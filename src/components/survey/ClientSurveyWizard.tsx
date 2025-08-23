@@ -15,6 +15,7 @@ import { ChargerLocationStep } from './steps/ChargerLocationStep';
 import { ConsumerUnitStep } from './steps/ConsumerUnitStep';
 import { VideoStep } from './steps/VideoStep';
 import { ConfirmSubmitStep } from './steps/ConfirmSubmitStep';
+import { useSurveyValidation } from '@/hooks/useSurveyValidation';
 
 interface SurveyData {
   [key: string]: any;
@@ -156,7 +157,14 @@ export function ClientSurveyWizard({ orderId, clientId, partnerId, partnerBrand 
     }));
   };
 
+  const { canContinue, errors } = useSurveyValidation(surveyData, currentStep);
+
   const nextStep = () => {
+    if (!canContinue) {
+      toast({ title: errors[0] || 'Please complete all required fields', variant: 'destructive' });
+      return;
+    }
+    
     if (currentStep < steps.length - 1) {
       setCurrentStep(currentStep + 1);
     }
@@ -229,14 +237,18 @@ export function ClientSurveyWizard({ orderId, clientId, partnerId, partnerBrand 
             </Button>
 
             {currentStep < steps.length - 1 ? (
-              <Button onClick={nextStep} className="bg-primary hover:bg-primary/90">
+              <Button 
+                onClick={nextStep} 
+                disabled={!canContinue}
+                className="bg-primary hover:bg-primary/90 disabled:opacity-50"
+              >
                 Continue
               </Button>
             ) : (
               <Button
                 onClick={submitSurvey}
-                disabled={!surveyData.consent || isLoading}
-                className="bg-primary hover:bg-primary/90"
+                disabled={!canContinue || isLoading}
+                className="bg-primary hover:bg-primary/90 disabled:opacity-50"
               >
                 {isLoading ? 'Submitting...' : 'Submit Survey'}
               </Button>

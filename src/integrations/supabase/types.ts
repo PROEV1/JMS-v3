@@ -1484,6 +1484,8 @@ export type Database = {
             | null
           sub_partner: string | null
           survey_required: boolean
+          survey_token: string | null
+          survey_token_expires_at: string | null
           time_window: string | null
           total_amount: number
           travel_time_minutes: number | null
@@ -1533,6 +1535,8 @@ export type Database = {
             | null
           sub_partner?: string | null
           survey_required?: boolean
+          survey_token?: string | null
+          survey_token_expires_at?: string | null
           time_window?: string | null
           total_amount?: number
           travel_time_minutes?: number | null
@@ -1582,6 +1586,8 @@ export type Database = {
             | null
           sub_partner?: string | null
           survey_required?: boolean
+          survey_token?: string | null
+          survey_token_expires_at?: string | null
           time_window?: string | null
           total_amount?: number
           travel_time_minutes?: number | null
@@ -3004,6 +3010,10 @@ export type Database = {
         Returns: Json
       }
       generate_client_token: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      generate_survey_token: {
         Args: Record<PropertyKey, never>
         Returns: string
       }

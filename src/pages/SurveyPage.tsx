@@ -12,10 +12,21 @@ export default function SurveyPage() {
   const token = searchParams.get('token');
 
   const { data: orderData, isLoading, error } = useQuery({
-    queryKey: ['survey-order', orderId],
+    queryKey: ['survey-order', orderId, token],
     queryFn: async () => {
       if (!orderId) throw new Error('Order ID is required');
 
+      // If we have a token, use survey-lookup for public access
+      if (token) {
+        const { data, error } = await supabase.functions.invoke('survey-lookup', {
+          body: { token }
+        });
+
+        if (error) throw new Error(error.message || 'Failed to access survey');
+        return data.order;
+      }
+
+      // Otherwise use authenticated access
       const { data, error } = await supabase
         .from('orders')
         .select(`

@@ -160,11 +160,61 @@ serve(async (req) => {
 
     console.log('Successfully created order:', order.id)
 
+    // Generate survey token and send survey email
+    let surveyEmailSent = false;
+    if (order.survey_required) {
+      try {
+        // Generate survey token
+        const surveyToken = crypto.randomUUID().replace(/-/g, '');
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 30); // 30 days expiry
+
+        // Update order with survey token
+        const { error: tokenError } = await supabaseClient
+          .from('orders')
+          .update({
+            survey_token: surveyToken,
+            survey_token_expires_at: expiresAt.toISOString()
+          })
+          .eq('id', order.id);
+
+        if (tokenError) {
+          console.error('Failed to update order with survey token:', tokenError);
+        } else {
+          // Send survey email
+          const { error: emailError } = await supabaseClient.functions.invoke('send-survey-email', {
+            body: {
+              orderId: order.id,
+              clientEmail: client_email,
+              clientName: client_name,
+              orderNumber: order.order_number,
+              surveyToken: surveyToken,
+              partnerBrand: partnerUser.partner ? {
+                name: partnerUser.partner.name,
+                logo_url: partnerUser.partner.logo_url,
+                hex: '#E30613'
+              } : null
+            }
+          });
+
+          if (emailError) {
+            console.error('Failed to send survey email:', emailError);
+          } else {
+            surveyEmailSent = true;
+            console.log('Survey email sent successfully for order:', order.id);
+          }
+        }
+      } catch (error) {
+        console.error('Error in survey setup:', error);
+      }
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
         message: 'Job created successfully',
-        order: order
+        order: order,
+        surveyEmailSent: surveyEmailSent
       }),
       { 
         status: 200, 

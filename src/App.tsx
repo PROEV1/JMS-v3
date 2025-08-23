@@ -44,6 +44,8 @@ import ClientProfilePage from "./pages/ClientProfilePage";
 import ClientProfileSelf from "./pages/ClientProfileSelf";
 import EnhancedClientOrderView from "./pages/EnhancedClientOrderView";
 import PartnerPortal from "./pages/PartnerPortal";
+import SurveyPage from "./pages/SurveyPage";
+import SurveySuccess from "./pages/SurveySuccess";
 import EngineerDashboard from "./pages/EngineerDashboard";
 import EngineerJobs from "./pages/EngineerJobs";
 import EngineerJobDetail from "./pages/EngineerJobDetail";
@@ -65,9 +67,11 @@ function App() {
               <Route path="/auth" element={<Auth />} />
               <Route path="/setup-password" element={<SetupPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
-              <Route path="/offers/:token" element={<ClientOfferViewPublic />} />
-              <Route path="/quotes/:shareToken" element={<PublicQuoteView />} />
-              <Route path="/partner" element={<PartnerPortal />} />
+               <Route path="/offers/:token" element={<ClientOfferViewPublic />} />
+               <Route path="/quotes/:shareToken" element={<PublicQuoteView />} />
+               <Route path="/survey/:orderId" element={<SurveyPage />} />
+               <Route path="/survey-success" element={<SurveySuccess />} />
+               <Route path="/partner" element={<PartnerPortal />} />
               
               {/* All other routes wrapped in Layout */}
               <Route path="/*" element={

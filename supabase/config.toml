@@ -30,3 +30,9 @@ verify_jwt = true
 
 [functions.seed-scheduling-data-v2]
 verify_jwt = false
+
+[functions.send-survey-reminders]
+verify_jwt = false
+
+[functions.survey-lookup]
+verify_jwt = false
