@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Upload, FileSpreadsheet, Plus, Loader2, Search } from 'lucide-react';
+import { Upload, FileSpreadsheet, Plus, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface PartnerUser {
@@ -32,47 +32,13 @@ export function PartnerJobUpload({ partnerUser }: PartnerJobUploadProps) {
     client_phone: '',
     job_address: '',
     postcode: '',
-    house_number: '',
     job_type: 'installation',
     notes: ''
   });
-  const [addressResults, setAddressResults] = useState<any[]>([]);
-  const [isLookingUp, setIsLookingUp] = useState(false);
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const postcodeLogicMutation = useMutation({
-    mutationFn: async (params: { postcode: string; house_number?: string }) => {
-      console.log('Looking up postcode:', params);
-      
-      const { data, error } = await supabase.functions.invoke('postcode-lookup', {
-        body: {
-          postcode: params.postcode,
-          house_number: params.house_number
-        }
-      });
-      
-      if (error) {
-        console.error('Postcode lookup error:', error);
-        throw error;
-      }
-      
-      console.log('Postcode lookup result:', data);
-      return data;
-    },
-    onSuccess: (result) => {
-      setAddressResults(result.addresses || []);
-    },
-    onError: (error: any) => {
-      toast({
-        title: 'Address Lookup Failed',
-        description: error.message || 'Could not find addresses for this postcode',
-        variant: 'destructive'
-      });
-      setAddressResults([]);
-    }
-  });
 
   const uploadMutation = useMutation({
     mutationFn: async (data: { type: 'csv' | 'manual'; payload: any }) => {
@@ -121,11 +87,9 @@ export function PartnerJobUpload({ partnerUser }: PartnerJobUploadProps) {
         client_phone: '',
         job_address: '',
         postcode: '',
-        house_number: '',
         job_type: 'installation',
         notes: ''
       });
-      setAddressResults([]);
       
       // Refresh partner jobs
       queryClient.invalidateQueries({ queryKey: ['partner-jobs'] });
@@ -144,35 +108,6 @@ export function PartnerJobUpload({ partnerUser }: PartnerJobUploadProps) {
     uploadMutation.mutate({ type: 'csv', payload: { file: csvFile } });
   };
 
-  const handleAddressLookup = async () => {
-    if (!manualJob.postcode.trim()) {
-      toast({
-        title: 'Postcode Required',
-        description: 'Please enter a postcode to search for addresses',
-        variant: 'destructive'
-      });
-      return;
-    }
-    
-    setIsLookingUp(true);
-    try {
-      await postcodeLogicMutation.mutateAsync({
-        postcode: manualJob.postcode,
-        house_number: manualJob.house_number || undefined
-      });
-    } finally {
-      setIsLookingUp(false);
-    }
-  };
-
-  const handleSelectAddress = (address: any) => {
-    setManualJob({
-      ...manualJob,
-      job_address: address.address,
-      postcode: address.postcode
-    });
-    setAddressResults([]);
-  };
 
   const handleManualSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -279,77 +214,31 @@ export function PartnerJobUpload({ partnerUser }: PartnerJobUploadProps) {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="client_phone">Phone</Label>
-                    <Input
-                      id="client_phone"
-                      value={manualJob.client_phone}
-                      onChange={(e) => setManualJob({ ...manualJob, client_phone: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="house_number">House No. (Optional)</Label>
-                    <Input
-                      id="house_number"
-                      value={manualJob.house_number}
-                      onChange={(e) => setManualJob({ ...manualJob, house_number: e.target.value })}
-                      placeholder="e.g., 123 or Flat 4A"
-                    />
-                  </div>
+                <div>
+                  <Label htmlFor="client_phone">Phone</Label>
+                  <Input
+                    id="client_phone"
+                    value={manualJob.client_phone}
+                    onChange={(e) => setManualJob({ ...manualJob, client_phone: e.target.value })}
+                  />
                 </div>
 
-                <div className="space-y-2">
+                <div>
                   <Label htmlFor="postcode">Postcode</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="postcode"
-                      value={manualJob.postcode}
-                      onChange={(e) => {
-                        setManualJob({ ...manualJob, postcode: e.target.value });
-                        setAddressResults([]);
-                      }}
-                      onBlur={() => {
-                        if (manualJob.postcode) {
-                          const normalized = manualJob.postcode.replace(/\s/g, '').toUpperCase();
-                          const formatted = normalized.replace(/^([A-Z]{1,2}\d{1,2}[A-Z]?)(\d[A-Z]{2})$/, '$1 $2');
-                          setManualJob({ ...manualJob, postcode: formatted });
-                        }
-                      }}
-                      placeholder="e.g., SW1A 1AA"
-                      required
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={handleAddressLookup}
-                      disabled={isLookingUp || !manualJob.postcode.trim()}
-                    >
-                      {isLookingUp ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Search className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                  
-                  {addressResults.length > 0 && (
-                    <div className="mt-2 border rounded-md bg-background">
-                      <div className="p-2 text-sm font-medium border-b">Select Address:</div>
-                      <div className="max-h-40 overflow-y-auto">
-                        {addressResults.map((address, index) => (
-                          <button
-                            key={index}
-                            type="button"
-                            className="w-full text-left p-2 hover:bg-muted text-sm border-b last:border-b-0"
-                            onClick={() => handleSelectAddress(address)}
-                          >
-                            {address.address}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                  <Input
+                    id="postcode"
+                    value={manualJob.postcode}
+                    onChange={(e) => setManualJob({ ...manualJob, postcode: e.target.value })}
+                    onBlur={() => {
+                      if (manualJob.postcode) {
+                        const normalized = manualJob.postcode.replace(/\s/g, '').toUpperCase();
+                        const formatted = normalized.replace(/^([A-Z]{1,2}\d{1,2}[A-Z]?)(\d[A-Z]{2})$/, '$1 $2');
+                        setManualJob({ ...manualJob, postcode: formatted });
+                      }
+                    }}
+                    placeholder="e.g., SW1A 1AA"
+                    required
+                  />
                 </div>
 
                 <div>
