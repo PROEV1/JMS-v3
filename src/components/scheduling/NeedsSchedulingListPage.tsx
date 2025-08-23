@@ -1,5 +1,5 @@
-import React from 'react';
-import { useQuery } from '@tanstack/react-query';
+import React, { useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { ScheduleStatusNavigation } from './ScheduleStatusNavigation';
 import { ScheduleStatusListPage } from './ScheduleStatusListPage';
@@ -8,8 +8,9 @@ import { Calendar } from 'lucide-react';
 
 export function NeedsSchedulingListPage() {
   console.log('NeedsSchedulingListPage: Starting component render');
+  const queryClient = useQueryClient();
   
-  const { data: orders = [], isLoading: ordersLoading, error: ordersError } = useQuery({
+  const { data: orders = [], isLoading: ordersLoading, error: ordersError, refetch: refetchOrders } = useQuery({
     queryKey: ['orders', 'needs-scheduling'],
     queryFn: async () => {
       console.log('NeedsSchedulingListPage: Fetching orders...');
@@ -71,6 +72,51 @@ export function NeedsSchedulingListPage() {
     }
   });
 
+  // Listen for scheduling refresh events and real-time updates
+  useEffect(() => {
+    const handleRefresh = () => {
+      console.log('NeedsSchedulingListPage: Received refresh event, refetching data...');
+      refetchOrders();
+    };
+    
+    // Listen for custom refresh events
+    window.addEventListener('scheduling:refresh', handleRefresh);
+    
+    // Set up real-time subscriptions for orders and job_offers
+    const ordersChannel = supabase
+      .channel('needs-scheduling-orders')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'orders'
+        },
+        (payload) => {
+          console.log('NeedsSchedulingListPage: Orders real-time update:', payload);
+          refetchOrders();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'job_offers'
+        },
+        (payload) => {
+          console.log('NeedsSchedulingListPage: Job offers real-time update:', payload);
+          refetchOrders();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      window.removeEventListener('scheduling:refresh', handleRefresh);
+      supabase.removeChannel(ordersChannel);
+    };
+  }, [refetchOrders]);
+
   console.log('NeedsSchedulingListPage - Orders count:', orders?.length, 'Engineers count:', engineers?.length);
   
   // Show errors if any
@@ -123,6 +169,10 @@ export function NeedsSchedulingListPage() {
             engineers={engineers}
             title="Needs Scheduling"
             showAutoSchedule={true}
+            onUpdate={() => {
+              console.log('NeedsSchedulingListPage: Manual update requested, refetching...');
+              refetchOrders();
+            }}
           />
         </CardContent>
       </Card>
