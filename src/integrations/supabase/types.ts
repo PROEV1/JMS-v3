@@ -1983,6 +1983,7 @@ export type Database = {
           brand_colors: Json | null
           client_agreement_required: boolean
           client_payment_required: boolean
+          client_survey_required: boolean | null
           created_at: string
           id: string
           is_active: boolean
@@ -1999,6 +2000,7 @@ export type Database = {
           brand_colors?: Json | null
           client_agreement_required?: boolean
           client_payment_required?: boolean
+          client_survey_required?: boolean | null
           created_at?: string
           id?: string
           is_active?: boolean
@@ -2015,6 +2017,7 @@ export type Database = {
           brand_colors?: Json | null
           client_agreement_required?: boolean
           client_payment_required?: boolean
+          client_survey_required?: boolean | null
           created_at?: string
           id?: string
           is_active?: boolean
