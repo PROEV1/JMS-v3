@@ -306,9 +306,12 @@ export function SmartAssignmentModal({
                           : 'border-border hover:border-primary/50'
                       }`}
                        onClick={() => {
-                         setSelectedEngineerId(suggestion.engineer.id);
-                         // Don't auto-set date - let the availability system handle it
-                       }}
+                          setSelectedEngineerId(suggestion.engineer.id);
+                          // Auto-set the suggested date for this engineer
+                          if (suggestion.availableDate) {
+                            setSelectedDate(new Date(suggestion.availableDate));
+                          }
+                        }}
                     >
                       <CardContent className="p-3">
                         <div className="space-y-2">
@@ -367,74 +370,6 @@ export function SmartAssignmentModal({
             </CardContent>
            </Card>
 
-          {/* Date Selection */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Select Installation Date</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {!selectedEngineerId ? (
-                <p className="text-center py-8 text-muted-foreground">
-                  Please select an engineer first to see available dates
-                </p>
-              ) : loadingAvailability ? (
-                <div className="text-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-                  <p className="mt-2 text-sm text-muted-foreground">Loading available dates...</p>
-                </div>
-              ) : availableDates.length === 0 ? (
-                <p className="text-center py-8 text-muted-foreground">
-                  No available dates found for the selected engineer
-                </p>
-              ) : (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-4">
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            "w-[280px] justify-start text-left font-normal",
-                            !selectedDate && "text-muted-foreground"
-                          )}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {selectedDate ? format(selectedDate, 'PPP') : <span>Pick a date</span>}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <CalendarComponent
-                          mode="single"
-                          selected={selectedDate}
-                          onSelect={setSelectedDate}
-                          disabled={(date) => {
-                            // Disable dates that are not in the available dates list
-                            return !availableDates.some(availableDate => 
-                              availableDate.toDateString() === date.toDateString()
-                            );
-                          }}
-                          initialFocus
-                          className={cn("p-3 pointer-events-auto")}
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    
-                    {selectedDate && (
-                      <div className="text-sm text-muted-foreground">
-                        Selected: {format(selectedDate, 'EEEE, MMMM d, yyyy')}
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div className="text-xs text-muted-foreground">
-                    <p>• {availableDates.length} available dates found</p>
-                    <p>• Weekends and blocked dates are excluded</p>
-                    <p>• Only dates when engineer is available are shown</p>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
 
           {/* Action Buttons */}
           <div className="flex justify-between">
