@@ -42,6 +42,7 @@ import ClientOfferViewPublic from "./pages/ClientOfferViewPublic";
 import ClientProfilePage from "./pages/ClientProfilePage";
 import ClientProfileSelf from "./pages/ClientProfileSelf";
 import EnhancedClientOrderView from "./pages/EnhancedClientOrderView";
+import PartnerPortal from "./pages/PartnerPortal";
 import EngineerDashboard from "./pages/EngineerDashboard";
 import EngineerJobs from "./pages/EngineerJobs";
 import EngineerJobDetail from "./pages/EngineerJobDetail";
@@ -65,6 +66,7 @@ function App() {
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/offers/:token" element={<ClientOfferViewPublic />} />
               <Route path="/quotes/:shareToken" element={<PublicQuoteView />} />
+              <Route path="/partner" element={<PartnerPortal />} />
               
               {/* All other routes wrapped in Layout */}
               <Route path="/*" element={

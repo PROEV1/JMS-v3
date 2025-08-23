@@ -1722,41 +1722,164 @@ export type Database = {
           },
         ]
       }
+      partner_job_uploads: {
+        Row: {
+          created_at: string | null
+          error_details: Json | null
+          failed_rows: number | null
+          file_name: string
+          file_url: string | null
+          id: string
+          partner_id: string
+          processed_at: string | null
+          processed_rows: number | null
+          status: string
+          total_rows: number | null
+          upload_type: string
+          uploaded_by: string
+        }
+        Insert: {
+          created_at?: string | null
+          error_details?: Json | null
+          failed_rows?: number | null
+          file_name: string
+          file_url?: string | null
+          id?: string
+          partner_id: string
+          processed_at?: string | null
+          processed_rows?: number | null
+          status?: string
+          total_rows?: number | null
+          upload_type: string
+          uploaded_by: string
+        }
+        Update: {
+          created_at?: string | null
+          error_details?: Json | null
+          failed_rows?: number | null
+          file_name?: string
+          file_url?: string | null
+          id?: string
+          partner_id?: string
+          processed_at?: string | null
+          processed_rows?: number | null
+          status?: string
+          total_rows?: number | null
+          upload_type?: string
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_job_uploads_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      partner_users: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          id: string
+          is_active: boolean | null
+          partner_id: string
+          permissions: Json | null
+          role: string
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          partner_id: string
+          permissions?: Json | null
+          role: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          partner_id?: string
+          permissions?: Json | null
+          role?: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_users_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       partners: {
         Row: {
           base_url: string | null
+          brand_colors: Json | null
           client_agreement_required: boolean
           client_payment_required: boolean
           created_at: string
           id: string
           is_active: boolean
+          logo_url: string | null
           name: string
+          parent_partner_id: string | null
+          partner_type: string
+          portal_subdomain: string | null
           slug: string | null
           updated_at: string
         }
         Insert: {
           base_url?: string | null
+          brand_colors?: Json | null
           client_agreement_required?: boolean
           client_payment_required?: boolean
           created_at?: string
           id?: string
           is_active?: boolean
+          logo_url?: string | null
           name: string
+          parent_partner_id?: string | null
+          partner_type?: string
+          portal_subdomain?: string | null
           slug?: string | null
           updated_at?: string
         }
         Update: {
           base_url?: string | null
+          brand_colors?: Json | null
           client_agreement_required?: boolean
           client_payment_required?: boolean
           created_at?: string
           id?: string
           is_active?: boolean
+          logo_url?: string | null
           name?: string
+          parent_partner_id?: string | null
+          partner_type?: string
+          portal_subdomain?: string | null
           slug?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "partners_parent_partner_id_fkey"
+            columns: ["parent_partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       payments: {
         Row: {
@@ -2736,6 +2859,10 @@ export type Database = {
         Args: { order_row: Database["public"]["Tables"]["orders"]["Row"] }
         Returns: Database["public"]["Enums"]["order_status_enhanced"]
       }
+      can_access_partner_data: {
+        Args: { target_partner_id: string; user_uuid: string }
+        Returns: boolean
+      }
       detect_scheduling_conflicts: {
         Args: { p_order_id: string }
         Returns: Json
@@ -2771,6 +2898,14 @@ export type Database = {
           location_id: string
           on_hand: number
         }[]
+      }
+      get_partner_user_partner_id: {
+        Args: { user_uuid: string }
+        Returns: string
+      }
+      get_partner_user_role: {
+        Args: { user_uuid: string }
+        Returns: string
       }
       get_user_role: {
         Args: { user_id: string }
