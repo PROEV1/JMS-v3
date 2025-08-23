@@ -26,12 +26,14 @@ export function useUserRole() {
       try {
         console.log('useUserRole: Fetching role for user ID:', user.id);
         
-        // First check if user is a partner user
+        // First check if user is a partner user (prevent 406 errors)
         const { data: partnerUser, error: partnerError } = await supabase
           .from('partner_users')
           .select('partner_id, role')
           .eq('user_id', user.id)
           .eq('is_active', true)
+          .order('created_at', { ascending: false })
+          .limit(1)
           .maybeSingle();
 
         console.log('useUserRole: Partner user check:', { partnerUser, partnerError });
@@ -44,11 +46,13 @@ export function useUserRole() {
           return;
         }
 
-        // Otherwise check their profile role
+        // Otherwise check their profile role (prevent 406 errors)
         const { data, error } = await supabase
           .from('profiles')
           .select('role, status')
           .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
           .maybeSingle();
 
         console.log('useUserRole: Profile query result:', { data, error });

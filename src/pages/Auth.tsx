@@ -27,86 +27,17 @@ export default function Auth() {
     if (user && !authLoading) {
       console.log('Auth: User authenticated, preparing redirect', { userId: user.id, email: user.email });
       
-      // Priority order: explicit redirect -> last authenticated path -> role-based default
+      // Check for explicit redirect path only
       const explicitRedirect = sessionStorage.getItem('authRedirectPath');
-      const lastAuthPath = sessionStorage.getItem('lastAuthenticatedPath');
-      
-      let redirectTo = '/';
       
       if (explicitRedirect) {
-        redirectTo = explicitRedirect;
         console.log('Auth: Using explicit redirect path:', explicitRedirect);
-        // Clear saved paths
         sessionStorage.removeItem('authRedirectPath');
-        // Navigate immediately
-        navigate(redirectTo, { replace: true });
-      } else if (lastAuthPath) {
-        redirectTo = lastAuthPath;
-        console.log('Auth: Using last authenticated path:', lastAuthPath);
-        // Navigate immediately
-        navigate(redirectTo, { replace: true });
+        navigate(explicitRedirect, { replace: true });
       } else {
-        // Check user's actual role in database
-        const checkUserRoleAndRedirect = async () => {
-          try {
-            console.log('Auth: Checking user role in database for:', user.email);
-            
-            // Check if user is a partner user
-            const { data: partnerUser, error: partnerError } = await supabase
-              .from('partner_users')
-              .select('partner_id, role')
-              .eq('user_id', user.id)
-              .eq('is_active', true)
-              .maybeSingle();
-
-            console.log('Auth: Partner user check result:', { partnerUser, partnerError });
-
-            if (partnerUser && !sessionStorage.getItem('forceMainPortal')) {
-              console.log('Auth: User IS a partner user, redirecting to partner portal');
-              redirectTo = '/partner';
-              navigate(redirectTo, { replace: true });
-              return;
-            } else if (sessionStorage.getItem('forceMainPortal')) {
-              console.log('Auth: Partner user forced to main portal');
-              sessionStorage.removeItem('forceMainPortal');
-            }
-
-            console.log('Auth: User is NOT a partner user, checking profile role');
-            
-            // Check profile role
-            const { data: profile, error: profileError } = await supabase
-              .from('profiles')
-              .select('role')
-              .eq('user_id', user.id)
-              .maybeSingle();
-
-            console.log('Auth: Profile check result:', { profile, profileError });
-
-            const userRole = profile?.role || 'client';
-            console.log('Auth: User profile role:', userRole);
-
-            // Role-based redirect
-            if (userRole === 'admin' || userRole === 'manager') {
-              redirectTo = '/admin';
-            } else if (userRole === 'engineer') {
-              redirectTo = '/engineer';
-            } else {
-              redirectTo = '/client';
-            }
-
-            console.log('Auth: Final redirect target:', redirectTo);
-            
-            // Navigate to the determined route
-            navigate(redirectTo, { replace: true });
-            
-          } catch (error) {
-            console.error('Auth: Error checking user role:', error);
-            // Fallback to client portal on error
-            navigate('/client', { replace: true });
-          }
-        };
-
-        checkUserRoleAndRedirect();
+        // Let Layout.tsx handle role-based routing - just go to root
+        console.log('Auth: No explicit redirect, going to root - Layout will handle role routing');
+        navigate('/', { replace: true });
       }
     }
   }, [user, authLoading, navigate]);

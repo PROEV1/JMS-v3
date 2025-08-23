@@ -82,35 +82,52 @@ export default function Layout({ children }: LayoutProps) {
     return <Navigate to="/auth" replace />;
   }
 
-  // Role-based route protection
+  // Centralized role-based routing and protection
   const currentPath = location.pathname;
   console.log('Layout: Current path:', currentPath, 'User role:', userRole);
   
-  // Redirect partner users to partner portal if they're not already there
+  // Handle root path - redirect to role-appropriate section
+  if (currentPath === '/') {
+    let redirectTo = '/client'; // default fallback
+    
+    if (userRole === 'partner') {
+      redirectTo = '/partner';
+    } else if (userRole === 'admin' || userRole === 'manager') {
+      redirectTo = '/admin';
+    } else if (userRole === 'engineer') {
+      redirectTo = '/engineer';
+    } else if (userRole === 'client') {
+      redirectTo = '/client';
+    }
+    
+    console.log(`Layout: Redirecting from root to ${redirectTo} for role ${userRole}`);
+    return <Navigate to={redirectTo} replace />;
+  }
+  
+  // Partner users can only access partner routes
   if (userRole === 'partner' && !currentPath.startsWith('/partner')) {
     console.log('Layout: Partner user accessing non-partner route, redirecting to /partner');
     return <Navigate to="/partner" replace />;
   }
   
-  // Protect admin routes from non-admins (but allow admins to access /dashboard)
-  if (userRole !== 'admin' && userRole !== 'manager' && currentPath.startsWith('/admin')) {
-    const redirectTo = userRole === 'engineer' ? '/engineer' : userRole === 'partner' ? '/partner' : '/client';
-    console.log(`Layout: ${userRole} accessing admin route, redirecting to ${redirectTo}`);
-    return <Navigate to={redirectTo} replace />;
+  // Protect admin routes (including /orders/:id) - only admin/manager can access
+  if (currentPath.startsWith('/admin') || currentPath.match(/^\/orders\/[^\/]+$/)) {
+    if (userRole !== 'admin' && userRole !== 'manager') {
+      const redirectTo = userRole === 'engineer' ? '/engineer' : userRole === 'partner' ? '/partner' : '/client';
+      console.log(`Layout: ${userRole} accessing admin route, redirecting to ${redirectTo}`);
+      return <Navigate to={redirectTo} replace />;
+    }
   }
   
   // Protect client routes from non-clients
-  if (userRole !== 'client' && (currentPath.startsWith('/client') || 
-      (userRole === 'admin' && ['/quotes', '/orders', '/messages', '/documents', '/payments', '/date-blocking', '/profile'].includes(currentPath)))) {
+  if (userRole !== 'client' && currentPath.startsWith('/client')) {
     const redirectTo = userRole === 'admin' ? '/admin' : userRole === 'engineer' ? '/engineer' : '/partner';
     console.log(`Layout: ${userRole} accessing client route, redirecting to ${redirectTo}`);
     return <Navigate to={redirectTo} replace />;
   }
 
   // Protect engineer routes from non-engineers
-  if (userRole !== 'engineer' && (currentPath.startsWith('/engineer') ||
-      (userRole === 'admin' && ['/availability', '/profile'].includes(currentPath)) ||
-      (userRole === 'client' && ['/availability', '/profile'].includes(currentPath)))) {
+  if (userRole !== 'engineer' && currentPath.startsWith('/engineer')) {
     const redirectTo = userRole === 'admin' ? '/admin' : userRole === 'partner' ? '/partner' : '/client';
     console.log(`Layout: ${userRole} accessing engineer route, redirecting to ${redirectTo}`);
     return <Navigate to={redirectTo} replace />;
