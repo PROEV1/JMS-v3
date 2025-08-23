@@ -8,11 +8,15 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Order, Engineer, getSmartEngineerRecommendations, getOrderEstimatedHours } from '@/utils/schedulingUtils';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Order, Engineer, getSmartEngineerRecommendations, getOrderEstimatedHours, getEngineerSettings } from '@/utils/schedulingUtils';
 import { getBestPostcode } from '@/utils/postcodeUtils';
-import { MapPin, Clock, User, CheckCircle, Send, Calendar } from 'lucide-react';
+import { MapPin, Clock, User, CheckCircle, Send, Calendar, CalendarIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 interface SmartAssignmentModalProps {
   isOpen: boolean;
@@ -49,6 +53,89 @@ export function SmartAssignmentModal({
   const [suggestions, setSuggestions] = useState<EngineerSuggestion[]>([]);
   const [loading, setLoading] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const [availableDates, setAvailableDates] = useState<Date[]>([]);
+  const [loadingAvailability, setLoadingAvailability] = useState(false);
+  const [blockedDates, setBlockedDates] = useState<Set<string>>(new Set());
+
+  // Helper function to check if engineer is available on a specific date
+  const isEngineerAvailableOnDate = async (engineerId: string, date: Date): Promise<boolean> => {
+    try {
+      const engineerSettings = await getEngineerSettings(engineerId);
+      if (!engineerSettings) return false;
+
+      const dayOfWeek = date.getDay();
+      const workingDay = engineerSettings.working_hours.find(wh => wh.day_of_week === dayOfWeek);
+      
+      if (!workingDay || !workingDay.is_available) return false;
+
+      // Check for time off
+      const dateString = date.toISOString().split('T')[0];
+      const hasTimeOff = engineerSettings.time_off.some(timeOff => 
+        dateString >= timeOff.start_date && dateString <= timeOff.end_date
+      );
+
+      return !hasTimeOff;
+    } catch (error) {
+      console.error('Error checking engineer availability:', error);
+      return false;
+    }
+  };
+
+  // Load available dates when engineer changes
+  useEffect(() => {
+    if (!selectedEngineerId || !isOpen) {
+      setAvailableDates([]);
+      return;
+    }
+
+    const loadAvailableDates = async () => {
+      setLoadingAvailability(true);
+      try {
+        // Load client blocked dates
+        const { data: clientBlockedDates } = await supabase
+          .from('client_blocked_dates')
+          .select('blocked_date')
+          .eq('client_id', order.client_id);
+
+        const blocked = new Set(clientBlockedDates?.map(d => d.blocked_date) || []);
+        setBlockedDates(blocked);
+
+        // Calculate available dates for next 60 days
+        const dates: Date[] = [];
+        const today = new Date();
+        const maxDate = new Date(today.getTime() + (60 * 24 * 60 * 60 * 1000)); // 60 days from now
+
+        for (let d = new Date(today); d <= maxDate; d.setDate(d.getDate() + 1)) {
+          const dateString = d.toISOString().split('T')[0];
+          
+          // Skip if client blocked date
+          if (blocked.has(dateString)) continue;
+          
+          // Skip weekends (can be made configurable)
+          if (d.getDay() === 0 || d.getDay() === 6) continue;
+          
+          // Check engineer availability
+          if (await isEngineerAvailableOnDate(selectedEngineerId, d)) {
+            dates.push(new Date(d));
+          }
+        }
+
+        setAvailableDates(dates);
+        
+        // Auto-select first available date if none selected
+        if (!selectedDate && dates.length > 0) {
+          setSelectedDate(dates[0]);
+        }
+      } catch (error) {
+        console.error('Error loading available dates:', error);
+        setAvailableDates([]);
+      } finally {
+        setLoadingAvailability(false);
+      }
+    };
+
+    loadAvailableDates();
+  }, [selectedEngineerId, isOpen, order.client_id]);
 
   // Reset state when modal closes/opens
   useEffect(() => {
@@ -57,15 +144,21 @@ export function SmartAssignmentModal({
       setSelectedDate(undefined);
       setSelectedEngineerId('');
       setSuggestions([]);
+      setAvailableDates([]);
+      setBlockedDates(new Set());
       setProcessing(false);
       setLoading(false);
+      setLoadingAvailability(false);
     } else {
       // Initialize state when opening
       setSelectedDate(order.scheduled_install_date ? new Date(order.scheduled_install_date) : undefined);
       setSelectedEngineerId(order.engineer_id || '');
       setSuggestions([]);
+      setAvailableDates([]);
+      setBlockedDates(new Set());
       setProcessing(false);
       setLoading(false);
+      setLoadingAvailability(false);
     }
   }, [isOpen, order.id]);
 
@@ -81,9 +174,8 @@ export function SmartAssignmentModal({
         });
         setSuggestions(result.recommendations);
         
-        // Auto-select the first available date if no date is selected
-        if (!selectedDate && result.recommendations.length > 0 && result.recommendations[0].availableDate) {
-          setSelectedDate(new Date(result.recommendations[0].availableDate));
+        // Auto-select the first engineer (don't auto-select date - let availability loading handle it)
+        if (!selectedEngineerId && result.recommendations.length > 0) {
           setSelectedEngineerId(result.recommendations[0].engineer.id);
         }
       } catch (error) {
@@ -213,12 +305,10 @@ export function SmartAssignmentModal({
                           ? 'ring-2 ring-primary bg-primary/5 border-primary' 
                           : 'border-border hover:border-primary/50'
                       }`}
-                      onClick={() => {
-                        setSelectedEngineerId(suggestion.engineer.id);
-                        if (suggestion.availableDate) {
-                          setSelectedDate(new Date(suggestion.availableDate));
-                        }
-                      }}
+                       onClick={() => {
+                         setSelectedEngineerId(suggestion.engineer.id);
+                         // Don't auto-set date - let the availability system handle it
+                       }}
                     >
                       <CardContent className="p-3">
                         <div className="space-y-2">
@@ -272,6 +362,75 @@ export function SmartAssignmentModal({
                       </CardContent>
                     </Card>
                   ))}
+                </div>
+              )}
+            </CardContent>
+           </Card>
+
+          {/* Date Selection */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Select Installation Date</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {!selectedEngineerId ? (
+                <p className="text-center py-8 text-muted-foreground">
+                  Please select an engineer first to see available dates
+                </p>
+              ) : loadingAvailability ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                  <p className="mt-2 text-sm text-muted-foreground">Loading available dates...</p>
+                </div>
+              ) : availableDates.length === 0 ? (
+                <p className="text-center py-8 text-muted-foreground">
+                  No available dates found for the selected engineer
+                </p>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-4">
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-[280px] justify-start text-left font-normal",
+                            !selectedDate && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {selectedDate ? format(selectedDate, 'PPP') : <span>Pick a date</span>}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <CalendarComponent
+                          mode="single"
+                          selected={selectedDate}
+                          onSelect={setSelectedDate}
+                          disabled={(date) => {
+                            // Disable dates that are not in the available dates list
+                            return !availableDates.some(availableDate => 
+                              availableDate.toDateString() === date.toDateString()
+                            );
+                          }}
+                          initialFocus
+                          className={cn("p-3 pointer-events-auto")}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    
+                    {selectedDate && (
+                      <div className="text-sm text-muted-foreground">
+                        Selected: {format(selectedDate, 'EEEE, MMMM d, yyyy')}
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="text-xs text-muted-foreground">
+                    <p>• {availableDates.length} available dates found</p>
+                    <p>• Weekends and blocked dates are excluded</p>
+                    <p>• Only dates when engineer is available are shown</p>
+                  </div>
                 </div>
               )}
             </CardContent>
