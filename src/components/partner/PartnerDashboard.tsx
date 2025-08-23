@@ -14,7 +14,7 @@ interface PartnerUser {
   id: string;
   user_id: string;
   partner_id: string;
-  role: 'partner_manufacturer' | 'partner_dealer';
+  role: 'partner_manufacturer' | 'partner_dealer' | 'partner_charger_manufacturer';
   permissions: any;
   partner: {
     id: string;
@@ -43,6 +43,8 @@ export function PartnerDashboard({ partnerUser }: PartnerDashboardProps) {
         return 'Manufacturer';
       case 'partner_dealer':
         return 'Dealer';
+      case 'partner_charger_manufacturer':
+        return 'Charger Manufacturer';
       default:
         return role;
     }

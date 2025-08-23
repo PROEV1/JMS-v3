@@ -5,7 +5,7 @@ interface PartnerUser {
   id: string;
   user_id: string;
   partner_id: string;
-  role: 'partner_manufacturer' | 'partner_dealer';
+  role: 'partner_manufacturer' | 'partner_dealer' | 'partner_charger_manufacturer';
   permissions: any;
   partner: {
     id: string;
@@ -75,7 +75,7 @@ export function usePartnerAuth() {
   const getAccessiblePartnerIds = (): string[] => {
     if (!partnerUser) return [];
     
-    if (partnerUser.role === 'partner_manufacturer') {
+    if (partnerUser.role === 'partner_manufacturer' || partnerUser.role === 'partner_charger_manufacturer') {
       // Manufacturers can access their own data and all dealers under them
       return [partnerUser.partner_id];
     }
@@ -88,7 +88,7 @@ export function usePartnerAuth() {
     partnerUser,
     loading,
     isPartnerUser: !!partnerUser,
-    isManufacturer: partnerUser?.role === 'partner_manufacturer',
+    isManufacturer: partnerUser?.role === 'partner_manufacturer' || partnerUser?.role === 'partner_charger_manufacturer',
     isDealer: partnerUser?.role === 'partner_dealer',
     getAccessiblePartnerIds,
   };
