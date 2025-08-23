@@ -27,6 +27,7 @@ interface Partner {
   is_active: boolean;
   client_payment_required: boolean;
   client_agreement_required: boolean;
+  client_survey_required: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -47,7 +48,8 @@ export default function AdminPartners() {
     parent_partner_id: '',
     is_active: true,
     client_payment_required: true,
-    client_agreement_required: true
+    client_agreement_required: true,
+    client_survey_required: true
   });
   const [logoFile, setLogoFile] = useState<File | null>(null);
 
@@ -97,7 +99,8 @@ export default function AdminPartners() {
           parent_partner_id: data.parent_partner_id || null,
           is_active: data.is_active,
           client_payment_required: data.client_payment_required,
-          client_agreement_required: data.client_agreement_required
+          client_agreement_required: data.client_agreement_required,
+          client_survey_required: data.client_survey_required ?? true
         }]);
       
       if (error) throw error;
@@ -146,7 +149,8 @@ export default function AdminPartners() {
           parent_partner_id: data.parent_partner_id || null,
           is_active: data.is_active,
           client_payment_required: data.client_payment_required,
-          client_agreement_required: data.client_agreement_required
+          client_agreement_required: data.client_agreement_required,
+          client_survey_required: data.client_survey_required ?? true
         })
         .eq('id', data.id);
       
@@ -175,7 +179,8 @@ export default function AdminPartners() {
       parent_partner_id: '',
       is_active: true,
       client_payment_required: true,
-      client_agreement_required: true
+      client_agreement_required: true,
+      client_survey_required: true
     });
     setLogoFile(null);
   };
@@ -192,7 +197,8 @@ export default function AdminPartners() {
       parent_partner_id: partner.parent_partner_id || '',
       is_active: partner.is_active,
       client_payment_required: partner.client_payment_required,
-      client_agreement_required: partner.client_agreement_required
+      client_agreement_required: partner.client_agreement_required,
+      client_survey_required: partner.client_survey_required ?? true
     });
     setLogoFile(null);
     setShowDialog(true);
@@ -373,6 +379,14 @@ export default function AdminPartners() {
                   />
                   <Label htmlFor="client_agreement_required">Client Agreement Required</Label>
                 </div>
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="client_survey_required"
+                    checked={formData.client_survey_required}
+                    onCheckedChange={(checked) => setFormData({ ...formData, client_survey_required: checked })}
+                  />
+                  <Label htmlFor="client_survey_required">Client Survey Required</Label>
+                </div>
               </div>
               
               <div className="flex items-center space-x-2">
@@ -433,6 +447,9 @@ export default function AdminPartners() {
                     )}
                     {!partner.client_agreement_required && (
                       <Badge variant="outline" className="text-xs">Agreement Not Required</Badge>
+                    )}
+                    {!partner.client_survey_required && (
+                      <Badge variant="outline" className="text-xs">Survey Not Required</Badge>
                     )}
                   </div>
                 </div>

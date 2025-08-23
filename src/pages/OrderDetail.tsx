@@ -94,6 +94,7 @@ interface Order {
     name: string;
     client_payment_required?: boolean;
     client_agreement_required?: boolean;
+    client_survey_required?: boolean;
   } | null;
   is_partner_job: boolean;
   scheduling_suppressed: boolean;
@@ -200,7 +201,7 @@ export default function OrderDetail() {
             description,
             uploaded_at
           ),
-          partner:partner_id(name, client_payment_required, client_agreement_required)
+          partner:partner_id(name, client_payment_required, client_agreement_required, client_survey_required)
         `)
         .eq('id', orderId)
         .single();
