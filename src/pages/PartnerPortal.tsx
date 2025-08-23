@@ -1,5 +1,3 @@
-import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { usePartnerAuth } from '@/hooks/usePartnerAuth';
 import { PartnerDashboard } from '@/components/partner/PartnerDashboard';
 import { PartnerAuth } from '@/components/partner/PartnerAuth';
@@ -7,14 +5,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 export default function PartnerPortal() {
   const { partnerUser, loading, isPartnerUser } = usePartnerAuth();
-  const navigate = useNavigate();
 
-  useEffect(() => {
-    // If user is not a partner user, redirect them
-    if (!loading && !isPartnerUser) {
-      navigate('/auth');
-    }
-  }, [loading, isPartnerUser, navigate]);
+  // Remove redirect logic - let component handle auth internally
 
   if (loading) {
     return (
