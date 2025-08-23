@@ -140,6 +140,7 @@ export async function calculateDayFit(
         partner_status_raw: null,
         scheduling_suppressed_reason: null,
         sub_partner: null,
+        survey_required: true,
         job_type: 'installation' as any // Default value for mock orders
       };
       allOrders.push(dbVirtualOrder);
@@ -195,6 +196,7 @@ export async function calculateDayFit(
         partner_status_raw: null,
         scheduling_suppressed_reason: null,
         sub_partner: null,
+        survey_required: newOrder.survey_required ?? true,
         job_type: (newOrder.job_type as any) || 'installation' // Preserve job_type if present
       };
       allOrders.push(dbOrder);

@@ -37,6 +37,7 @@ export interface Order {
   installation_notes?: string;
   scheduling_conflicts?: any; // Allow Json or any[]
   is_partner_job?: boolean;
+  survey_required?: boolean;
   partner_status?: string;
   sub_partner?: string;
   partner_external_url?: string;

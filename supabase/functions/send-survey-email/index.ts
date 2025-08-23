@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { Resend } from "npm:resend@2.0.0"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -24,7 +24,10 @@ serve(async (req) => {
   try {
     const { orderId, clientEmail, clientName, orderNumber, isPartnerJob, partnerId, surveyToken }: SurveyEmailRequest = await req.json()
 
+    const resend = new Resend(Deno.env.get('RESEND_API_KEY'))
+
     // Initialize Supabase client
+    const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2')
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -118,28 +121,15 @@ serve(async (req) => {
     `
 
     // Send email using Resend
-    const resendApiKey = Deno.env.get('RESEND_API_KEY')
-    if (!resendApiKey) {
-      throw new Error('RESEND_API_KEY not configured')
-    }
-
-    const emailResponse = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${resendApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from: 'ProEV <noreply@proev.co.uk>',
-        to: [clientEmail],
-        subject: subject,
-        html: emailHtml,
-      }),
+    const emailResponse = await resend.emails.send({
+      from: 'ProEV <noreply@proev.co.uk>',
+      to: [clientEmail],
+      subject: subject,
+      html: emailHtml,
     })
 
-    if (!emailResponse.ok) {
-      const error = await emailResponse.text()
-      throw new Error(`Email send failed: ${error}`)
+    if (!emailResponse.data) {
+      throw new Error(`Email send failed: ${emailResponse.error?.message || 'Unknown error'}`)
     }
 
     console.log(`Survey email sent to ${clientEmail} for order ${orderNumber}`)
