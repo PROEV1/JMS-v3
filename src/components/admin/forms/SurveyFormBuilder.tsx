@@ -3,7 +3,7 @@ import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautif
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Plus, GripVertical, Eye, Save, Rocket } from 'lucide-react';
+import { Plus, GripVertical, Eye, Save, Rocket, Trash2 } from 'lucide-react';
 import { SurveyFormSchema, SurveyStep, SurveyField, DEFAULT_EV_INSTALL_TEMPLATE } from '@/types/survey-forms';
 import { FormStepEditor } from './FormStepEditor';
 import { FormFieldPalette } from './FormFieldPalette';
@@ -245,6 +245,18 @@ export function SurveyFormBuilder({
                                     {step.fields.length} field{step.fields.length !== 1 ? 's' : ''}
                                   </p>
                                 </div>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteStep(step.key);
+                                  }}
+                                  disabled={schema.steps.length <= 1}
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </Button>
                               </div>
                             </CardContent>
                           </Card>
