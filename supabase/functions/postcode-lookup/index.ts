@@ -11,51 +11,65 @@ interface AddressResult {
   postcode: string;
 }
 
-// Extract addresses helper function
-function extractAddresses(data: any, formattedPostcode: string, houseNumber: string | null): AddressResult[] {
-  return data.features?.map((feature: any) => {
-    const placeName = feature.place_name || ''
-    const context = feature.context || []
-    
-    // Extract postcode from context or use formatted one
-    const postcodeContext = context.find((c: any) => c.id?.startsWith('postcode'))
-    const extractedPostcode = postcodeContext?.text || formattedPostcode
-    
-    // Clean up the address - remove country 
-    let cleanAddress = placeName
-      .replace(/, United Kingdom$/, '')
-      .replace(/, UK$/, '')
-      .trim()
-    
-    // For postcode searches, provide more detailed address information
-    if (!houseNumber && feature.place_type?.includes('postcode')) {
-      // For postcode results, show the full postcode with area
-      const addressParts = cleanAddress.split(', ')
-      if (addressParts.length >= 3) {
-        // Show postcode, area, and region
-        cleanAddress = `${extractedPostcode} - ${addressParts[1]}, ${addressParts[2]}`
-      } else if (addressParts.length >= 2) {
-        cleanAddress = `${extractedPostcode} - ${addressParts[1]}`
-      } else {
-        cleanAddress = `${extractedPostcode} Area`
+// Helper function to extract and format addresses from API responses
+function extractAddresses(data: any[], source: 'mapbox' | 'postcodes' | 'nominatim'): AddressResult[] {
+  const addresses: AddressResult[] = [];
+  
+  if (source === 'mapbox' && data.length > 0) {
+    data.forEach(feature => {
+      if (feature.place_name) {
+        // Keep the full address text as provided by Mapbox, just clean up country suffix
+        const fullAddress = feature.place_name
+          .replace(/, United Kingdom$/, '')
+          .replace(/, UK$/, '')
+          .trim();
+        
+        // For the short address, try to extract meaningful parts
+        const parts = fullAddress.split(',').map(p => p.trim());
+        let shortAddress = parts[0];
+        
+        // If we have house number in the address, show more context
+        if (parts.length > 1 && shortAddress.match(/^\d+/)) {
+          shortAddress = parts.slice(0, 2).join(', ');
+        } else if (parts.length > 2) {
+          shortAddress = parts.slice(0, 2).join(', ');
+        }
+        
+        addresses.push({
+          address: shortAddress,
+          full_address: fullAddress,
+          postcode: feature.text || feature.context?.find((c: any) => c.id?.startsWith('postcode'))?.text || ''
+        });
       }
-    }
-    
-    // If it's an address result with house number, show full street address
-    if (feature.place_type?.includes('address')) {
-      const addressParts = cleanAddress.split(',')
-      if (addressParts.length >= 3) {
-        // Show street address with area
-        cleanAddress = `${addressParts[0]}, ${addressParts[1]}`
+    });
+  } else if (source === 'postcodes' && data.length > 0) {
+    data.forEach(item => {
+      const postcode = item.postcode || '';
+      const district = item.admin_district || '';
+      
+      addresses.push({
+        address: district,
+        full_address: `${district}, ${postcode}`,
+        postcode: postcode
+      });
+    });
+  } else if (source === 'nominatim' && data.length > 0) {
+    data.forEach(item => {
+      if (item.display_name) {
+        const fullAddress = item.display_name;
+        const parts = fullAddress.split(',').map((p: string) => p.trim());
+        const shortAddress = parts.slice(0, 2).join(', ');
+        
+        addresses.push({
+          address: shortAddress,
+          full_address: fullAddress,
+          postcode: item.address?.postcode || ''
+        });
       }
-    }
-
-    return {
-      address: cleanAddress,
-      full_address: placeName.replace(/, United Kingdom$/, '').replace(/, UK$/, ''),
-      postcode: extractedPostcode
-    }
-  }) || []
+    });
+  }
+  
+  return addresses;
 }
 
 serve(async (req) => {
@@ -105,140 +119,153 @@ serve(async (req) => {
     console.log('Formatted postcode:', formattedPostcode)
 
     let addresses: AddressResult[] = [];
+    let postcodeCoords: { lat: number, lon: number } | null = null;
     
-    // Strategy 1: Try UK's official address lookup if we have a house number
-    if (houseNumber) {
-      console.log('Trying UK Address API with house number...')
-      try {
-        // Try postcodes.io nearest endpoint which can find addresses
-        const ukNearestUrl = `https://api.postcodes.io/postcodes/${encodeURIComponent(formattedPostcode)}/nearest`
-        const nearestResponse = await fetch(ukNearestUrl)
-        
-        if (nearestResponse.ok) {
-          const nearestData = await nearestResponse.json()
-          console.log('UK Postcodes nearest response:', JSON.stringify(nearestData, null, 2))
-        }
-
-        // Try the main postcode lookup to get area info
-        const ukApiUrl = `https://api.postcodes.io/postcodes/${encodeURIComponent(formattedPostcode)}`
-        const ukResponse = await fetch(ukApiUrl)
-        
-        if (ukResponse.ok) {
-          const ukData = await ukResponse.json()
-          console.log('UK Postcodes API response:', JSON.stringify(ukData, null, 2))
-          
-          if (ukData.status === 200 && ukData.result) {
-            const result = ukData.result
-            // Create a detailed address with the house number and area information
-            const fullAddress = `${houseNumber} ${result.admin_ward || ''}, ${result.admin_district || result.parish || ''}, ${formattedPostcode}`.replace(/\s+/g, ' ').trim()
-            addresses.push({
-              address: fullAddress,
-              full_address: fullAddress,
-              postcode: formattedPostcode
-            })
-          }
-        }
-      } catch (error) {
-        console.log('UK Address API failed:', error)
-      }
-    }
-    
-    // Strategy 2: Try Mapbox with house number (multiple variations)
-    if (houseNumber && addresses.length === 0) {
-      console.log('Trying Mapbox with house number variations...')
+    // First, get postcode coordinates for proximity biasing
+    try {
+      const ukApiUrl = `https://api.postcodes.io/postcodes/${encodeURIComponent(formattedPostcode)}`
+      const ukResponse = await fetch(ukApiUrl)
       
-      const searchVariations = [
+      if (ukResponse.ok) {
+        const ukData = await ukResponse.json()
+        if (ukData.status === 200 && ukData.result) {
+          postcodeCoords = {
+            lat: ukData.result.latitude,
+            lon: ukData.result.longitude
+          };
+          console.log('Got postcode coordinates:', postcodeCoords)
+        }
+      }
+    } catch (error) {
+      console.log('Failed to get postcode coordinates:', error)
+    }
+
+    // Strategy 1: Try comprehensive Mapbox searches with house number
+    if (houseNumber) {
+      console.log('Strategy 1: Trying comprehensive Mapbox searches with house number...')
+      
+      const searchQueries = [
         `${houseNumber} ${formattedPostcode}`,
         `${houseNumber}, ${formattedPostcode}`,
-        `${formattedPostcode} ${houseNumber}`,
+        `${houseNumber} ${formattedPostcode.replace(' ', '')}`,
+        `${houseNumber} ${formattedPostcode} UK`,
+        `${houseNumber} ${formattedPostcode.split(' ')[0]}`,
       ];
       
-      for (const searchQuery of searchVariations) {
+      for (const searchQuery of searchQueries) {
         try {
-          const mapboxUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchQuery)}.json?` +
+          let mapboxUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchQuery)}.json?` +
             `access_token=${mapboxToken}&` +
             'country=GB&' +
             'types=address,poi&' +
             'limit=10'
           
-          console.log('Mapbox request URL (variation):', mapboxUrl)
+          // Add proximity biasing if we have coordinates
+          if (postcodeCoords) {
+            mapboxUrl += `&proximity=${postcodeCoords.lon},${postcodeCoords.lat}`
+          }
+          
+          console.log('Mapbox search query:', searchQuery)
           
           const response = await fetch(mapboxUrl)
           if (response.ok) {
             const data = await response.json()
-            console.log('Mapbox response (variation):', JSON.stringify(data, null, 2))
-            const foundAddresses = extractAddresses(data, formattedPostcode, houseNumber)
-            if (foundAddresses.length > 0) {
+            console.log('Mapbox response for query "' + searchQuery + '":', JSON.stringify(data, null, 2))
+            
+            if (data.features && data.features.length > 0) {
+              const foundAddresses = extractAddresses(data.features, 'mapbox')
               addresses.push(...foundAddresses)
-              break; // Stop if we found addresses
+              
+              // If we found good results, prioritize them
+              if (foundAddresses.length > 0) {
+                console.log('Found addresses with query:', searchQuery)
+                break;
+              }
             }
           }
         } catch (error) {
-          console.log('Mapbox variation search failed:', error)
+          console.log('Mapbox search failed for query:', searchQuery, error)
         }
       }
     }
     
-    // Strategy 3: Search just the postcode to get area information
-    if (addresses.length === 0) {
-      console.log('Trying postcode-only search...')
+    // Strategy 2: Try OpenStreetMap Nominatim for additional coverage
+    if (houseNumber && addresses.length === 0) {
+      console.log('Strategy 2: Trying OpenStreetMap Nominatim...')
       
-      // First try UK Postcodes API for detailed area info
+      try {
+        const nominatimQuery = `${houseNumber} ${formattedPostcode}, UK`
+        const nominatimUrl = `https://nominatim.openstreetmap.org/search?` +
+          `q=${encodeURIComponent(nominatimQuery)}&` +
+          'format=json&' +
+          'addressdetails=1&' +
+          'countrycodes=gb&' +
+          'limit=5'
+        
+        console.log('Nominatim query:', nominatimQuery)
+        
+        const nominatimResponse = await fetch(nominatimUrl, {
+          headers: {
+            'User-Agent': 'PostcodeLookup/1.0'
+          }
+        })
+        
+        if (nominatimResponse.ok) {
+          const nominatimData = await nominatimResponse.json()
+          console.log('Nominatim response:', JSON.stringify(nominatimData, null, 2))
+          
+          const nominatimAddresses = extractAddresses(nominatimData, 'nominatim')
+          addresses.push(...nominatimAddresses)
+        }
+      } catch (error) {
+        console.log('Nominatim search failed:', error)
+      }
+    }
+    
+    // Strategy 3: Try postcode-only searches for area context
+    if (addresses.length === 0) {
+      console.log('Strategy 3: Trying postcode-only searches...')
+      
+      try {
+        let mapboxUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(formattedPostcode)}.json?` +
+          `access_token=${mapboxToken}&` +
+          'country=GB&' +
+          'types=postcode,place&' +
+          'limit=10'
+        
+        // Add proximity biasing if we have coordinates  
+        if (postcodeCoords) {
+          mapboxUrl += `&proximity=${postcodeCoords.lon},${postcodeCoords.lat}`
+        }
+        
+        console.log('Mapbox postcode search for:', formattedPostcode)
+        
+        const response = await fetch(mapboxUrl)
+        if (response.ok) {
+          const data = await response.json()
+          console.log('Mapbox postcode response:', JSON.stringify(data, null, 2))
+          
+          const postcodeAddresses = extractAddresses(data.features || [], 'mapbox')
+          addresses.push(...postcodeAddresses)
+        }
+      } catch (error) {
+        console.log('Mapbox postcode search failed:', error)
+      }
+      
+      // Also try UK Postcodes API for fallback
       try {
         const ukApiUrl = `https://api.postcodes.io/postcodes/${encodeURIComponent(formattedPostcode)}`
         const ukResponse = await fetch(ukApiUrl)
         
         if (ukResponse.ok) {
           const ukData = await ukResponse.json()
-          console.log('UK Postcodes API response:', JSON.stringify(ukData, null, 2))
-          
           if (ukData.status === 200 && ukData.result) {
-            const result = ukData.result
-            
-            if (houseNumber) {
-              // Create a constructed address with available information
-              const streetInfo = result.admin_ward || result.parish || 'Street'
-              const area = result.admin_district || result.country || 'Area'
-              const constructedAddress = `${houseNumber} ${streetInfo}, ${area}, ${formattedPostcode}`
-              
-              addresses.push({
-                address: constructedAddress,
-                full_address: constructedAddress,
-                postcode: formattedPostcode
-              })
-            }
-            
-            // Also add the general area option
-            addresses.push({
-              address: `${formattedPostcode} - ${result.admin_district || result.parish || 'Area'}`,
-              full_address: `${formattedPostcode}, ${result.admin_district || result.parish || result.country}, United Kingdom`,
-              postcode: formattedPostcode
-            })
+            const postcodeAddresses = extractAddresses([ukData.result], 'postcodes')
+            addresses.push(...postcodeAddresses)
           }
         }
       } catch (error) {
         console.log('UK Postcodes API failed:', error)
-      }
-      
-      // Then try Mapbox for additional results
-      try {
-        const mapboxUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(formattedPostcode)}.json?` +
-          `access_token=${mapboxToken}&` +
-          'country=GB&' +
-          'types=postcode,place&' +
-          'limit=10'
-        
-        console.log('Mapbox request URL (postcode only):', mapboxUrl)
-        
-        const response2 = await fetch(mapboxUrl)
-        if (response2.ok) {
-          const data2 = await response2.json()
-          console.log('Mapbox response (postcode only):', JSON.stringify(data2, null, 2))
-          const postcodeAddresses = extractAddresses(data2, formattedPostcode, null)
-          addresses.push(...postcodeAddresses)
-        }
-      } catch (error) {
-        console.log('Postcode search failed:', error)
       }
     }
     
@@ -249,9 +276,9 @@ serve(async (req) => {
       postcode: formattedPostcode
     })
 
-    // Filter out duplicates based on address
+    // Filter out duplicates based on full_address to avoid showing the same address multiple times
     const uniqueAddresses = addresses.filter((addr, index, self) => 
-      index === self.findIndex(a => a.address === addr.address)
+      index === self.findIndex(a => a.full_address === addr.full_address)
     )
 
     console.log('Found', uniqueAddresses.length, 'unique addresses')
