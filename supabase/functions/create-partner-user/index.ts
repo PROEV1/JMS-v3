@@ -41,11 +41,21 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log('Creating user account for:', email);
 
-    // First, check if user already exists
-    const { data: existingUser, error: getUserError } = await supabaseAdmin.auth.admin.getUserByEmail(email);
+    // First, check if user already exists by searching through users
+    const { data: users, error: getUserError } = await supabaseAdmin.auth.admin.listUsers();
+    
+    if (getUserError) {
+      console.error('Error fetching users:', getUserError);
+      return new Response(
+        JSON.stringify({ error: 'Failed to check existing users' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
-    if (existingUser && existingUser.user) {
-      console.log('User already exists:', existingUser.user.id);
+    const existingUser = users.users?.find(user => user.email === email);
+
+    if (existingUser) {
+      console.log('User already exists:', existingUser.id);
       
       // User exists, just send a password reset email
       const { error: resetError } = await supabaseAdmin.auth.admin.generateLink({
@@ -63,7 +73,7 @@ const handler = async (req: Request): Promise<Response> => {
       return new Response(
         JSON.stringify({ 
           success: true, 
-          user: existingUser.user,
+          user: existingUser,
           message: 'User account already exists. Password setup instructions sent via email.',
           userExists: true
         }),
