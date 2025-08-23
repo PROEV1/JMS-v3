@@ -38,19 +38,60 @@ export default function Auth() {
         redirectTo = lastAuthPath;
         console.log('Auth: Using last authenticated path:', lastAuthPath);
       } else {
-        // IMPROVED: Role-aware default fallback
-        const userEmail = user.email || '';
-        console.log('Auth: No saved paths, using role-aware default for:', userEmail);
-        
-        // Simple role detection based on common patterns
-        if (userEmail.includes('admin') || userEmail.includes('manager')) {
-          redirectTo = '/admin';
-        } else if (userEmail.includes('engineer') || userEmail.includes('tech')) {
-          redirectTo = '/engineer';
-        } else {
-          redirectTo = '/client';
-        }
-        console.log('Auth: Role-aware default redirect:', redirectTo);
+        // Check user's actual role in database
+        const checkUserRoleAndRedirect = async () => {
+          try {
+            console.log('Auth: Checking user role in database for:', user.email);
+            
+            // Check if user is a partner user
+            const { data: partnerUser } = await supabase
+              .from('partner_users')
+              .select('partner_id, role')
+              .eq('user_id', user.id)
+              .eq('is_active', true)
+              .single();
+
+            if (partnerUser) {
+              console.log('Auth: User is partner user, redirecting to partner portal');
+              redirectTo = '/partner';
+            } else {
+              // Check profile role
+              const { data: profile } = await supabase
+                .from('profiles')
+                .select('role')
+                .eq('user_id', user.id)
+                .single();
+
+              const userRole = profile?.role || 'client';
+              console.log('Auth: User profile role:', userRole);
+
+              // Role-based redirect
+              if (userRole === 'admin' || userRole === 'manager') {
+                redirectTo = '/admin';
+              } else if (userRole === 'engineer') {
+                redirectTo = '/engineer';
+              } else {
+                redirectTo = '/client';
+              }
+            }
+
+            console.log('Auth: Final redirect target:', redirectTo);
+            
+            // Clear saved paths
+            sessionStorage.removeItem('authRedirectPath');
+            
+            // Navigate to the determined route
+            navigate(redirectTo, { replace: true });
+            
+          } catch (error) {
+            console.error('Auth: Error checking user role:', error);
+            // Fallback to client portal on error
+            navigate('/client', { replace: true });
+          }
+        };
+
+        checkUserRoleAndRedirect();
+        return; // Exit early since we're handling redirect asynchronously
       }
       
       console.log('Auth: Final redirect target:', redirectTo);
