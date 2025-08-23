@@ -96,6 +96,76 @@ export const CreateClientModal = ({ isOpen, onClose, onSuccess }: CreateClientMo
 
       console.log('Client created successfully:', data);
       
+      toast({
+        title: "Success",
+        description: "Client created successfully",
+      });
+      
+      // Send welcome email if it's a new user
+      if (data.isNewUser && data.temporaryPassword) {
+        try {
+          const emailResponse = await supabase.functions.invoke('send-client-invite', {
+            body: {
+              clientId: data.client.id,
+              clientName: formData.full_name,
+              clientEmail: formData.email,
+              temporaryPassword: data.temporaryPassword,
+              siteUrl: window.location.origin,
+              companyName: 'Pro EV',
+              companyLogoUrl: `${window.location.origin}/pro-ev-logo.png`,
+              partnerName: 'ProSpace',
+              partnerLogoUrl: `${window.location.origin}/prospace-logo.png`
+            }
+          });
+          
+          if (emailResponse.error) {
+            console.error("Error sending welcome email:", emailResponse.error);
+            toast({
+              title: "Warning",
+              description: "Client created but welcome email failed to send",
+              variant: "destructive",
+            });
+          } else {
+            toast({
+              title: "Welcome Email Sent",
+              description: `Welcome email sent to ${formData.email}`,
+            });
+          }
+        } catch (emailError) {
+          console.error("Error sending welcome email:", emailError);
+          toast({
+            title: "Warning", 
+            description: "Client created but welcome email failed to send",
+            variant: "destructive",
+          });
+        }
+      } else if (!data.isNewUser) {
+        // Still send email for existing users with next steps
+        try {
+          const emailResponse = await supabase.functions.invoke('send-client-invite', {
+            body: {
+              clientId: data.client.id,
+              clientName: formData.full_name,
+              clientEmail: formData.email,
+              siteUrl: window.location.origin,
+              companyName: 'Pro EV',
+              companyLogoUrl: `${window.location.origin}/pro-ev-logo.png`,
+              partnerName: 'ProSpace',
+              partnerLogoUrl: `${window.location.origin}/prospace-logo.png`
+            }
+          });
+          
+          if (!emailResponse.error) {
+            toast({
+              title: "Welcome Email Sent",
+              description: `Welcome email sent to ${formData.email}`,
+            });
+          }
+        } catch (emailError) {
+          console.error("Error sending welcome email:", emailError);
+        }
+      }
+      
       // Reset form
       setFormData({
         full_name: '',
@@ -105,16 +175,8 @@ export const CreateClientModal = ({ isOpen, onClose, onSuccess }: CreateClientMo
         postcode: ''
       });
       
-      // Close the modal and return the created client data
-      onClose();
       onSuccess(data.client);
-      
-      toast({
-        title: "Success",
-        description: data.isNewUser 
-          ? `Client created successfully${data.temporaryPassword ? ` with temporary password: ${data.temporaryPassword}` : ''}`
-          : "Existing user connected as client successfully",
-      });
+      handleClose();
 
     } catch (error) {
       console.error('Error creating client:', error);
