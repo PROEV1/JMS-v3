@@ -89,24 +89,11 @@ export default function AdminPartnerUsers() {
     mutationFn: async (data: typeof formData) => {
       console.log('Creating partner user with data:', data);
       
-      // First check if a user with this email already exists
-      const { data: existingUser } = await supabase.auth.admin.listUsers();
-      const userExists = existingUser.users.find(u => u.email === data.email);
-      
-      let userId = userExists?.id;
-      
-      // If user doesn't exist, we need to create them first
-      if (!userExists) {
-        // For now, we'll just create the partner_user record without user_id
-        // In a real implementation, you'd want to send an invite or create the auth user
-        userId = null;
-      }
-      
       const { error } = await supabase
         .from('partner_users')
         .insert([{
-          user_id: userId,
           partner_id: partnerId,
+          email: data.email,
           role: data.role,
           permissions: data.permissions,
           is_active: data.is_active
