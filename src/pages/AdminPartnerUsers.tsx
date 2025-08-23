@@ -164,12 +164,8 @@ export default function AdminPartnerUsers() {
     mutationFn: async (user: PartnerUser) => {
       if (!user.email) throw new Error('No email found for user');
       
-      const { error } = await supabase.functions.invoke('send-user-invite', {
-        body: {
-          email: user.email,
-          full_name: user.email.split('@')[0], // Use email prefix as name
-          role: user.role
-        }
+      const { error } = await supabase.auth.admin.inviteUserByEmail(user.email, {
+        redirectTo: `${window.location.origin}/setup-password`
       });
       
       if (error) throw error;
