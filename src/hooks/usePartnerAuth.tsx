@@ -36,7 +36,7 @@ export function usePartnerAuth() {
           .from('partner_users')
           .select(`
             *,
-            partner:partners(
+            partners!inner(
               id,
               name,
               partner_type,
@@ -47,7 +47,7 @@ export function usePartnerAuth() {
           `)
           .eq('user_id', user.id)
           .eq('is_active', true)
-          .maybeSingle();
+          .single();
 
         console.log('usePartnerAuth: Query result:', { data, error });
 

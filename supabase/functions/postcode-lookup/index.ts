@@ -26,9 +26,19 @@ serve(async (req) => {
       )
     }
 
-    const url = new URL(req.url)
-    const postcode = url.searchParams.get('postcode')
-    const houseNumber = url.searchParams.get('house_number')
+    // Handle both GET (query params) and POST (JSON body) requests
+    let postcode: string | null = null;
+    let houseNumber: string | null = null;
+    
+    if (req.method === 'GET') {
+      const url = new URL(req.url)
+      postcode = url.searchParams.get('postcode')
+      houseNumber = url.searchParams.get('house_number')
+    } else if (req.method === 'POST') {
+      const body = await req.json()
+      postcode = body.postcode
+      houseNumber = body.house_number
+    }
 
     if (!postcode) {
       return new Response(
