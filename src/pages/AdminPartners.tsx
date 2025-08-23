@@ -21,7 +21,7 @@ interface Partner {
   slug: string | null;
   base_url: string | null;
   logo_url: string | null;
-  partner_type: 'manufacturer' | 'dealer' | null;
+  partner_type: 'manufacturer' | 'dealer' | 'charger_manufacturer' | null;
   brand_colors: any;
   parent_partner_id: string | null;
   is_active: boolean;
@@ -42,7 +42,7 @@ export default function AdminPartners() {
     slug: '',
     base_url: '',
     logo_url: '',
-    partner_type: '' as 'manufacturer' | 'dealer' | '',
+    partner_type: '' as 'manufacturer' | 'dealer' | 'charger_manufacturer' | '',
     brand_colors: { primary: '#000000', secondary: '#ffffff' },
     parent_partner_id: '',
     is_active: true,
@@ -170,7 +170,7 @@ export default function AdminPartners() {
       slug: '', 
       base_url: '',
       logo_url: '',
-      partner_type: '' as 'manufacturer' | 'dealer' | '',
+      partner_type: '' as 'manufacturer' | 'dealer' | 'charger_manufacturer' | '',
       brand_colors: { primary: '#000000', secondary: '#ffffff' },
       parent_partner_id: '',
       is_active: true,
@@ -187,7 +187,7 @@ export default function AdminPartners() {
       slug: partner.slug || '',
       base_url: partner.base_url || '',
       logo_url: partner.logo_url || '',
-      partner_type: partner.partner_type || '' as 'manufacturer' | 'dealer' | '',
+      partner_type: partner.partner_type || '' as 'manufacturer' | 'dealer' | 'charger_manufacturer' | '',
       brand_colors: partner.brand_colors || { primary: '#000000', secondary: '#ffffff' },
       parent_partner_id: partner.parent_partner_id || '',
       is_active: partner.is_active,
@@ -266,13 +266,14 @@ export default function AdminPartners() {
               
               <div>
                 <Label htmlFor="partner_type">Partner Type</Label>
-                <Select value={formData.partner_type} onValueChange={(value: 'manufacturer' | 'dealer') => setFormData({ ...formData, partner_type: value })}>
+                <Select value={formData.partner_type} onValueChange={(value: 'manufacturer' | 'dealer' | 'charger_manufacturer') => setFormData({ ...formData, partner_type: value })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select partner type" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="manufacturer">Manufacturer</SelectItem>
                     <SelectItem value="dealer">Dealer</SelectItem>
+                    <SelectItem value="charger_manufacturer">Charger Manufacturer</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -285,7 +286,7 @@ export default function AdminPartners() {
                       <SelectValue placeholder="Select parent manufacturer" />
                     </SelectTrigger>
                     <SelectContent>
-                      {partners.filter(p => p.partner_type === 'manufacturer').map(partner => (
+                      {partners.filter(p => p.partner_type === 'manufacturer' || p.partner_type === 'charger_manufacturer').map(partner => (
                         <SelectItem key={partner.id} value={partner.id}>{partner.name}</SelectItem>
                       ))}
                     </SelectContent>
@@ -416,7 +417,7 @@ export default function AdminPartners() {
                     {partner.partner_type && (
                       <Badge variant="outline">
                         {partner.partner_type === 'manufacturer' ? <Building2 className="h-3 w-3 mr-1" /> : null}
-                        {partner.partner_type}
+                        {partner.partner_type === 'charger_manufacturer' ? 'Charger Manufacturer' : partner.partner_type}
                       </Badge>
                     )}
                   </CardTitle>

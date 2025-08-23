@@ -19,7 +19,7 @@ interface PartnerUser {
   user_id: string | null;
   partner_id: string;
   email?: string; // Make optional since it might not be in database yet
-  role: 'partner_manufacturer' | 'partner_dealer';
+  role: 'partner_manufacturer' | 'partner_dealer' | 'partner_charger_manufacturer';
   permissions: any;
   is_active: boolean;
   created_at: string;
@@ -43,7 +43,7 @@ export default function AdminPartnerUsers() {
   const [showDialog, setShowDialog] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
-    role: '' as 'partner_manufacturer' | 'partner_dealer' | '',
+    role: '' as 'partner_manufacturer' | 'partner_dealer' | 'partner_charger_manufacturer' | '',
     permissions: {
       can_upload_jobs: true,
       can_view_jobs: true,
@@ -157,7 +157,7 @@ export default function AdminPartnerUsers() {
   const resetForm = () => {
     setFormData({
       email: '',
-      role: '' as 'partner_manufacturer' | 'partner_dealer' | '',
+      role: '' as 'partner_manufacturer' | 'partner_dealer' | 'partner_charger_manufacturer' | '',
       permissions: {
         can_upload_jobs: true,
         can_view_jobs: true,
@@ -260,13 +260,14 @@ export default function AdminPartnerUsers() {
             
             <div>
               <Label htmlFor="role">Role</Label>
-              <Select value={formData.role} onValueChange={(value: 'partner_manufacturer' | 'partner_dealer') => setFormData({ ...formData, role: value })}>
+              <Select value={formData.role} onValueChange={(value: 'partner_manufacturer' | 'partner_dealer' | 'partner_charger_manufacturer') => setFormData({ ...formData, role: value })}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="partner_manufacturer">Partner Manufacturer</SelectItem>
                   <SelectItem value="partner_dealer">Partner Dealer</SelectItem>
+                  <SelectItem value="partner_charger_manufacturer">Partner Charger Manufacturer</SelectItem>
                 </SelectContent>
               </Select>
             </div>
