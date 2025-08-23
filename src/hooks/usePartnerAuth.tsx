@@ -59,10 +59,17 @@ export function usePartnerAuth() {
           .from('partners')
           .select('id, name, partner_type, logo_url, brand_colors, parent_partner_id')
           .eq('id', partnerUserData.partner_id)
-          .single();
+          .maybeSingle();
 
         if (partnerError) {
           console.error('Error fetching partner:', partnerError);
+          setPartnerUser(null);
+          setLoading(false);
+          return;
+        }
+
+        if (!partnerData) {
+          console.error('Partner record not found for partner_id:', partnerUserData.partner_id);
           setPartnerUser(null);
           setLoading(false);
           return;
