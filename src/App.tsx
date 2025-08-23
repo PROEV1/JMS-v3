@@ -24,6 +24,7 @@ import AdminProducts from "./pages/AdminProducts";
 import AdminMessages from "./pages/AdminMessages";
 import AdminSettings from "./pages/AdminSettings";
 import AdminPartners from "./pages/AdminPartners";
+import AdminPartnerUsers from "./pages/AdminPartnerUsers";
 import AdminPartnerProfiles from "./pages/AdminPartnerProfiles";
 import AdminEngineers from "./pages/AdminEngineers";
 import AdminSchedule from "./pages/AdminSchedule";

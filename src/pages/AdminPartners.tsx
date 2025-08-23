@@ -9,7 +9,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Edit, Trash2, FileSpreadsheet, Settings } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Plus, Edit, Trash2, Users, Settings, Upload, Building2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
@@ -19,6 +20,10 @@ interface Partner {
   name: string;
   slug: string | null;
   base_url: string | null;
+  logo_url: string | null;
+  partner_type: 'manufacturer' | 'dealer' | null;
+  brand_colors: any;
+  parent_partner_id: string | null;
   is_active: boolean;
   client_payment_required: boolean;
   client_agreement_required: boolean;
@@ -36,10 +41,15 @@ export default function AdminPartners() {
     name: '',
     slug: '',
     base_url: '',
+    logo_url: '',
+    partner_type: '' as 'manufacturer' | 'dealer' | '',
+    brand_colors: { primary: '#000000', secondary: '#ffffff' },
+    parent_partner_id: '',
     is_active: true,
     client_payment_required: true,
     client_agreement_required: true
   });
+  const [logoFile, setLogoFile] = useState<File | null>(null);
 
   const { data: partners, isLoading } = useQuery({
     queryKey: ['partners'],
@@ -56,12 +66,35 @@ export default function AdminPartners() {
 
   const createPartnerMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
+      let logoUrl = data.logo_url;
+      
+      // Upload logo if file is provided
+      if (logoFile) {
+        const fileExt = logoFile.name.split('.').pop();
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('partner-logos')
+          .upload(fileName, logoFile);
+          
+        if (uploadError) throw uploadError;
+        
+        const { data: { publicUrl } } = supabase.storage
+          .from('partner-logos')
+          .getPublicUrl(fileName);
+        logoUrl = publicUrl;
+      }
+      
       const { error } = await supabase
         .from('partners')
         .insert([{
           name: data.name,
           slug: data.slug || null,
           base_url: data.base_url || null,
+          logo_url: logoUrl || null,
+          partner_type: data.partner_type || null,
+          brand_colors: data.brand_colors,
+          parent_partner_id: data.parent_partner_id || null,
           is_active: data.is_active,
           client_payment_required: data.client_payment_required,
           client_agreement_required: data.client_agreement_required
@@ -82,12 +115,35 @@ export default function AdminPartners() {
 
   const updatePartnerMutation = useMutation({
     mutationFn: async (data: { id: string } & typeof formData) => {
+      let logoUrl = data.logo_url;
+      
+      // Upload new logo if file is provided
+      if (logoFile) {
+        const fileExt = logoFile.name.split('.').pop();
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('partner-logos')
+          .upload(fileName, logoFile);
+          
+        if (uploadError) throw uploadError;
+        
+        const { data: { publicUrl } } = supabase.storage
+          .from('partner-logos')
+          .getPublicUrl(fileName);
+        logoUrl = publicUrl;
+      }
+      
       const { error } = await supabase
         .from('partners')
         .update({
           name: data.name,
           slug: data.slug || null,
           base_url: data.base_url || null,
+          logo_url: logoUrl || null,
+          partner_type: data.partner_type || null,
+          brand_colors: data.brand_colors,
+          parent_partner_id: data.parent_partner_id || null,
           is_active: data.is_active,
           client_payment_required: data.client_payment_required,
           client_agreement_required: data.client_agreement_required
@@ -112,11 +168,16 @@ export default function AdminPartners() {
     setFormData({ 
       name: '', 
       slug: '', 
-      base_url: '', 
+      base_url: '',
+      logo_url: '',
+      partner_type: '' as 'manufacturer' | 'dealer' | '',
+      brand_colors: { primary: '#000000', secondary: '#ffffff' },
+      parent_partner_id: '',
       is_active: true,
       client_payment_required: true,
       client_agreement_required: true
     });
+    setLogoFile(null);
   };
 
   const handleEdit = (partner: Partner) => {
@@ -125,10 +186,15 @@ export default function AdminPartners() {
       name: partner.name,
       slug: partner.slug || '',
       base_url: partner.base_url || '',
+      logo_url: partner.logo_url || '',
+      partner_type: partner.partner_type || '' as 'manufacturer' | 'dealer' | '',
+      brand_colors: partner.brand_colors || { primary: '#000000', secondary: '#ffffff' },
+      parent_partner_id: partner.parent_partner_id || '',
       is_active: partner.is_active,
       client_payment_required: partner.client_payment_required,
       client_agreement_required: partner.client_agreement_required
     });
+    setLogoFile(null);
     setShowDialog(true);
   };
 
@@ -197,6 +263,78 @@ export default function AdminPartners() {
                   required
                 />
               </div>
+              
+              <div>
+                <Label htmlFor="partner_type">Partner Type</Label>
+                <Select value={formData.partner_type} onValueChange={(value: 'manufacturer' | 'dealer') => setFormData({ ...formData, partner_type: value })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select partner type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="manufacturer">Manufacturer</SelectItem>
+                    <SelectItem value="dealer">Dealer</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {formData.partner_type === 'dealer' && partners && (
+                <div>
+                  <Label htmlFor="parent_partner_id">Parent Manufacturer</Label>
+                  <Select value={formData.parent_partner_id} onValueChange={(value) => setFormData({ ...formData, parent_partner_id: value })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select parent manufacturer" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {partners.filter(p => p.partner_type === 'manufacturer').map(partner => (
+                        <SelectItem key={partner.id} value={partner.id}>{partner.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              <div>
+                <Label htmlFor="logo">Logo</Label>
+                <Input
+                  id="logo"
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setLogoFile(e.target.files?.[0] || null)}
+                />
+                {formData.logo_url && (
+                  <div className="mt-2">
+                    <img src={formData.logo_url} alt="Current logo" className="h-12 w-auto rounded" />
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="primary_color">Primary Brand Color</Label>
+                  <Input
+                    id="primary_color"
+                    type="color"
+                    value={formData.brand_colors.primary}
+                    onChange={(e) => setFormData({ 
+                      ...formData, 
+                      brand_colors: { ...formData.brand_colors, primary: e.target.value } 
+                    })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="secondary_color">Secondary Brand Color</Label>
+                  <Input
+                    id="secondary_color"
+                    type="color"
+                    value={formData.brand_colors.secondary}
+                    onChange={(e) => setFormData({ 
+                      ...formData, 
+                      brand_colors: { ...formData.brand_colors, secondary: e.target.value } 
+                    })}
+                  />
+                </div>
+              </div>
+              
               <div>
                 <Label htmlFor="slug">Slug (optional)</Label>
                 <Input
@@ -265,29 +403,48 @@ export default function AdminPartners() {
         {partners?.map((partner) => (
           <Card key={partner.id}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  {partner.name}
-                  <Badge variant={partner.is_active ? 'default' : 'secondary'}>
-                    {partner.is_active ? 'Active' : 'Inactive'}
-                  </Badge>
-                </CardTitle>
-                {partner.slug && (
-                  <p className="text-sm text-muted-foreground">Slug: {partner.slug}</p>
+              <div className="flex gap-4">
+                {partner.logo_url && (
+                  <img src={partner.logo_url} alt={`${partner.name} logo`} className="h-12 w-auto rounded" />
                 )}
-                {partner.base_url && (
-                  <p className="text-sm text-muted-foreground">URL: {partner.base_url}</p>
-                )}
-                <div className="flex gap-2 mt-2">
-                  {!partner.client_payment_required && (
-                    <Badge variant="outline" className="text-xs">Payment Not Required</Badge>
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    {partner.name}
+                    <Badge variant={partner.is_active ? 'default' : 'secondary'}>
+                      {partner.is_active ? 'Active' : 'Inactive'}
+                    </Badge>
+                    {partner.partner_type && (
+                      <Badge variant="outline">
+                        {partner.partner_type === 'manufacturer' ? <Building2 className="h-3 w-3 mr-1" /> : null}
+                        {partner.partner_type}
+                      </Badge>
+                    )}
+                  </CardTitle>
+                  {partner.slug && (
+                    <p className="text-sm text-muted-foreground">Slug: {partner.slug}</p>
                   )}
-                  {!partner.client_agreement_required && (
-                    <Badge variant="outline" className="text-xs">Agreement Not Required</Badge>
+                  {partner.base_url && (
+                    <p className="text-sm text-muted-foreground">URL: {partner.base_url}</p>
                   )}
+                  <div className="flex gap-2 mt-2">
+                    {!partner.client_payment_required && (
+                      <Badge variant="outline" className="text-xs">Payment Not Required</Badge>
+                    )}
+                    {!partner.client_agreement_required && (
+                      <Badge variant="outline" className="text-xs">Agreement Not Required</Badge>
+                    )}
+                  </div>
                 </div>
               </div>
               <div className="flex space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate(`/admin/partners/${partner.id}/users`)}
+                >
+                  <Users className="h-4 w-4 mr-1" />
+                  Users
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"
