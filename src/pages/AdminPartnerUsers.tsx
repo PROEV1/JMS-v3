@@ -18,12 +18,13 @@ interface PartnerUser {
   id: string;
   user_id: string | null;
   partner_id: string;
-  email: string;
+  email?: string; // Make optional since it might not be in database yet
   role: 'partner_manufacturer' | 'partner_dealer';
   permissions: any;
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  created_by?: string;
 }
 
 interface Partner {
@@ -351,7 +352,7 @@ export default function AdminPartnerUsers() {
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
               <div>
                 <CardTitle className="flex items-center gap-2">
-                  {user.email}
+                  {user.email || 'No email'}
                   <Badge variant={user.is_active ? 'default' : 'secondary'}>
                     {user.is_active ? 'Active' : 'Inactive'}
                   </Badge>
@@ -384,7 +385,7 @@ export default function AdminPartnerUsers() {
                     <AlertDialogHeader>
                       <AlertDialogTitle>Delete Partner User</AlertDialogTitle>
                       <AlertDialogDescription>
-                        Are you sure you want to delete "{user.email}"? This action cannot be undone.
+                        Are you sure you want to delete "{user.email || 'this user'}"? This action cannot be undone.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
