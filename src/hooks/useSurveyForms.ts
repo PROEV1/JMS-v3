@@ -232,6 +232,26 @@ export function useSurveyFormMappings() {
   });
 }
 
+export function useDeleteSurveyForm() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (formId: string) => {
+      // Delete the survey form (CASCADE will handle versions and mappings)
+      const { error } = await supabase
+        .from('survey_forms')
+        .delete()
+        .eq('id', formId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['survey-forms'] });
+      queryClient.invalidateQueries({ queryKey: ['survey-form-mappings'] });
+    }
+  });
+}
+
 export function useUpdateSurveyFormMapping() {
   const queryClient = useQueryClient();
 
