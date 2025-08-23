@@ -44,26 +44,22 @@ export function PartnerJobUpload({ partnerUser }: PartnerJobUploadProps) {
 
   const postcodeLogicMutation = useMutation({
     mutationFn: async (params: { postcode: string; house_number?: string }) => {
-      const searchParams = new URLSearchParams();
-      searchParams.set('postcode', params.postcode);
-      if (params.house_number) {
-        searchParams.set('house_number', params.house_number);
-      }
+      console.log('Looking up postcode:', params);
       
-      const response = await fetch(
-        `https://qvppvstgconmzzjsryna.supabase.co/functions/v1/postcode-lookup?${searchParams}`,
-        {
-          headers: {
-            'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF2cHB2c3RnY29ubXp6anNyeW5hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUyNTYxNjEsImV4cCI6MjA3MDgzMjE2MX0.3hJXqRe_xTpIhdIIEDBgG-8qc23UCRMwpLaf2zV0Se8`,
-          }
+      const { data, error } = await supabase.functions.invoke('postcode-lookup', {
+        body: {
+          postcode: params.postcode,
+          house_number: params.house_number
         }
-      );
+      });
       
-      if (!response.ok) {
-        throw new Error('Failed to lookup postcode');
+      if (error) {
+        console.error('Postcode lookup error:', error);
+        throw error;
       }
       
-      return response.json();
+      console.log('Postcode lookup result:', data);
+      return data;
     },
     onSuccess: (result) => {
       setAddressResults(result.addresses || []);

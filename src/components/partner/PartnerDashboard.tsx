@@ -81,12 +81,24 @@ export function PartnerDashboard({ partnerUser }: PartnerDashboardProps) {
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              {logoUrl && (
+              {logoUrl ? (
                 <img 
                   src={logoUrl} 
                   alt={`${partnerName} logo`}
                   className="h-10 w-auto"
+                  onError={(e) => {
+                    console.error('Logo failed to load:', logoUrl);
+                  }}
                 />
+              ) : (
+                <div
+                  className="h-10 w-10 rounded-lg flex items-center justify-center text-white font-bold text-sm"
+                  style={{ 
+                    backgroundColor: brandColors.primary || '#dc2626' 
+                  }}
+                >
+                  {partnerName.charAt(0).toUpperCase()}
+                </div>
               )}
               <div>
                 <h1 className="text-2xl font-bold text-foreground">
