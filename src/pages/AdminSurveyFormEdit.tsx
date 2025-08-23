@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { SurveyFormBuilder } from '@/components/admin/forms/SurveyFormBuilder';
 import { useSurveyFormVersion, useUpdateSurveyFormVersion, usePublishSurveyFormVersion } from '@/hooks/useSurveyForms';
@@ -12,8 +12,16 @@ export default function AdminSurveyFormEdit() {
   const { data: version, isLoading } = useSurveyFormVersion(versionId!);
   const updateVersion = useUpdateSurveyFormVersion();
   const publishVersion = usePublishSurveyFormVersion();
+  
+  const [localSchema, setLocalSchema] = useState(null);
 
-  if (isLoading || !version) {
+  useEffect(() => {
+    if (version?.schema) {
+      setLocalSchema(version.schema);
+    }
+  }, [version?.schema]);
+
+  if (isLoading || !version || !localSchema) {
     return <div className="p-6">Loading...</div>;
   }
 
@@ -21,7 +29,7 @@ export default function AdminSurveyFormEdit() {
     try {
       await updateVersion.mutateAsync({
         versionId: version.id,
-        schema: version.schema
+        schema: localSchema
       });
       toast({
         title: "Form saved",
@@ -54,12 +62,12 @@ export default function AdminSurveyFormEdit() {
   };
 
   const handleSchemaChange = (schema: any) => {
-    // Update local state - the actual save happens when user clicks save
+    setLocalSchema(schema);
   };
 
   return (
     <SurveyFormBuilder
-      schema={version.schema}
+      schema={localSchema}
       onSchemaChange={handleSchemaChange}
       onSave={handleSave}
       onPublish={handlePublish}
