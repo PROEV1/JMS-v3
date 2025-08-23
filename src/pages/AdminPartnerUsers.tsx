@@ -35,7 +35,7 @@ interface Partner {
 }
 
 export default function AdminPartnerUsers() {
-  const { partnerId } = useParams<{ partnerId: string }>();
+  const { id: partnerId } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
