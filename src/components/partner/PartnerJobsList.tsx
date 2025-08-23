@@ -14,11 +14,12 @@ interface PartnerUser {
 
 interface PartnerJobsListProps {
   partnerUser: PartnerUser;
+  statusFilter?: 'total' | 'completed' | 'scheduled' | 'pending';
 }
 
-export function PartnerJobsList({ partnerUser }: PartnerJobsListProps) {
+export function PartnerJobsList({ partnerUser, statusFilter }: PartnerJobsListProps) {
   const { data: jobs, isLoading } = useQuery({
-    queryKey: ['partner-jobs', partnerUser.partner_id],
+    queryKey: ['partner-jobs', partnerUser.partner_id, statusFilter],
     queryFn: async () => {
       let query = supabase
         .from('orders')
@@ -49,6 +50,23 @@ export function PartnerJobsList({ partnerUser }: PartnerJobsListProps) {
 
       const { data, error } = await query;
       if (error) throw error;
+      
+      // Apply status filter if provided
+      if (statusFilter && statusFilter !== 'total' && data) {
+        return data.filter(job => {
+          switch (statusFilter) {
+            case 'completed':
+              return job.status_enhanced === 'completed';
+            case 'scheduled':
+              return job.status_enhanced === 'scheduled';
+            case 'pending':
+              return ['awaiting_payment', 'awaiting_agreement', 'awaiting_install_booking'].includes(job.status_enhanced);
+            default:
+              return true;
+          }
+        });
+      }
+      
       return data;
     }
   });
@@ -93,9 +111,12 @@ export function PartnerJobsList({ partnerUser }: PartnerJobsListProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Your Jobs</CardTitle>
+        <CardTitle>
+          Your Jobs
+          {statusFilter && statusFilter !== 'total' && ` - ${statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)}`}
+        </CardTitle>
         <CardDescription>
-          {jobs?.length || 0} total jobs
+          {jobs?.length || 0} {statusFilter && statusFilter !== 'total' ? statusFilter : 'total'} jobs
         </CardDescription>
       </CardHeader>
       <CardContent>

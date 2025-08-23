@@ -32,6 +32,7 @@ interface PartnerDashboardProps {
 
 export function PartnerDashboard({ partnerUser }: PartnerDashboardProps) {
   const [activeTab, setActiveTab] = useState('overview');
+  const [jobsFilter, setJobsFilter] = useState<'total' | 'completed' | 'scheduled' | 'pending' | undefined>();
 
   // Debug log to see the exact structure
   console.log('PartnerDashboard: Received partnerUser:', JSON.stringify(partnerUser, null, 2));
@@ -62,6 +63,11 @@ export function PartnerDashboard({ partnerUser }: PartnerDashboardProps) {
   const partnerType = partnerUser?.partner?.partner_type || 'Partner';
 
   console.log('PartnerDashboard: Using brandColors:', brandColors);
+
+  const handleMetricClick = (metric: 'total' | 'completed' | 'scheduled' | 'pending') => {
+    setJobsFilter(metric);
+    setActiveTab('jobs');
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -138,7 +144,7 @@ export function PartnerDashboard({ partnerUser }: PartnerDashboardProps) {
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <PartnerMetrics partnerUser={partnerUser} />
+                    <PartnerMetrics partnerUser={partnerUser} onMetricClick={handleMetricClick} />
                   </div>
                 </CardContent>
               </Card>
@@ -150,7 +156,7 @@ export function PartnerDashboard({ partnerUser }: PartnerDashboardProps) {
           </TabsContent>
 
           <TabsContent value="jobs">
-            <PartnerJobsList partnerUser={partnerUser} />
+            <PartnerJobsList partnerUser={partnerUser} statusFilter={jobsFilter} />
           </TabsContent>
         </Tabs>
       </div>

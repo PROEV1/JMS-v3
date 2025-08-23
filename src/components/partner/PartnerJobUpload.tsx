@@ -112,8 +112,9 @@ export function PartnerJobUpload({ partnerUser }: PartnerJobUploadProps) {
     },
     onSuccess: () => {
       toast({
-        title: 'Success',
-        description: uploadType === 'csv' ? 'CSV uploaded successfully' : 'Job created successfully'
+        title: '✅ Success!',
+        description: uploadType === 'csv' ? 'CSV uploaded successfully' : 'Job created successfully',
+        duration: 5000,
       });
       
       // Reset forms

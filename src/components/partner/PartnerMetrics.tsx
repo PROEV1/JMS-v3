@@ -12,9 +12,10 @@ interface PartnerUser {
 
 interface PartnerMetricsProps {
   partnerUser: PartnerUser;
+  onMetricClick?: (metric: 'total' | 'completed' | 'scheduled' | 'pending') => void;
 }
 
-export function PartnerMetrics({ partnerUser }: PartnerMetricsProps) {
+export function PartnerMetrics({ partnerUser, onMetricClick }: PartnerMetricsProps) {
   const { data: metrics, isLoading } = useQuery({
     queryKey: ['partner-metrics', partnerUser.partner_id],
     queryFn: async () => {
@@ -73,35 +74,43 @@ export function PartnerMetrics({ partnerUser }: PartnerMetricsProps) {
       title: 'Total Jobs',
       value: metrics?.total || 0,
       icon: Calendar,
-      description: 'All jobs submitted'
+      description: 'All jobs submitted',
+      key: 'total' as const
     },
     {
       title: 'Completed',
       value: metrics?.completed || 0,
       icon: CheckCircle,
       description: `${metrics?.completionRate || 0}% completion rate`,
-      className: 'text-green-600'
+      className: 'text-green-600',
+      key: 'completed' as const
     },
     {
       title: 'Scheduled',
       value: metrics?.scheduled || 0,
       icon: Clock,
       description: 'Jobs with confirmed dates',
-      className: 'text-blue-600'
+      className: 'text-blue-600',
+      key: 'scheduled' as const
     },
     {
       title: 'Pending',
       value: metrics?.pending || 0,
       icon: AlertCircle,
       description: 'Awaiting action',
-      className: 'text-amber-600'
+      className: 'text-amber-600',
+      key: 'pending' as const
     }
   ];
 
   return (
     <>
       {metricCards.map((metric, index) => (
-        <Card key={index}>
+        <Card 
+          key={index}
+          className={onMetricClick ? "cursor-pointer hover:shadow-md transition-shadow" : ""}
+          onClick={() => onMetricClick?.(metric.key)}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
               {metric.title}
