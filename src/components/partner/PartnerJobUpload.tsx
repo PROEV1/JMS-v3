@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Upload, FileSpreadsheet, Plus, Loader2 } from 'lucide-react';
+import { Upload, FileSpreadsheet, Plus, Loader2, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface PartnerUser {
@@ -32,12 +32,51 @@ export function PartnerJobUpload({ partnerUser }: PartnerJobUploadProps) {
     client_phone: '',
     job_address: '',
     postcode: '',
+    house_number: '',
     job_type: 'installation',
     notes: ''
   });
+  const [addressResults, setAddressResults] = useState<any[]>([]);
+  const [isLookingUp, setIsLookingUp] = useState(false);
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  const postcodeLogicMutation = useMutation({
+    mutationFn: async (params: { postcode: string; house_number?: string }) => {
+      const searchParams = new URLSearchParams();
+      searchParams.set('postcode', params.postcode);
+      if (params.house_number) {
+        searchParams.set('house_number', params.house_number);
+      }
+      
+      const response = await fetch(
+        `https://qvppvstgconmzzjsryna.supabase.co/functions/v1/postcode-lookup?${searchParams}`,
+        {
+          headers: {
+            'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF2cHB2c3RnY29ubXp6anNyeW5hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUyNTYxNjEsImV4cCI6MjA3MDgzMjE2MX0.3hJXqRe_xTpIhdIIEDBgG-8qc23UCRMwpLaf2zV0Se8`,
+          }
+        }
+      );
+      
+      if (!response.ok) {
+        throw new Error('Failed to lookup postcode');
+      }
+      
+      return response.json();
+    },
+    onSuccess: (result) => {
+      setAddressResults(result.addresses || []);
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Address Lookup Failed',
+        description: error.message || 'Could not find addresses for this postcode',
+        variant: 'destructive'
+      });
+      setAddressResults([]);
+    }
+  });
 
   const uploadMutation = useMutation({
     mutationFn: async (data: { type: 'csv' | 'manual'; payload: any }) => {
@@ -54,42 +93,21 @@ export function PartnerJobUpload({ partnerUser }: PartnerJobUploadProps) {
         if (error) throw error;
         return result;
       } else {
-        // Handle manual job creation
-        const { data: client, error: clientError } = await supabase
-          .from('clients')
-          .insert({
-            full_name: data.payload.client_name,
-            email: data.payload.client_email,
-            phone: data.payload.client_phone,
-            address: data.payload.job_address,
-            postcode: data.payload.postcode,
-            is_partner_client: true,
-            partner_id: partnerUser.partner_id
-          })
-          .select()
-          .single();
-
-        if (clientError) throw clientError;
-
-        const { data: order, error: orderError } = await supabase
-          .from('orders')
-          .insert({
-            client_id: client.id,
-            partner_id: partnerUser.partner_id,
-            is_partner_job: true,
-            job_type: data.payload.job_type,
+        // Handle manual job creation via new edge function
+        const { data: result, error } = await supabase.functions.invoke('partner-create-job', {
+          body: {
+            client_name: data.payload.client_name,
+            client_email: data.payload.client_email,
+            client_phone: data.payload.client_phone,
             job_address: data.payload.job_address,
             postcode: data.payload.postcode,
-            installation_notes: data.payload.notes,
-            status: 'awaiting_payment',
-            total_amount: 0,
-            order_number: 'TEMP'
-          })
-          .select()
-          .single();
-
-        if (orderError) throw orderError;
-        return order;
+            job_type: data.payload.job_type,
+            notes: data.payload.notes
+          }
+        });
+        
+        if (error) throw error;
+        return result;
       }
     },
     onSuccess: () => {
@@ -106,9 +124,11 @@ export function PartnerJobUpload({ partnerUser }: PartnerJobUploadProps) {
         client_phone: '',
         job_address: '',
         postcode: '',
+        house_number: '',
         job_type: 'installation',
         notes: ''
       });
+      setAddressResults([]);
       
       // Refresh partner jobs
       queryClient.invalidateQueries({ queryKey: ['partner-jobs'] });
@@ -125,6 +145,36 @@ export function PartnerJobUpload({ partnerUser }: PartnerJobUploadProps) {
   const handleCsvUpload = () => {
     if (!csvFile) return;
     uploadMutation.mutate({ type: 'csv', payload: { file: csvFile } });
+  };
+
+  const handleAddressLookup = async () => {
+    if (!manualJob.postcode.trim()) {
+      toast({
+        title: 'Postcode Required',
+        description: 'Please enter a postcode to search for addresses',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    setIsLookingUp(true);
+    try {
+      await postcodeLogicMutation.mutateAsync({
+        postcode: manualJob.postcode,
+        house_number: manualJob.house_number || undefined
+      });
+    } finally {
+      setIsLookingUp(false);
+    }
+  };
+
+  const handleSelectAddress = (address: any) => {
+    setManualJob({
+      ...manualJob,
+      job_address: address.address,
+      postcode: address.postcode
+    });
+    setAddressResults([]);
   };
 
   const handleManualSubmit = (e: React.FormEvent) => {
@@ -242,14 +292,67 @@ export function PartnerJobUpload({ partnerUser }: PartnerJobUploadProps) {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="postcode">Postcode</Label>
+                    <Label htmlFor="house_number">House No. (Optional)</Label>
+                    <Input
+                      id="house_number"
+                      value={manualJob.house_number}
+                      onChange={(e) => setManualJob({ ...manualJob, house_number: e.target.value })}
+                      placeholder="e.g., 123 or Flat 4A"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="postcode">Postcode</Label>
+                  <div className="flex gap-2">
                     <Input
                       id="postcode"
                       value={manualJob.postcode}
-                      onChange={(e) => setManualJob({ ...manualJob, postcode: e.target.value })}
+                      onChange={(e) => {
+                        setManualJob({ ...manualJob, postcode: e.target.value });
+                        setAddressResults([]);
+                      }}
+                      onBlur={() => {
+                        if (manualJob.postcode) {
+                          const normalized = manualJob.postcode.replace(/\s/g, '').toUpperCase();
+                          const formatted = normalized.replace(/^([A-Z]{1,2}\d{1,2}[A-Z]?)(\d[A-Z]{2})$/, '$1 $2');
+                          setManualJob({ ...manualJob, postcode: formatted });
+                        }
+                      }}
+                      placeholder="e.g., SW1A 1AA"
                       required
                     />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleAddressLookup}
+                      disabled={isLookingUp || !manualJob.postcode.trim()}
+                    >
+                      {isLookingUp ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Search className="h-4 w-4" />
+                      )}
+                    </Button>
                   </div>
+                  
+                  {addressResults.length > 0 && (
+                    <div className="mt-2 border rounded-md bg-background">
+                      <div className="p-2 text-sm font-medium border-b">Select Address:</div>
+                      <div className="max-h-40 overflow-y-auto">
+                        {addressResults.map((address, index) => (
+                          <button
+                            key={index}
+                            type="button"
+                            className="w-full text-left p-2 hover:bg-muted text-sm border-b last:border-b-0"
+                            onClick={() => handleSelectAddress(address)}
+                          >
+                            {address.address}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div>
