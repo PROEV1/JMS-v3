@@ -106,66 +106,84 @@ serve(async (req) => {
 
     let addresses: AddressResult[] = [];
     
-    // Strategy 1: If we have a house number, try searching with it
+    // Strategy 1: Try UK's official address lookup if we have a house number
     if (houseNumber) {
-      console.log('Trying search with house number...')
-      const searchQuery = `${houseNumber} ${formattedPostcode}`
-      const mapboxUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchQuery)}.json?` +
-        `access_token=${mapboxToken}&` +
-        'country=GB&' +
-        'types=address&' +
-        'limit=10'
-      
-      console.log('Mapbox request URL (with house):', mapboxUrl)
-      
+      console.log('Trying UK Address API with house number...')
       try {
-        const response1 = await fetch(mapboxUrl)
-        if (response1.ok) {
-          const data1 = await response1.json()
-          console.log('Mapbox response (with house number):', JSON.stringify(data1, null, 2))
-          addresses = extractAddresses(data1, formattedPostcode, houseNumber)
+        // Try postcodes.io nearest endpoint which can find addresses
+        const ukNearestUrl = `https://api.postcodes.io/postcodes/${encodeURIComponent(formattedPostcode)}/nearest`
+        const nearestResponse = await fetch(ukNearestUrl)
+        
+        if (nearestResponse.ok) {
+          const nearestData = await nearestResponse.json()
+          console.log('UK Postcodes nearest response:', JSON.stringify(nearestData, null, 2))
         }
-      } catch (error) {
-        console.log('House number search failed:', error)
-      }
-    }
-    
-    // Strategy 2: If no results or no house number, search just the postcode
-    if (addresses.length === 0) {
-      console.log('Trying postcode-only search...')
-      const mapboxUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(formattedPostcode)}.json?` +
-        `access_token=${mapboxToken}&` +
-        'country=GB&' +
-        'types=postcode,place&' +
-        'limit=10'
-      
-      console.log('Mapbox request URL (postcode only):', mapboxUrl)
-      
-      try {
-        const response2 = await fetch(mapboxUrl)
-        if (response2.ok) {
-          const data2 = await response2.json()
-          console.log('Mapbox response (postcode only):', JSON.stringify(data2, null, 2))
-          const postcodeAddresses = extractAddresses(data2, formattedPostcode, null)
-          addresses.push(...postcodeAddresses)
+
+        // Try the main postcode lookup to get area info
+        const ukApiUrl = `https://api.postcodes.io/postcodes/${encodeURIComponent(formattedPostcode)}`
+        const ukResponse = await fetch(ukApiUrl)
+        
+        if (ukResponse.ok) {
+          const ukData = await ukResponse.json()
+          console.log('UK Postcodes API response:', JSON.stringify(ukData, null, 2))
           
-          // If we found postcode area, create generic address options
-          if (postcodeAddresses.length > 0) {
+          if (ukData.status === 200 && ukData.result) {
+            const result = ukData.result
+            // Create a detailed address with the house number and area information
+            const fullAddress = `${houseNumber} ${result.admin_ward || ''}, ${result.admin_district || result.parish || ''}, ${formattedPostcode}`.replace(/\s+/g, ' ').trim()
             addresses.push({
-              address: `${formattedPostcode} - Enter full address manually`,
-              full_address: `${formattedPostcode}, United Kingdom`,
+              address: fullAddress,
+              full_address: fullAddress,
               postcode: formattedPostcode
             })
           }
         }
       } catch (error) {
-        console.log('Postcode search failed:', error)
+        console.log('UK Address API failed:', error)
       }
     }
     
-    // Strategy 3: UK Postcode API fallback (if still no results)
+    // Strategy 2: Try Mapbox with house number (multiple variations)
+    if (houseNumber && addresses.length === 0) {
+      console.log('Trying Mapbox with house number variations...')
+      
+      const searchVariations = [
+        `${houseNumber} ${formattedPostcode}`,
+        `${houseNumber}, ${formattedPostcode}`,
+        `${formattedPostcode} ${houseNumber}`,
+      ];
+      
+      for (const searchQuery of searchVariations) {
+        try {
+          const mapboxUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchQuery)}.json?` +
+            `access_token=${mapboxToken}&` +
+            'country=GB&' +
+            'types=address,poi&' +
+            'limit=10'
+          
+          console.log('Mapbox request URL (variation):', mapboxUrl)
+          
+          const response = await fetch(mapboxUrl)
+          if (response.ok) {
+            const data = await response.json()
+            console.log('Mapbox response (variation):', JSON.stringify(data, null, 2))
+            const foundAddresses = extractAddresses(data, formattedPostcode, houseNumber)
+            if (foundAddresses.length > 0) {
+              addresses.push(...foundAddresses)
+              break; // Stop if we found addresses
+            }
+          }
+        } catch (error) {
+          console.log('Mapbox variation search failed:', error)
+        }
+      }
+    }
+    
+    // Strategy 3: Search just the postcode to get area information
     if (addresses.length === 0) {
-      console.log('Trying UK Postcode API fallback...')
+      console.log('Trying postcode-only search...')
+      
+      // First try UK Postcodes API for detailed area info
       try {
         const ukApiUrl = `https://api.postcodes.io/postcodes/${encodeURIComponent(formattedPostcode)}`
         const ukResponse = await fetch(ukApiUrl)
@@ -176,6 +194,21 @@ serve(async (req) => {
           
           if (ukData.status === 200 && ukData.result) {
             const result = ukData.result
+            
+            if (houseNumber) {
+              // Create a constructed address with available information
+              const streetInfo = result.admin_ward || result.parish || 'Street'
+              const area = result.admin_district || result.country || 'Area'
+              const constructedAddress = `${houseNumber} ${streetInfo}, ${area}, ${formattedPostcode}`
+              
+              addresses.push({
+                address: constructedAddress,
+                full_address: constructedAddress,
+                postcode: formattedPostcode
+              })
+            }
+            
+            // Also add the general area option
             addresses.push({
               address: `${formattedPostcode} - ${result.admin_district || result.parish || 'Area'}`,
               full_address: `${formattedPostcode}, ${result.admin_district || result.parish || result.country}, United Kingdom`,
@@ -186,16 +219,35 @@ serve(async (req) => {
       } catch (error) {
         console.log('UK Postcodes API failed:', error)
       }
+      
+      // Then try Mapbox for additional results
+      try {
+        const mapboxUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(formattedPostcode)}.json?` +
+          `access_token=${mapboxToken}&` +
+          'country=GB&' +
+          'types=postcode,place&' +
+          'limit=10'
+        
+        console.log('Mapbox request URL (postcode only):', mapboxUrl)
+        
+        const response2 = await fetch(mapboxUrl)
+        if (response2.ok) {
+          const data2 = await response2.json()
+          console.log('Mapbox response (postcode only):', JSON.stringify(data2, null, 2))
+          const postcodeAddresses = extractAddresses(data2, formattedPostcode, null)
+          addresses.push(...postcodeAddresses)
+        }
+      } catch (error) {
+        console.log('Postcode search failed:', error)
+      }
     }
     
-    // Strategy 4: Always provide manual entry option as fallback
-    if (addresses.length === 0) {
-      addresses.push({
-        address: `${formattedPostcode} - Manual Entry Required`,
-        full_address: `Please enter full address for ${formattedPostcode}`,
-        postcode: formattedPostcode
-      })
-    }
+    // Strategy 4: Always provide manual entry option
+    addresses.push({
+      address: `${formattedPostcode} - Enter full address manually`,
+      full_address: `Please enter complete address for ${formattedPostcode}`,
+      postcode: formattedPostcode
+    })
 
     // Filter out duplicates based on address
     const uniqueAddresses = addresses.filter((addr, index, self) => 
