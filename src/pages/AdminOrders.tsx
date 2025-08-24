@@ -11,6 +11,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Eye, Search, Filter, Calendar, User, Package } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
+import type { Database } from "@/integrations/supabase/types";
+
+type OrderStatusEnhanced = Database['public']['Enums']['order_status_enhanced'];
 
 export default function AdminOrders() {
   const navigate = useNavigate();
@@ -46,7 +49,7 @@ export default function AdminOrders() {
         .order('created_at', { ascending: false });
 
       if (statusFilter !== 'all') {
-        query = query.eq('status_enhanced', statusFilter);
+        query = query.eq('status_enhanced', statusFilter as OrderStatusEnhanced);
       }
 
       if (engineerFilter !== 'all') {

@@ -36,7 +36,6 @@ export default function EnhancedClientOrderView() {
             id,
             quote_number,
             total_cost,
-            total_price,
             items,
             created_at
           ),
@@ -80,7 +79,8 @@ export default function EnhancedClientOrderView() {
         client: data.clients || null,
         quote: data.quotes || null,
         engineer: data.engineers || null,
-        partner: data.partners || null
+        partner: data.partners || null,
+        order_payments: data.order_payments || []
       };
     },
     enabled: !!orderId,
@@ -199,7 +199,7 @@ export default function EnhancedClientOrderView() {
           <EnhancedSurveySection orderId={order.id} />
 
           {/* Engineer Uploads */}
-          <EngineerUploadsSection orderId={order.id} />
+          <EngineerUploadsSection order={order} />
         </div>
 
         {/* Sidebar */}
@@ -260,7 +260,13 @@ export default function EnhancedClientOrderView() {
           )}
 
           {/* Status Management */}
-          <OrderStatusManager order={order} />
+          <OrderStatusManager 
+            orderId={order.id}
+            currentStatus={order.status_enhanced}
+            manualOverride={order.manual_status_override || false}
+            manualNotes={order.manual_status_notes}
+            onUpdate={() => window.location.reload()}
+          />
 
           {/* Activity Timeline */}
           <OrderActivityTimeline orderId={order.id} />
