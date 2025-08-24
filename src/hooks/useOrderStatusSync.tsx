@@ -36,6 +36,9 @@ export function useOrderStatusSync(orderId: string) {
               title: "Order Status Updated",
               description: `Status changed to: ${newOrder.status_enhanced.replace('_', ' ')}`,
             });
+            
+            // Trigger scheduling refresh to update status counts
+            window.dispatchEvent(new CustomEvent('scheduling:refresh'));
           }
         }
       )
