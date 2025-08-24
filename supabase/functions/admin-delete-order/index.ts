@@ -103,6 +103,16 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Delete related records first (due to foreign key constraints)
     
+    // Delete quote snapshots first
+    const { error: snapshotsError } = await supabaseAdmin
+      .from('order_quote_snapshots')
+      .delete()
+      .eq('order_id', orderId);
+
+    if (snapshotsError) {
+      console.error('Error deleting order quote snapshots:', snapshotsError);
+    }
+    
     // Delete job offers (defensive cleanup, should be handled by CASCADE)
     const { error: offersError } = await supabaseAdmin
       .from('job_offers')
@@ -141,6 +151,16 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (uploadsError) {
       console.error('Error deleting engineer uploads:', uploadsError);
+    }
+
+    // Delete client surveys
+    const { error: surveysError } = await supabaseAdmin
+      .from('client_surveys')
+      .delete()
+      .eq('order_id', orderId);
+
+    if (surveysError) {
+      console.error('Error deleting client surveys:', surveysError);
     }
 
     // Finally delete the order

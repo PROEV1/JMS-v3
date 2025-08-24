@@ -150,12 +150,21 @@ export default function AdminQuoteDetail() {
 
   const handleAcceptQuote = async (quoteId: string) => {
     try {
+      console.log('Starting quote acceptance for:', quoteId);
+      
       // Check if order already exists for this quote
-      const { data: existingOrder } = await supabase
+      const { data: existingOrder, error: orderCheckError } = await supabase
         .from('orders')
         .select('id')
         .eq('quote_id', quoteId)
         .maybeSingle();
+
+      if (orderCheckError) {
+        console.error('Error checking existing order:', orderCheckError);
+        throw orderCheckError;
+      }
+
+      console.log('Existing order check result:', existingOrder);
 
       // Update quote status to accepted
       const { error: updateError } = await supabase
@@ -166,12 +175,19 @@ export default function AdminQuoteDetail() {
         })
         .eq('id', quoteId);
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error('Error updating quote status:', updateError);
+        throw updateError;
+      }
+
+      console.log('Quote status updated to accepted');
 
       let order = existingOrder;
 
       // Only create order if one doesn't exist
       if (!existingOrder && quote) {
+        console.log('Creating new order for quote:', quote);
+        
         // Create order from accepted quote
         const { data: newOrder, error: orderError } = await supabase
           .from('orders')
@@ -187,24 +203,41 @@ export default function AdminQuoteDetail() {
           .select()
           .single();
 
-        if (orderError) throw orderError;
+        if (orderError) {
+          console.error('Error creating order:', orderError);
+          throw orderError;
+        }
+
+        console.log('New order created:', newOrder);
         order = newOrder;
 
         // Link quote to order
-        await supabase
+        const { error: linkError } = await supabase
           .from('quotes')
           .update({ order_id: order.id })
           .eq('id', quoteId);
 
+        if (linkError) {
+          console.error('Error linking quote to order:', linkError);
+          // Don't throw here as order is already created
+        }
+
         // Save quote snapshot
         try {
-          await supabase.functions.invoke('quote-snapshot-save', {
+          console.log('Saving quote snapshot...');
+          const { data: snapshotResult, error: snapshotError } = await supabase.functions.invoke('quote-snapshot-save', {
             body: {
               quoteId: quote.id,
               orderId: order.id,
               snapshotType: 'original'
             }
           });
+
+          if (snapshotError) {
+            console.error('Snapshot save error:', snapshotError);
+          } else {
+            console.log('Quote snapshot saved:', snapshotResult);
+          }
         } catch (snapshotError) {
           console.error('Failed to save quote snapshot:', snapshotError);
           // Don't fail the whole process if snapshot fails
@@ -221,8 +254,9 @@ export default function AdminQuoteDetail() {
 
       // Redirect to order details page if new order was created
       if (!existingOrder && order) {
+        console.log('Redirecting to order:', order.id);
         setTimeout(() => {
-          navigate(`/orders/${order.id}`);
+          navigate(`/admin/orders/${order.id}`);
         }, 1500);
       }
 
@@ -230,7 +264,7 @@ export default function AdminQuoteDetail() {
       console.error('Error accepting quote:', error);
       toast({
         title: "Error",
-        description: "Failed to accept quote",
+        description: `Failed to accept quote: ${error.message || 'Unknown error'}`,
         variant: "destructive",
       });
     }
