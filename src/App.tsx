@@ -76,6 +76,7 @@ function App() {
                <Route path="/offers/:token" element={<ClientOfferViewPublic />} />
                <Route path="/quotes/:shareToken" element={<PublicQuoteView />} />
                <Route path="/survey/:orderId" element={<SurveyPage />} />
+               <Route path="/survey/:orderId/success" element={<SurveySuccess />} />
                <Route path="/survey-success" element={<SurveySuccess />} />
                <Route path="/partner" element={<PartnerPortal />} />
               
