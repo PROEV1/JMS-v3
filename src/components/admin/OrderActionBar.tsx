@@ -4,8 +4,9 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { Download, Mail, Flag, MoreVertical, Copy } from "lucide-react";
+import { Download, Mail, Flag, MoreVertical, Copy, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
@@ -97,6 +98,35 @@ export function OrderActionBar({ orderId, order }: OrderActionBarProps) {
     }
   };
 
+  const handleDeleteOrder = async () => {
+    if (!confirm('Are you sure you want to delete this order? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase.functions.invoke('admin-delete-order', {
+        body: { orderId }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Order Deleted",
+        description: "Order has been successfully deleted",
+      });
+
+      // Redirect to orders list
+      window.location.href = '/admin/orders';
+    } catch (error) {
+      console.error('Error deleting order:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete order",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="flex items-center gap-2">
       <Button
@@ -134,6 +164,11 @@ export function OrderActionBar({ orderId, order }: OrderActionBarProps) {
           <DropdownMenuItem onClick={handleFlagForReview}>
             <Flag className="h-4 w-4 mr-2" />
             Flag for Review
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={handleDeleteOrder} className="text-destructive">
+            <Trash2 className="h-4 w-4 mr-2" />
+            Delete Order
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

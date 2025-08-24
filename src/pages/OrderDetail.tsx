@@ -166,8 +166,8 @@ export default function OrderDetail() {
         .from('orders')
         .select(`
           *,
-          client:client_id(id, full_name, email, address, postcode, phone),
-          quote:quote_id(
+          clients!inner(id, full_name, email, address, postcode, phone),
+          quotes(
             id,
             quote_number,
             total_cost,
@@ -191,7 +191,7 @@ export default function OrderDetail() {
             paid_at,
             created_at
           ),
-          engineer:engineer_id(
+          engineers(
             id,
             name,
             email
@@ -204,7 +204,7 @@ export default function OrderDetail() {
             description,
             uploaded_at
           ),
-          partner:partner_id(name, client_payment_required, client_agreement_required, client_survey_required)
+          partners(name, client_payment_required, client_agreement_required, client_survey_required)
         `)
         .eq('id', orderId)
         .single();
@@ -212,10 +212,19 @@ export default function OrderDetail() {
       if (error) throw error;
       
       console.log('Order data fetched:', data);
-      console.log('Client data:', data.client);
-      console.log('Quote data:', data.quote);
+      console.log('Client data:', data.clients);
+      console.log('Quote data:', data.quotes);
       
-      setOrder(data as any);
+      // Transform the data to match our interface
+      const transformedOrder = {
+        ...data,
+        client: data.clients,
+        quote: data.quotes?.[0] || null,
+        engineer: data.engineers?.[0] || null,
+        partner: data.partners?.[0] || null
+      };
+      
+      setOrder(transformedOrder as any);
     } catch (error) {
       console.error('Error fetching order:', error);
       toast({
