@@ -47,7 +47,7 @@ import ClientOfferView from "./pages/ClientOfferView";
 import ClientOfferViewPublic from "./pages/ClientOfferViewPublic";
 import ClientProfilePage from "./pages/ClientProfilePage";
 import ClientProfileSelf from "./pages/ClientProfileSelf";
-import EnhancedClientOrderView from "./pages/EnhancedClientOrderView";
+import ClientOrderDetail from "./pages/ClientOrderDetail";
 import PartnerPortal from "./pages/PartnerPortal";
 import SurveyPage from "./pages/SurveyPage";
 import SurveyReadOnlyViewPage from "./pages/SurveyReadOnlyView";
@@ -126,7 +126,7 @@ function App() {
                     <Route path="/client/quotes" element={<ClientQuotes />} />
                     <Route path="/client/quotes/:id" element={<ClientQuoteDetail />} />
                     <Route path="/client/orders" element={<ClientOrders />} />
-                    <Route path="/client/orders/:id" element={<EnhancedClientOrderView />} />
+                    <Route path="/client/orders/:id" element={<ClientOrderDetail />} />
                     <Route path="/client/messages" element={<ClientMessages />} />
                     <Route path="/client/payments" element={<ClientPayments />} />
                     <Route path="/client/documents" element={<ClientDocuments />} />

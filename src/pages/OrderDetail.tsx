@@ -167,7 +167,7 @@ export default function OrderDetail() {
         .from('orders')
         .select(`
           *,
-          clients!orders_client_id_fkey(
+          clients(
             id, 
             full_name, 
             email, 
@@ -175,7 +175,7 @@ export default function OrderDetail() {
             postcode, 
             phone
           ),
-          quotes!orders_quote_id_fkey(
+          quotes(
             id,
             quote_number,
             total_cost,
@@ -199,7 +199,7 @@ export default function OrderDetail() {
             paid_at,
             created_at
           ),
-          engineers!orders_engineer_id_fkey(
+          engineers(
             id,
             name,
             email
@@ -212,7 +212,7 @@ export default function OrderDetail() {
             description,
             uploaded_at
           ),
-          partners!orders_partner_id_fkey(
+          partners(
             name, 
             client_payment_required, 
             client_agreement_required, 
