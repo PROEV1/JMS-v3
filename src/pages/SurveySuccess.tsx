@@ -21,54 +21,54 @@ export default function SurveySuccess() {
       <DualBrandHeader partnerBrand={partnerBrand} />
       
       <div className="max-w-2xl mx-auto px-4 py-16">
-        <Card className="border-green-200 bg-green-50/50">
+        <Card className="border-[hsl(var(--status-accepted-bg))] bg-[hsl(var(--status-accepted-bg))]">
           <CardContent className="p-8 text-center">
             <div className="mb-6">
-              <CheckCircle className="h-16 w-16 text-green-600 mx-auto mb-4" />
-              <h1 className="text-2xl font-bold text-slate-900 mb-2">
+              <CheckCircle className="h-16 w-16 text-[hsl(var(--status-accepted))] mx-auto mb-4" />
+              <h1 className="text-2xl font-semibold font-montserrat text-foreground mb-2">
                 Survey Submitted Successfully!
               </h1>
-              <p className="text-slate-600">
+              <p className="text-muted-foreground font-montserrat">
                 Thank you for completing your installation survey
                 {orderNumber && ` for order #${orderNumber}`}.
               </p>
             </div>
 
-            <div className="bg-white rounded-lg p-6 mb-6 border border-green-200">
-              <h2 className="font-semibold text-slate-900 mb-4">What happens next?</h2>
+            <div className="bg-card rounded-lg p-6 mb-6 border border-border shadow-sm">
+              <h2 className="font-semibold font-montserrat text-foreground mb-4">What happens next?</h2>
               
               <div className="space-y-4 text-left">
                 <div className="flex items-start space-x-3">
-                  <div className="flex-shrink-0 w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center mt-0.5">
-                    <span className="text-xs font-medium text-blue-600">1</span>
+                  <div className="flex-shrink-0 w-6 h-6 bg-primary/10 rounded-full flex items-center justify-center mt-0.5">
+                    <span className="text-xs font-medium text-primary">1</span>
                   </div>
                   <div>
-                    <p className="font-medium text-slate-900">Review Process</p>
-                    <p className="text-sm text-slate-600">
+                    <p className="font-medium font-montserrat text-foreground">Review Process</p>
+                    <p className="text-sm text-muted-foreground font-montserrat">
                       Our team will review your survey responses and photos within 1-2 business days.
                     </p>
                   </div>
                 </div>
 
                 <div className="flex items-start space-x-3">
-                  <div className="flex-shrink-0 w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center mt-0.5">
-                    <span className="text-xs font-medium text-blue-600">2</span>
+                  <div className="flex-shrink-0 w-6 h-6 bg-primary/10 rounded-full flex items-center justify-center mt-0.5">
+                    <span className="text-xs font-medium text-primary">2</span>
                   </div>
                   <div>
-                    <p className="font-medium text-slate-900">Installation Scheduling</p>
-                    <p className="text-sm text-slate-600">
+                    <p className="font-medium font-montserrat text-foreground">Installation Scheduling</p>
+                    <p className="text-sm text-muted-foreground font-montserrat">
                       Once approved, we'll contact you to schedule your EV charger installation.
                     </p>
                   </div>
                 </div>
 
                 <div className="flex items-start space-x-3">
-                  <div className="flex-shrink-0 w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center mt-0.5">
-                    <span className="text-xs font-medium text-blue-600">3</span>
+                  <div className="flex-shrink-0 w-6 h-6 bg-primary/10 rounded-full flex items-center justify-center mt-0.5">
+                    <span className="text-xs font-medium text-primary">3</span>
                   </div>
                   <div>
-                    <p className="font-medium text-slate-900">Professional Installation</p>
-                    <p className="text-sm text-slate-600">
+                    <p className="font-medium font-montserrat text-foreground">Professional Installation</p>
+                    <p className="text-sm text-muted-foreground font-montserrat">
                       Our certified engineers will complete your installation on the scheduled date.
                     </p>
                   </div>
@@ -76,16 +76,16 @@ export default function SurveySuccess() {
               </div>
             </div>
 
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
-              <div className="flex items-center justify-center space-x-2 text-amber-800">
+            <div className="bg-[hsl(var(--status-pending-bg))] border border-[hsl(var(--status-pending-bg))] rounded-lg p-4 mb-6">
+              <div className="flex items-center justify-center space-x-2 text-[hsl(var(--status-pending))]">
                 <Clock className="h-4 w-4" />
-                <span className="text-sm font-medium">
+                <span className="text-sm font-medium font-montserrat">
                   We may contact you if we need any additional information
                 </span>
               </div>
             </div>
 
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-muted-foreground font-montserrat">
               If you have any questions or need to make changes, please contact our support team.
             </p>
           </CardContent>
