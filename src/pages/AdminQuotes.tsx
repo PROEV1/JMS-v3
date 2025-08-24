@@ -136,12 +136,52 @@ export default function AdminQuotes() {
     }
 
     try {
-      const { error } = await supabase
+      console.log('Attempting to delete quote:', quoteId);
+      
+      // First check if there are any orders associated with this quote
+      const { data: orders, error: orderCheckError } = await supabase
+        .from('orders')
+        .select('id, order_number')
+        .eq('quote_id', quoteId);
+
+      if (orderCheckError) {
+        console.error('Error checking for orders:', orderCheckError);
+        throw orderCheckError;
+      }
+
+      if (orders && orders.length > 0) {
+        const orderNumbers = orders.map(o => o.order_number).join(', ');
+        toast({
+          title: "Cannot Delete Quote",
+          description: `This quote has associated orders (${orderNumbers}). Delete the orders first.`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Delete quote items first
+      const { error: deleteItemsError } = await supabase
+        .from('quote_items')
+        .delete()
+        .eq('quote_id', quoteId);
+
+      if (deleteItemsError) {
+        console.error('Error deleting quote items:', deleteItemsError);
+        throw deleteItemsError;
+      }
+
+      // Then delete the quote
+      const { error: deleteQuoteError } = await supabase
         .from('quotes')
         .delete()
         .eq('id', quoteId);
 
-      if (error) throw error;
+      if (deleteQuoteError) {
+        console.error('Error deleting quote:', deleteQuoteError);
+        throw deleteQuoteError;
+      }
+
+      console.log('Quote deletion successful');
 
       toast({
         title: "Success",
@@ -153,7 +193,7 @@ export default function AdminQuotes() {
       console.error('Error deleting quote:', error);
       toast({
         title: "Error",
-        description: "Failed to delete quote",
+        description: `Failed to delete quote: ${error.message}`,
         variant: "destructive",
       });
     }
