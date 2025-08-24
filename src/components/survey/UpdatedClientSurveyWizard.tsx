@@ -108,7 +108,7 @@ export function ClientSurveyWizard({ orderId, clientId, partnerId, partnerBrand 
             field_key: fieldKey,
             file_url: file.url,
             file_name: file.name,
-            media_type: file.type || 'photo',
+            media_type: file.type || 'image',
             position: index,
             file_size: file.size
           }));

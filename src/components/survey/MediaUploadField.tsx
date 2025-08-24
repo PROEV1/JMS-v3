@@ -55,7 +55,7 @@ export function MediaUploadField({ field, value = [], onChange }: MediaUploadFie
         file,
         name: file.name,
         size: file.size,
-        type: file.type,
+        type: file.type.startsWith('video/') ? 'video' : 'image', // Map to enum values
         url: URL.createObjectURL(file),
         id: Math.random().toString(36).substr(2, 9)
       };
