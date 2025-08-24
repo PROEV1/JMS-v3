@@ -446,6 +446,93 @@ export function SurveySection({ orderId }: SurveySectionProps) {
           )}
 
           {/* Enhanced Survey Responses */}
+          {responses.property_type && (
+            <div>
+              <h4 className="font-medium text-slate-900 mb-2">Property Details</h4>
+              <div className="bg-slate-50 rounded-lg p-4 space-y-2">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-slate-600">Property Type:</span>
+                    <span className="ml-2 font-medium capitalize">{responses.property_type}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-600">Parking:</span>
+                    <span className="ml-2 font-medium capitalize">{responses.parking_type}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {responses.charger_location_notes && (
+            <div>
+              <h4 className="font-medium text-slate-900 mb-2">Charger Location</h4>
+              <div className="bg-slate-50 rounded-lg p-4">
+                <div className="text-sm">
+                  <span className="text-slate-600">Notes:</span>
+                  <span className="ml-2 font-medium">{responses.charger_location_notes}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {responses.consumer_unit_notes && (
+            <div>
+              <h4 className="font-medium text-slate-900 mb-2">Consumer Unit</h4>
+              <div className="bg-slate-50 rounded-lg p-4">
+                <div className="text-sm">
+                  <span className="text-slate-600">Notes:</span>
+                  <span className="ml-2 font-medium">{responses.consumer_unit_notes}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {responses.consent && (
+            <div>
+              <h4 className="font-medium text-slate-900 mb-2">Consent</h4>
+              <div className="bg-slate-50 rounded-lg p-4">
+                <div className="text-sm">
+                  <span className="text-slate-600">Terms accepted:</span>
+                  <span className="ml-2 font-medium text-green-700">Yes</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Legacy format support */}
+          {responses.propertyDetails && (
+            <div>
+              <h4 className="font-medium text-slate-900 mb-2">Property Details</h4>
+              <div className="bg-slate-50 rounded-lg p-4 space-y-2">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-slate-600">Property Type:</span>
+                    <span className="ml-2 font-medium">{responses.propertyDetails.propertyType}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-600">Parking:</span>
+                    <span className="ml-2 font-medium">{responses.propertyDetails.parkingType}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-600">Postcode:</span>
+                    <span className="ml-2 font-medium">{responses.propertyDetails.postcode}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-600">Year Built:</span>
+                    <span className="ml-2 font-medium">{responses.propertyDetails.yearBuilt}</span>
+                  </div>
+                </div>
+                {responses.propertyDetails.notes && (
+                  <div className="text-sm">
+                    <span className="text-slate-600">Notes:</span>
+                    <span className="ml-2">{responses.propertyDetails.notes}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {responses.parkingAccess && (
             <div>
               <h4 className="font-medium text-slate-900 mb-2">Parking Access</h4>

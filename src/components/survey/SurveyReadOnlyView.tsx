@@ -11,7 +11,7 @@ interface SurveyReadOnlyViewProps {
 }
 
 export function SurveyReadOnlyView({ survey, media }: SurveyReadOnlyViewProps) {
-  const responses = survey.responses as any;
+  const responses = survey.responses || {};
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
@@ -116,6 +116,77 @@ export function SurveyReadOnlyView({ survey, media }: SurveyReadOnlyViewProps) {
     );
   };
 
+  const renderPhotosFromArray = (photos: any[], title: string) => {
+    if (!photos || !photos.length) return null;
+    
+    return (
+      <div className="mt-4">
+        <div className="text-sm font-medium text-slate-600 mb-2">{title}:</div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {photos.map((photo: any, index: number) => (
+            <div key={index} className="aspect-square rounded-lg overflow-hidden bg-slate-100">
+              {photo.url ? (
+                <img 
+                  src={photo.url} 
+                  alt={photo.name || `${title} ${index + 1}`}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    const target = e.currentTarget;
+                    target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="%23f3f4f6"/><text x="50" y="50" text-anchor="middle" dy="0.3em" fill="%236b7280">Image</text></svg>';
+                  }}
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <div className="text-center">
+                    <Image size={24} className="mx-auto mb-2 text-slate-400" />
+                    <p className="text-xs text-slate-600">{photo.name}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  const renderVideoFromArray = (videos: any[], title: string) => {
+    if (!videos || !videos.length) return null;
+    
+    return (
+      <div className="mt-4">
+        <div className="text-sm font-medium text-slate-600 mb-2">{title}:</div>
+        <div className="space-y-3">
+          {videos.map((video: any, index: number) => (
+            <div key={index} className="border rounded-lg p-4">
+              <div className="flex items-center gap-3 mb-3">
+                <Video className="h-6 w-6 text-slate-600" />
+                <div>
+                  <p className="font-medium text-sm">{video.name}</p>
+                  <p className="text-xs text-slate-600">
+                    {video.size ? `${(video.size / 1024 / 1024).toFixed(1)} MB` : 'Video file'}
+                  </p>
+                </div>
+              </div>
+              {video.url && (
+                <video 
+                  controls 
+                  className="w-full rounded"
+                  style={{ maxHeight: '300px' }}
+                  preload="metadata"
+                >
+                  <source src={video.url} type="video/mp4" />
+                  <source src={video.url} type="video/mov" />
+                  Your browser does not support the video tag.
+                </video>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-4xl mx-auto space-y-6">
@@ -133,6 +204,98 @@ export function SurveyReadOnlyView({ survey, media }: SurveyReadOnlyViewProps) {
         {/* Survey Responses */}
         <div className="space-y-6">
           {/* Property Details */}
+          {(responses.property_type || responses.parking_type) && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Property Details</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {responses.property_type && (
+                    <div>
+                      <span className="text-slate-600 font-medium">Property Type:</span>
+                      <span className="ml-2 capitalize">{responses.property_type}</span>
+                    </div>
+                  )}
+                  {responses.parking_type && (
+                    <div>
+                      <span className="text-slate-600 font-medium">Parking:</span>
+                      <span className="ml-2 capitalize">{responses.parking_type}</span>
+                    </div>
+                  )}
+                </div>
+                {renderMediaForField('propertyDetails')}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Charger Location */}
+          {(responses.charger_location_notes || responses.charger_location_photos) && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Charger Location</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {responses.charger_location_notes && (
+                  <div>
+                    <span className="text-slate-600 font-medium">Notes:</span>
+                    <p className="mt-1 text-slate-900">{responses.charger_location_notes}</p>
+                  </div>
+                )}
+                {renderPhotosFromArray(responses.charger_location_photos, "Charger Location Photos")}
+                {renderMediaForField('chargerLocation')}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Consumer Unit */}
+          {(responses.consumer_unit_notes || responses.consumer_unit_photos) && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Consumer Unit Details</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {responses.consumer_unit_notes && (
+                  <div>
+                    <span className="text-slate-600 font-medium">Notes:</span>
+                    <p className="mt-1 text-slate-900">{responses.consumer_unit_notes}</p>
+                  </div>
+                )}
+                {renderPhotosFromArray(responses.consumer_unit_photos, "Consumer Unit Photos")}
+                {renderMediaForField('consumerUnit')}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Walkthrough Video */}
+          {responses.walkthrough_video && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Walkthrough Video</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {renderVideoFromArray(responses.walkthrough_video, "Property Walkthrough")}
+                {renderMediaForField('walkthrough')}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Consent */}
+          {responses.consent && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Consent</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-600 font-medium">Terms and conditions accepted:</span>
+                  <Badge className="bg-green-100 text-green-700">Yes</Badge>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Legacy format support - Property Details */}
           {responses.propertyDetails && (
             <Card>
               <CardHeader>
@@ -176,7 +339,7 @@ export function SurveyReadOnlyView({ survey, media }: SurveyReadOnlyViewProps) {
             </Card>
           )}
 
-          {/* Parking Access */}
+          {/* Legacy format support - other sections */}
           {responses.parkingAccess && (
             <Card>
               <CardHeader>
@@ -192,7 +355,6 @@ export function SurveyReadOnlyView({ survey, media }: SurveyReadOnlyViewProps) {
             </Card>
           )}
 
-          {/* Charger Location */}
           {responses.chargerLocation && (
             <Card>
               <CardHeader>
@@ -208,7 +370,6 @@ export function SurveyReadOnlyView({ survey, media }: SurveyReadOnlyViewProps) {
             </Card>
           )}
 
-          {/* Consumer Unit */}
           {responses.consumerUnit && (
             <Card>
               <CardHeader>
@@ -230,7 +391,6 @@ export function SurveyReadOnlyView({ survey, media }: SurveyReadOnlyViewProps) {
             </Card>
           )}
 
-          {/* Video Summary */}
           {responses.videoSummary && (
             <Card>
               <CardHeader>
@@ -243,7 +403,6 @@ export function SurveyReadOnlyView({ survey, media }: SurveyReadOnlyViewProps) {
             </Card>
           )}
 
-          {/* Additional Media */}
           {responses.additionalMedia && (
             <Card>
               <CardHeader>
