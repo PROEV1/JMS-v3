@@ -1,31 +1,74 @@
-
-import { useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { CalendarDays, MapPin, User, Phone, Mail, Package, CreditCard } from "lucide-react";
-import { OrderStatusManager } from "@/components/admin/OrderStatusManager";
-import { OrderActivityTimeline } from "@/components/admin/OrderActivityTimeline";
-import { OrderProgressTimeline } from "@/components/admin/OrderProgressTimeline";
-import { EngineerUploadsSection } from "@/components/admin/sections/EngineerUploadsSection";
-import { EnhancedSurveySection } from "@/components/admin/sections/EnhancedSurveySection";
-import { format } from "date-fns";
-import type { Database } from "@/integrations/supabase/types";
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { CalendarDays, MapPin, User, Phone, Mail, Package, CreditCard, CheckCircle, Clock, FileText, Calendar } from 'lucide-react';
+import { format } from 'date-fns';
+import type { Database } from '@/integrations/supabase/types';
 
 type OrderStatusEnhanced = Database['public']['Enums']['order_status_enhanced'];
 
+interface Order {
+  id: string;
+  order_number: string;
+  status_enhanced: OrderStatusEnhanced;
+  total_amount: number;
+  amount_paid: number;
+  deposit_amount: number;
+  job_address: string | null;
+  scheduled_install_date: string | null;
+  agreement_signed_at: string | null;
+  created_at: string;
+  survey_token: string | null;
+  client: {
+    id: string;
+    full_name: string;
+    email: string;
+    address: string | null;
+    postcode: string | null;
+    phone?: string;
+  } | null;
+  quote: {
+    id: string;
+    quote_number: string;
+    total_cost: number;
+  } | null;
+  engineer: {
+    id: string;
+    name: string;
+    email: string;
+  } | null;
+  order_payments: Array<{
+    id: string;
+    amount: number;
+    payment_type: string;
+    status: string;
+    paid_at: string | null;
+    created_at: string;
+  }>;
+}
+
 export default function EnhancedClientOrderView() {
   const { id: orderId } = useParams();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const [order, setOrder] = useState<Order | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [processingPayment, setProcessingPayment] = useState(false);
 
-  const { data: order, isLoading, error, refetch } = useQuery({
-    queryKey: ['client-order', orderId],
-    queryFn: async () => {
-      if (!orderId) throw new Error('Order ID is required');
-      
-      console.log('Fetching client order with ID:', orderId);
-      console.log('Attempting to fetch order:', orderId);
-      
+  useEffect(() => {
+    if (orderId) {
+      fetchOrder();
+    }
+  }, [orderId]);
+
+  const fetchOrder = async () => {
+    if (!orderId) return;
+
+    try {
       const { data, error } = await supabase
         .from('orders')
         .select(`
@@ -41,62 +84,253 @@ export default function EnhancedClientOrderView() {
           quotes(
             id,
             quote_number,
-            total_cost,
-            created_at
+            total_cost
           ),
           engineers(
             id,
             name,
             email
           ),
-          partners(
-            name, 
-            client_payment_required, 
-            client_agreement_required, 
-            client_survey_required
+          order_payments(
+            id,
+            amount,
+            payment_type,
+            status,
+            paid_at,
+            created_at
           )
-         `)
-         .eq('id', orderId)
-         .maybeSingle();
+        `)
+        .eq('id', orderId)
+        .maybeSingle();
 
-      if (error) {
-        console.error('Database error:', error);
-        throw new Error(`Failed to fetch order: ${error.message}`);
-      }
+      if (error) throw error;
+      if (!data) throw new Error('Order not found');
 
-      if (!data) {
-        console.error('No order found for ID:', orderId);
-        throw new Error('Order not found');
-      }
-
-      console.log('Order data received:', data);
-      
-      // Fetch related data separately to avoid foreign key issues
-      const [paymentsRes, uploadsRes] = await Promise.all([
-        supabase
-          .from('order_payments')
-          .select('*')
-          .eq('order_id', orderId),
-        supabase
-          .from('engineer_uploads')
-          .select('*')
-          .eq('order_id', orderId)
-      ]);
-
-      return {
+      setOrder({
         ...data,
         client: data.clients || null,
         quote: data.quotes || null,
         engineer: data.engineers || null,
-        partner: data.partners || null,
-        order_payments: paymentsRes.data || [],
-        engineer_uploads: uploadsRes.data || []
-      };
-    },
-    enabled: !!orderId,
-  });
+        order_payments: data.order_payments || []
+      } as Order);
+    } catch (error) {
+      console.error('Error fetching order:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load order details",
+        variant: "destructive",
+      });
+      navigate('/client/orders');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  if (isLoading) {
+  const getCurrentStep = () => {
+    if (!order) return { step: 1, title: 'Survey', description: 'Complete property survey' };
+
+    const status = order.status_enhanced;
+    
+    if (['awaiting_survey_submission', 'survey_rework_requested', 'awaiting_survey_review'].includes(status)) {
+      return { step: 1, title: 'Survey', description: 'Complete property survey' };
+    }
+    
+    if (status === 'awaiting_payment') {
+      return { step: 2, title: 'Make Payment', description: 'Make payment to move forward' };
+    }
+    
+    if (status === 'awaiting_agreement') {
+      return { step: 3, title: 'Sign Agreement', description: 'Sign to lock in your booking' };
+    }
+    
+    if (['awaiting_install_booking', 'date_offered', 'date_accepted', 'date_rejected', 'offer_expired'].includes(status)) {
+      return { step: 4, title: 'Submit Install Preferences', description: 'Choose your preferred install date' };
+    }
+    
+    if (status === 'scheduled') {
+      return { step: 5, title: 'Install Confirmed', description: "We'll confirm install shortly" };
+    }
+    
+    return { step: 6, title: 'Complete', description: 'Installation finished' };
+  };
+
+  const getProgressSteps = () => {
+    const currentStep = getCurrentStep().step;
+    
+    return [
+      {
+        number: 1,
+        title: 'Survey',
+        description: 'Complete property survey',
+        icon: FileText,
+        completed: currentStep > 1,
+        active: currentStep === 1
+      },
+      {
+        number: 2,
+        title: 'Make Payment',
+        description: 'Make payment to move forward',
+        icon: CreditCard,
+        completed: currentStep > 2,
+        active: currentStep === 2
+      },
+      {
+        number: 3,
+        title: 'Sign Agreement',
+        description: 'Sign to lock in your booking',
+        icon: FileText,
+        completed: currentStep > 3,
+        active: currentStep === 3
+      },
+      {
+        number: 4,
+        title: 'Submit Install Preferences',
+        description: 'Choose your preferred install date',
+        icon: Calendar,
+        completed: currentStep > 4,
+        active: currentStep === 4
+      },
+      {
+        number: 5,
+        title: 'Install Confirmed',
+        description: "We'll confirm install shortly",
+        icon: CheckCircle,
+        completed: currentStep > 5,
+        active: currentStep === 5
+      }
+    ];
+  };
+
+  const handleSurveyStart = () => {
+    if (order?.survey_token) {
+      navigate(`/survey/${order.survey_token}`);
+    }
+  };
+
+  const handlePayment = async (type: 'deposit' | 'balance') => {
+    if (!order) return;
+    
+    setProcessingPayment(true);
+    
+    try {
+      let paymentAmount = 0;
+      
+      if (type === 'deposit') {
+        paymentAmount = order.deposit_amount - order.amount_paid;
+      } else {
+        paymentAmount = order.total_amount - order.amount_paid;
+      }
+
+      if (paymentAmount <= 0) {
+        toast({
+          title: "Error",
+          description: "No payment required",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke('create-payment-session', {
+        body: {
+          order_id: order.id,
+          amount: paymentAmount,
+          payment_type: type
+        }
+      });
+
+      if (error) throw error;
+      if (data?.url) {
+        window.open(data.url, '_blank');
+      }
+    } catch (error) {
+      console.error('Error creating payment session:', error);
+      toast({
+        title: "Payment Error",
+        description: "Failed to initiate payment",
+        variant: "destructive",
+      });
+    } finally {
+      setProcessingPayment(false);
+    }
+  };
+
+  const renderStepContent = () => {
+    const currentStep = getCurrentStep();
+    
+    if (currentStep.step === 1) {
+      return (
+        <div className="space-y-6">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center font-bold">
+                1
+              </div>
+              <div>
+                <h3 className="font-semibold text-red-700">Survey</h3>
+                <p className="text-sm text-red-600">Complete property survey</p>
+              </div>
+            </div>
+            <Button onClick={handleSurveyStart} className="bg-red-500 hover:bg-red-600">
+              Start Survey
+            </Button>
+          </div>
+        </div>
+      );
+    }
+    
+    if (currentStep.step === 2) {
+      const outstandingAmount = order?.total_amount ? order.total_amount - order.amount_paid : 0;
+      const depositAmount = order?.deposit_amount || 0;
+      
+      return (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div>
+              <p className="text-sm text-muted-foreground">Total Order Value:</p>
+              <p className="text-xl font-bold">£{order?.total_amount?.toFixed(2)}</p>
+            </div>
+            {depositAmount > 0 && (
+              <div>
+                <p className="text-sm text-muted-foreground">Deposit Required:</p>
+                <p className="text-xl font-bold">£{depositAmount.toFixed(2)}</p>
+              </div>
+            )}
+            <div>
+              <p className="text-sm text-muted-foreground">Amount Paid:</p>
+              <p className="text-xl font-bold text-green-600">£{order?.amount_paid?.toFixed(2)}</p>
+            </div>
+          </div>
+          
+          <div className="mb-6">
+            <p className="text-sm text-muted-foreground">Outstanding:</p>
+            <p className="text-3xl font-bold text-red-600">£{outstandingAmount.toFixed(2)}</p>
+          </div>
+          
+          <Button 
+            onClick={() => handlePayment(depositAmount > order!.amount_paid ? 'deposit' : 'balance')} 
+            disabled={processingPayment || outstandingAmount <= 0}
+            className="w-full bg-red-500 hover:bg-red-600"
+            size="lg"
+          >
+            <CreditCard className="mr-2 h-4 w-4" />
+            {depositAmount > order!.amount_paid 
+              ? `Pay Deposit Now (£${depositAmount.toFixed(2)})` 
+              : `Pay Balance Now (£${outstandingAmount.toFixed(2)})`
+            }
+          </Button>
+        </div>
+      );
+    }
+    
+    return (
+      <div className="text-center py-8">
+        <h3 className="text-lg font-semibold mb-2">{currentStep.title}</h3>
+        <p className="text-muted-foreground">{currentStep.description}</p>
+      </div>
+    );
+  };
+
+  if (loading) {
     return (
       <div className="container mx-auto py-6">
         <div className="text-center">Loading order details...</div>
@@ -104,60 +338,161 @@ export default function EnhancedClientOrderView() {
     );
   }
 
-  if (error || !order) {
+  if (!order) {
     return (
       <div className="container mx-auto py-6">
-        <div className="text-center text-red-600">
-          Error loading order: {error?.message || 'Order not found'}
-        </div>
+        <div className="text-center text-red-600">Order not found</div>
       </div>
     );
   }
 
+  const currentStep = getCurrentStep();
+  const progressSteps = getProgressSteps();
+
   return (
-    <div className="container mx-auto py-6 space-y-6">
+    <div className="container mx-auto py-6">
       {/* Header */}
-      <div className="flex justify-between items-start">
-        <div>
-          <h1 className="text-3xl font-bold">Order {order.order_number}</h1>
-          <p className="text-muted-foreground">
-            Created {format(new Date(order.created_at), 'PPP')}
-          </p>
+      <div className="flex justify-between items-start mb-6">
+        <div className="flex items-center gap-4">
+          <Button 
+            variant="outline" 
+            onClick={() => navigate('/client/orders')}
+            className="text-red-500 border-red-500 hover:bg-red-50"
+          >
+            ← Back to Dashboard
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold">Order {order.order_number}</h1>
+            <p className="text-muted-foreground">
+              Accepted on {format(new Date(order.created_at), 'MMM d, yyyy')}
+            </p>
+          </div>
         </div>
-        <Badge variant={order.status_enhanced === 'completed' ? 'default' : 'secondary'}>
-          {order.status_enhanced?.replace(/_/g, ' ').toUpperCase()}
-        </Badge>
+        <div className="flex items-center gap-4">
+          <Button variant="outline">Refresh</Button>
+          <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300">
+            {order.status_enhanced?.replace(/_/g, ' ').toUpperCase()}
+          </Badge>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Content */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Client Information */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Left Side - Progress Steps */}
+        <div>
+          <Card>
+            <CardHeader>
+              <CardTitle>Your Progress</CardTitle>
+              <CardDescription>
+                {progressSteps.filter(s => s.completed).length} of {progressSteps.length} steps completed
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {progressSteps.map((step) => {
+                const IconComponent = step.icon;
+                return (
+                  <div key={step.number} className={`flex items-center gap-4 p-3 rounded-lg ${
+                    step.active ? 'bg-blue-50 border border-blue-200' : 
+                    step.completed ? 'bg-green-50 border border-green-200' : 
+                    'bg-gray-50'
+                  }`}>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                      step.completed ? 'bg-green-500 text-white' :
+                      step.active ? 'bg-blue-500 text-white' :
+                      'bg-gray-300 text-gray-600'
+                    }`}>
+                      {step.completed ? (
+                        <CheckCircle className="w-4 h-4" />
+                      ) : (
+                        step.number
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <p className={`font-medium ${
+                        step.active ? 'text-blue-700' : 
+                        step.completed ? 'text-green-700' : 
+                        'text-gray-600'
+                      }`}>
+                        {step.title}
+                      </p>
+                      <p className="text-sm text-muted-foreground">{step.description}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Right Side - Current Step Content */}
+        <div className="space-y-6">
+          {/* Current Step Card */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-blue-600">
+                  Step {currentStep.step} of {progressSteps.length} - {currentStep.title}
+                </CardTitle>
+                <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                  Active
+                </Badge>
+              </div>
+              <CardDescription>{currentStep.description}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {renderStepContent()}
+            </CardContent>
+          </Card>
+
+          {/* Order Summary */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Package className="h-5 w-5" />
+                Order Summary
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-3 gap-4 mb-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Amount</p>
+                  <p className="text-lg font-bold">£{order.total_amount}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Amount Paid</p>
+                  <p className="text-lg font-bold text-green-600">£{order.amount_paid}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Balance</p>
+                  <p className="text-lg font-bold text-orange-600">£{order.total_amount - order.amount_paid}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Contact Information */}
           {order.client && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <User className="h-5 w-5" />
-                  Client Information
+                  Contact Information
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <p className="font-medium">{order.client.full_name}</p>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Mail className="h-4 w-4" />
-                      {order.client.email}
-                    </div>
-                    {order.client.phone && (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Phone className="h-4 w-4" />
-                        {order.client.phone}
-                      </div>
-                    )}
+              <CardContent>
+                <div className="space-y-2">
+                  <p className="font-medium">{order.client.full_name}</p>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Mail className="h-4 w-4" />
+                    {order.client.email}
                   </div>
+                  {order.client.phone && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Phone className="h-4 w-4" />
+                      {order.client.phone}
+                    </div>
+                  )}
                   {order.job_address && (
-                    <div className="flex items-start gap-2">
+                    <div className="flex items-start gap-2 mt-4">
                       <MapPin className="h-4 w-4 mt-1 text-muted-foreground" />
                       <div className="text-sm">
                         <p className="font-medium">Installation Address</p>
@@ -178,70 +513,32 @@ export default function EnhancedClientOrderView() {
                 Installation Details
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {order.scheduled_install_date && (
+            <CardContent>
+              {order.scheduled_install_date ? (
                 <div>
                   <p className="font-medium">Scheduled Date</p>
                   <p className="text-muted-foreground">
                     {format(new Date(order.scheduled_install_date), 'PPP')}
                   </p>
                 </div>
+              ) : (
+                <div className="flex items-center gap-2 text-amber-600">
+                  <Clock className="h-4 w-4" />
+                  <p>Installation date will be scheduled after survey and payment completion</p>
+                </div>
               )}
+              
               {order.engineer && (
-                <div>
+                <div className="mt-4">
                   <p className="font-medium">Assigned Engineer</p>
                   <p className="text-muted-foreground">{order.engineer.name}</p>
                 </div>
               )}
-              {order.estimated_duration_hours && (
-                <div>
-                  <p className="font-medium">Estimated Duration</p>
-                  <p className="text-muted-foreground">{order.estimated_duration_hours} hours</p>
-                </div>
-              )}
             </CardContent>
           </Card>
 
-          {/* Order Progress */}
-          <OrderProgressTimeline order={order} />
-
-          {/* Survey Section */}
-          <EnhancedSurveySection orderId={order.id} />
-
-          {/* Engineer Uploads */}
-          <EngineerUploadsSection order={order} onUpdate={() => refetch()} />
-        </div>
-
-        {/* Sidebar */}
-        <div className="space-y-6">
-          {/* Order Summary */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Package className="h-5 w-5" />
-                Order Summary
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span>Total Amount:</span>
-                  <span className="font-medium">£{order.total_amount}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Amount Paid:</span>
-                  <span className="font-medium">£{order.amount_paid}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Balance:</span>
-                  <span className="font-medium">£{order.total_amount - order.amount_paid}</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Payment Information */}
-          {order.order_payments && order.order_payments.length > 0 && (
+          {/* Payment History */}
+          {order.order_payments.length > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -251,7 +548,7 @@ export default function EnhancedClientOrderView() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {order.order_payments.map((payment: any) => (
+                  {order.order_payments.map((payment) => (
                     <div key={payment.id} className="border-b pb-2 last:border-b-0">
                       <div className="flex justify-between items-center">
                         <span className="font-medium">£{payment.amount}</span>
@@ -268,18 +565,6 @@ export default function EnhancedClientOrderView() {
               </CardContent>
             </Card>
           )}
-
-          {/* Status Management */}
-          <OrderStatusManager 
-            orderId={order.id}
-            currentStatus={order.status_enhanced as any}
-            manualOverride={order.manual_status_override || false}
-            manualNotes={order.manual_status_notes}
-            onUpdate={() => refetch()}
-          />
-
-          {/* Activity Timeline */}
-          <OrderActivityTimeline orderId={order.id} />
         </div>
       </div>
     </div>
