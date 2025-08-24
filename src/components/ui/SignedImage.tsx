@@ -28,6 +28,7 @@ export function SignedImage({
 
     const loadSignedUrl = async () => {
       if (!path) {
+        console.log('No path provided, using fallback:', fallbackUrl); // Debug log
         // Use fallback URL during migration
         if (fallbackUrl) {
           setSignedUrl(fallbackUrl);
@@ -40,7 +41,9 @@ export function SignedImage({
       }
 
       try {
+        console.log('Loading signed URL for:', { bucket, path }); // Debug log
         const result = await getSecureFileUrl(bucket, path, expiresIn);
+        console.log('Signed URL result:', result); // Debug log
         
         if (!mounted) return;
         
@@ -54,18 +57,22 @@ export function SignedImage({
             if (mounted) loadSignedUrl();
           }, refreshAt);
         } else {
+          console.error('Failed to get signed URL:', result.message); // Debug log
           // Fallback to public URL if available
           if (fallbackUrl) {
+            console.log('Using fallback URL due to signed URL failure:', fallbackUrl); // Debug log
             setSignedUrl(fallbackUrl);
           } else {
             setError(true);
           }
         }
       } catch (err) {
+        console.error('Exception getting signed URL:', err); // Debug log
         if (!mounted) return;
         
         // Fallback to public URL if available
         if (fallbackUrl) {
+          console.log('Using fallback URL due to exception:', fallbackUrl); // Debug log
           setSignedUrl(fallbackUrl);
         } else {
           setError(true);

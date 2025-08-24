@@ -39,40 +39,45 @@ export function SurveyReadOnlyView({ survey, media }: SurveyReadOnlyViewProps) {
       <div className="mt-3">
         <div className="text-sm font-medium text-slate-600 mb-2">Uploaded Media:</div>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          {fieldMedia.map((item, index) => (
-            <div key={index} className="relative group">
-              {item.media_type === 'image' ? (
-                <div className="aspect-square rounded-lg overflow-hidden bg-slate-100">
-                  {item.storage_path ? (
-                    <SignedImage
-                      bucket={item.storage_bucket || 'client-documents'}
-                      path={item.storage_path}
-                      fallbackUrl="/placeholder.svg"
-                      className="w-full h-full object-cover"
-                      alt={item.file_name || 'Survey image'}
-                    />
-                  ) : item.file_url && !item.file_url.startsWith('blob:') ? (
-                    <img
-                      src={item.file_url}
-                      alt={item.file_name || 'Survey image'}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        const target = e.currentTarget;
-                        target.src = '/placeholder.svg';
-                      }}
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-slate-500">
-                      <div className="text-center">
-                        <Image size={24} className="mx-auto mb-2" />
-                        <p className="text-xs">Image Unavailable</p>
+          {fieldMedia.map((item, index) => {
+            console.log('Media item:', item); // Debug log
+            return (
+              <div key={index} className="relative group">
+                {item.media_type === 'image' ? (
+                  <div className="aspect-square rounded-lg overflow-hidden bg-slate-100">
+                    {item.storage_path && item.storage_bucket ? (
+                      <SignedImage
+                        bucket={item.storage_bucket}
+                        path={item.storage_path}
+                        fallbackUrl="/placeholder.svg"
+                        className="w-full h-full object-cover"
+                        alt={item.file_name || 'Survey image'}
+                      />
+                    ) : item.file_url && !item.file_url.startsWith('blob:') && item.file_url.startsWith('http') ? (
+                      <img
+                        src={item.file_url}
+                        alt={item.file_name || 'Survey image'}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          const target = e.currentTarget;
+                          target.src = '/placeholder.svg';
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-slate-500">
+                        <div className="text-center">
+                          <Image size={24} className="mx-auto mb-2" />
+                          <p className="text-xs">Image Unavailable</p>
+                          <p className="text-[10px] text-slate-400 mt-1">
+                            {item.storage_path ? 'Storage path exists' : 'No storage path'}
+                          </p>
+                        </div>
                       </div>
+                    )}
+                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-200 flex items-center justify-center">
+                      <Image className="text-white opacity-0 group-hover:opacity-100 transition-opacity" size={24} />
                     </div>
-                  )}
-                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-200 flex items-center justify-center">
-                    <Image className="text-white opacity-0 group-hover:opacity-100 transition-opacity" size={24} />
                   </div>
-                </div>
               ) : item.media_type === 'video' ? (
                 <div className="aspect-video rounded-lg overflow-hidden bg-slate-100 flex items-center justify-center">
                   {item.storage_path ? (
@@ -131,7 +136,8 @@ export function SurveyReadOnlyView({ survey, media }: SurveyReadOnlyViewProps) {
                 </div>
               )}
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     );
