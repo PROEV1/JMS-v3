@@ -16,6 +16,8 @@ interface Order {
   scheduled_install_date: string | null;
   status: string;
   status_enhanced: string;
+  is_partner_job?: boolean;
+  survey_required?: boolean;
   order_payments: Array<{
     paid_at: string | null;
     status: string;
@@ -43,48 +45,55 @@ export function OrderProgressTimeline({ order }: OrderProgressTimelineProps) {
     const completed = order.status === 'completed' || order.status_enhanced === 'install_completed_pending_qa';
     
     // Survey-related states
+    const needsSurvey = order.survey_required !== false && !order.is_partner_job;
     const surveySubmitted = ['awaiting_survey_review', 'survey_approved', 'survey_rework_requested'].includes(order.status_enhanced);
     const surveyApproved = order.status_enhanced === 'survey_approved';
     const surveyRework = order.status_enhanced === 'survey_rework_requested';
+    const surveyWaiting = order.status_enhanced === 'awaiting_survey_submission';
+    const hasSurveyStep = needsSurvey || surveySubmitted || surveyWaiting || order.status_enhanced.includes('survey');
 
-    const stages = [
-      {
-        id: 'payment',
-        label: 'Payment',
-        icon: CreditCard,
-        completed: paymentCompleted,
-        active: !paymentCompleted && !surveySubmitted,
-        timestamp: order.order_payments.find(p => p.status === 'paid')?.paid_at
-      },
-      {
-        id: 'agreement',
-        label: 'Agreement',
-        icon: FileText,
-        completed: agreementSigned,
-        active: paymentCompleted && !agreementSigned && !surveySubmitted,
-        timestamp: order.agreement_signed_at
-      }
-    ];
+    const stages = [];
 
-    // Add survey step if survey is required
-    if (order.status_enhanced.includes('survey') || surveySubmitted) {
+    // For direct orders: Survey comes first
+    if (hasSurveyStep) {
       stages.push({
         id: 'survey',
-        label: surveyRework ? 'Survey Rework' : 'Survey Review',
+        label: surveyRework ? 'Survey Rework' : surveyWaiting ? 'Survey Needed' : 'Survey Review',
         icon: FileText,
         completed: surveyApproved,
-        active: surveySubmitted && !surveyApproved,
+        active: (surveyWaiting || surveySubmitted || surveyRework) && !surveyApproved,
         timestamp: null // Could add survey submitted/approved timestamp
       });
     }
 
+    // Payment step
+    stages.push({
+      id: 'payment',
+      label: 'Payment',
+      icon: CreditCard,
+      completed: paymentCompleted,
+      active: (!hasSurveyStep || surveyApproved) && !paymentCompleted,
+      timestamp: order.order_payments.find(p => p.status === 'paid')?.paid_at
+    });
+
+    // Agreement step  
+    stages.push({
+      id: 'agreement',
+      label: 'Agreement',
+      icon: FileText,
+      completed: agreementSigned,
+      active: paymentCompleted && !agreementSigned,
+      timestamp: order.agreement_signed_at
+    });
+
+    // Scheduling, Install, and Completion steps
     stages.push(
       {
         id: 'scheduled',
         label: 'Scheduled',
         icon: Calendar,
         completed: installScheduled,
-        active: paymentCompleted && agreementSigned && surveyApproved && !installScheduled,
+        active: paymentCompleted && agreementSigned && !installScheduled,
         timestamp: order.scheduled_install_date
       },
       {
