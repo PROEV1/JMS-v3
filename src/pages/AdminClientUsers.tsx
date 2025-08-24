@@ -62,6 +62,7 @@ interface UserProfile {
 export default function AdminClientUsers() {
   const navigate = useNavigate();
   const { canManageUsers, canCreateUsers, canDeleteUsers, loading: permissionsLoading } = usePermissions();
+  const { toast } = useToast();
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -71,7 +72,11 @@ export default function AdminClientUsers() {
 
   useEffect(() => {
     if (!permissionsLoading && !canManageUsers) {
-      toast.error('You do not have permission to access user management');
+      toast({
+        title: "Permission Error",
+        description: 'You do not have permission to access user management',
+        variant: "destructive",
+      });
       navigate('/admin');
       return;
     }
@@ -93,7 +98,11 @@ export default function AdminClientUsers() {
       setUsers(data || []);
     } catch (error) {
       console.error('Error fetching client users:', error);
-      toast.error('Failed to fetch client users');
+      toast({
+        title: "Error",
+        description: 'Failed to fetch client users',
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
@@ -117,17 +126,28 @@ export default function AdminClientUsers() {
         p_details: { old_status: currentStatus, new_status: newStatus }
       });
 
-      toast.success(`Client ${newStatus === 'active' ? 'activated' : 'deactivated'} successfully`);
+      toast({
+        title: "Success",
+        description: `Client ${newStatus === 'active' ? 'activated' : 'deactivated'} successfully`,
+      });
       fetchUsers();
     } catch (error) {
       console.error('Error updating client status:', error);
-      toast.error('Failed to update client status');
+      toast({
+        title: "Error",
+        description: 'Failed to update client status',
+        variant: "destructive",
+      });
     }
   };
 
   const handleDeleteUser = async (userId: string, userName: string) => {
     if (!canDeleteUsers) {
-      toast.error('You do not have permission to delete users');
+      toast({
+        title: "Permission Error",
+        description: 'You do not have permission to delete users',
+        variant: "destructive",
+      });
       return;
     }
 
@@ -151,11 +171,18 @@ export default function AdminClientUsers() {
 
       if (error) throw error;
 
-      toast.success('Client deleted successfully');
+      toast({
+        title: "Success",
+        description: 'Client deleted successfully',
+      });
       fetchUsers();
     } catch (error) {
       console.error('Error deleting client:', error);
-      toast.error('Failed to delete client');
+      toast({
+        title: "Error",
+        description: 'Failed to delete client',
+        variant: "destructive",
+      });
     }
   };
 

@@ -28,6 +28,7 @@ export default function AdminUserDetail() {
   const { id: userId } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { canManageUsers, loading: permissionsLoading } = usePermissions();
+  const { toast } = useToast();
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

@@ -28,6 +28,7 @@ interface UserProfile {
 export default function AdminUsers() {
   const navigate = useNavigate();
   const { canManageUsers, canCreateUsers, canDeleteUsers, loading: permissionsLoading } = usePermissions();
+  const { toast } = useToast();
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
