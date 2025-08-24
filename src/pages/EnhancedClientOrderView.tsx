@@ -376,9 +376,9 @@ export default function EnhancedClientOrderView() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Left Side - Progress Steps */}
-        <div>
+        <div className="lg:col-span-1">
           <Card>
             <CardHeader>
               <CardTitle>Your Progress</CardTitle>
@@ -424,7 +424,7 @@ export default function EnhancedClientOrderView() {
         </div>
 
         {/* Right Side - Current Step Content */}
-        <div className="space-y-6">
+        <div className="lg:col-span-3 space-y-6">
           {/* Current Step Card */}
           <Card>
             <CardHeader>
