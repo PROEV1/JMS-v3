@@ -3114,6 +3114,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_set_order_status: {
+        Args: {
+          p_order_id: string
+          p_reason: string
+          p_status: Database["public"]["Enums"]["order_status_enhanced"]
+        }
+        Returns: boolean
+      }
       archive_engineer_work: {
         Args: {
           p_order_id: string
