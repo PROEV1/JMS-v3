@@ -18,6 +18,7 @@ import { ActivityHistorySection } from '@/components/admin/sections/ActivityHist
 import { EngineerUploadsSection } from '@/components/admin/sections/EngineerUploadsSection';
 import { SurveySection } from '@/components/admin/sections/SurveySection';
 import { ClientBlockedDatesSection } from '@/components/admin/sections/ClientBlockedDatesSection';
+import { OrderQuotesSection } from '@/components/admin/sections/OrderQuotesSection';
 import { OrderStatusEnhanced } from '@/components/admin/EnhancedJobStatusBadge';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -45,6 +46,8 @@ interface Order {
   estimated_duration_hours: number | null;
   internal_install_notes: string | null;
   admin_qa_notes: string | null;
+  quote_id: string | null;
+  client_id: string;
   client: {
     id: string;
     full_name: string;
@@ -650,6 +653,12 @@ export default function OrderDetail() {
                 onUpdate={fetchOrder}
               />
             )}
+
+            {/* Quote History & Management */}
+            <OrderQuotesSection 
+              order={order} 
+              onOrderUpdate={fetchOrder}
+            />
 
             {/* Payment Management */}
             <PaymentSection order={order} />

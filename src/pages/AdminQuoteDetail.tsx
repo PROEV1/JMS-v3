@@ -189,6 +189,26 @@ export default function AdminQuoteDetail() {
 
         if (orderError) throw orderError;
         order = newOrder;
+
+        // Link quote to order
+        await supabase
+          .from('quotes')
+          .update({ order_id: order.id })
+          .eq('id', quoteId);
+
+        // Save quote snapshot
+        try {
+          await supabase.functions.invoke('quote-snapshot-save', {
+            body: {
+              quoteId: quote.id,
+              orderId: order.id,
+              snapshotType: 'original'
+            }
+          });
+        } catch (snapshotError) {
+          console.error('Failed to save quote snapshot:', snapshotError);
+          // Don't fail the whole process if snapshot fails
+        }
       }
 
       toast({

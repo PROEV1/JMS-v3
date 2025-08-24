@@ -1470,6 +1470,57 @@ export type Database = {
           },
         ]
       }
+      order_quote_snapshots: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          html_content: string | null
+          id: string
+          order_id: string
+          pdf_url: string | null
+          quote_data: Json
+          quote_id: string
+          snapshot_type: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          html_content?: string | null
+          id?: string
+          order_id: string
+          pdf_url?: string | null
+          quote_data: Json
+          quote_id: string
+          snapshot_type: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          html_content?: string | null
+          id?: string
+          order_id?: string
+          pdf_url?: string | null
+          quote_data?: Json
+          quote_id?: string
+          snapshot_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_quote_snapshots_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_quote_snapshots_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       orders: {
         Row: {
           admin_qa_notes: string | null
@@ -2625,6 +2676,7 @@ export type Database = {
           is_shareable: boolean | null
           materials_cost: number
           notes: string | null
+          order_id: string | null
           product_details: string
           quote_number: string
           quote_template: string | null
@@ -2647,6 +2699,7 @@ export type Database = {
           is_shareable?: boolean | null
           materials_cost?: number
           notes?: string | null
+          order_id?: string | null
           product_details: string
           quote_number: string
           quote_template?: string | null
@@ -2669,6 +2722,7 @@ export type Database = {
           is_shareable?: boolean | null
           materials_cost?: number
           notes?: string | null
+          order_id?: string | null
           product_details?: string
           quote_number?: string
           quote_template?: string | null
@@ -2685,6 +2739,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
             referencedColumns: ["id"]
           },
         ]

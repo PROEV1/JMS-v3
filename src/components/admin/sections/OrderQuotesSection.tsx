@@ -1,0 +1,307 @@
+import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { useToast } from '@/hooks/use-toast';
+import { FileText, Plus, Eye } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+
+interface Quote {
+  id: string;
+  quote_number: string;
+  status: string;
+  total_cost: number;
+  created_at: string;
+  accepted_at: string | null;
+}
+
+interface QuoteSnapshot {
+  id: string;
+  snapshot_type: string;
+  quote_data: any;
+  html_content: string;
+  created_at: string;
+  quote: Quote;
+}
+
+interface OrderQuotesSectionProps {
+  order: {
+    id: string;
+    quote_id: string | null;
+    client_id: string;
+    status_enhanced: string;
+  };
+  onOrderUpdate?: () => void;
+}
+
+export function OrderQuotesSection({ order, onOrderUpdate }: OrderQuotesSectionProps) {
+  const [snapshots, setSnapshots] = useState<QuoteSnapshot[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedSnapshot, setSelectedSnapshot] = useState<QuoteSnapshot | null>(null);
+  const [isCreatingRevision, setIsCreatingRevision] = useState(false);
+  const { toast } = useToast();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    fetchQuoteSnapshots();
+  }, [order.id]);
+
+  const fetchQuoteSnapshots = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('order_quote_snapshots')
+        .select(`
+          *,
+          quote:quotes(*)
+        `)
+        .eq('order_id', order.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setSnapshots(data || []);
+    } catch (error) {
+      console.error('Error fetching quote snapshots:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load quote snapshots",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateRevisedQuote = async () => {
+    if (!order.quote_id) {
+      toast({
+        title: "Error",
+        description: "No original quote found to revise",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsCreatingRevision(true);
+
+    try {
+      // Fetch the original quote data
+      const { data: originalQuote, error: fetchError } = await supabase
+        .from('quotes')
+        .select('*')
+        .eq('id', order.quote_id)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // Create a new quote based on the original
+      const { data: newQuote, error: createError } = await supabase
+        .from('quotes')
+        .insert({
+          client_id: order.client_id,
+          order_id: order.id,
+          quote_number: '', // Will be auto-generated
+          total_cost: originalQuote.total_cost,
+          materials_cost: originalQuote.materials_cost,
+          install_cost: originalQuote.install_cost,
+          extras_cost: originalQuote.extras_cost,
+          product_details: originalQuote.product_details,
+          special_instructions: originalQuote.special_instructions,
+          warranty_period: originalQuote.warranty_period,
+          includes_installation: originalQuote.includes_installation,
+          notes: `Revised quote based on ${originalQuote.quote_number}`,
+          status: 'draft'
+        })
+        .select()
+        .single();
+
+      if (createError) throw createError;
+
+      // Copy quote items if they exist
+      const { data: originalItems } = await supabase
+        .from('quote_items')
+        .select('*')
+        .eq('quote_id', order.quote_id);
+
+      if (originalItems && originalItems.length > 0) {
+        const newItems = originalItems.map(item => ({
+          quote_id: newQuote.id,
+          product_id: item.product_id,
+          product_name: item.product_name,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          total_price: item.total_price,
+          configuration: item.configuration
+        }));
+
+        await supabase
+          .from('quote_items')
+          .insert(newItems);
+      }
+
+      // Update order status to awaiting payment (revised quote needs acceptance)
+      await supabase
+        .from('orders')
+        .update({ 
+          status_enhanced: 'awaiting_payment',
+          quote_id: newQuote.id
+        })
+        .eq('id', order.id);
+
+      toast({
+        title: "Revised Quote Created",
+        description: "A new quote has been created for revision. Redirecting to edit...",
+      });
+
+      // Redirect to edit the new quote
+      setTimeout(() => {
+        navigate(`/admin/quotes/${newQuote.id}/edit`);
+      }, 1500);
+
+    } catch (error) {
+      console.error('Error creating revised quote:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create revised quote",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCreatingRevision(false);
+    }
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-GB', {
+      style: 'currency',
+      currency: 'GBP'
+    }).format(amount);
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-GB', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'accepted': return 'bg-green-100 text-green-800';
+      case 'rejected': return 'bg-red-100 text-red-800';
+      case 'sent': return 'bg-blue-100 text-blue-800';
+      case 'draft': return 'bg-gray-100 text-gray-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            Quotes
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-4">Loading quotes...</div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Quotes
+            </div>
+            <Button
+              onClick={handleCreateRevisedQuote}
+              disabled={isCreatingRevision || !order.quote_id}
+              size="sm"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Create Revised Quote
+            </Button>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {snapshots.length === 0 ? (
+            <div className="text-center py-4 text-muted-foreground">
+              No quote snapshots available
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {snapshots.map((snapshot) => (
+                <div
+                  key={snapshot.id}
+                  className="flex items-center justify-between p-4 border rounded-lg"
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <h4 className="font-medium">
+                        {snapshot.quote.quote_number}
+                      </h4>
+                      <Badge className={getStatusColor(snapshot.quote.status)}>
+                        {snapshot.quote.status}
+                      </Badge>
+                      <Badge variant="outline">
+                        {snapshot.snapshot_type}
+                      </Badge>
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      <span>Total: {formatCurrency(snapshot.quote.total_cost)}</span>
+                      <span className="mx-2">•</span>
+                      <span>Created: {formatDate(snapshot.created_at)}</span>
+                      {snapshot.quote.accepted_at && (
+                        <>
+                          <span className="mx-2">•</span>
+                          <span>Accepted: {formatDate(snapshot.quote.accepted_at)}</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSelectedSnapshot(snapshot)}
+                  >
+                    <Eye className="h-4 w-4 mr-2" />
+                    View
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog 
+        open={!!selectedSnapshot} 
+        onOpenChange={() => setSelectedSnapshot(null)}
+      >
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Quote Snapshot: {selectedSnapshot?.quote.quote_number}
+            </DialogTitle>
+          </DialogHeader>
+          {selectedSnapshot && (
+            <div 
+              className="prose max-w-none"
+              dangerouslySetInnerHTML={{ 
+                __html: selectedSnapshot.html_content || 'No preview available' 
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
