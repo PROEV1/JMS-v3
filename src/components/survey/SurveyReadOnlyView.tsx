@@ -1,0 +1,292 @@
+import React from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { SignedImage } from '@/components/ui/SignedImage';
+import { SignedFile } from '@/components/ui/SignedFile';
+import { Image, Video, FileText } from 'lucide-react';
+
+interface SurveyReadOnlyViewProps {
+  survey: any;
+  media: any[];
+}
+
+export function SurveyReadOnlyView({ survey, media }: SurveyReadOnlyViewProps) {
+  const responses = survey.responses as any;
+
+  const getStatusBadge = (status: string) => {
+    const statusConfig = {
+      draft: { label: 'Draft', color: 'bg-slate-100 text-slate-700' },
+      submitted: { label: 'Submitted', color: 'bg-blue-100 text-blue-700' },
+      under_review: { label: 'Under Review', color: 'bg-yellow-100 text-yellow-700' },
+      rework_requested: { label: 'Rework Requested', color: 'bg-red-100 text-red-700' },
+      resubmitted: { label: 'Resubmitted', color: 'bg-purple-100 text-purple-700' },
+      approved: { label: 'Approved', color: 'bg-green-100 text-green-700' },
+    };
+    
+    const config = statusConfig[status as keyof typeof statusConfig];
+    return (
+      <Badge className={config?.color || 'bg-slate-100 text-slate-700'}>
+        {config?.label || status}
+      </Badge>
+    );
+  };
+
+  const renderMediaForField = (fieldKey: string) => {
+    const fieldMedia = media.filter(m => m.field_key === fieldKey);
+    if (!fieldMedia.length) return null;
+
+    return (
+      <div className="mt-3">
+        <div className="text-sm font-medium text-slate-600 mb-2">Uploaded Media:</div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {fieldMedia.map((item, index) => (
+            <div key={index} className="relative group">
+              {item.media_type === 'image' ? (
+                <div className="aspect-square rounded-lg overflow-hidden bg-slate-100">
+                  {item.storage_path ? (
+                    <SignedImage
+                      bucket={item.storage_bucket || 'client-documents'}
+                      path={item.storage_path}
+                      fallbackUrl="/placeholder.svg"
+                      className="w-full h-full object-cover"
+                      alt={item.file_name || 'Survey image'}
+                    />
+                  ) : (
+                    <img
+                      src={item.file_url}
+                      alt={item.file_name || 'Survey image'}
+                      className="w-full h-full object-cover"
+                    />
+                  )}
+                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-200 flex items-center justify-center">
+                    <Image className="text-white opacity-0 group-hover:opacity-100 transition-opacity" size={24} />
+                  </div>
+                </div>
+              ) : item.media_type === 'video' ? (
+                <div className="aspect-video rounded-lg overflow-hidden bg-slate-100 flex items-center justify-center">
+                  {item.storage_path ? (
+                    <SignedFile
+                      bucket={item.storage_bucket || 'client-documents'}
+                      path={item.storage_path}
+                      fileName={item.file_name}
+                      variant="ghost"
+                      className="w-full h-full"
+                      showIcon={false}
+                    >
+                      <div className="flex flex-col items-center justify-center h-full text-slate-600">
+                        <Video size={32} className="mb-2" />
+                        <span className="text-sm text-center px-2">{item.file_name}</span>
+                      </div>
+                    </SignedFile>
+                  ) : (
+                    <a href={item.file_url} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center justify-center h-full text-slate-600 hover:text-slate-800">
+                      <Video size={32} className="mb-2" />
+                      <span className="text-sm text-center px-2">{item.file_name}</span>
+                    </a>
+                  )}
+                </div>
+              ) : (
+                <div className="aspect-square rounded-lg bg-slate-100 flex items-center justify-center">
+                  {item.storage_path ? (
+                    <SignedFile
+                      bucket={item.storage_bucket || 'client-documents'}
+                      path={item.storage_path}
+                      fileName={item.file_name}
+                      variant="ghost"
+                      className="w-full h-full"
+                      showIcon={false}
+                    >
+                      <div className="flex flex-col items-center justify-center h-full text-slate-600">
+                        <FileText size={32} className="mb-2" />
+                        <span className="text-sm text-center px-2">{item.file_name}</span>
+                      </div>
+                    </SignedFile>
+                  ) : (
+                    <a href={item.file_url} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center justify-center h-full text-slate-600 hover:text-slate-800">
+                      <FileText size={32} className="mb-2" />
+                      <span className="text-sm text-center px-2">{item.file_name}</span>
+                    </a>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-background p-6">
+      <div className="max-w-4xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-slate-900 mb-2">Survey Submission</h1>
+          <div className="flex items-center justify-center gap-4">
+            {getStatusBadge(survey.status)}
+            <span className="text-slate-600">
+              Submitted: {new Date(survey.submitted_at || survey.created_at).toLocaleDateString()}
+            </span>
+          </div>
+        </div>
+
+        {/* Survey Responses */}
+        <div className="space-y-6">
+          {/* Property Details */}
+          {responses.propertyDetails && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Property Details</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {responses.propertyDetails.propertyType && (
+                    <div>
+                      <span className="text-slate-600 font-medium">Property Type:</span>
+                      <span className="ml-2">{responses.propertyDetails.propertyType}</span>
+                    </div>
+                  )}
+                  {responses.propertyDetails.parkingType && (
+                    <div>
+                      <span className="text-slate-600 font-medium">Parking:</span>
+                      <span className="ml-2">{responses.propertyDetails.parkingType}</span>
+                    </div>
+                  )}
+                  {responses.propertyDetails.postcode && (
+                    <div>
+                      <span className="text-slate-600 font-medium">Postcode:</span>
+                      <span className="ml-2">{responses.propertyDetails.postcode}</span>
+                    </div>
+                  )}
+                  {responses.propertyDetails.yearBuilt && (
+                    <div>
+                      <span className="text-slate-600 font-medium">Year Built:</span>
+                      <span className="ml-2">{responses.propertyDetails.yearBuilt}</span>
+                    </div>
+                  )}
+                </div>
+                {responses.propertyDetails.notes && (
+                  <div>
+                    <span className="text-slate-600 font-medium">Notes:</span>
+                    <p className="mt-1 text-slate-900">{responses.propertyDetails.notes}</p>
+                  </div>
+                )}
+                {renderMediaForField('propertyDetails')}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Parking Access */}
+          {responses.parkingAccess && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Parking Access</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div>
+                  <span className="text-slate-600 font-medium">Access Type:</span>
+                  <span className="ml-2">{responses.parkingAccess}</span>
+                </div>
+                {renderMediaForField('parkingAccess')}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Charger Location */}
+          {responses.chargerLocation && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Charger Location</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div>
+                  <span className="text-slate-600 font-medium">Preferred Location:</span>
+                  <span className="ml-2">{responses.chargerLocation}</span>
+                </div>
+                {renderMediaForField('chargerLocation')}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Consumer Unit */}
+          {responses.consumerUnit && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Consumer Unit Details</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {Object.entries(responses.consumerUnit).map(([key, value]) => (
+                    <div key={key}>
+                      <span className="text-slate-600 font-medium capitalize">
+                        {key.replace(/([A-Z])/g, ' $1')}:
+                      </span>
+                      <span className="ml-2">{String(value)}</span>
+                    </div>
+                  ))}
+                </div>
+                {renderMediaForField('consumerUnit')}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Video Summary */}
+          {responses.videoSummary && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Video Summary</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-slate-900">{responses.videoSummary}</p>
+                {renderMediaForField('videoSummary')}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Additional Media */}
+          {responses.additionalMedia && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Additional Documentation</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {responses.additionalMedia.notes && (
+                  <p className="text-slate-900 mb-4">{responses.additionalMedia.notes}</p>
+                )}
+                {renderMediaForField('additionalMedia')}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Review Information */}
+          {(survey.review_notes || survey.rework_reason) && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Review Information</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {survey.review_notes && (
+                  <div>
+                    <span className="text-slate-600 font-medium">Review Notes:</span>
+                    <p className="mt-1 text-slate-900">{survey.review_notes}</p>
+                  </div>
+                )}
+                {survey.rework_reason && (
+                  <div>
+                    <span className="text-slate-600 font-medium">Rework Reason:</span>
+                    <p className="mt-1 text-slate-900">{survey.rework_reason}</p>
+                  </div>
+                )}
+                {survey.reviewed_at && (
+                  <div className="text-sm text-slate-600">
+                    Reviewed: {new Date(survey.reviewed_at).toLocaleDateString()}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

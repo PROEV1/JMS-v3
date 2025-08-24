@@ -6,6 +6,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CheckCircle, XCircle, FileText, Image, Video, Eye, Copy, ExternalLink, Send, Link } from 'lucide-react';
+import { SignedImage } from '@/components/ui/SignedImage';
+import { SignedFile } from '@/components/ui/SignedFile';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -357,9 +359,9 @@ export function SurveySection({ orderId }: SurveySectionProps) {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => window.open(getSurveyLink(), '_blank')}
+                    onClick={() => window.open(`${window.location.origin}/survey-view/${orderId}?token=${order.survey_token}`, '_blank')}
                   >
-                    <ExternalLink className="h-4 w-4 mr-2" />
+                    <Eye className="h-4 w-4 mr-2" />
                     View Survey
                   </Button>
                 )}
@@ -496,17 +498,101 @@ export function SurveySection({ orderId }: SurveySectionProps) {
             </div>
           )}
 
-          {/* Raw data fallback for other fields */}
-          <details className="border rounded-lg">
-            <summary className="p-3 cursor-pointer font-medium">View All Raw Data</summary>
-            <div className="p-3 pt-0">
-              <pre className="text-xs bg-muted p-3 rounded overflow-auto">
-                {JSON.stringify(responses, null, 2)}
-              </pre>
-            </div>
-          </details>
-        </CardContent>
-      </Card>
+            {/* Media Gallery */}
+            {media.length > 0 && (
+              <div>
+                <h4 className="font-medium text-slate-900 mb-3">Uploaded Media</h4>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                  {media.map((item, index) => (
+                    <div key={index} className="relative group">
+                      {item.media_type === 'image' ? (
+                        <div className="aspect-square rounded-lg overflow-hidden bg-slate-100">
+                          {item.storage_path ? (
+                            <SignedImage
+                              bucket={item.storage_bucket || 'client-documents'}
+                              path={item.storage_path}
+                              fallbackUrl="/placeholder.svg"
+                              className="w-full h-full object-cover"
+                              alt={item.file_name || 'Survey image'}
+                            />
+                          ) : (
+                            <img
+                              src={item.file_url}
+                              alt={item.file_name || 'Survey image'}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                e.currentTarget.src = '/placeholder.svg';
+                              }}
+                            />
+                          )}
+                          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-200 flex items-center justify-center">
+                            <Image className="text-white opacity-0 group-hover:opacity-100 transition-opacity" size={24} />
+                          </div>
+                        </div>
+                      ) : item.media_type === 'video' ? (
+                        <div className="aspect-video rounded-lg overflow-hidden bg-slate-100 flex items-center justify-center">
+                          {item.storage_path ? (
+                            <SignedFile
+                              bucket={item.storage_bucket || 'client-documents'}
+                              path={item.storage_path}
+                              fileName={item.file_name}
+                              variant="ghost"
+                              className="w-full h-full"
+                              showIcon={false}
+                            >
+                              <div className="flex flex-col items-center justify-center h-full text-slate-600">
+                                <Video size={32} className="mb-2" />
+                                <span className="text-xs text-center px-2">{item.file_name}</span>
+                              </div>
+                            </SignedFile>
+                          ) : (
+                            <a href={item.file_url} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center justify-center h-full text-slate-600 hover:text-slate-800">
+                              <Video size={32} className="mb-2" />
+                              <span className="text-xs text-center px-2">{item.file_name}</span>
+                            </a>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="aspect-square rounded-lg bg-slate-100 flex items-center justify-center">
+                          {item.storage_path ? (
+                            <SignedFile
+                              bucket={item.storage_bucket || 'client-documents'}
+                              path={item.storage_path}
+                              fileName={item.file_name}
+                              variant="ghost"
+                              className="w-full h-full"
+                              showIcon={false}
+                            >
+                              <div className="flex flex-col items-center justify-center h-full text-slate-600">
+                                <FileText size={32} className="mb-2" />
+                                <span className="text-xs text-center px-2">{item.file_name}</span>
+                              </div>
+                            </SignedFile>
+                          ) : (
+                            <a href={item.file_url} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center justify-center h-full text-slate-600 hover:text-slate-800">
+                              <FileText size={32} className="mb-2" />
+                              <span className="text-xs text-center px-2">{item.file_name}</span>
+                            </a>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Raw data fallback for debugging */}
+            <details className="border rounded-lg">
+              <summary className="p-3 cursor-pointer font-medium">View All Raw Data</summary>
+              <div className="p-3 pt-0">
+                <pre className="text-xs bg-muted p-3 rounded overflow-auto">
+                  {JSON.stringify(responses, null, 2)}
+                </pre>
+              </div>
+            </details>
+          </CardContent>
+        </Card>
       ) : (
         <Card>
           <CardContent className="flex items-center justify-center h-40">
@@ -520,24 +606,39 @@ export function SurveySection({ orderId }: SurveySectionProps) {
         </Card>
       )}
 
-      {/* Media Gallery */}
+      {/* Legacy Media Gallery Card - Remove this if media is shown above */}
       {survey && media.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Uploaded Media</CardTitle>
+            <CardTitle>Media Files</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {media.map((item: any) => (
                 <div key={item.id} className="relative group">
                   {item.media_type === 'image' ? (
-                    <img
-                      src={item.file_url}
-                      alt={item.file_name}
-                      className="w-full h-32 object-cover rounded-lg border"
-                    />
+                    <div className="aspect-square rounded-lg overflow-hidden bg-slate-100">
+                      {item.storage_path ? (
+                        <SignedImage
+                          bucket={item.storage_bucket || 'client-documents'}
+                          path={item.storage_path}
+                          fallbackUrl="/placeholder.svg"
+                          className="w-full h-full object-cover"
+                          alt={item.file_name || 'Survey image'}
+                        />
+                      ) : (
+                        <img
+                          src={item.file_url}
+                          alt={item.file_name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.src = '/placeholder.svg';
+                          }}
+                        />
+                      )}
+                    </div>
                   ) : (
-                    <div className="w-full h-32 bg-slate-100 rounded-lg border flex items-center justify-center">
+                    <div className="w-full aspect-square bg-slate-100 rounded-lg border flex items-center justify-center">
                       <Video className="h-8 w-8 text-slate-400" />
                     </div>
                   )}
@@ -546,7 +647,14 @@ export function SurveySection({ orderId }: SurveySectionProps) {
                       size="sm"
                       variant="secondary"
                       className="opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={() => window.open(item.file_url, '_blank')}
+                      onClick={() => {
+                        if (item.storage_path) {
+                          // For secure files, we would need to get signed URL
+                          window.open(item.file_url, '_blank');
+                        } else {
+                          window.open(item.file_url, '_blank');
+                        }
+                      }}
                     >
                       <Eye className="h-4 w-4" />
                     </Button>
