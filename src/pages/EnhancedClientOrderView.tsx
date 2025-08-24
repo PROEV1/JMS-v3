@@ -18,7 +18,7 @@ type OrderStatusEnhanced = Database['public']['Enums']['order_status_enhanced'];
 export default function EnhancedClientOrderView() {
   const { orderId } = useParams();
 
-  const { data: order, isLoading, error } = useQuery({
+  const { data: order, isLoading, error, refetch } = useQuery({
     queryKey: ['client-order', orderId],
     queryFn: async () => {
       if (!orderId) throw new Error('Order ID is required');
@@ -202,7 +202,7 @@ export default function EnhancedClientOrderView() {
           <EnhancedSurveySection orderId={order.id} />
 
           {/* Engineer Uploads */}
-          <EngineerUploadsSection order={order} />
+          <EngineerUploadsSection order={order} onUpdate={() => refetch()} />
         </div>
 
         {/* Sidebar */}
@@ -265,10 +265,10 @@ export default function EnhancedClientOrderView() {
           {/* Status Management */}
           <OrderStatusManager 
             orderId={order.id}
-            currentStatus={order.status_enhanced as OrderStatusEnhanced}
+            currentStatus={order.status_enhanced as any}
             manualOverride={order.manual_status_override || false}
             manualNotes={order.manual_status_notes}
-            onUpdate={() => window.location.reload()}
+            onUpdate={() => refetch()}
           />
 
           {/* Activity Timeline */}
