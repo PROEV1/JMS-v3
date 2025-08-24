@@ -1462,13 +1462,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "fk_order_payments_order_id"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "order_payments_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
@@ -2746,13 +2739,6 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "quotes_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders"
             referencedColumns: ["id"]
           },
         ]
