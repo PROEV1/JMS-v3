@@ -58,23 +58,7 @@ export function DynamicSurveyWizard({
   const progress = ((currentStep + 1) / schema.steps.length) * 100;
 
   // Use the updated validation hook with the dynamic schema
-  const { isValid, errors, canContinue } = useSurveyValidation(
-    {
-      ...Object.fromEntries(
-        schema.steps.map(step => [
-          step.key,
-          Object.fromEntries(
-            step.fields.map(field => [field.key, formData[field.key]])
-          )
-        ])
-      ),
-      // Add media validation
-      chargerLocation: { photos: mediaData.charger_location_photos || [] },
-      consumerUnit: { photos: mediaData.consumer_unit_photos || [] },
-      consent: formData.consent
-    },
-    currentStep
-  );
+  const { isValid, errors, canContinue } = useSurveyValidation(formData, currentStep, schema);
 
   const handleFieldChange = (fieldKey: string, value: any) => {
     setFormData(prev => ({

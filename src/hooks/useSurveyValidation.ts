@@ -1,18 +1,8 @@
 import { useMemo } from 'react';
+import { SurveyFormSchema, SurveyField } from '@/types/survey-forms';
 
 interface SurveyData {
-  propertyDetails?: any;
-  parkingAccess?: any;
-  chargerLocation?: {
-    photos?: any[];
-    notes?: string;
-  };
-  consumerUnit?: {
-    photos?: any[];
-    notes?: string;
-  };
-  video?: any;
-  consent?: boolean;
+  [key: string]: any;
 }
 
 interface ValidationResult {
@@ -21,111 +11,96 @@ interface ValidationResult {
   canContinue: boolean;
 }
 
-export function useSurveyValidation(surveyData: SurveyData, currentStep: number): ValidationResult {
+export function useSurveyValidation(
+  surveyData: SurveyData, 
+  currentStep: number, 
+  schema?: SurveyFormSchema
+): ValidationResult {
   return useMemo(() => {
     const errors: string[] = [];
     let canContinue = true;
 
-    // Helper function to get field value with fallback for different naming conventions
-    const getFieldValue = (path: string) => {
-      // Try exact path first
-      const keys = path.split('.');
-      let value = surveyData;
-      for (const key of keys) {
-        value = value?.[key];
+    // If no schema is provided, fall back to legacy validation
+    if (!schema) {
+      return { isValid: true, errors: [], canContinue: true };
+    }
+
+    // Get current step fields from schema
+    const currentStepFields = schema.steps[currentStep]?.fields || [];
+
+    // Validate each field in the current step
+    for (const field of currentStepFields) {
+      const fieldValue = surveyData[field.key];
+      const isRequired = field.settings?.required || false;
+
+      // Check if field should be shown based on logic
+      const shouldShow = !field.logic || field.logic.every(logic => {
+        if (logic.action !== 'show') return true; // Only check show conditions
+        
+        const ruleValue = surveyData[logic.condition.fieldKey];
+        switch (logic.condition.operator) {
+          case 'equals':
+            return ruleValue === logic.condition.value;
+          case 'not_equals':
+            return ruleValue !== logic.condition.value;
+          case 'contains':
+            return Array.isArray(ruleValue) && ruleValue.includes(logic.condition.value);
+          default:
+            return true;
+        }
+      });
+
+      if (!shouldShow) continue;
+
+      // Required field validation
+      if (isRequired) {
+        if (field.type === 'photo' || field.type === 'video' || field.type === 'file') {
+          const mediaFiles = Array.isArray(fieldValue) ? fieldValue : [];
+          const minFiles = field.settings?.mediaSettings?.minItems || 1;
+          
+          if (mediaFiles.length < minFiles) {
+            errors.push(`${field.settings?.label || field.key} requires at least ${minFiles} file(s) (${mediaFiles.length}/${minFiles})`);
+            canContinue = false;
+          }
+        } else if (field.type === 'checkbox') {
+          if (!fieldValue) {
+            errors.push(`${field.settings?.label || field.key} must be checked`);
+            canContinue = false;
+          }
+        } else {
+          if (!fieldValue || (typeof fieldValue === 'string' && !fieldValue.trim())) {
+            errors.push(`${field.settings?.label || field.key} is required`);
+            canContinue = false;
+          }
+        }
       }
-      if (value !== undefined) return value;
 
-      // Try flat structure for dynamic forms
-      return surveyData[path] || surveyData[keys[keys.length - 1]];
-    };
-
-    // Step-specific validation
-    switch (currentStep) {
-      case 0: // Property Details
-        if (!getFieldValue('propertyDetails.propertyType') && !getFieldValue('propertyType')) {
-          errors.push('Property type is required');
-          canContinue = false;
+      // Type-specific validation
+      if (fieldValue) {
+        switch (field.type) {
+          case 'email':
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(fieldValue)) {
+              errors.push(`${field.settings?.label || field.key} must be a valid email`);
+              canContinue = false;
+            }
+            break;
+          case 'phone':
+            const phoneRegex = /^[\d\s\-\+\(\)]+$/;
+            if (!phoneRegex.test(fieldValue)) {
+              errors.push(`${field.settings?.label || field.key} must be a valid phone number`);
+              canContinue = false;
+            }
+            break;
+          case 'number':
+          case 'currency':
+            if (isNaN(Number(fieldValue))) {
+              errors.push(`${field.settings?.label || field.key} must be a valid number`);
+              canContinue = false;
+            }
+            break;
         }
-        if (!getFieldValue('propertyDetails.parkingType') && !getFieldValue('parkingType')) {
-          errors.push('Parking type is required');
-          canContinue = false;
-        }
-        if (!getFieldValue('propertyDetails.postcode')?.trim() && !getFieldValue('postcode')?.trim()) {
-          errors.push('Postcode is required');
-          canContinue = false;
-        }
-        break;
-
-      case 1: // Parking Access
-        // Support both old field names and new dynamic field names
-        const propertyAccess = getFieldValue('parkingAccess.propertyAccess') || getFieldValue('accessType') || getFieldValue('propertyAccess');
-        const vehicleAccess = getFieldValue('parkingAccess.vehicleAccess') || getFieldValue('vehicleAccess');
-        
-        if (!propertyAccess) {
-          errors.push('Property access type is required');
-          canContinue = false;
-        }
-        if (!vehicleAccess) {
-          errors.push('Vehicle access difficulty is required');
-          canContinue = false;
-        }
-        break;
-
-      case 2: // Charger Location
-        const chargerPhotos = getFieldValue('chargerLocation.photos') || getFieldValue('chargerLocationPhotos') || [];
-        if (chargerPhotos.length < 3) {
-          errors.push(`At least 3 charger location photos are required (${chargerPhotos.length}/3)`);
-          canContinue = false;
-        }
-        break;
-
-      case 3: // Consumer Unit
-        const consumerPhotos = getFieldValue('consumerUnit.photos') || getFieldValue('consumerUnitPhotos') || [];
-        if (consumerPhotos.length < 1) {
-          errors.push('At least 1 consumer unit photo is required');
-          canContinue = false;
-        }
-        break;
-
-      case 4: // Video (optional)
-        // No validation required for video step
-        break;
-
-      case 5: // Confirm & Submit
-        if (!getFieldValue('consent')) {
-          errors.push('You must agree to the terms before submitting');
-          canContinue = false;
-        }
-        
-        // Final validation - all previous requirements
-        const finalChargerPhotos = getFieldValue('chargerLocation.photos') || getFieldValue('chargerLocationPhotos') || [];
-        const finalConsumerPhotos = getFieldValue('consumerUnit.photos') || getFieldValue('consumerUnitPhotos') || [];
-        
-        if (finalChargerPhotos.length < 3) {
-          errors.push('Charger location photos incomplete (3 required)');
-          canContinue = false;
-        }
-        
-        if (finalConsumerPhotos.length < 1) {
-          errors.push('Consumer unit photo required');
-          canContinue = false;
-        }
-
-        const hasPropertyType = getFieldValue('propertyDetails.propertyType') || getFieldValue('propertyType');
-        const hasParkingType = getFieldValue('propertyDetails.parkingType') || getFieldValue('parkingType');
-        if (!hasPropertyType || !hasParkingType) {
-          errors.push('Property details incomplete');
-          canContinue = false;
-        }
-
-        const hasPropertyAccess = getFieldValue('parkingAccess.propertyAccess') || getFieldValue('accessType') || getFieldValue('propertyAccess');
-        const hasVehicleAccess = getFieldValue('parkingAccess.vehicleAccess') || getFieldValue('vehicleAccess');
-        if (!hasPropertyAccess || !hasVehicleAccess) {
-          errors.push('Access information incomplete');
-          canContinue = false;
-        }
-        break;
+      }
     }
 
     return {
@@ -133,5 +108,5 @@ export function useSurveyValidation(surveyData: SurveyData, currentStep: number)
       errors,
       canContinue
     };
-  }, [surveyData, currentStep]);
+  }, [surveyData, currentStep, schema]);
 }
