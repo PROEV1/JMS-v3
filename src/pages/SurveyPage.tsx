@@ -24,7 +24,8 @@ export default function SurveyPage() {
         });
 
         if (error) throw new Error(error.message || 'Failed to access survey');
-        return data.order;
+        if (!data.ok) throw new Error(data.error || 'Failed to access survey');
+        return data.data;
       }
 
       // Otherwise use authenticated access
