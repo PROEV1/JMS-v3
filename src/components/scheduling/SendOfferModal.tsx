@@ -9,7 +9,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CalendarDays, Clock, User, Mail, MessageSquare, Send, CheckCircle, AlertCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
+import { useToast } from '@/hooks/use-toast';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Order, getOrderEstimatedHours } from '@/utils/schedulingUtils';
 import { getBestPostcode } from '@/utils/postcodeUtils';
@@ -48,6 +48,7 @@ export function SendOfferModal({
   const [customMessage, setCustomMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [availableDates, setAvailableDates] = useState<Date[]>([]);
+  const { toast } = useToast();
 
   const selectedEngineer = engineers.find(e => e.id === selectedEngineerId);
 
@@ -113,7 +114,11 @@ export function SendOfferModal({
 
   const handleSendOffer = async () => {
     if (!selectedEngineerId || !selectedDate) {
-      toast.error('Please select an engineer and date');
+      toast({
+        title: "Validation Error",
+        description: 'Please select an engineer and date',
+        variant: "destructive",
+      });
       return;
     }
 
@@ -144,7 +149,10 @@ export function SendOfferModal({
         throw new Error(data.message || data.error || 'Failed to send offer');
       }
 
-       toast.success('Installation offer sent successfully!');
+       toast({
+         title: "Success",
+         description: 'Installation offer sent successfully!',
+       });
        
        // Invalidate all order-related queries to refresh the UI
        await queryClient.invalidateQueries({ queryKey: ['orders'] });
@@ -167,11 +175,23 @@ export function SendOfferModal({
       
       // Special handling for engineer availability errors
       if (errorMessage.includes('not available on')) {
-        toast.error(errorMessage, { duration: 6000 });
+        toast({
+          title: "Something went wrong",
+          description: errorMessage,
+          variant: "destructive",
+        });
       } else if (errorMessage.includes('at capacity') || errorMessage.includes('exceed')) {
-        toast.error(errorMessage);
+        toast({
+          title: "Something went wrong",
+          description: errorMessage,
+          variant: "destructive",
+        });
       } else {
-        toast.error('Failed to send offer. Please try again.');
+        toast({
+          title: "Something went wrong",
+          description: 'Failed to send offer. Please try again.',
+          variant: "destructive",
+        });
       }
     } finally {
       setSending(false);

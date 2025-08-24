@@ -138,6 +138,8 @@ export type Database = {
           media_type: Database["public"]["Enums"]["survey_media_type"]
           order_id: string
           position: number
+          storage_bucket: string | null
+          storage_path: string | null
           survey_id: string
           uploaded_at: string
           uploaded_by: string | null
@@ -152,6 +154,8 @@ export type Database = {
           media_type: Database["public"]["Enums"]["survey_media_type"]
           order_id: string
           position?: number
+          storage_bucket?: string | null
+          storage_path?: string | null
           survey_id: string
           uploaded_at?: string
           uploaded_by?: string | null
@@ -166,6 +170,8 @@ export type Database = {
           media_type?: Database["public"]["Enums"]["survey_media_type"]
           order_id?: string
           position?: number
+          storage_bucket?: string | null
+          storage_path?: string | null
           survey_id?: string
           uploaded_at?: string
           uploaded_by?: string | null
@@ -591,6 +597,8 @@ export type Database = {
           file_url: string
           id: string
           order_id: string
+          storage_bucket: string | null
+          storage_path: string | null
           upload_type: string
           uploaded_at: string
         }
@@ -603,6 +611,8 @@ export type Database = {
           file_url: string
           id?: string
           order_id: string
+          storage_bucket?: string | null
+          storage_path?: string | null
           upload_type: string
           uploaded_at?: string
         }
@@ -615,6 +625,8 @@ export type Database = {
           file_url?: string
           id?: string
           order_id?: string
+          storage_bucket?: string | null
+          storage_path?: string | null
           upload_type?: string
           uploaded_at?: string
         }
@@ -686,6 +698,8 @@ export type Database = {
           id: string
           project_id: string | null
           quote_id: string | null
+          storage_bucket: string | null
+          storage_path: string | null
           upload_type: string
           uploaded_by: string
         }
@@ -700,6 +714,8 @@ export type Database = {
           id?: string
           project_id?: string | null
           quote_id?: string | null
+          storage_bucket?: string | null
+          storage_path?: string | null
           upload_type: string
           uploaded_by: string
         }
@@ -714,6 +730,8 @@ export type Database = {
           id?: string
           project_id?: string | null
           quote_id?: string | null
+          storage_bucket?: string | null
+          storage_path?: string | null
           upload_type?: string
           uploaded_by?: string
         }
@@ -1987,6 +2005,8 @@ export type Database = {
           created_at: string
           id: string
           is_active: boolean
+          logo_storage_bucket: string | null
+          logo_storage_path: string | null
           logo_url: string | null
           name: string
           parent_partner_id: string | null
@@ -2004,6 +2024,8 @@ export type Database = {
           created_at?: string
           id?: string
           is_active?: boolean
+          logo_storage_bucket?: string | null
+          logo_storage_path?: string | null
           logo_url?: string | null
           name: string
           parent_partner_id?: string | null
@@ -2021,6 +2043,8 @@ export type Database = {
           created_at?: string
           id?: string
           is_active?: boolean
+          logo_storage_bucket?: string | null
+          logo_storage_path?: string | null
           logo_url?: string | null
           name?: string
           parent_partner_id?: string | null

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
+import { useToast } from '@/hooks/use-toast';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
@@ -28,6 +28,7 @@ export const PortalAccessPanel: React.FC<PortalAccessPanelProps> = ({ client }) 
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     loadUserProfile();
@@ -76,13 +77,20 @@ export const PortalAccessPanel: React.FC<PortalAccessPanelProps> = ({ client }) 
       }
 
       console.log('Invite sent successfully:', data);
-      toast.success(profile ? 'Password reset link sent' : 'Portal invite sent');
+      toast({
+        title: "Success",
+        description: profile ? 'Password reset link sent' : 'Portal invite sent',
+      });
       
       // Reload profile data
       await loadUserProfile();
     } catch (error) {
       console.error('Error sending invite:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to send invite');
+      toast({
+        title: "Something went wrong",
+        description: error instanceof Error ? error.message : 'Failed to send invite',
+        variant: "destructive",
+      });
     } finally {
       setSending(false);
     }

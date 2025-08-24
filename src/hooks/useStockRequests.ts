@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { StockRequest, StockRequestWithDetails, CreateStockRequestData } from '@/types/stock-request';
 import { safeApiCall, showErrorToast, showSuccessToast } from '@/utils/apiErrorHandler';
-import { toast } from 'sonner';
+//import { toast } from 'sonner'; // Removed - use showErrorToast/showSuccessToast from apiErrorHandler
 
 export const useStockRequests = (engineerId?: string, limit = 30) => {
   return useQuery({
@@ -76,11 +76,11 @@ export const useCreateStockRequest = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['stock-requests'] });
-      toast.success('Stock request submitted successfully');
+      showSuccessToast('Stock request submitted successfully');
     },
     onError: (error) => {
       console.error('Failed to create stock request:', error);
-      toast.error('Failed to submit stock request');
+      showErrorToast('Failed to submit stock request');
     }
   });
 };
@@ -106,11 +106,11 @@ export const useUpdateStockRequestStatus = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['stock-requests'] });
-      toast.success('Request status updated');
+      showSuccessToast('Request status updated');
     },
     onError: (error) => {
       console.error('Failed to update request status:', error);
-      toast.error('Failed to update request status');
+      showErrorToast('Failed to update request status');
     }
   });
 };

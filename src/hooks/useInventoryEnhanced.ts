@@ -1,7 +1,6 @@
 import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
 import { safeApiCall, showErrorToast, showSuccessToast } from '@/utils/apiErrorHandler';
 
 // Enhanced inventory hook with real-time updates and caching
@@ -145,10 +144,10 @@ export function useInventoryEnhanced() {
       queryClient.invalidateQueries({ queryKey: ['inventory-items'] });
       queryClient.invalidateQueries({ queryKey: ['inventory-kpis'] });
       queryClient.invalidateQueries({ queryKey: ['low-stock-items'] });
-      toast.success('Stock adjustment completed');
+      showSuccessToast('Stock adjustment completed');
     },
     onError: (error) => {
-      toast.error('Failed to adjust stock: ' + error.message);
+      showErrorToast('Failed to adjust stock: ' + error.message);
     }
   });
 
@@ -197,10 +196,10 @@ export function useInventoryEnhanced() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['inventory-items'] });
       queryClient.invalidateQueries({ queryKey: ['inventory-transactions'] });
-      toast.success('Stock transfer completed');
+      showSuccessToast('Stock transfer completed');
     },
     onError: (error) => {
-      toast.error('Failed to transfer stock: ' + error.message);
+      showErrorToast('Failed to transfer stock: ' + error.message);
     }
   });
 
@@ -221,10 +220,10 @@ export function useInventoryEnhanced() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['inventory-items'] });
-      toast.success(`Updated ${data.length} items`);
+      showSuccessToast(`Updated ${data.length} items`);
     },
     onError: (error) => {
-      toast.error('Failed to update items: ' + error.message);
+      showErrorToast('Failed to update items: ' + error.message);
     }
   });
 

@@ -12,7 +12,7 @@ import { CalendarDays, Clock, User, CheckCircle, XCircle, AlertTriangle, Calenda
 import Layout from '@/components/Layout';
 import { BrandTypography } from '@/components/brand/BrandTypography';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
+import { useToast } from '@/hooks/use-toast';
 
 interface OfferDetails {
   id: string;

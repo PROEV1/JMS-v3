@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { CalendarDays, Clock, User, CheckCircle, XCircle, AlertTriangle, Calendar } from 'lucide-react';
 import { BrandTypography } from '@/components/brand/BrandTypography';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
+import { useToast } from '@/hooks/use-toast';
 import { ProEVLogo } from '@/components/ProEVLogo';
 
 interface OfferDetails {

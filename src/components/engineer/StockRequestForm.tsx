@@ -13,7 +13,7 @@ import { Plus, Trash2, Upload, X } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCreateStockRequest } from '@/hooks/useStockRequests';
-import { toast } from 'sonner';
+import { useToast } from '@/hooks/use-toast';
 
 // Keep schema simple and flat for the form layer
 const StockRequestSchema = z.object({
@@ -69,6 +69,7 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({
 }) => {
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const createRequest = useCreateStockRequest();
+  const { toast } = useToast();
 
   const form = useForm<StockRequestFormValues>({
     resolver: zodResolver(StockRequestSchema) as any, // prevent deep generic instantiation
@@ -151,7 +152,11 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({
       return data?.publicUrl || null;
     } catch (error) {
       console.error('Photo upload failed:', error);
-      toast.error('Failed to upload photo');
+        toast({
+          title: "Something went wrong",
+          description: 'Failed to upload photo',
+          variant: "destructive",
+        });
       return null;
     }
   };
