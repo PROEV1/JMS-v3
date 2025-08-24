@@ -12,15 +12,18 @@ export default function SurveyPage() {
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
 
-  const { data: orderData, isLoading, error } = useQuery({
-    queryKey: ['survey-order', orderId, token],
-    queryFn: async () => {
-      if (!orderId) throw new Error('Order ID is required');
+  // Check if orderId is actually a survey token (32-character hex string)
+  const isTokenInPath = orderId && /^[a-f0-9]{32}$/i.test(orderId);
+  const surveyToken = isTokenInPath ? orderId : token;
+  const actualOrderId = isTokenInPath ? undefined : orderId;
 
-      // If we have a token, use survey-lookup for public access
-      if (token) {
+  const { data: orderData, isLoading, error } = useQuery({
+    queryKey: ['survey-order', actualOrderId, surveyToken],
+    queryFn: async () => {
+      // If we have a survey token, use survey-lookup for public access
+      if (surveyToken) {
         const { data, error } = await supabase.functions.invoke('survey-lookup', {
-          body: { token }
+          body: { token: surveyToken }
         });
 
         if (error) throw new Error(error.message || 'Failed to access survey');
@@ -28,7 +31,9 @@ export default function SurveyPage() {
         return data.data;
       }
 
-      // Otherwise use authenticated access
+      // Otherwise use authenticated access with order ID
+      if (!actualOrderId) throw new Error('Order ID is required');
+      
       const { data, error } = await supabase
         .from('orders')
         .select(`
@@ -49,13 +54,13 @@ export default function SurveyPage() {
             logo_url
           )
         `)
-        .eq('id', orderId)
+        .eq('id', actualOrderId)
         .maybeSingle();
 
       if (error) throw error;
       return data;
     },
-    enabled: !!orderId,
+    enabled: !!(actualOrderId || surveyToken),
   });
 
   if (isLoading) {
