@@ -105,8 +105,8 @@ export function OrderActionBar({ orderId, order }: OrderActionBarProps) {
     }
 
     try {
-      const { data, error } = await supabase.rpc('admin_delete_order', {
-        p_order_id: orderId
+      const { data, error } = await supabase.functions.invoke('admin-delete-order', {
+        body: { orderId }
       });
 
       if (error) throw error;

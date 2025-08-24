@@ -23,6 +23,7 @@ export default function EnhancedClientOrderView() {
     queryFn: async () => {
       if (!orderId) throw new Error('Order ID is required');
       
+      console.log('Fetching client order with ID:', orderId);
       const { data, error } = await supabase
         .from('orders')
         .select(`
@@ -69,22 +70,29 @@ export default function EnhancedClientOrderView() {
             client_agreement_required, 
             client_survey_required
           )
-        `)
-        .eq('id', orderId)
-        .single();
+         `)
+         .eq('id', orderId)
+         .maybeSingle();
 
-      if (error) throw error;
-      
-      // Transform the data to match our interface, handling nullable relationships and ensuring arrays
-      return {
-        ...data,
-        client: data.clients || null,
-        quote: data.quotes || null,
-        engineer: data.engineers || null,
-        partner: data.partners || null,
-        order_payments: Array.isArray(data.order_payments) ? data.order_payments : [],
-        engineer_uploads: Array.isArray(data.engineer_uploads) ? data.engineer_uploads : []
-      };
+       if (error) {
+         console.error('Database error:', error);
+         throw error;
+       }
+       
+       if (!data) {
+         throw new Error('Order not found');
+       }
+       
+       // Transform the data to match our interface, handling nullable relationships and ensuring arrays
+       return {
+         ...data,
+         client: data.clients || null,
+         quote: data.quotes || null,
+         engineer: data.engineers || null,
+         partner: data.partners || null,
+         order_payments: Array.isArray(data.order_payments) ? data.order_payments : [],
+         engineer_uploads: Array.isArray(data.engineer_uploads) ? data.engineer_uploads : []
+       };
     },
     enabled: !!orderId,
   });

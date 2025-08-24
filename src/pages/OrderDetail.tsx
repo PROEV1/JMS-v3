@@ -220,9 +220,23 @@ export default function OrderDetail() {
           )
         `)
         .eq('id', orderId)
-        .single();
+        .maybeSingle();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Database error:', error);
+        throw error;
+      }
+      
+      if (!data) {
+        console.error('Order not found for ID:', orderId);
+        toast({
+          title: "Error",
+          description: "Order not found",
+          variant: "destructive",
+        });
+        navigate('/admin/orders');
+        return;
+      }
       
       console.log('Order data fetched:', data);
       console.log('Client data:', data.clients);
