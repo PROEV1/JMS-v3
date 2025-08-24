@@ -16,7 +16,7 @@ import type { Database } from "@/integrations/supabase/types";
 type OrderStatusEnhanced = Database['public']['Enums']['order_status_enhanced'];
 
 export default function EnhancedClientOrderView() {
-  const { orderId } = useParams();
+  const { id: orderId } = useParams();
 
   const { data: order, isLoading, error, refetch } = useQuery({
     queryKey: ['client-order', orderId],

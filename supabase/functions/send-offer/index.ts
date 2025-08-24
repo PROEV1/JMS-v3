@@ -88,8 +88,8 @@ serve(async (req: Request) => {
       .from('orders')
       .select(`
         *,
-        client:clients(*),
-        quote:quotes(*)
+        client:clients!orders_client_id_fkey(*),
+        quote:quotes!orders_quote_id_fkey(*)
       `)
       .eq('id', order_id)
       .maybeSingle();
@@ -241,10 +241,10 @@ serve(async (req: Request) => {
       .single();
 
     if (configError) {
-      throw new Error('Offer configuration not found');
+      console.warn('Offer configuration not found, using defaults');
     }
 
-    const offerConfig = config.setting_value;
+    const offerConfig = config?.setting_value || {};
     const ttlHours = offerConfig.default_ttl_hours || 24;
     const expiresAt = new Date(Date.now() + ttlHours * 60 * 60 * 1000);
 
