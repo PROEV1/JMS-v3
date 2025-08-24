@@ -3175,6 +3175,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_delete_order: {
+        Args: { p_order_id: string }
+        Returns: boolean
+      }
       admin_set_order_status: {
         Args: {
           p_order_id: string

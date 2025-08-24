@@ -1,1092 +1,271 @@
-import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+
+import { useParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
-import { useOrderStatusSync } from "@/hooks/useOrderStatusSync";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { Separator } from "@/components/ui/separator";
-import { EnhancedJobStatusBadge, OrderStatusEnhanced } from "@/components/admin/EnhancedJobStatusBadge";
+import { CalendarDays, MapPin, User, Phone, Mail, Package, CreditCard } from "lucide-react";
+import { OrderStatusManager } from "@/components/admin/OrderStatusManager";
+import { OrderActivityTimeline } from "@/components/admin/OrderActivityTimeline";
+import { OrderProgressTimeline } from "@/components/admin/OrderProgressTimeline";
+import { EngineerUploadsSection } from "@/components/admin/sections/EngineerUploadsSection";
+import { EnhancedSurveySection } from "@/components/admin/sections/EnhancedSurveySection";
 import { format } from "date-fns";
-import { 
-  ArrowLeft, 
-  Download, 
-  CheckCircle, 
-  Clock, 
-  Calendar,
-  Star,
-  FileText,
-  CreditCard,
-  User,
-  MapPin,
-  XCircle,
-  AlertCircle,
-  Clipboard
-} from "lucide-react";
-import { AgreementSigningModal } from "@/components/AgreementSigningModal";
-import { isSurveyRequiredForOrder, getSurveyRequirementReason } from "@/utils/surveyUtils";
-import { RejectOfferModal } from "@/components/RejectOfferModal";
-
-interface JobOffer {
-  id: string;
-  status: 'pending' | 'accepted' | 'rejected' | 'expired';
-  offered_date: string;
-  time_window?: string;
-  expires_at: string;
-  engineer: {
-    name: string;
-    email: string;
-  };
-  created_at: string;
-}
-
-interface ClientOrder {
-  id: string;
-  order_number: string;
-  status_enhanced: OrderStatusEnhanced;
-  total_amount: number;
-  amount_paid: number;
-  deposit_amount?: number;
-  agreement_signed_at: string | null;
-  scheduled_install_date: string | null;
-  created_at: string;
-  status: string;
-  survey_required?: boolean;
-  client: {
-    full_name: string;
-    email: string;
-    address: string | null;
-  };
-  quote: {
-    quote_number: string;
-    warranty_period: string;
-    quote_items: Array<{
-      product_name: string;
-      quantity: number;
-      total_price: number;
-    }>;
-  };
-  engineer?: {
-    name: string;
-    email: string;
-  } | null;
-}
-
-interface SurveyData {
-  id: string;
-  status: 'draft' | 'submitted' | 'under_review' | 'approved' | 'rework_requested' | 'resubmitted';
-  created_at: string;
-}
 
 export default function EnhancedClientOrderView() {
-  const { id: orderId } = useParams();
-  const navigate = useNavigate();
-  const { toast } = useToast();
-  const [order, setOrder] = useState<ClientOrder | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [activeStep, setActiveStep] = useState(0);
-  const [paymentLoading, setPaymentLoading] = useState(false);
-  const [agreementModalOpen, setAgreementModalOpen] = useState(false);
-  const [jobOffers, setJobOffers] = useState<JobOffer[]>([]);
-  const [offerLoading, setOfferLoading] = useState(false);
-  const [rejectModalOpen, setRejectModalOpen] = useState(false);
-  const [selectedOfferId, setSelectedOfferId] = useState<string | null>(null);
-  const [selectedOfferDate, setSelectedOfferDate] = useState<string>('');
-  const [latestSurvey, setLatestSurvey] = useState<SurveyData | null>(null);
-  const { lastStatus } = useOrderStatusSync(orderId!);
+  const { orderId } = useParams();
 
-  useEffect(() => {
-    if (orderId) {
-      checkPendingPayments();
-      fetchJobOffers();
-    }
-  }, [orderId]);
-
-  // Also refresh every 10 seconds to ensure data is current
-  useEffect(() => {
-    if (orderId) {
-      const interval = setInterval(() => {
-        console.log('Auto-refreshing order data...');
-        fetchOrder();
-      }, 10000);
-      
-      return () => clearInterval(interval);
-    }
-  }, [orderId]);
-
-  useEffect(() => {
-    if (lastStatus && order) {
-      // Refresh order data when status changes
-      fetchOrder();
-    }
-  }, [lastStatus]);
-
-  // Recalculate active step whenever order changes
-  useEffect(() => {
-    if (order) {
-      const steps = getProgressSteps();
-      const newActiveStep = steps.findIndex(step => step.isActive);
-      if (newActiveStep >= 0 && newActiveStep !== activeStep) {
-        console.log('Updating active step from', activeStep, 'to', newActiveStep);
-        setActiveStep(newActiveStep);
-      }
-    }
-  }, [order?.amount_paid, order?.agreement_signed_at, order?.scheduled_install_date, order?.status]);
-
-  const checkPendingPayments = async () => {
-    console.log('Checking pending payments and fetching order...');
-    
-    // Always fetch order data first to get latest state
-    await fetchOrder();
-    
-    try {
-      // Get URL parameters to check if returning from Stripe
-      const urlParams = new URLSearchParams(window.location.search);
-      const sessionId = urlParams.get('session_id');
-      
-      if (sessionId) {
-        console.log('Found session_id, verifying payment:', sessionId);
-        
-        // Verify the payment
-        const { data, error } = await supabase.functions.invoke('verify-payment', {
-          body: { session_id: sessionId }
-        });
-
-        console.log('Payment verification response:', { data, error });
-
-        if (error) {
-          console.error('Payment verification error:', error);
-          toast({
-            title: "Payment Verification Error",
-            description: error.message || "Failed to verify payment",
-            variant: "destructive",
-          });
-        } else if (data?.success) {
-          toast({
-            title: "Payment Confirmed",
-            description: `Payment of ${data.amount_paid ? `£${data.amount_paid}` : ''} was processed successfully!`,
-          });
-          
-          // Force immediate refresh and wait for completion
-          console.log('Payment verified successfully, refreshing order data...');
-          setLoading(true);
-          
-          // Refresh order data immediately
-          await fetchOrder();
-          
-          // Wait a bit more and refresh again to ensure we get the latest data
-          setTimeout(async () => {
-            console.log('Second refresh after payment verification...');
-            await fetchOrder();
-            setLoading(false);
-          }, 1000);
-        }
-        
-        // Clean up URL
-        window.history.replaceState({}, document.title, window.location.pathname);
-      }
-    } catch (error) {
-      console.error('Error checking pending payments:', error);
-      toast({
-        title: "Error",
-        description: "Failed to verify payment status",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const fetchOrder = async (retryCount = 0) => {
-    try {
-      console.log('Fetching order data for ID:', orderId, 'retry:', retryCount);
+  const { data: order, isLoading, error } = useQuery({
+    queryKey: ['client-order', orderId],
+    queryFn: async () => {
+      if (!orderId) throw new Error('Order ID is required');
       
       const { data, error } = await supabase
         .from('orders')
         .select(`
           *,
-          client:clients(full_name, email, address),
-          quote:quotes(
-            quote_number,
-            warranty_period,
-            quote_items!inner(product_name, quantity, total_price)
+          clients!orders_client_id_fkey(
+            id, 
+            full_name, 
+            email, 
+            address, 
+            postcode, 
+            phone
           ),
-          engineer:engineers(name, email)
+          quotes!orders_quote_id_fkey(
+            id,
+            quote_number,
+            total_cost,
+            total_price,
+            items,
+            created_at
+          ),
+          order_payments!orders_id_fkey(
+            id,
+            amount,
+            status,
+            payment_type,
+            payment_method,
+            paid_at,
+            created_at
+          ),
+          engineers!orders_engineer_id_fkey(
+            id,
+            name,
+            email
+          ),
+          engineer_uploads!orders_id_fkey(
+            id,
+            file_name,
+            file_url,
+            upload_type,
+            description,
+            uploaded_at
+          ),
+          partners!orders_partner_id_fkey(
+            name, 
+            client_payment_required, 
+            client_agreement_required, 
+            client_survey_required
+          )
         `)
         .eq('id', orderId)
-        .maybeSingle();
+        .single();
 
-      // Also fetch survey data
-      if (data) {
-        const { data: surveyData } = await supabase
-          .from('client_surveys')
-          .select('id, status, created_at')
-          .eq('order_id', orderId)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        
-        setLatestSurvey(surveyData);
-      }
-
-      console.log('Order fetch result:', { data, error });
-
-      if (error) {
-        console.error('Error fetching order:', error);
-        throw error;
-      }
+      if (error) throw error;
       
-      if (data) {
-        console.log('Order data received:', {
-          id: data.id,
-          amount_paid: data.amount_paid,
-          total_amount: data.total_amount,
-          status: data.status
-        });
-        
-        setOrder(data as any);
-        
-        // Update active step based on new order data
-        const steps = getProgressSteps();
-        const newActiveStep = steps.findIndex(step => step.isActive);
-        if (newActiveStep >= 0) {
-          console.log('Setting active step to:', newActiveStep);
-          setActiveStep(newActiveStep);
-        }
-      } else {
-        console.error('No order found for ID:', orderId, 'retry:', retryCount);
-        
-        // If this is a newly created order (coming from quote acceptance), retry a few times
-        if (retryCount < 3) {
-          console.log('Retrying order fetch in 2 seconds...');
-          setTimeout(() => fetchOrder(retryCount + 1), 2000);
-          return;
-        }
-        
-        // After retries, check if user needs to log in again
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
-          toast({
-            title: "Session Expired",
-            description: "Please log in again to view your order.",
-            variant: "destructive",
-          });
-          navigate('/auth');
-          return;
-        }
-        
-        toast({
-          title: "Order Not Found",
-          description: "The requested order could not be found. If you just accepted a quote, please wait a moment and refresh the page.",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      console.error('Error fetching order:', error);
-      
-      // Retry on network errors
-      if (retryCount < 2 && (error as any)?.message?.includes('network')) {
-        console.log('Network error, retrying in 1 second...');
-        setTimeout(() => fetchOrder(retryCount + 1), 1000);
-        return;
-      }
-      
-      toast({
-        title: "Error",
-        description: "Failed to load order details. Please try refreshing the page.",
-        variant: "destructive",
-      });
-    } finally {
-      if (retryCount === 0) {
-        setLoading(false);
-      }
-    }
-  };
-
-  const fetchJobOffers = async () => {
-    if (!orderId) return;
-    
-    try {
-      const { data, error } = await supabase
-        .from('job_offers')
-        .select(`
-          *,
-          engineer:engineers!job_offers_engineer_id_fkey(name, email)
-        `)
-        .eq('order_id', orderId)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching job offers:', error);
-        return;
-      }
-
-      setJobOffers(data || []);
-    } catch (error) {
-      console.error('Error fetching job offers:', error);
-    }
-  };
-
-  const handleOfferResponse = async (offerId: string, response: 'accept' | 'reject', rejectionData?: {
-    reason: string;
-    blockThisDate: boolean;
-    blockDateRanges?: Array<{
-      start_date: string;
-      end_date: string;
-    }>;
-  }) => {
-    setOfferLoading(true);
-    try {
-      const requestBody: any = {
-        offer_id: offerId,
-        response
+      // Transform the data to match our interface, handling nullable relationships
+      return {
+        ...data,
+        client: data.clients || null,
+        quote: data.quotes || null,
+        engineer: data.engineers || null,
+        partner: data.partners || null
       };
+    },
+    enabled: !!orderId,
+  });
 
-      if (response === 'reject' && rejectionData) {
-        requestBody.rejection_reason = rejectionData.reason;
-        requestBody.block_this_date = rejectionData.blockThisDate;
-        
-        if (rejectionData.blockDateRanges) {
-          requestBody.blockDateRanges = rejectionData.blockDateRanges;
-        }
-      }
-
-      const { data, error } = await supabase.functions.invoke('offer-respond', {
-        body: requestBody
-      });
-
-      if (error || data?.error) {
-        throw new Error(data?.error || `Failed to ${response} offer`);
-      }
-
-      toast({
-        title: response === 'accept' ? "Offer Accepted!" : "Offer Declined",
-        description: response === 'accept' 
-          ? "Your installation has been confirmed and scheduled!" 
-          : "We'll find another suitable time for your installation.",
-      });
-      
-      // Refresh data
-      await Promise.all([fetchOrder(), fetchJobOffers()]);
-      
-    } catch (error) {
-      console.error(`Error ${response}ing offer:`, error);
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : `Failed to ${response} offer`,
-        variant: "destructive",
-      });
-    } finally {
-      setOfferLoading(false);
-    }
-  };
-
-  const handleRejectClick = (offerId: string, offeredDate: string) => {
-    setSelectedOfferId(offerId);
-    setSelectedOfferDate(offeredDate);
-    setRejectModalOpen(true);
-  };
-
-  const handleRejectOffer = async (rejectionData: any) => {
-    if (!selectedOfferId) return;
-    await handleOfferResponse(selectedOfferId, 'reject', rejectionData);
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-GB', {
-      style: 'currency',
-      currency: 'GBP'
-    }).format(amount);
-  };
-
-  const getProgressSteps = () => {
-    if (!order) return [];
-
-    const surveyRequired = isSurveyRequiredForOrder(order);
-    const surveyCompleted = !surveyRequired || (latestSurvey?.status === 'approved');
-    const depositComplete = order.amount_paid >= (order.deposit_amount || order.total_amount * 0.25);
-    const paymentComplete = order.amount_paid >= order.total_amount;
-    const agreementSigned = !!order.agreement_signed_at;
-    const installScheduled = !!order.scheduled_install_date;
-    const installComplete = order.status === 'completed';
-
-    return [
-      {
-        id: 'survey',
-        title: 'Complete Survey',
-        subtitle: surveyRequired ? 'Required pre-installation survey' : 'Survey not required',
-        completed: surveyCompleted,
-        icon: Clipboard,
-        details: surveyCompleted 
-          ? (surveyRequired ? 'Survey approved' : 'Survey not required') 
-          : latestSurvey?.status === 'rework_requested' 
-            ? 'Rework requested - please resubmit'
-            : latestSurvey?.status === 'submitted' || latestSurvey?.status === 'under_review' || latestSurvey?.status === 'resubmitted'
-              ? 'Under review'
-              : 'Survey required',
-        isActive: surveyRequired && !surveyCompleted
-      },
-      {
-        id: 'payment',
-        title: 'Make Payment',
-        subtitle: 'Make payment to move forward',
-        completed: depositComplete,
-        icon: CreditCard,
-        details: depositComplete ? 'Deposit received' : `Deposit ${formatCurrency((order.deposit_amount || order.total_amount * 0.25))} required`,
-        isActive: surveyCompleted && !depositComplete
-      },
-      {
-        id: 'agreement',
-        title: 'Sign Agreement',
-        subtitle: 'Sign to lock in your booking',
-        completed: agreementSigned,
-        icon: FileText,
-        details: agreementSigned 
-          ? `Signed on ${format(new Date(order.agreement_signed_at!), 'PPP')}` 
-          : 'Pending signature',
-        isActive: surveyCompleted && depositComplete && !agreementSigned
-      },
-      {
-        id: 'scheduling',
-        title: 'Submit Install Preferences',
-        subtitle: 'Choose your preferred install date',
-        completed: installScheduled,
-        icon: Calendar,
-        details: installScheduled 
-          ? `Scheduled for ${format(new Date(order.scheduled_install_date!), 'PPP')}${order.engineer ? ` with ${order.engineer.name}` : ''}`
-          : 'Awaiting scheduling',
-        isActive: surveyCompleted && depositComplete && agreementSigned && !installScheduled
-      },
-      {
-        id: 'completion',
-        title: 'Install Confirmed',
-        subtitle: 'We\'ll confirm install shortly',
-        completed: installComplete,
-        icon: CheckCircle,
-        details: installComplete ? 'Installation complete' : 'Pending completion',
-        isActive: installScheduled && !installComplete
-      }
-    ];
-  };
-
-  const getCurrentActiveStep = () => {
-    const steps = getProgressSteps();
-    const activeStepIndex = steps.findIndex(step => step.isActive);
-    return activeStepIndex >= 0 ? activeStepIndex : steps.length - 1;
-  };
-
-  const handlePayment = async (paymentType: 'deposit' | 'balance') => {
-    if (!order) return;
-    
-    setPaymentLoading(true);
-    try {
-      const depositAmount = order.deposit_amount || order.total_amount * 0.25;
-      const balanceAmount = order.total_amount - order.amount_paid;
-      const amount = paymentType === 'deposit' ? Math.min(depositAmount, balanceAmount) : balanceAmount;
-
-      const { data, error } = await supabase.functions.invoke('create-payment-session', {
-        body: {
-          order_id: order.id,
-          amount: amount,
-          payment_type: paymentType
-        }
-      });
-
-      if (error) {
-        throw new Error(error.message || 'Failed to create payment session');
-      }
-
-      if (!data?.url) {
-        throw new Error('No payment URL received');
-      }
-
-      // Redirect to Stripe checkout in the same window
-      window.location.href = data.url;
-
-      toast({
-        title: "Payment Session Created",
-        description: "Redirecting to Stripe checkout in a new tab...",
-      });
-
-    } catch (error) {
-      console.error('Payment error:', error);
-      toast({
-        title: "Payment Error",
-        description: error instanceof Error ? error.message : "Failed to initiate payment",
-        variant: "destructive",
-      });
-    } finally {
-      setPaymentLoading(false);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
-  if (!order) {
+  if (isLoading) {
     return (
       <div className="container mx-auto py-6">
-        <Card className="p-6 text-center">
-          <h2 className="text-xl font-semibold mb-2">Order Not Found</h2>
-          <p className="text-muted-foreground">The requested order could not be found.</p>
-        </Card>
+        <div className="text-center">Loading order details...</div>
       </div>
     );
   }
 
-  const progressSteps = getProgressSteps();
-  const completedSteps = progressSteps.filter(step => step.completed).length;
-  const progressPercentage = (completedSteps / progressSteps.length) * 100;
-  const currentStep = getCurrentActiveStep();
+  if (error || !order) {
+    return (
+      <div className="container mx-auto py-6">
+        <div className="text-center text-red-600">
+          Error loading order: {error?.message || 'Order not found'}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto py-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" onClick={() => navigate('/client')}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Dashboard
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold">Order {order.order_number}</h1>
-            <p className="text-muted-foreground">
-              Accepted on {format(new Date(order.created_at), 'PP')}
-            </p>
-          </div>
+      <div className="flex justify-between items-start">
+        <div>
+          <h1 className="text-3xl font-bold">Order {order.order_number}</h1>
+          <p className="text-muted-foreground">
+            Created {format(new Date(order.created_at), 'PPP')}
+          </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => fetchOrder()}>
-            Refresh
-          </Button>
-          <EnhancedJobStatusBadge status={order.status_enhanced} />
-        </div>
+        <Badge variant={order.status_enhanced === 'completed' ? 'default' : 'secondary'}>
+          {order.status_enhanced?.replace(/_/g, ' ').toUpperCase()}
+        </Badge>
       </div>
 
-      {/* Status Alert */}
-      {lastStatus && (
-        <Card className="border-green-200 bg-green-50">
-          <div className="p-4">
-            <div className="flex items-center gap-2">
-              <CheckCircle className="h-5 w-5 text-green-600" />
-              <span className="font-medium text-green-800">Status Updated!</span>
-            </div>
-            <p className="text-green-700 mt-1">
-              Your order status has been updated. Check the progress below for details.
-            </p>
-          </div>
-        </Card>
-      )}
-
-      {/* Installation Confirmed Banner */}
-      {order.scheduled_install_date && (
-        <Card className="border-blue-200 bg-blue-50">
-          <div className="p-6">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="p-2 bg-blue-100 rounded-full">
-                <Calendar className="h-5 w-5 text-blue-600" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-blue-900">✅ Your installation is now confirmed!</h3>
-                <p className="text-blue-700">
-                  {format(new Date(order.scheduled_install_date), 'EEEE, MMMM d, yyyy')}
-                  {order.engineer?.name && ` with ${order.engineer.name}`}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                Installation Confirmed
-              </Badge>
-            </div>
-          </div>
-        </Card>
-      )}
-
-      {/* Completion Message */}
-      {order.status === 'completed' && (
-        <Card className="border-green-200 bg-green-50">
-          <div className="p-6 text-center">
-            <div className="p-3 bg-green-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-              <CheckCircle className="h-8 w-8 text-green-600" />
-            </div>
-            <h3 className="text-xl font-semibold text-green-900 mb-2">
-              Thank you! Your installation is now complete.
-            </h3>
-            <p className="text-green-700 mb-4">
-              Your warranty is active, and we're here if you need anything.
-            </p>
-            <div className="flex justify-center gap-4">
-              <Button variant="outline" className="border-green-300">
-                <Download className="h-4 w-4 mr-2" />
-                Download Warranty Certificate
-              </Button>
-              <Button variant="outline" className="border-green-300">
-                <Star className="h-4 w-4 mr-2" />
-                Leave a Review
-              </Button>
-            </div>
-          </div>
-        </Card>
-      )}
-
-      {/* Main Layout with Sidebar */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Left Sidebar - Progress Steps */}
-        <div className="lg:col-span-1">
-          <Card className="p-6">
-            <h3 className="font-semibold mb-4">Your Progress</h3>
-            
-            <div className="space-y-4">
-              {progressSteps.map((step, index) => {
-                const IconComponent = step.icon;
-                const isCurrentStep = index === currentStep;
-                
-                return (
-                  <div 
-                    key={step.id} 
-                    className={`
-                      flex items-start gap-3 p-3 rounded-lg transition-colors
-                      ${isCurrentStep ? 'bg-blue-50 border border-blue-200' : ''}
-                      ${step.completed ? 'opacity-100' : 'opacity-70'}
-                      ${(step.completed || step.isActive) ? 'cursor-pointer hover:bg-gray-50' : 'cursor-not-allowed opacity-50'}
-                    `}
-                    onClick={() => {
-                      // Only allow clicking on completed steps or the current active step
-                      if (step.completed || step.isActive) {
-                        setActiveStep(index);
-                      }
-                    }}
-                  >
-                    <div className={`
-                      p-2 rounded-full transition-colors flex-shrink-0
-                      ${step.completed 
-                        ? 'bg-green-100 text-green-600' 
-                        : isCurrentStep
-                        ? 'bg-blue-100 text-blue-600'
-                        : 'bg-gray-100 text-gray-400'
-                      }
-                    `}>
-                      <IconComponent className="h-4 w-4" />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Main Content */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Client Information */}
+          {order.client && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <User className="h-5 w-5" />
+                  Client Information
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <p className="font-medium">{order.client.full_name}</p>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Mail className="h-4 w-4" />
+                      {order.client.email}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className={`font-medium text-sm ${step.completed || isCurrentStep ? 'text-foreground' : 'text-muted-foreground'}`}>
-                          {step.title}
-                        </span>
-                        {step.completed && (
-                          <Badge variant="secondary" className="h-4 text-xs bg-green-100 text-green-700">
-                            ✓
-                          </Badge>
-                        )}
+                    {order.client.phone && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Phone className="h-4 w-4" />
+                        {order.client.phone}
                       </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {step.subtitle}
-                      </p>
-                    </div>
+                    )}
                   </div>
-                );
-              })}
-            </div>
-          </Card>
-        </div>
-
-        {/* Main Content Area - Active Step */}
-        <div className="lg:col-span-3">
-          {activeStep === 0 && (
-            <Card className="p-6">
-              <div className="mb-6">
-                <div className="flex items-center justify-between mb-2">
-                  <h2 className="text-xl font-semibold text-blue-600">
-                    Step 1 of 5 - Complete Survey
-                  </h2>
-                  <Badge variant="secondary" className={
-                    progressSteps[0]?.completed ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700"
-                  }>
-                    {progressSteps[0]?.completed ? 'Completed' : 'Active'}
-                  </Badge>
-                </div>
-                <p className="text-muted-foreground">
-                  {order?.survey_required === false 
-                    ? 'Survey not required for this order' 
-                    : 'Please complete the pre-installation survey'}
-                </p>
-              </div>
-
-              {!isSurveyRequiredForOrder(order) ? (
-                <div className="text-center py-8">
-                  <CheckCircle className="h-16 w-16 text-green-600 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-green-800 mb-2">Survey Not Required</h3>
-                  <p className="text-muted-foreground">
-                    No survey is required for this installation
-                  </p>
-                </div>
-              ) : progressSteps[0]?.completed ? (
-                <div className="text-center py-8">
-                  <CheckCircle className="h-16 w-16 text-green-600 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-green-800 mb-2">Survey Approved!</h3>
-                  <p className="text-muted-foreground">
-                    Your survey has been reviewed and approved
-                  </p>
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <Clipboard className="h-16 w-16 text-blue-600 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">
-                    {latestSurvey?.status === 'rework_requested' 
-                      ? 'Survey Rework Required'
-                      : latestSurvey?.status === 'submitted' || latestSurvey?.status === 'under_review' || latestSurvey?.status === 'resubmitted'
-                        ? 'Survey Under Review'
-                        : 'Complete Your Survey'
-                    }
-                  </h3>
-                  <p className="text-muted-foreground mb-6">
-                    {latestSurvey?.status === 'rework_requested' 
-                      ? 'Please review feedback and resubmit your survey'
-                      : latestSurvey?.status === 'submitted' || latestSurvey?.status === 'under_review' || latestSurvey?.status === 'resubmitted'
-                        ? 'We are reviewing your submitted survey'
-                        : 'Help us prepare for your installation by completing our survey'
-                    }
-                  </p>
-                  {(latestSurvey?.status === 'rework_requested' || !latestSurvey || latestSurvey?.status === 'draft') && (
-                    <Button 
-                      onClick={() => navigate(`/survey/${orderId}`)}
-                      className="w-full sm:w-auto"
-                    >
-                      <Clipboard className="h-4 w-4 mr-2" />
-                      {latestSurvey?.status === 'rework_requested' ? 'Resume Survey' : 'Start Survey'}
-                    </Button>
+                  {order.job_address && (
+                    <div className="flex items-start gap-2">
+                      <MapPin className="h-4 w-4 mt-1 text-muted-foreground" />
+                      <div className="text-sm">
+                        <p className="font-medium">Installation Address</p>
+                        <p className="text-muted-foreground">{order.job_address}</p>
+                      </div>
+                    </div>
                   )}
                 </div>
-              )}
+              </CardContent>
             </Card>
           )}
 
-          {activeStep === 1 && (
-            <Card className="p-6">
-              <div className="mb-6">
-                <div className="flex items-center justify-between mb-2">
-                  <h2 className="text-xl font-semibold text-blue-600">
-                    Step 2 of 5 - Make Payment
-                  </h2>
-                  <Badge variant="secondary" className="bg-blue-100 text-blue-700">
-                    Active
-                  </Badge>
+          {/* Installation Details */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CalendarDays className="h-5 w-5" />
+                Installation Details
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {order.scheduled_install_date && (
+                <div>
+                  <p className="font-medium">Scheduled Date</p>
+                  <p className="text-muted-foreground">
+                    {format(new Date(order.scheduled_install_date), 'PPP')}
+                  </p>
                 </div>
-                <p className="text-muted-foreground">Make payment to move forward</p>
-              </div>
+              )}
+              {order.engineer && (
+                <div>
+                  <p className="font-medium">Assigned Engineer</p>
+                  <p className="text-muted-foreground">{order.engineer.name}</p>
+                </div>
+              )}
+              {order.estimated_duration_hours && (
+                <div>
+                  <p className="font-medium">Estimated Duration</p>
+                  <p className="text-muted-foreground">{order.estimated_duration_hours} hours</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-              <div className="space-y-4">
+          {/* Order Progress */}
+          <OrderProgressTimeline order={order} />
+
+          {/* Survey Section */}
+          <EnhancedSurveySection orderId={order.id} />
+
+          {/* Engineer Uploads */}
+          <EngineerUploadsSection orderId={order.id} />
+        </div>
+
+        {/* Sidebar */}
+        <div className="space-y-6">
+          {/* Order Summary */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Package className="h-5 w-5" />
+                Order Summary
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
                 <div className="flex justify-between">
-                  <span>Total Order Value:</span>
-                  <span className="font-semibold">{formatCurrency(order.total_amount)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Deposit Required:</span>
-                  <span className="font-semibold">{formatCurrency((order.deposit_amount || order.total_amount * 0.25))}</span>
+                  <span>Total Amount:</span>
+                  <span className="font-medium">£{order.total_amount}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Amount Paid:</span>
-                  <span className="font-semibold text-green-600">{formatCurrency(order.amount_paid)}</span>
+                  <span className="font-medium">£{order.amount_paid}</span>
                 </div>
-                <div className="flex justify-between text-lg font-bold">
-                  <span>Outstanding:</span>
-                  <span className="text-red-600">{formatCurrency(order.total_amount - order.amount_paid)}</span>
+                <div className="flex justify-between">
+                  <span>Balance:</span>
+                  <span className="font-medium">£{order.total_amount - order.amount_paid}</span>
                 </div>
-
-                {order.amount_paid < order.total_amount && (
-                  (() => {
-                    const depositAmount = order.deposit_amount || order.total_amount * 0.25;
-                    const depositComplete = order.amount_paid >= depositAmount;
-                    const balanceAmount = order.total_amount - order.amount_paid;
-                    
-                    return (
-                      <Button 
-                        className="w-full mt-6" 
-                        onClick={() => handlePayment(depositComplete ? 'balance' : 'deposit')}
-                        disabled={paymentLoading}
-                      >
-                        <CreditCard className="h-4 w-4 mr-2" />
-                        {paymentLoading 
-                          ? 'Processing...' 
-                          : depositComplete 
-                            ? `Pay Balance (${formatCurrency(balanceAmount)})`
-                            : `Pay Deposit Now (${formatCurrency(Math.min(depositAmount, balanceAmount))})`
-                        }
-                      </Button>
-                    );
-                  })()
-                )}
               </div>
-            </Card>
-          )}
+            </CardContent>
+          </Card>
 
-          {activeStep === 2 && (
-            <Card className="p-6">
-              <div className="mb-6">
-                <h2 className="text-xl font-semibold text-blue-600">
-                  Step 3 of 5 - Sign Agreement
-                </h2>
-                <p className="text-muted-foreground">Sign to lock in your booking</p>
-              </div>
-
-              {order.agreement_signed_at ? (
-                <div className="text-center py-8">
-                  <CheckCircle className="h-16 w-16 text-green-600 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-green-800 mb-2">Agreement Signed!</h3>
-                  <p className="text-muted-foreground">
-                    Signed on {format(new Date(order.agreement_signed_at), 'PPP')}
-                  </p>
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <FileText className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">Ready to Sign Agreement</h3>
-                  <p className="text-muted-foreground mb-6">
-                    Review and sign your service agreement to proceed
-                  </p>
-                  <Button onClick={() => setAgreementModalOpen(true)}>
-                    <FileText className="h-4 w-4 mr-2" />
-                    View & Sign Agreement
-                  </Button>
-                </div>
-              )}
-            </Card>
-          )}
-
-          {activeStep === 3 && (
-            <div className="space-y-6">
-              {/* Main Scheduling Card */}
-              <Card className="p-6">
-                <div className="mb-6">
-                  <h2 className="text-xl font-semibold text-blue-600">
-                    Step 4 of 5 - Submit Install Preferences
-                  </h2>
-                  <p className="text-muted-foreground">Awaiting scheduling confirmation</p>
-                </div>
-
-                {order.scheduled_install_date ? (
-                  <div className="text-center py-8">
-                    <Calendar className="h-16 w-16 text-green-600 mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold text-green-800 mb-2">Installation Scheduled!</h3>
-                    <p className="text-muted-foreground">
-                      {format(new Date(order.scheduled_install_date), 'EEEE, MMMM d, yyyy')}
-                      {order.engineer?.name && ` with ${order.engineer.name}`}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <Clock className="h-16 w-16 text-blue-600 mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">Awaiting Scheduling by Pro EV Team</h3>
-                    <p className="text-muted-foreground mb-6">
-                      Our team will contact you shortly to schedule your installation
-                    </p>
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                      <p className="text-sm text-blue-800">
-                        <strong>What happens next:</strong><br />
-                        • Our team will review your order<br />
-                        • We'll contact you to arrange a suitable installation date<br />
-                        • You'll receive confirmation once scheduled
+          {/* Payment Information */}
+          {order.order_payments && order.order_payments.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CreditCard className="h-5 w-5" />
+                  Payment History
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {order.order_payments.map((payment: any) => (
+                    <div key={payment.id} className="border-b pb-2 last:border-b-0">
+                      <div className="flex justify-between items-center">
+                        <span className="font-medium">£{payment.amount}</span>
+                        <Badge variant={payment.status === 'completed' ? 'default' : 'secondary'}>
+                          {payment.status}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {payment.payment_type} • {format(new Date(payment.created_at), 'PPP')}
                       </p>
                     </div>
-                  </div>
-                )}
-              </Card>
-
-              {/* Pending Offers Card */}
-              {jobOffers.length > 0 && (
-                <Card className="p-6">
-                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                    <AlertCircle className="h-5 w-5 text-amber-600" />
-                    Installation Date Offers
-                  </h3>
-                  <p className="text-muted-foreground mb-4">
-                    We have found available installation slots for you. Please review and respond to the offers below.
-                  </p>
-                  
-                  <div className="space-y-4">
-                    {jobOffers.map((offer) => {
-                      const isExpired = new Date(offer.expires_at) < new Date();
-                      const isPending = offer.status === 'pending' && !isExpired;
-                      
-                      return (
-                        <div key={offer.id} className="border rounded-lg p-4">
-                          <div className="flex items-start justify-between mb-3">
-                            <div>
-                              <h4 className="font-medium">
-                                {format(new Date(offer.offered_date), 'EEEE, MMMM d, yyyy')}
-                              </h4>
-                              <p className="text-sm text-muted-foreground">
-                                Engineer: {offer.engineer?.name || 'Pro EV engineer'}
-                                {offer.time_window && ` • Time: ${offer.time_window}`}
-                              </p>
-                              {isPending && (
-                                <p className="text-xs text-amber-600 mt-1">
-                                  Expires: {format(new Date(offer.expires_at), 'PPp')}
-                                </p>
-                              )}
-                            </div>
-                            
-                            <Badge 
-                              variant={
-                                offer.status === 'accepted' ? 'default' :
-                                offer.status === 'rejected' ? 'destructive' :
-                                isExpired ? 'secondary' : 'outline'
-                              }
-                            >
-                              {offer.status === 'accepted' && <CheckCircle className="h-3 w-3 mr-1" />}
-                              {offer.status === 'rejected' && <XCircle className="h-3 w-3 mr-1" />}
-                              {isExpired ? 'Expired' : offer.status.charAt(0).toUpperCase() + offer.status.slice(1)}
-                            </Badge>
-                          </div>
-                          
-                          {isPending && (
-                            <div className="flex gap-2">
-                              <Button
-                                size="sm"
-                                onClick={() => handleOfferResponse(offer.id, 'accept')}
-                                disabled={offerLoading}
-                                className="bg-green-600 hover:bg-green-700"
-                              >
-                                <CheckCircle className="h-4 w-4 mr-2" />
-                                Accept
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleRejectClick(offer.id, offer.offered_date)}
-                                disabled={offerLoading}
-                                className="border-red-300 text-red-600 hover:bg-red-50"
-                              >
-                                <XCircle className="h-4 w-4 mr-2" />
-                                Decline
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </Card>
-              )}
-            </div>
-          )}
-
-          {activeStep === 4 && (
-            <Card className="p-6">
-              <div className="mb-6">
-                <h2 className="text-xl font-semibold text-blue-600">
-                  Step 5 of 5 - Install Confirmed
-                </h2>
-                <p className="text-muted-foreground">We'll confirm install shortly</p>
-              </div>
-
-              {order.status === 'completed' ? (
-                <div className="text-center py-8">
-                  <CheckCircle className="h-16 w-16 text-green-600 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-green-800 mb-2">Installation Complete!</h3>
-                  <p className="text-muted-foreground mb-6">
-                    Your installation has been completed successfully
-                  </p>
-                  <div className="flex justify-center gap-4">
-                    <Button variant="outline">
-                      <Download className="h-4 w-4 mr-2" />
-                      Download Warranty
-                    </Button>
-                    <Button variant="outline">
-                      <Star className="h-4 w-4 mr-2" />
-                      Leave Review
-                    </Button>
-                  </div>
+                  ))}
                 </div>
-              ) : (
-                <div className="text-center py-8">
-                  <Clock className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">Pending Completion</h3>
-                  <p className="text-muted-foreground">
-                    We'll update you once the installation is complete
-                  </p>
-                </div>
-              )}
+              </CardContent>
             </Card>
           )}
 
-          {/* Order Summary Card */}
-          <Card className="p-6 mt-6">
-            <h3 className="font-semibold mb-4">Order Summary</h3>
-            
-            <div className="space-y-3">
-              <div>
-                {order.quote?.quote_items?.length ? (
-                  <span className="text-sm text-muted-foreground">Products Ordered:</span>
-                ) : null}
-                {order.quote?.quote_items?.map((item, index) => (
-                  <div key={index} className="flex justify-between">
-                    <span>{item.product_name} (Qty: {item.quantity})</span>
-                    <span>{formatCurrency(item.total_price)}</span>
-                  </div>
-                ))}
-              </div>
-              
-              <Separator />
-              
-              <div className="flex justify-between font-semibold text-lg">
-                <span>Total Value:</span>
-                <span>{formatCurrency(order.total_amount)}</span>
-              </div>
-            </div>
-          </Card>
+          {/* Status Management */}
+          <OrderStatusManager order={order} />
 
-          {/* Support Card */}
-          <Card className="p-6 mt-6">
-            <h3 className="font-semibold mb-4">Need Help?</h3>
-            <p className="text-muted-foreground mb-4">
-              Our support team is here to help with any questions about your order.
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              <Button variant="outline" className="w-full">
-                Email Support
-              </Button>
-              <Button variant="outline" className="w-full">
-                Call Support
-              </Button>
-            </div>
-          </Card>
+          {/* Activity Timeline */}
+          <OrderActivityTimeline orderId={order.id} />
         </div>
       </div>
-
-      {/* Agreement Signing Modal */}
-      <AgreementSigningModal
-        isOpen={agreementModalOpen}
-        onClose={() => setAgreementModalOpen(false)}
-        order={order}
-        onAgreementSigned={() => {
-          setAgreementModalOpen(false);
-          fetchOrder(); // Refresh order data after agreement is signed
-          toast({
-            title: "Agreement Signed",
-            description: "Your agreement has been signed successfully!",
-          });
-        }}
-      />
-
-      {/* Reject Offer Modal */}
-      <RejectOfferModal
-        isOpen={rejectModalOpen}
-        onClose={() => {
-          setRejectModalOpen(false);
-          setSelectedOfferId(null);
-          setSelectedOfferDate('');
-        }}
-        onReject={handleRejectOffer}
-        offeredDate={selectedOfferDate}
-        loading={offerLoading}
-      />
     </div>
   );
 }
