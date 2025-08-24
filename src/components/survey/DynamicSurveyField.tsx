@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { SurveyField } from '@/types/survey-forms';
+import { MediaUploadField } from './MediaUploadField';
 
 interface DynamicSurveyFieldProps {
   field: SurveyField;
@@ -199,23 +200,11 @@ export function DynamicSurveyField({ field, value, onChange, formData }: Dynamic
       case 'video':
       case 'file':
         return (
-          <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center">
-            <p className="text-muted-foreground">
-              {field.type === 'photo' && 'Photo upload preview'}
-              {field.type === 'video' && 'Video upload preview'}
-              {field.type === 'file' && 'File upload preview'}
-            </p>
-            <p className="text-xs text-muted-foreground mt-2">
-              {settings.mediaSettings?.minItems && `Min: ${settings.mediaSettings.minItems} items`}
-              {settings.mediaSettings?.maxItems && ` • Max: ${settings.mediaSettings.maxItems} items`}
-              {settings.mediaSettings?.maxSizeMB && ` • Max size: ${settings.mediaSettings.maxSizeMB}MB`}
-            </p>
-            {Array.isArray(value) && value.length > 0 && (
-              <Badge variant="outline" className="mt-2">
-                {value.length} file{value.length !== 1 ? 's' : ''} selected
-              </Badge>
-            )}
-          </div>
+          <MediaUploadField
+            field={field}
+            value={value}
+            onChange={onChange}
+          />
         );
 
       case 'address':

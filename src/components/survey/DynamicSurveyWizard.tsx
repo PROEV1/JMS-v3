@@ -88,6 +88,12 @@ export function DynamicSurveyWizard({
       ...prev,
       [fieldKey]: files
     }));
+    
+    // Also update form data for validation
+    setFormData(prev => ({
+      ...prev,
+      [fieldKey]: files
+    }));
   };
 
   const saveDraft = async () => {

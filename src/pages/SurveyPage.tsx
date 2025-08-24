@@ -3,7 +3,7 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { isSurveyRequiredForOrder, getSurveyRequirementReason } from "@/utils/surveyUtils";
-import { ClientSurveyWizard } from '@/components/survey/ClientSurveyWizard';
+import { ClientSurveyWizard } from '@/components/survey/UpdatedClientSurveyWizard';
 import { Card, CardContent } from '@/components/ui/card';
 import { AlertTriangle } from 'lucide-react';
 
@@ -49,7 +49,7 @@ export default function SurveyPage() {
           )
         `)
         .eq('id', orderId)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
       return data;

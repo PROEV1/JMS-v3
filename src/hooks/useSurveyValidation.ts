@@ -26,36 +26,54 @@ export function useSurveyValidation(surveyData: SurveyData, currentStep: number)
     const errors: string[] = [];
     let canContinue = true;
 
+    // Helper function to get field value with fallback for different naming conventions
+    const getFieldValue = (path: string) => {
+      // Try exact path first
+      const keys = path.split('.');
+      let value = surveyData;
+      for (const key of keys) {
+        value = value?.[key];
+      }
+      if (value !== undefined) return value;
+
+      // Try flat structure for dynamic forms
+      return surveyData[path] || surveyData[keys[keys.length - 1]];
+    };
+
     // Step-specific validation
     switch (currentStep) {
       case 0: // Property Details
-        if (!surveyData.propertyDetails?.propertyType) {
+        if (!getFieldValue('propertyDetails.propertyType') && !getFieldValue('propertyType')) {
           errors.push('Property type is required');
           canContinue = false;
         }
-        if (!surveyData.propertyDetails?.parkingType) {
+        if (!getFieldValue('propertyDetails.parkingType') && !getFieldValue('parkingType')) {
           errors.push('Parking type is required');
           canContinue = false;
         }
-        if (!surveyData.propertyDetails?.postcode?.trim()) {
+        if (!getFieldValue('propertyDetails.postcode')?.trim() && !getFieldValue('postcode')?.trim()) {
           errors.push('Postcode is required');
           canContinue = false;
         }
         break;
 
       case 1: // Parking Access
-        if (!surveyData.parkingAccess?.propertyAccess) {
+        // Support both old field names and new dynamic field names
+        const propertyAccess = getFieldValue('parkingAccess.propertyAccess') || getFieldValue('accessType') || getFieldValue('propertyAccess');
+        const vehicleAccess = getFieldValue('parkingAccess.vehicleAccess') || getFieldValue('vehicleAccess');
+        
+        if (!propertyAccess) {
           errors.push('Property access type is required');
           canContinue = false;
         }
-        if (!surveyData.parkingAccess?.vehicleAccess) {
+        if (!vehicleAccess) {
           errors.push('Vehicle access difficulty is required');
           canContinue = false;
         }
         break;
 
       case 2: // Charger Location
-        const chargerPhotos = surveyData.chargerLocation?.photos || [];
+        const chargerPhotos = getFieldValue('chargerLocation.photos') || getFieldValue('chargerLocationPhotos') || [];
         if (chargerPhotos.length < 3) {
           errors.push(`At least 3 charger location photos are required (${chargerPhotos.length}/3)`);
           canContinue = false;
@@ -63,7 +81,7 @@ export function useSurveyValidation(surveyData: SurveyData, currentStep: number)
         break;
 
       case 3: // Consumer Unit
-        const consumerPhotos = surveyData.consumerUnit?.photos || [];
+        const consumerPhotos = getFieldValue('consumerUnit.photos') || getFieldValue('consumerUnitPhotos') || [];
         if (consumerPhotos.length < 1) {
           errors.push('At least 1 consumer unit photo is required');
           canContinue = false;
@@ -75,14 +93,14 @@ export function useSurveyValidation(surveyData: SurveyData, currentStep: number)
         break;
 
       case 5: // Confirm & Submit
-        if (!surveyData.consent) {
+        if (!getFieldValue('consent')) {
           errors.push('You must agree to the terms before submitting');
           canContinue = false;
         }
         
         // Final validation - all previous requirements
-        const finalChargerPhotos = surveyData.chargerLocation?.photos || [];
-        const finalConsumerPhotos = surveyData.consumerUnit?.photos || [];
+        const finalChargerPhotos = getFieldValue('chargerLocation.photos') || getFieldValue('chargerLocationPhotos') || [];
+        const finalConsumerPhotos = getFieldValue('consumerUnit.photos') || getFieldValue('consumerUnitPhotos') || [];
         
         if (finalChargerPhotos.length < 3) {
           errors.push('Charger location photos incomplete (3 required)');
@@ -94,12 +112,16 @@ export function useSurveyValidation(surveyData: SurveyData, currentStep: number)
           canContinue = false;
         }
 
-        if (!surveyData.propertyDetails?.propertyType || !surveyData.propertyDetails?.parkingType) {
+        const hasPropertyType = getFieldValue('propertyDetails.propertyType') || getFieldValue('propertyType');
+        const hasParkingType = getFieldValue('propertyDetails.parkingType') || getFieldValue('parkingType');
+        if (!hasPropertyType || !hasParkingType) {
           errors.push('Property details incomplete');
           canContinue = false;
         }
 
-        if (!surveyData.parkingAccess?.propertyAccess || !surveyData.parkingAccess?.vehicleAccess) {
+        const hasPropertyAccess = getFieldValue('parkingAccess.propertyAccess') || getFieldValue('accessType') || getFieldValue('propertyAccess');
+        const hasVehicleAccess = getFieldValue('parkingAccess.vehicleAccess') || getFieldValue('vehicleAccess');
+        if (!hasPropertyAccess || !hasVehicleAccess) {
           errors.push('Access information incomplete');
           canContinue = false;
         }
