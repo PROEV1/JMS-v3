@@ -26,6 +26,7 @@ import {
   Clipboard
 } from "lucide-react";
 import { AgreementSigningModal } from "@/components/AgreementSigningModal";
+import { isSurveyRequiredForOrder, getSurveyRequirementReason } from "@/utils/surveyUtils";
 import { RejectOfferModal } from "@/components/RejectOfferModal";
 
 interface JobOffer {
@@ -401,7 +402,7 @@ export default function EnhancedClientOrderView() {
   const getProgressSteps = () => {
     if (!order) return [];
 
-    const surveyRequired = order.survey_required !== false;
+    const surveyRequired = isSurveyRequiredForOrder(order);
     const surveyCompleted = !surveyRequired || (latestSurvey?.status === 'approved');
     const depositComplete = order.amount_paid >= (order.deposit_amount || order.total_amount * 0.25);
     const paymentComplete = order.amount_paid >= order.total_amount;
@@ -717,7 +718,7 @@ export default function EnhancedClientOrderView() {
                 </p>
               </div>
 
-              {order?.survey_required === false ? (
+              {!isSurveyRequiredForOrder(order) ? (
                 <div className="text-center py-8">
                   <CheckCircle className="h-16 w-16 text-green-600 mx-auto mb-4" />
                   <h3 className="text-lg font-semibold text-green-800 mb-2">Survey Not Required</h3>

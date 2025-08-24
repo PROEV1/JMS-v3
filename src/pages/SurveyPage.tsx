@@ -2,6 +2,7 @@ import React from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { isSurveyRequiredForOrder, getSurveyRequirementReason } from "@/utils/surveyUtils";
 import { ClientSurveyWizard } from '@/components/survey/ClientSurveyWizard';
 import { Card, CardContent } from '@/components/ui/card';
 import { AlertTriangle } from 'lucide-react';
@@ -89,7 +90,7 @@ export default function SurveyPage() {
   }
 
   // Check if survey is required
-  if (!orderData.survey_required) {
+  if (!isSurveyRequiredForOrder(orderData)) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="max-w-md">
@@ -98,7 +99,7 @@ export default function SurveyPage() {
               Survey Not Required
             </h1>
             <p className="text-slate-600">
-              A survey is not required for this order. If you believe this is an error, please contact support.
+              {getSurveyRequirementReason(orderData)}
             </p>
           </CardContent>
         </Card>

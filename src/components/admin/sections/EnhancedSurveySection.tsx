@@ -9,6 +9,7 @@ import { CheckCircle, XCircle, Image as ImageIcon, Video, FileText } from 'lucid
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
+import { isSurveyRequiredForOrder, getSurveyRequirementReason } from "@/utils/surveyUtils";
 
 export function EnhancedSurveySection({ orderId }: { orderId: string }) {
   const { toast } = useToast();
@@ -110,11 +111,11 @@ export function EnhancedSurveySection({ orderId }: { orderId: string }) {
   const survey = surveyData?.survey;
   const order = surveyData?.order;
 
-  if (!order?.survey_required) {
+  if (!isSurveyRequiredForOrder(order)) {
     return (
       <Card>
         <CardContent className="p-6 text-center text-muted-foreground">
-          Survey not required for this order
+          {getSurveyRequirementReason(order)}
         </CardContent>
       </Card>
     );
