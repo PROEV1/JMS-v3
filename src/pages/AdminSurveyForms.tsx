@@ -17,41 +17,22 @@ export default function AdminSurveyForms() {
   const deleteForm = useDeleteSurveyForm();
 
   const handleCreateForm = async () => {
+    const newFormData = {
+      name: "New EV Installation Form",
+      description: "Survey form for EV charger installation assessment",
+      schema: DEFAULT_EV_INSTALL_TEMPLATE.schema
+    };
+    
     try {
-      const result = await createForm.mutateAsync({
-        name: 'New Survey Form',
-        description: 'A new survey form',
-        schema: DEFAULT_EV_INSTALL_TEMPLATE.schema
-      });
-      
-      navigate(`/admin/survey-forms/${result.version.id}/edit`);
-      toast({
-        title: "Form created",
-        description: "New survey form has been created"
-      });
+      const result = await createForm.mutateAsync(newFormData);
+      navigate(`/admin/survey-forms/${(result as any).version.id}/edit`);
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to create form",
-        variant: "destructive"
-      });
+      // Error handling is done in the hook now
     }
   };
 
   const handleDeleteForm = async (formId: string, formName: string) => {
-    try {
-      await deleteForm.mutateAsync(formId);
-      toast({
-        title: "Form deleted",
-        description: `"${formName}" has been deleted successfully`
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to delete form",
-        variant: "destructive"
-      });
-    }
+    await deleteForm.mutateAsync(formId);
   };
 
   if (isLoading) {

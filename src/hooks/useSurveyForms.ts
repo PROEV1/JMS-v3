@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { SurveyForm, SurveyFormVersion, SurveyFormMapping, SurveyFormSchema } from '@/types/survey-forms';
+import { safeApiCall, showErrorToast, showSuccessToast } from '@/utils/apiErrorHandler';
 
 export function useSurveyForms() {
   return useQuery({
@@ -74,35 +75,47 @@ export function useCreateSurveyForm() {
       description?: string; 
       schema: SurveyFormSchema;
     }) => {
-      // Create form
-      const { data: form, error: formError } = await supabase
-        .from('survey_forms')
-        .insert({
-          name,
-          description
-        })
-        .select()
-        .single();
+      const result = await safeApiCall(async () => {
+        // Create form
+        const { data: form, error: formError } = await supabase
+          .from('survey_forms')
+          .insert({
+            name,
+            description
+          })
+          .select()
+          .single();
 
-      if (formError) throw formError;
+        if (formError) throw formError;
 
-      // Create initial version
-      const { data: version, error: versionError } = await supabase
-        .from('survey_form_versions')
-        .insert({
-          form_id: form.id,
-          version_number: 1,
-          schema: schema as any
-        })
-        .select()
-        .single();
+        // Create initial version
+        const { data: version, error: versionError } = await supabase
+          .from('survey_form_versions')
+          .insert({
+            form_id: form.id,
+            version_number: 1,
+            schema: schema as any
+          })
+          .select()
+          .single();
 
-      if (versionError) throw versionError;
+        if (versionError) throw versionError;
 
-      return { form, version };
+        return { form, version };
+      }, 'createSurveyForm');
+
+      if (!result.ok) {
+        throw new Error(result.message);
+      }
+
+      return result.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['survey-forms'] });
+      showSuccessToast('Survey form created successfully');
+    },
+    onError: (error: Error) => {
+      showErrorToast(error.message, 'Failed to create form');
     }
   });
 }
@@ -237,17 +250,27 @@ export function useDeleteSurveyForm() {
 
   return useMutation({
     mutationFn: async (formId: string) => {
-      // Delete the survey form (CASCADE will handle versions and mappings)
-      const { error } = await supabase
-        .from('survey_forms')
-        .delete()
-        .eq('id', formId);
+      const result = await safeApiCall(async () => {
+        const { error } = await supabase
+          .from('survey_forms')
+          .delete()
+          .eq('id', formId);
 
-      if (error) throw error;
+        if (error) throw error;
+        return { success: true };
+      }, 'deleteSurveyForm');
+
+      if (!result.ok) {
+        throw new Error(result.message);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['survey-forms'] });
       queryClient.invalidateQueries({ queryKey: ['survey-form-mappings'] });
+      showSuccessToast('Survey form deleted successfully');
+    },
+    onError: (error: Error) => {
+      showErrorToast(error.message, 'Failed to delete form');
     }
   });
 }
