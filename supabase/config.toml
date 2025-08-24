@@ -39,3 +39,9 @@ verify_jwt = false
 
 [functions.survey-upload]
 verify_jwt = false
+
+[functions.admin-delete-order]
+verify_jwt = true
+
+[functions.quote-snapshot-save]
+verify_jwt = true

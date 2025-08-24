@@ -166,8 +166,15 @@ export default function OrderDetail() {
         .from('orders')
         .select(`
           *,
-          clients!inner(id, full_name, email, address, postcode, phone),
-          quotes(
+          clients!orders_client_id_fkey(
+            id, 
+            full_name, 
+            email, 
+            address, 
+            postcode, 
+            phone
+          ),
+          quotes!orders_quote_id_fkey(
             id,
             quote_number,
             total_cost,
@@ -191,7 +198,7 @@ export default function OrderDetail() {
             paid_at,
             created_at
           ),
-          engineers(
+          engineers!orders_engineer_id_fkey(
             id,
             name,
             email
@@ -204,7 +211,12 @@ export default function OrderDetail() {
             description,
             uploaded_at
           ),
-          partners(name, client_payment_required, client_agreement_required, client_survey_required)
+          partners!orders_partner_id_fkey(
+            name, 
+            client_payment_required, 
+            client_agreement_required, 
+            client_survey_required
+          )
         `)
         .eq('id', orderId)
         .single();
@@ -215,13 +227,13 @@ export default function OrderDetail() {
       console.log('Client data:', data.clients);
       console.log('Quote data:', data.quotes);
       
-      // Transform the data to match our interface
+      // Transform the data to match our interface, handling nullable relationships
       const transformedOrder = {
         ...data,
-        client: data.clients,
-        quote: data.quotes?.[0] || null,
-        engineer: data.engineers?.[0] || null,
-        partner: data.partners?.[0] || null
+        client: data.clients || null,
+        quote: data.quotes || null,
+        engineer: data.engineers || null,
+        partner: data.partners || null
       };
       
       setOrder(transformedOrder as any);
