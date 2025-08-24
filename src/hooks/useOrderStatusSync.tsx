@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -10,7 +11,7 @@ export function useOrderStatusSync(orderId: string) {
     if (!orderId) return;
 
     // Set up real-time subscription for order changes
-    const channel = supabase
+    const orderChannel = supabase
       .channel('order-status-changes')
       .on(
         'postgres_changes',
@@ -44,8 +45,58 @@ export function useOrderStatusSync(orderId: string) {
       )
       .subscribe();
 
+    // Set up real-time subscription for survey changes that affect this order
+    const surveyChannel = supabase
+      .channel('survey-status-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'client_surveys',
+          filter: `order_id=eq.${orderId}`
+        },
+        async (payload) => {
+          console.log('Survey change detected for order:', orderId, payload);
+          
+          // Survey changed, trigger order status recalculation
+          // The database trigger should handle this automatically, but we can force a refresh
+          window.dispatchEvent(new CustomEvent('scheduling:refresh'));
+          
+          // Show appropriate toast based on survey status
+          if (payload.eventType === 'UPDATE') {
+            const newSurvey = payload.new as any;
+            const oldSurvey = payload.old as any;
+            
+            if (newSurvey.status !== oldSurvey.status) {
+              let message = '';
+              switch (newSurvey.status) {
+                case 'submitted':
+                  message = 'Survey submitted for review';
+                  break;
+                case 'approved':
+                  message = 'Survey approved - ready for next steps';
+                  break;
+                case 'rework_requested':
+                  message = 'Survey requires additional work';
+                  break;
+                default:
+                  message = `Survey status updated to: ${newSurvey.status}`;
+              }
+              
+              toast({
+                title: "Survey Updated",
+                description: message,
+              });
+            }
+          }
+        }
+      )
+      .subscribe();
+
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(orderChannel);
+      supabase.removeChannel(surveyChannel);
     };
   }, [orderId, toast]);
 
