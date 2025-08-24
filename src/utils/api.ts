@@ -45,6 +45,7 @@ export async function safeMutation<T>(
 
 /**
  * Safe wrapper for Edge Function invocations with standardized error handling
+ * Now uses the robust apiClient for better retries and circuit breaking
  */
 export async function safeInvoke<T>(
   functionName: string,
@@ -52,16 +53,27 @@ export async function safeInvoke<T>(
   context?: string,
   showToastOnError = true
 ): Promise<ApiResponse<T>> {
-  const result = await safeApiCall<T>(
-    () => supabase.functions.invoke(functionName, { body: payload }),
-    context || `Edge Function: ${functionName}`
-  );
-  
-  if (!result.ok && showToastOnError) {
-    showErrorToast(result);
+  try {
+    // Import apiClient dynamically to avoid circular imports
+    const { apiClient, buildFunctionUrl } = await import('@/lib/apiClient');
+    
+    const url = buildFunctionUrl(functionName);
+    const result = await apiClient.post(url, payload);
+    
+    return {
+      ok: true,
+      data: result,
+      message: 'Success',
+    };
+  } catch (error: any) {
+    const apiResponse = handleApiError(error, context || `Edge Function: ${functionName}`);
+    
+    if (showToastOnError) {
+      showErrorToast(apiResponse);
+    }
+    
+    return apiResponse;
   }
-  
-  return result;
 }
 
 /**

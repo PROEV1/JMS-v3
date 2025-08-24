@@ -1,41 +1,38 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-}
+import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { corsHeaders, json } from '../_shared/cors.ts';
 
 serve(async (req) => {
+  const requestId = crypto.randomUUID();
+  
+  // Handle preflight
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
-
-  if (req.method !== 'POST') {
-    return new Response(
-      JSON.stringify({ error: 'Method not allowed' }),
-      { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    const { token } = await req.json();
-
-    if (!token) {
-      return new Response(
-        JSON.stringify({ error: 'Token is required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    const url = new URL(req.url);
+    if (url.searchParams.get('test') === '1') {
+      return json({ ok: true, status: 'alive', function: url.pathname }, 200, requestId);
     }
 
-    const supabaseClient = createClient(
+    if (req.method !== 'POST') {
+      return json({ ok: false, error: 'Method not allowed' }, 405, requestId);
+    }
+
+    const body = await req.json().catch(() => ({}));
+    const { token } = body;
+
+    if (!token) {
+      return json({ ok: false, error: 'Survey token is required' }, 400, requestId);
+    }
+
+    const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Look up order by survey token
-    const { data: order, error } = await supabaseClient
+    const { data: order, error } = await supabase
       .from('orders')
       .select(`
         id,
@@ -61,42 +58,24 @@ serve(async (req) => {
 
     if (error || !order) {
       console.error('Order lookup failed:', error);
-      return new Response(
-        JSON.stringify({ error: 'Invalid or expired survey link' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Check if token has expired
-    if (order.survey_token_expires_at && new Date(order.survey_token_expires_at) < new Date()) {
-      return new Response(
-        JSON.stringify({ error: 'Survey link has expired' }),
-        { status: 410, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    return new Response(
-      JSON.stringify({ 
-        success: true, 
-        order: order 
-      }),
-      { 
-        status: 200, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      if (error?.code === 'PGRST116') {
+        return json({ ok: false, error: 'Invalid or expired survey link' }, 404, requestId);
       }
-    );
+      return json({ ok: false, error: 'Database error occurred' }, 500, requestId);
+    }
+
+    // Check if survey token has expired
+    if (order.survey_token_expires_at && new Date(order.survey_token_expires_at) < new Date()) {
+      return json({ ok: false, error: 'Survey link has expired' }, 410, requestId);
+    }
+
+    return json({ 
+      ok: true, 
+      data: order 
+    }, 200, requestId);
 
   } catch (error) {
     console.error('Survey lookup error:', error);
-    return new Response(
-      JSON.stringify({ 
-        error: 'Internal server error',
-        details: error.message 
-      }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
-    );
+    return json({ ok: false, error: String(error) }, 500, requestId);
   }
-})
+});

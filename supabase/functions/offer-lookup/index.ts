@@ -1,24 +1,22 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.52.1";
+import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { corsHeaders, json } from '../_shared/cors.ts';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-const supabase = createClient(
-  Deno.env.get('SUPABASE_URL')!,
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-);
-
-serve(async (req: Request) => {
+serve(async (req) => {
+  const requestId = crypto.randomUUID();
+  
+  // Handle preflight
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    let token;
+    const url = new URL(req.url);
+    if (url.searchParams.get('test') === '1') {
+      return json({ ok: true, status: 'alive', function: url.pathname }, 200, requestId);
+    }
 
+    let token;
     console.log('Offer lookup called with method:', req.method);
     console.log('Request URL:', req.url);
 
@@ -35,7 +33,6 @@ serve(async (req: Request) => {
 
     // If no token from body or if GET request, try URL path
     if (!token) {
-      const url = new URL(req.url);
       const pathSegments = url.pathname.split('/').filter(Boolean);
       console.log('Path segments:', pathSegments);
       
@@ -52,14 +49,13 @@ serve(async (req: Request) => {
 
     if (!token) {
       console.log('No token found in request');
-      return new Response(
-        JSON.stringify({ error: 'Token required' }),
-        {
-          status: 400,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders }
-        }
-      );
+      return json({ ok: false, error: 'Token required' }, 400, requestId);
     }
+
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    );
 
     console.log('Looking up offer with token:', token);
 
@@ -72,16 +68,11 @@ serve(async (req: Request) => {
 
     if (offerError || !jobOffer) {
       console.log('Offer not found, error:', offerError);
-      return new Response(
-        JSON.stringify({ 
-          error: 'Offer not found or expired',
-          expired: true
-        }),
-        {
-          status: 404,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders }
-        }
-      );
+      return json({ 
+        ok: false,
+        error: 'Offer not found or expired',
+        expired: true
+      }, 404, requestId);
     }
 
     // Get the order details
@@ -93,16 +84,11 @@ serve(async (req: Request) => {
 
     if (orderError || !order) {
       console.log('Order not found for offer:', orderError);
-      return new Response(
-        JSON.stringify({ 
-          error: 'Order not found',
-          expired: true
-        }),
-        {
-          status: 404,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders }
-        }
-      );
+      return json({ 
+        ok: false,
+        error: 'Order not found',
+        expired: true
+      }, 404, requestId);
     }
 
     // Get the engineer details
@@ -114,16 +100,11 @@ serve(async (req: Request) => {
 
     if (engineerError || !engineer) {
       console.log('Engineer not found for offer:', engineerError);
-      return new Response(
-        JSON.stringify({ 
-          error: 'Engineer not found',
-          expired: true
-        }),
-        {
-          status: 404,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders }
-        }
-      );
+      return json({ 
+        ok: false,
+        error: 'Engineer not found',
+        expired: true
+      }, 404, requestId);
     }
 
     console.log('Offer lookup successful:', { offerId: jobOffer.id, orderId: order.id, engineerId: engineer.id });
@@ -142,35 +123,28 @@ serve(async (req: Request) => {
         })
         .eq('id', jobOffer.id);
 
-      return new Response(
-        JSON.stringify({ 
-          error: 'This offer has expired',
-          expired: true
-        }),
-        {
-          status: 410,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders }
-        }
-      );
+      return json({ 
+        ok: false,
+        error: 'This offer has expired',
+        expired: true
+      }, 410, requestId);
     }
 
     // Check if offer has already been responded to
     if (jobOffer.status !== 'pending') {
-      return new Response(
-        JSON.stringify({
+      return json({
+        ok: true,
+        data: {
           ...jobOffer,
           already_responded: true
-        }),
-        {
-          status: 200,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders }
         }
-      );
+      }, 200, requestId);
     }
 
     // Return offer details
-    return new Response(
-      JSON.stringify({
+    return json({
+      ok: true,
+      data: {
         id: jobOffer.id,
         status: jobOffer.status,
         offered_date: jobOffer.offered_date,
@@ -187,21 +161,11 @@ serve(async (req: Request) => {
         engineer: {
           name: engineer.name
         }
-      }),
-      {
-        status: 200,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
       }
-    );
+    }, 200, requestId);
 
   } catch (error: any) {
     console.error('Error in offer-lookup function:', error);
-    return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
-      {
-        status: 500,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
-      }
-    );
+    return json({ ok: false, error: String(error) }, 500, requestId);
   }
 });

@@ -1,15 +1,6 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.52.1";
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-const supabase = createClient(
-  Deno.env.get('SUPABASE_URL')!,
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-);
+import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { corsHeaders, json } from '../_shared/cors.ts';
 
 interface OfferResponse {
   token?: string;
@@ -28,22 +19,33 @@ interface OfferResponse {
 }
 
 serve(async (req: Request) => {
+  const requestId = crypto.randomUUID();
+  
+  // Handle preflight
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders });
   }
 
   try {
+    const url = new URL(req.url);
+    if (url.searchParams.get('test') === '1') {
+      return json({ ok: true, status: 'alive', function: url.pathname }, 200, requestId);
+    }
+
+    if (req.method !== 'POST') {
+      return json({ ok: false, error: 'Method not allowed' }, 405, requestId);
+    }
+
     const { token, offer_id, response, rejection_reason, block_this_date, block_date_range, blockDateRanges }: OfferResponse = await req.json();
 
     if ((!token && !offer_id) || !response) {
-      return new Response(
-        JSON.stringify({ error: 'Either token or offer_id and response are required' }),
-        {
-          status: 400,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders }
-        }
-      );
+      return json({ ok: false, error: 'Either token or offer_id and response are required' }, 400, requestId);
     }
+
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    );
 
     let jobOffer;
 
@@ -56,13 +58,7 @@ serve(async (req: Request) => {
         .single();
 
       if (error || !data) {
-        return new Response(
-          JSON.stringify({ error: 'Offer not found' }),
-          {
-            status: 404,
-            headers: { 'Content-Type': 'application/json', ...corsHeaders }
-          }
-        );
+        return json({ ok: false, error: 'Offer not found' }, 404, requestId);
       }
       
       // Get order and engineer details separately
@@ -72,13 +68,7 @@ serve(async (req: Request) => {
       ]);
 
       if (orderResult.error || engineerResult.error) {
-        return new Response(
-          JSON.stringify({ error: 'Failed to load offer details' }),
-          {
-            status: 500,
-            headers: { 'Content-Type': 'application/json', ...corsHeaders }
-          }
-        );
+        return json({ ok: false, error: 'Failed to load offer details' }, 500, requestId);
       }
 
       jobOffer = {
@@ -88,19 +78,11 @@ serve(async (req: Request) => {
       };
     } else if (offer_id) {
       // Authenticated client access via offer ID
-      // For authenticated access, we need to verify the client owns this order
       const authHeader = req.headers.get('Authorization');
       if (!authHeader) {
-        return new Response(
-          JSON.stringify({ error: 'Authorization required for offer_id access' }),
-          {
-            status: 401,
-            headers: { 'Content-Type': 'application/json', ...corsHeaders }
-          }
-        );
+        return json({ ok: false, error: 'Authorization required for offer_id access' }, 401, requestId);
       }
 
-      // Verify client access - using separate queries to avoid ambiguous embeds
       const { data, error } = await supabase
         .from('job_offers')
         .select('*')
@@ -108,29 +90,16 @@ serve(async (req: Request) => {
         .single();
 
       if (error || !data) {
-        return new Response(
-          JSON.stringify({ error: 'Offer not found' }),
-          {
-            status: 404,
-            headers: { 'Content-Type': 'application/json', ...corsHeaders }
-          }
-        );
+        return json({ ok: false, error: 'Offer not found' }, 404, requestId);
       }
 
-      // Get order, client, and engineer details separately
       const [orderResult, engineerResult] = await Promise.all([
         supabase.from('orders').select('*, client:clients(user_id)').eq('id', data.order_id).single(),
         supabase.from('engineers').select('*').eq('id', data.engineer_id).single()
       ]);
 
       if (orderResult.error || engineerResult.error) {
-        return new Response(
-          JSON.stringify({ error: 'Failed to load offer details' }),
-          {
-            status: 500,
-            headers: { 'Content-Type': 'application/json', ...corsHeaders }
-          }
-        );
+        return json({ ok: false, error: 'Failed to load offer details' }, 500, requestId);
       }
 
       jobOffer = {
@@ -145,24 +114,12 @@ serve(async (req: Request) => {
     const expiresAt = new Date(jobOffer.expires_at);
     
     if (now > expiresAt) {
-      return new Response(
-        JSON.stringify({ error: 'This offer has expired' }),
-        {
-          status: 410,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders }
-        }
-      );
+      return json({ ok: false, error: 'This offer has expired' }, 410, requestId);
     }
 
     // Check if already responded
     if (jobOffer.status !== 'pending') {
-      return new Response(
-        JSON.stringify({ error: 'This offer has already been responded to' }),
-        {
-          status: 409,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders }
-        }
-      );
+      return json({ ok: false, error: 'This offer has already been responded to' }, 409, requestId);
     }
 
     const responseTime = now.toISOString();
@@ -213,7 +170,7 @@ serve(async (req: Request) => {
       console.log(`Offer accepted for order ${jobOffer.order.order_number} - moved to ready-to-book`);
 
     } else if (response === 'reject') {
-      // Reject the offer
+      // Reject the offer with full date blocking functionality
       const { error: updateOfferError } = await supabase
         .from('job_offers')
         .update({
@@ -241,18 +198,16 @@ serve(async (req: Request) => {
         console.error('Failed to reset order status:', resetOrderError);
       }
 
-      // Collect all dates to block in a Set to avoid duplicates
+      // Process date blocking
       const datesToBlock = new Set<string>();
       const blockingMessages: string[] = [];
 
-      // Add offered date if requested
       if (block_this_date) {
         const offeredDateOnly = jobOffer.offered_date.split('T')[0];
         datesToBlock.add(offeredDateOnly);
         blockingMessages.push(`${new Date(offeredDateOnly).toLocaleDateString('en-GB')}`);
       }
 
-      // Combine legacy single range with new multiple ranges
       const allRanges = [];
       if (block_date_range?.start_date && block_date_range.end_date) {
         allRanges.push(block_date_range);
@@ -261,7 +216,6 @@ serve(async (req: Request) => {
         allRanges.push(...blockDateRanges);
       }
 
-      // Process all date ranges
       for (const range of allRanges) {
         if (range.start_date && range.end_date) {
           const startDate = new Date(range.start_date);
@@ -273,7 +227,6 @@ serve(async (req: Request) => {
             currentDate.setDate(currentDate.getDate() + 1);
           }
           
-          // Add human-readable message
           if (startDate.getTime() === endDate.getTime()) {
             blockingMessages.push(`${startDate.toLocaleDateString('en-GB')}`);
           } else {
@@ -282,7 +235,6 @@ serve(async (req: Request) => {
         }
       }
 
-      // Insert blocked dates using upsert to prevent duplicates
       if (datesToBlock.size > 0) {
         const blockedDatesArray = Array.from(datesToBlock).map(date => ({
           client_id: jobOffer.order.client_id,
@@ -302,31 +254,8 @@ serve(async (req: Request) => {
         } else {
           console.log(`Blocked ${datesToBlock.size} dates for client ${jobOffer.order.client_id}`);
         }
-
-        // Update order scheduling conflicts for admin visibility
-        const existingConflicts = jobOffer.order.scheduling_conflicts || [];
-        const newConflict = {
-          type: 'client_unavailability',
-          message: `Client unavailable ${blockingMessages.join(', ')}`,
-          ranges: allRanges,
-          blocked_dates: Array.from(datesToBlock),
-          source: 'client_rejection',
-          created_at: responseTime
-        };
-
-        const { error: conflictsError } = await supabase
-          .from('orders')
-          .update({
-            scheduling_conflicts: [...existingConflicts, newConflict]
-          })
-          .eq('id', jobOffer.order_id);
-
-        if (conflictsError) {
-          console.error('Failed to update scheduling conflicts:', conflictsError);
-        }
       }
 
-      // Log activity with better details
       await supabase.rpc('log_order_activity', {
         p_order_id: jobOffer.order_id,
         p_activity_type: 'offer_rejected',
@@ -347,26 +276,17 @@ serve(async (req: Request) => {
       console.log(`Offer rejected for order ${jobOffer.order.order_number}: ${rejection_reason}`);
     }
 
-    return new Response(
-      JSON.stringify({
+    return json({
+      ok: true,
+      data: {
         success: true,
         message: response === 'accept' ? 'Offer accepted successfully' : 'Offer rejected',
         response_type: response
-      }),
-      {
-        status: 200,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
       }
-    );
+    }, 200, requestId);
 
   } catch (error: any) {
     console.error('Error in offer-respond function:', error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      {
-        status: 500,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders }
-      }
-    );
+    return json({ ok: false, error: String(error) }, 500, requestId);
   }
 });

@@ -1,4 +1,4 @@
-// Dynamic CORS handler for Lovable preview domains and localhost
+// Standardized CORS headers for all Edge Functions
 export const getCorsHeaders = (origin?: string | null) => {
   const allowedOrigins = [
     'http://localhost:5173',
@@ -23,14 +23,28 @@ export const getCorsHeaders = (origin?: string | null) => {
   }
 
   return {
-    'Access-Control-Allow-Origin': allowOrigin,
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-requested-with',
-    'Access-Control-Allow-Methods': 'OPTIONS, POST',
-    'Access-Control-Max-Age': '86400',
-    'Access-Control-Allow-Credentials': allowOrigin !== '*' ? 'true' : 'false',
-    'Vary': 'Origin'
+    'access-control-allow-origin': allowOrigin,
+    'access-control-allow-methods': 'GET,POST,OPTIONS',
+    'access-control-allow-headers': 'authorization, x-client-info, apikey, content-type',
+    'access-control-max-age': '86400',
+    'access-control-allow-credentials': allowOrigin !== '*' ? 'true' : 'false',
+    'vary': 'origin'
   };
 };
 
-// Fallback static headers for backwards compatibility
+// Standard CORS headers for most use cases
 export const corsHeaders = getCorsHeaders();
+
+// JSON response helper with consistent headers
+export function json(data: unknown, status = 200, requestId?: string) {
+  const headers: Record<string, string> = {
+    'content-type': 'application/json',
+    ...corsHeaders
+  };
+  
+  if (requestId) {
+    headers['x-request-id'] = requestId;
+  }
+  
+  return new Response(JSON.stringify(data), { status, headers });
+}
