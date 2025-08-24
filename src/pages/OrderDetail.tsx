@@ -8,6 +8,7 @@ import { OrderStickyHeader } from '@/components/admin/OrderStickyHeader';
 import { OrderActionBar } from '@/components/admin/OrderActionBar';
 import { OfferLinkWidget } from '@/components/admin/OfferLinkWidget';
 import { OrderSectionLayout } from '@/components/admin/OrderSectionLayout';
+import { AdminOrderOverview } from '@/components/admin/AdminOrderOverview';
 import { ClientDetailsSection } from '@/components/admin/sections/ClientDetailsSection';
 import { ProductSummarySection } from '@/components/admin/sections/ProductSummarySection';
 import { InstallationManagementSection } from '@/components/admin/sections/InstallationManagementSection';
@@ -661,6 +662,9 @@ export default function OrderDetail() {
             </div>
 
           <div className="space-y-6">
+            {/* Order Overview */}
+            <AdminOrderOverview order={order} />
+
             {/* Client Information */}
             <ClientDetailsSection 
               order={order} 

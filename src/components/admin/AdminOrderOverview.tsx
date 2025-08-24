@@ -13,6 +13,8 @@ interface Order {
   agreement_signed_at: string | null;
   installation_notes: string | null;
   engineer_id: string | null;
+  is_partner_job: boolean;
+  partner_status?: string | null;
   client: {
     full_name: string;
     email: string;
@@ -28,6 +30,9 @@ interface Order {
   engineer?: {
     name: string;
   };
+  partner?: {
+    name: string;
+  } | null;
 }
 
 interface AdminOrderOverviewProps {
@@ -79,6 +84,18 @@ export function AdminOrderOverview({ order }: AdminOrderOverviewProps) {
             <h4 className="font-medium text-sm text-muted-foreground">Order Reference</h4>
             <p className="font-semibold">{order.order_number}</p>
             <p className="text-sm text-muted-foreground">Quote: {order.quote.quote_number}</p>
+            {order.is_partner_job && order.partner && (
+              <div className="flex items-center gap-2 mt-1">
+                <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700">
+                  Partner: {order.partner.name}
+                </Badge>
+                {order.partner_status && (
+                  <Badge variant="outline" className="text-xs">
+                    {order.partner_status}
+                  </Badge>
+                )}
+              </div>
+            )}
           </div>
           
           <div>

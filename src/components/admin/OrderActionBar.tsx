@@ -140,6 +140,16 @@ export function OrderActionBar({ orderId, order }: OrderActionBarProps) {
         Email Client
       </Button>
       
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={handleDeleteOrder}
+        className="text-destructive hover:text-destructive"
+      >
+        <Trash2 className="h-4 w-4 mr-2" />
+        <span className="hidden sm:inline">Delete Order</span>
+      </Button>
+      
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="outline" size="sm">
