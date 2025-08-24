@@ -237,7 +237,7 @@ export const QuoteDetailView: React.FC<QuoteDetailViewProps> = ({ quote, onBack,
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'sent': return 'bg-primary text-white';
-      case 'accepted': return 'bg-brand-green text-white';
+      case 'accepted': return 'bg-brand-teal text-white';
       case 'rejected': return 'bg-destructive text-destructive-foreground';
       case 'declined': return 'bg-destructive text-destructive-foreground';
       case 'expired': return 'bg-muted text-muted-foreground';
@@ -439,7 +439,7 @@ export const QuoteDetailView: React.FC<QuoteDetailViewProps> = ({ quote, onBack,
           <div className="flex space-x-2">
             {quote.status === 'sent' && (
               <>
-                <Button onClick={handleAcceptQuote} className="bg-brand-green hover:bg-brand-green-dark text-white">
+                <Button onClick={handleAcceptQuote} className="bg-brand-teal hover:bg-brand-teal-dark text-white">
                   <CheckCircle className="h-4 w-4 mr-2" />
                   Accept Quote
                 </Button>
@@ -458,7 +458,7 @@ export const QuoteDetailView: React.FC<QuoteDetailViewProps> = ({ quote, onBack,
               </Button>
             )}
             {quote.status === 'rejected' && (
-              <Button onClick={handleAcceptQuote} className="bg-brand-green hover:bg-brand-green-dark text-white">
+              <Button onClick={handleAcceptQuote} className="bg-brand-teal hover:bg-brand-teal-dark text-white">
                 <CheckCircle className="h-4 w-4 mr-2" />
                 Accept Quote
               </Button>
@@ -586,17 +586,17 @@ export const QuoteDetailView: React.FC<QuoteDetailViewProps> = ({ quote, onBack,
                           <div className="space-y-2">
                             <div className="flex items-center justify-between p-2 bg-green-50 rounded-lg">
                               <div className="flex items-center space-x-3">
-                                <Wrench className="h-4 w-4 text-brand-green" />
-                                <span className="text-sm">Professional installation by certified team</span>
-                              </div>
-                              <span className="text-sm font-medium text-brand-green">Free</span>
+                                 <Wrench className="h-4 w-4 text-brand-teal" />
+                                 <span className="text-sm">Professional installation by certified team</span>
+                               </div>
+                               <span className="text-sm font-medium text-brand-teal">Free</span>
                             </div>
                             <div className="flex items-center justify-between p-2 bg-green-50 rounded-lg">
                               <div className="flex items-center space-x-3">
-                                <Wrench className="h-4 w-4 text-brand-green" />
-                                <span className="text-sm">Stud Wall Removal</span>
-                              </div>
-                              <span className="text-sm font-medium text-brand-green">Free</span>
+                                 <Wrench className="h-4 w-4 text-brand-teal" />
+                                 <span className="text-sm">Stud Wall Removal</span>
+                               </div>
+                               <span className="text-sm font-medium text-brand-teal">Free</span>
                             </div>
                           </div>
                         </div>
@@ -664,28 +664,28 @@ export const QuoteDetailView: React.FC<QuoteDetailViewProps> = ({ quote, onBack,
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center">
-            <Shield className="h-5 w-5 mr-2 text-brand-green" />
+            <Shield className="h-5 w-5 mr-2 text-brand-teal" />
             What's Always Included
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid md:grid-cols-2 gap-4">
             <div className="flex items-center space-x-2">
-              <div className="w-2 h-2 bg-brand-green rounded-full"></div>
+              <div className="w-2 h-2 bg-brand-teal rounded-full"></div>
               <span>{quote.warranty_period} warranty</span>
             </div>
             {quote.includes_installation && (
               <div className="flex items-center space-x-2">
-                <div className="w-2 h-2 bg-brand-green rounded-full"></div>
+                <div className="w-2 h-2 bg-brand-teal rounded-full"></div>
                 <span>Professional installation</span>
               </div>
             )}
             <div className="flex items-center space-x-2">
-              <div className="w-2 h-2 bg-brand-green rounded-full"></div>
+              <div className="w-2 h-2 bg-brand-teal rounded-full"></div>
               <span>Free consultation</span>
             </div>
             <div className="flex items-center space-x-2">
-              <div className="w-2 h-2 bg-brand-green rounded-full"></div>
+              <div className="w-2 h-2 bg-brand-teal rounded-full"></div>
               <span>Quality guarantee</span>
             </div>
           </div>
