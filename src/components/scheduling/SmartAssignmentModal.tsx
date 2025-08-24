@@ -209,9 +209,20 @@ export function SmartAssignmentModal({
         onClose();
       }, 300);
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error sending offer:', error);
-      toast.error('Failed to send offer to client');
+      
+      // Handle specific error types from send-offer function
+      if (error.message && error.message.includes('not available on')) {
+        const engineerName = suggestions.find(s => s.engineer.id === selectedEngineerId)?.engineer.name || 'Engineer';
+        toast.error(`${engineerName} is not available on the selected date. Please choose a different date or engineer.`);
+      } else if (error.message && error.message.includes('at capacity')) {
+        toast.error('Engineer is at capacity on this date. Please choose a different date or engineer.');
+      } else if (error.message && error.message.includes('exceed working hours')) {
+        toast.error('This booking would exceed the engineer\'s working hours. Please choose a different date or engineer.');
+      } else {
+        toast.error(error.message || 'Failed to send offer to client');
+      }
     } finally {
       setProcessing(false);
     }

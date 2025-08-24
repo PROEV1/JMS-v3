@@ -133,7 +133,18 @@ export function useJobOffers(orderId?: string) {
       });
 
       if (error || data?.error) {
-        throw new Error(data?.error || 'Failed to resend offer');
+        // Handle specific error types from send-offer function
+        if (data?.error === 'engineer_not_available') {
+          const engineerName = data?.details?.engineer_name || 'Engineer';
+          const availableDays = data?.details?.available_days?.join(', ') || 'weekdays';
+          throw new Error(`${engineerName} is not available on ${data?.details?.requested_day}. Available days: ${availableDays}`);
+        } else if (data?.message && data.message.includes('at capacity')) {
+          throw new Error('Engineer is at capacity on this date. Please choose a different date or engineer.');
+        } else if (data?.message && data.message.includes('exceed working hours')) {
+          throw new Error('This booking would exceed the engineer\'s working hours. Please choose a different date or engineer.');
+        } else {
+          throw new Error(data?.error || 'Failed to resend offer');
+        }
       }
 
       await fetchOffers(); // Refresh the offers

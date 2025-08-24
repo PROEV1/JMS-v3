@@ -508,8 +508,24 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
           }
         });
 
-        if (error || data?.error) {
-          throw new Error(data?.error || 'Failed to send offer');
+        if (error) {
+          console.error('Function invocation error:', error);
+          throw new Error('Failed to send offer');
+        }
+
+        if (data?.error) {
+          // Handle specific error types from send-offer function
+          if (data.error === 'engineer_not_available') {
+            const engineerName = engineers.find(e => e.id === engineerId)?.name || 'Engineer';
+            const availableDays = data.details?.available_days?.join(', ') || 'weekdays';
+            throw new Error(`${engineerName} is not available on ${data.details?.requested_day}. Available days: ${availableDays}`);
+          } else if (data.message && data.message.includes('at capacity')) {
+            throw new Error('Engineer is at capacity on this date. Please choose a different date or engineer.');
+          } else if (data.message && data.message.includes('exceed working hours')) {
+            throw new Error('This booking would exceed the engineer\'s working hours. Please choose a different date or engineer.');
+          } else {
+            throw new Error(data.message || data.error || 'Failed to send offer');
+          }
         }
 
         // Log activity
@@ -565,7 +581,17 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
 
     } catch (error: any) {
       console.error('Assignment error:', error);
-      throw error;
+      
+      // Handle specific error types more gracefully
+      if (error.message && error.message.includes('not available on')) {
+        toast.error(error.message);
+      } else if (error.message && error.message.includes('at capacity')) {
+        toast.error(error.message);
+      } else if (error.message && error.message.includes('exceed working hours')) {
+        toast.error(error.message);
+      } else {
+        toast.error(error.message || 'Failed to process assignment');
+      }
     }
   };
 
