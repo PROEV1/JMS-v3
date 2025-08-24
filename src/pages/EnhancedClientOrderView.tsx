@@ -76,12 +76,16 @@ export default function EnhancedClientOrderView() {
 
        if (error) {
          console.error('Database error:', error);
-         throw error;
+         console.error('Error details:', JSON.stringify(error, null, 2));
+         throw new Error(`Failed to fetch order: ${error.message}`);
        }
        
        if (!data) {
+         console.error('No order found for ID:', orderId);
          throw new Error('Order not found');
        }
+       
+       console.log('Order data received:', data);
        
        // Transform the data to match our interface, handling nullable relationships and ensuring arrays
        return {
