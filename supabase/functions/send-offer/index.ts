@@ -94,7 +94,13 @@ serve(async (req: Request) => {
       .eq('id', order_id)
       .single();
 
-    if (orderError || !order) {
+    if (orderError) {
+      console.error('Order query error:', orderError);
+      throw new Error(`Failed to fetch order: ${orderError.message}`);
+    }
+    
+    if (!order) {
+      console.error('Order not found for ID:', order_id);
       throw new Error('Order not found');
     }
 
