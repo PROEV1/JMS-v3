@@ -5,14 +5,18 @@ import { Badge } from '@/components/ui/badge';
 import { Upload, Camera, X, Image, Video } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { SurveyField } from '@/types/survey-forms';
+import { supabase } from '@/integrations/supabase/client';
 
 interface MediaUploadFieldProps {
   field: SurveyField;
   value: any[];
   onChange: (files: any[]) => void;
+  orderId?: string;
+  surveyId?: string;
+  token?: string;
 }
 
-export function MediaUploadField({ field, value = [], onChange }: MediaUploadFieldProps) {
+export function MediaUploadField({ field, value = [], onChange, orderId, surveyId, token }: MediaUploadFieldProps) {
   const [uploading, setUploading] = useState(false);
   const { toast } = useToast();
   
@@ -37,6 +41,15 @@ export function MediaUploadField({ field, value = [], onChange }: MediaUploadFie
       return;
     }
 
+    if (!orderId || !token) {
+      toast({
+        title: 'Upload not available',
+        description: 'Missing required upload configuration',
+        variant: 'destructive'
+      });
+      return;
+    }
+
     setUploading(true);
 
     const newFiles = [];
@@ -50,22 +63,54 @@ export function MediaUploadField({ field, value = [], onChange }: MediaUploadFie
         continue;
       }
 
-      // Create a temporary file object with preview URL
-      const fileWithPreview = {
-        file,
-        name: file.name,
-        size: file.size,
-        type: file.type.startsWith('video/') ? 'video' : 'image', // Map to enum values
-        url: URL.createObjectURL(file),
-        id: Math.random().toString(36).substr(2, 9)
-      };
+      try {
+        // Upload to Supabase Storage via edge function
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('orderId', orderId);
+        formData.append('surveyId', surveyId || '');
+        formData.append('mediaType', file.type.startsWith('video/') ? 'video' : 'image');
+        formData.append('fieldKey', field.key);
+        formData.append('token', token);
+        formData.append('position', value.length.toString());
+        formData.append('isMain', 'false');
 
-      newFiles.push(fileWithPreview);
+        const { data: uploadData, error: uploadError } = await supabase.functions.invoke('survey-upload', {
+          body: formData
+        });
+
+        if (uploadError) throw uploadError;
+
+        if (!uploadData.success) {
+          throw new Error(uploadData.error || 'Upload failed');
+        }
+
+        const uploadedFile = {
+          id: uploadData.data.id,
+          name: uploadData.data.file_name,
+          size: uploadData.data.file_size,
+          type: uploadData.data.media_type,
+          url: uploadData.data.signed_url,
+          storage_path: uploadData.data.storage_path,
+          storage_bucket: uploadData.data.storage_bucket,
+        };
+
+        newFiles.push(uploadedFile);
+      } catch (error) {
+        console.error('Upload error:', error);
+        toast({
+          title: `Failed to upload ${file.name}`,
+          description: error instanceof Error ? error.message : 'Upload failed',
+          variant: 'destructive'
+        });
+      }
     }
 
-    onChange([...value, ...newFiles]);
+    if (newFiles.length > 0) {
+      onChange([...value, ...newFiles]);
+    }
     setUploading(false);
-  }, [value, maxFiles, maxFileSize, onChange, toast]);
+  }, [value, maxFiles, maxFileSize, onChange, toast, orderId, surveyId, token, field.key]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -74,11 +119,36 @@ export function MediaUploadField({ field, value = [], onChange }: MediaUploadFie
     disabled: uploading || value.length >= maxFiles,
   });
 
-  const removeFile = (fileId: string) => {
+  const removeFile = async (fileId: string) => {
     const fileToRemove = value.find(f => f.id === fileId);
-    if (fileToRemove?.url) {
+    
+    // If it's an uploaded file with a database ID, delete from database
+    if (fileToRemove?.id && typeof fileToRemove.id === 'string' && fileToRemove.id.length > 10) {
+      try {
+        const { error } = await supabase
+          .from('client_survey_media')
+          .delete()
+          .eq('id', fileToRemove.id);
+        
+        if (error) {
+          console.error('Error deleting file from database:', error);
+          toast({
+            title: 'Error',
+            description: 'Failed to delete file',
+            variant: 'destructive'
+          });
+          return;
+        }
+      } catch (error) {
+        console.error('Error deleting file:', error);
+      }
+    }
+    
+    // If it's a blob URL, revoke it
+    if (fileToRemove?.url && fileToRemove.url.startsWith('blob:')) {
       URL.revokeObjectURL(fileToRemove.url);
     }
+    
     onChange(value.filter(f => f.id !== fileId));
   };
 

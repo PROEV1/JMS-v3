@@ -15,9 +15,12 @@ interface DynamicSurveyFieldProps {
   value: any;
   onChange: (value: any) => void;
   formData: Record<string, any>;
+  orderId?: string;
+  surveyId?: string;
+  token?: string;
 }
 
-export function DynamicSurveyField({ field, value, onChange, formData }: DynamicSurveyFieldProps) {
+export function DynamicSurveyField({ field, value, onChange, formData, orderId, surveyId, token }: DynamicSurveyFieldProps) {
   const { settings } = field;
 
   // Check logic rules
@@ -204,6 +207,9 @@ export function DynamicSurveyField({ field, value, onChange, formData }: Dynamic
             field={field}
             value={value}
             onChange={onChange}
+            orderId={orderId}
+            surveyId={surveyId}
+            token={token}
           />
         );
 

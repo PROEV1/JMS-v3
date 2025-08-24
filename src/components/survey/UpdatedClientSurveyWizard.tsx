@@ -21,6 +21,7 @@ export function ClientSurveyWizard({ orderId, clientId, partnerId, partnerBrand 
   const { data: activeForm, isLoading } = useActiveSurveyForm(contextType);
   const [existingSurvey, setExistingSurvey] = useState<any>(null);
   const [surveyId, setSurveyId] = useState<string | null>(null);
+  const [surveyToken, setSurveyToken] = useState<string | null>(null);
 
   useEffect(() => {
     loadExistingSurvey();
@@ -28,6 +29,16 @@ export function ClientSurveyWizard({ orderId, clientId, partnerId, partnerBrand 
 
   const loadExistingSurvey = async () => {
     try {
+      // Get order and survey data
+      const { data: orderData, error: orderError } = await supabase
+        .from('orders')
+        .select('survey_token')
+        .eq('id', orderId)
+        .single();
+
+      if (orderError) throw orderError;
+      setSurveyToken(orderData.survey_token);
+
       const { data, error } = await supabase
         .from('client_surveys')
         .select(`
@@ -40,7 +51,10 @@ export function ClientSurveyWizard({ orderId, clientId, partnerId, partnerBrand 
             field_key,
             file_url,
             file_name,
-            media_type
+            media_type,
+            file_size,
+            storage_path,
+            storage_bucket
           )
         `)
         .eq('order_id', orderId)
@@ -91,35 +105,9 @@ export function ClientSurveyWizard({ orderId, clientId, partnerId, partnerBrand 
         if (updateError) throw updateError;
       }
 
-      // Save media files
-      for (const [fieldKey, files] of Object.entries(media)) {
-        if (files && files.length > 0) {
-          // Delete existing media for this field
-          await supabase
-            .from('client_survey_media')
-            .delete()
-            .eq('survey_id', currentSurveyId)
-            .eq('field_key', fieldKey);
-
-          // Insert new media
-          const mediaRecords = files.map((file, index) => ({
-            survey_id: currentSurveyId,
-            order_id: orderId,
-            field_key: fieldKey,
-            file_url: file.url,
-            file_name: file.name,
-            media_type: file.type || 'image',
-            position: index,
-            file_size: file.size
-          }));
-
-          const { error: mediaError } = await supabase
-            .from('client_survey_media')
-            .insert(mediaRecords);
-
-          if (mediaError) throw mediaError;
-        }
-      }
+      // Note: Media files are now uploaded directly via MediaUploadField
+      // No need to handle blob URLs or temporary media here anymore
+      // The media is already saved to the database when uploaded
 
       toast({
         title: "Draft saved",
@@ -201,6 +189,8 @@ export function ClientSurveyWizard({ orderId, clientId, partnerId, partnerBrand 
     <DynamicSurveyWizard
       schema={activeForm.schema as unknown as SurveyFormSchema}
       orderId={orderId}
+      surveyId={surveyId}
+      token={surveyToken}
       partnerBrand={partnerBrand}
       existingResponses={existingSurvey?.responses || {}}
       existingMedia={existingSurvey?.client_survey_media || []}

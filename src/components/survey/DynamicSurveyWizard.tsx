@@ -13,6 +13,8 @@ import { useToast } from '@/hooks/use-toast';
 interface DynamicSurveyWizardProps {
   schema: SurveyFormSchema;
   orderId: string;
+  surveyId?: string;
+  token?: string;
   partnerBrand?: {
     name: string;
     logo_url?: string;
@@ -26,6 +28,8 @@ interface DynamicSurveyWizardProps {
 export function DynamicSurveyWizard({
   schema,
   orderId,
+  surveyId,
+  token,
   partnerBrand,
   existingResponses,
   existingMedia,
@@ -44,9 +48,13 @@ export function DynamicSurveyWizard({
           mediaByField[media.field_key] = [];
         }
         mediaByField[media.field_key].push({
+          id: media.id,
           url: media.file_url,
           name: media.file_name,
-          type: media.media_type
+          type: media.media_type,
+          size: media.file_size,
+          storage_path: media.storage_path,
+          storage_bucket: media.storage_bucket
         });
       }
     });
@@ -170,7 +178,7 @@ export function DynamicSurveyWizard({
                     key={field.key}
                     field={field}
                     value={field.type === 'photo' || field.type === 'video' || field.type === 'file' 
-                      ? mediaData[field.key] 
+                      ? mediaData[field.key] || []
                       : formData[field.key]
                     }
                     onChange={field.type === 'photo' || field.type === 'video' || field.type === 'file'
@@ -178,6 +186,9 @@ export function DynamicSurveyWizard({
                       : (value) => handleFieldChange(field.key, value)
                     }
                     formData={formData}
+                    orderId={orderId}
+                    surveyId={surveyId}
+                    token={token}
                   />
                 ))}
               </div>
