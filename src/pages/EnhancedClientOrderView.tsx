@@ -24,6 +24,8 @@ export default function EnhancedClientOrderView() {
       if (!orderId) throw new Error('Order ID is required');
       
       console.log('Fetching client order with ID:', orderId);
+      console.log('Attempting to fetch order:', orderId);
+      
       const { data, error } = await supabase
         .from('orders')
         .select(`
@@ -42,27 +44,10 @@ export default function EnhancedClientOrderView() {
             total_cost,
             created_at
           ),
-          order_payments(
-            id,
-            amount,
-            status,
-            payment_type,
-            payment_method,
-            paid_at,
-            created_at
-          ),
           engineers(
             id,
             name,
             email
-          ),
-          engineer_uploads(
-            id,
-            file_name,
-            file_url,
-            upload_type,
-            description,
-            uploaded_at
           ),
           partners(
             name, 
@@ -74,29 +59,39 @@ export default function EnhancedClientOrderView() {
          .eq('id', orderId)
          .maybeSingle();
 
-       if (error) {
-         console.error('Database error:', error);
-         console.error('Error details:', JSON.stringify(error, null, 2));
-         throw new Error(`Failed to fetch order: ${error.message}`);
-       }
-       
-       if (!data) {
-         console.error('No order found for ID:', orderId);
-         throw new Error('Order not found');
-       }
-       
-       console.log('Order data received:', data);
-       
-       // Transform the data to match our interface, handling nullable relationships and ensuring arrays
-       return {
-         ...data,
-         client: data.clients || null,
-         quote: data.quotes || null,
-         engineer: data.engineers || null,
-         partner: data.partners || null,
-         order_payments: Array.isArray(data.order_payments) ? data.order_payments : [],
-         engineer_uploads: Array.isArray(data.engineer_uploads) ? data.engineer_uploads : []
-       };
+      if (error) {
+        console.error('Database error:', error);
+        throw new Error(`Failed to fetch order: ${error.message}`);
+      }
+
+      if (!data) {
+        console.error('No order found for ID:', orderId);
+        throw new Error('Order not found');
+      }
+
+      console.log('Order data received:', data);
+      
+      // Fetch related data separately to avoid foreign key issues
+      const [paymentsRes, uploadsRes] = await Promise.all([
+        supabase
+          .from('order_payments')
+          .select('*')
+          .eq('order_id', orderId),
+        supabase
+          .from('engineer_uploads')
+          .select('*')
+          .eq('order_id', orderId)
+      ]);
+
+      return {
+        ...data,
+        client: data.clients || null,
+        quote: data.quotes || null,
+        engineer: data.engineers || null,
+        partner: data.partners || null,
+        order_payments: paymentsRes.data || [],
+        engineer_uploads: uploadsRes.data || []
+      };
     },
     enabled: !!orderId,
   });
