@@ -376,7 +376,7 @@ export default function EnhancedClientOrderView() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Side - Progress Steps */}
         <div className="lg:col-span-1">
           <Card>
@@ -391,24 +391,24 @@ export default function EnhancedClientOrderView() {
                 const IconComponent = step.icon;
                 return (
                   <div key={step.number} className={`flex items-center gap-4 p-3 rounded-lg ${
-                    step.active ? 'bg-blue-50 border border-blue-200' : 
+                    step.active ? 'bg-red-50 border border-red-200' : 
                     step.completed ? 'bg-green-50 border border-green-200' : 
                     'bg-gray-50'
                   }`}>
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-sm font-medium ${
                       step.completed ? 'bg-green-500 text-white' :
-                      step.active ? 'bg-blue-500 text-white' :
+                      step.active ? 'bg-red-500 text-white' :
                       'bg-gray-300 text-gray-600'
                     }`}>
                       {step.completed ? (
-                        <CheckCircle className="w-4 h-4" />
+                        <CheckCircle className="w-3 h-3" />
                       ) : (
                         step.number
                       )}
                     </div>
                     <div className="flex-1">
                       <p className={`font-medium ${
-                        step.active ? 'text-blue-700' : 
+                        step.active ? 'text-red-700' : 
                         step.completed ? 'text-green-700' : 
                         'text-gray-600'
                       }`}>
@@ -424,15 +424,15 @@ export default function EnhancedClientOrderView() {
         </div>
 
         {/* Right Side - Current Step Content */}
-        <div className="lg:col-span-3 space-y-6">
+        <div className="lg:col-span-2 space-y-6">
           {/* Current Step Card */}
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle className="text-blue-600">
+                <CardTitle className="text-red-600">
                   Step {currentStep.step} of {progressSteps.length} - {currentStep.title}
                 </CardTitle>
-                <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                <Badge variant="secondary" className="bg-red-100 text-red-800">
                   Active
                 </Badge>
               </div>
