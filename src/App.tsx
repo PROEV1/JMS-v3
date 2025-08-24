@@ -103,6 +103,7 @@ function App() {
                     <Route path="/admin/quotes/:id/edit" element={<AdminQuoteEdit />} />
                     <Route path="/admin/quotes/:id" element={<AdminQuoteDetail />} />
                     <Route path="/admin/orders" element={<AdminOrders />} />
+                    <Route path="/admin/orders/:id" element={<OrderDetail />} />
                     <Route path="/admin/products" element={<AdminProducts />} />
                     <Route path="/admin/messages" element={<AdminMessages />} />
                     <Route path="/admin/settings" element={<AdminSettings />} />

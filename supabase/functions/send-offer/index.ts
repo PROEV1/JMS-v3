@@ -92,7 +92,7 @@ serve(async (req: Request) => {
         quote:quotes(*)
       `)
       .eq('id', order_id)
-      .single();
+      .maybeSingle();
 
     if (orderError) {
       console.error('Order query error:', orderError);
