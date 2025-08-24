@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { toast } from 'sonner';
+import { showErrorToast, showSuccessToast } from '@/utils/apiErrorHandler';
 import { Send, MessageCircle } from 'lucide-react';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
@@ -79,7 +79,7 @@ export const WhatsAppChat: React.FC<WhatsAppChatProps> = ({
 
       if (error) {
         console.error('Error loading messages:', error);
-        toast.error('Failed to load messages');
+        showErrorToast('Failed to load messages');
         setMessages([]);
       } else {
         console.log('Messages loaded:', data);
@@ -141,13 +141,13 @@ export const WhatsAppChat: React.FC<WhatsAppChatProps> = ({
 
       console.log('Message sent successfully:', data);
       setNewMessage('');
-      toast.success('Message sent');
+      showSuccessToast('Message sent');
       
       // Reload messages to show the new one
       await loadMessages();
     } catch (error) {
       console.error('Error sending message:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to send message');
+      showErrorToast(error instanceof Error ? error.message : 'Failed to send message');
     } finally {
       setSending(false);
     }

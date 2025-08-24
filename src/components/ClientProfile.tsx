@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { toast } from 'sonner';
+import { showErrorToast, showSuccessToast } from '@/utils/apiErrorHandler';
 import { normalizePostcode } from '@/utils/postcodeUtils';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -85,7 +85,7 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({
 
       if (error) {
         console.error('Error fetching client:', error);
-        toast.error('Failed to load client');
+        showErrorToast('Failed to load client');
       } else {
         // Ensure all required fields are present with defaults
         const clientData = {
@@ -97,7 +97,7 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({
       }
     } catch (error) {
       console.error('Error loading client:', error);
-      toast.error('Failed to load client');
+      showErrorToast('Failed to load client');
     } finally {
       setLoading(false);
     }
@@ -114,13 +114,13 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({
 
       if (error) {
         console.error('Error fetching quotes:', error);
-        toast.error('Failed to load quotes');
+        showErrorToast('Failed to load quotes');
       } else {
         setQuotes(data || []);
       }
     } catch (error) {
       console.error('Error loading quotes:', error);
-      toast.error('Failed to load quotes');
+      showErrorToast('Failed to load quotes');
     } finally {
       setQuotesLoading(false);
     }
@@ -137,13 +137,13 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({
 
       if (error) {
         console.error('Error fetching orders:', error);
-        toast.error('Failed to load orders');
+        showErrorToast('Failed to load orders');
       } else {
         setOrders(data || []);
       }
     } catch (error) {
       console.error('Error loading orders:', error);
-      toast.error('Failed to load orders');
+      showErrorToast('Failed to load orders');
     } finally {
       setOrdersLoading(false);
     }
@@ -168,15 +168,15 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({
 
       if (error) {
         console.error('Error updating client:', error);
-        toast.error('Failed to update client');
+        showErrorToast('Failed to update client');
       } else {
-        toast.success('Client updated successfully');
+        showSuccessToast('Client updated successfully');
         setIsEditing(false);
         loadClient();
       }
     } catch (error) {
       console.error('Error updating client:', error);
-      toast.error('Failed to update client');
+      showErrorToast('Failed to update client');
     } finally {
       setSaving(false);
     }

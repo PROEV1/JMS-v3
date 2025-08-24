@@ -9,7 +9,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Loader2, Trash2, AlertTriangle, BarChart3, HelpCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { showErrorToast, showSuccessToast } from '@/utils/apiErrorHandler';
 
 interface DeletePartnerJobsModalProps {
   isOpen: boolean;
@@ -85,21 +85,21 @@ export function DeletePartnerJobsModal({ isOpen, onClose, partnerId, partnerName
           parsedData = JSON.parse(data);
         } catch (e) {
           console.error("Failed to parse dry run response:", e);
-          toast.error("Invalid response format from server");
+          showErrorToast("Invalid response format from server");
           return;
         }
       }
       
       if (parsedData?.stats) {
         setPreviewStats(parsedData.stats);
-        toast.success("Preview generated successfully");
+        showSuccessToast("Preview generated successfully");
       } else {
         console.error("Invalid dry run response format:", parsedData);
-        toast.error("Invalid response format - missing stats");
+        showErrorToast("Invalid response format - missing stats");
       }
     },
     onError: (error: any) => {
-      toast.error("Failed to generate preview: " + error.message);
+      showErrorToast("Failed to generate preview: " + error.message);
     }
   });
 
@@ -127,24 +127,24 @@ export function DeletePartnerJobsModal({ isOpen, onClose, partnerId, partnerName
           parsedData = JSON.parse(data);
         } catch (e) {
           console.error("Failed to parse delete response:", e);
-          toast.error("Invalid response format from server");
+          showErrorToast("Invalid response format from server");
           return;
         }
       }
       
       if (parsedData?.stats) {
-        toast.success(`Successfully deleted ${parsedData.stats.orders} orders and related records`);
+        showSuccessToast(`Successfully deleted ${parsedData.stats.orders} orders and related records`);
         queryClient.invalidateQueries({ queryKey: ["partner-import-runs"] });
         onClose();
         setPreviewStats(null);
         setConfirmationText("");
       } else {
         console.error("Invalid delete response format:", parsedData);
-        toast.error("Invalid response format - missing stats");
+        showErrorToast("Invalid response format - missing stats");
       }
     },
     onError: (error: any) => {
-      toast.error("Failed to delete jobs: " + error.message);
+      showErrorToast("Failed to delete jobs: " + error.message);
     }
   });
 
@@ -155,7 +155,7 @@ export function DeletePartnerJobsModal({ isOpen, onClose, partnerId, partnerName
 
   const handleDelete = () => {
     if (confirmationText.toUpperCase() !== "DELETE") {
-      toast.error("Please type DELETE to confirm (case-insensitive)");
+      showErrorToast("Please type DELETE to confirm (case-insensitive)");
       return;
     }
     deleteMutation.mutate();

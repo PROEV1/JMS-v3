@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { toast } from 'sonner';
+import { showErrorToast, showSuccessToast } from '@/utils/apiErrorHandler';
 
 const resetPasswordSchema = z.object({
   password: z.string().min(6, 'Password must be at least 6 characters'),
@@ -38,7 +38,7 @@ const ResetPassword = () => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        toast.error('Invalid or expired reset link');
+        showErrorToast('Invalid or expired reset link');
         navigate('/auth');
       }
     };
@@ -56,11 +56,11 @@ const ResetPassword = () => {
 
       if (error) throw error;
 
-      toast.success('Password updated successfully');
+      showSuccessToast('Password updated successfully');
       navigate('/dashboard');
     } catch (error: any) {
       console.error('Password reset error:', error);
-      toast.error(error.message || 'Failed to update password');
+      showErrorToast(error.message || 'Failed to update password');
     } finally {
       setIsLoading(false);
     }

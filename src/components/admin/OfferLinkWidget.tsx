@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Copy, ExternalLink, Clock, CheckCircle, XCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
+import { showErrorToast, showSuccessToast } from '@/utils/apiErrorHandler';
 
 interface OfferLinkWidgetProps {
   orderId: string;
@@ -62,7 +62,7 @@ export function OfferLinkWidget({ orderId }: OfferLinkWidgetProps) {
     if (activeOffer) {
       const offerUrl = `${window.location.origin}/offers/${activeOffer.client_token}`;
       navigator.clipboard.writeText(offerUrl);
-      toast.success('Offer URL copied to clipboard');
+      showSuccessToast('Offer URL copied to clipboard');
     }
   };
 
