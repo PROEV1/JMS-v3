@@ -41,14 +41,19 @@ export function OrderProgressTimeline({ order }: OrderProgressTimelineProps) {
     const installScheduled = !!order.scheduled_install_date && !!order.engineer;
     const workInProgress = order.status_enhanced === 'in_progress';
     const completed = order.status === 'completed' || order.status_enhanced === 'install_completed_pending_qa';
+    
+    // Survey-related states
+    const surveySubmitted = ['awaiting_survey_review', 'survey_approved', 'survey_rework_requested'].includes(order.status_enhanced);
+    const surveyApproved = order.status_enhanced === 'survey_approved';
+    const surveyRework = order.status_enhanced === 'survey_rework_requested';
 
-    return [
+    const stages = [
       {
         id: 'payment',
         label: 'Payment',
         icon: CreditCard,
         completed: paymentCompleted,
-        active: !paymentCompleted,
+        active: !paymentCompleted && !surveySubmitted,
         timestamp: order.order_payments.find(p => p.status === 'paid')?.paid_at
       },
       {
@@ -56,15 +61,30 @@ export function OrderProgressTimeline({ order }: OrderProgressTimelineProps) {
         label: 'Agreement',
         icon: FileText,
         completed: agreementSigned,
-        active: paymentCompleted && !agreementSigned,
+        active: paymentCompleted && !agreementSigned && !surveySubmitted,
         timestamp: order.agreement_signed_at
-      },
+      }
+    ];
+
+    // Add survey step if survey is required
+    if (order.status_enhanced.includes('survey') || surveySubmitted) {
+      stages.push({
+        id: 'survey',
+        label: surveyRework ? 'Survey Rework' : 'Survey Review',
+        icon: FileText,
+        completed: surveyApproved,
+        active: surveySubmitted && !surveyApproved,
+        timestamp: null // Could add survey submitted/approved timestamp
+      });
+    }
+
+    stages.push(
       {
         id: 'scheduled',
         label: 'Scheduled',
         icon: Calendar,
         completed: installScheduled,
-        active: paymentCompleted && agreementSigned && !installScheduled,
+        active: paymentCompleted && agreementSigned && surveyApproved && !installScheduled,
         timestamp: order.scheduled_install_date
       },
       {
@@ -83,7 +103,9 @@ export function OrderProgressTimeline({ order }: OrderProgressTimelineProps) {
         active: workInProgress && !completed,
         timestamp: null // Would need completion time
       }
-    ];
+    );
+
+    return stages;
   };
 
   const stages = getStages();

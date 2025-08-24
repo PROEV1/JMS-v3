@@ -32,29 +32,29 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { data: order, error } = await supabase
-      .from('orders')
-      .select(`
+  const { data: order, error } = await supabase
+    .from('orders')
+    .select(`
+      id,
+      order_number,
+      client_id,
+      partner_id,
+      is_partner_job,
+      survey_required,
+      survey_token_expires_at,
+      clients!inner (
         id,
-        order_number,
-        client_id,
-        partner_id,
-        is_partner_job,
-        survey_required,
-        survey_token_expires_at,
-        clients!inner (
-          id,
-          full_name,
-          email
-        ),
-        partners (
-          id,
-          name,
-          logo_url
-        )
-      `)
-      .eq('survey_token', token)
-      .single();
+        full_name,
+        email
+      ),
+      partners (
+        id,
+        name,
+        logo_url
+      )
+    `)
+    .eq('survey_token', token)
+    .maybeSingle();
 
     if (error || !order) {
       console.error('Order lookup failed:', error);
