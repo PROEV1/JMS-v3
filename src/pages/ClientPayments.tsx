@@ -56,13 +56,19 @@ export default function ClientPayments() {
         .from('order_payments')
         .select(`
           *,
-          order:orders!inner(order_number, client_id)
+          orders!order_payments_order_id_fkey(order_number, client_id)
         `)
-        .eq('order.client_id', client.id)
+        .eq('orders.client_id', client.id)
         .order('created_at', { ascending: false });
 
       if (paymentsError) throw paymentsError;
-      setPayments(paymentsData || []);
+      
+      const payments = paymentsData?.map(payment => ({
+        ...payment,
+        order: payment.orders || { order_number: 'Unknown' }
+      })) || [];
+      
+      setPayments(payments);
     } catch (error) {
       console.error('Error fetching payments:', error);
       toast({
