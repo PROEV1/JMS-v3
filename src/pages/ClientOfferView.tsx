@@ -38,6 +38,7 @@ interface OfferDetails {
 export default function ClientOfferView() {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [offer, setOffer] = useState<OfferDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [responding, setResponding] = useState(false);
@@ -93,7 +94,10 @@ export default function ClientOfferView() {
         throw new Error(data?.error || 'Failed to accept offer');
       }
 
-      toast.success('Offer accepted successfully!');
+      toast({
+        title: "Success",
+        description: 'Offer accepted successfully!',
+      });
       
       // Update the offer state to show success
       if (offer) {
@@ -105,7 +109,11 @@ export default function ClientOfferView() {
       }
 
     } catch (err: any) {
-      toast.error(err.message || 'Failed to accept offer');
+      toast({
+        title: "Error",
+        description: err.message || 'Failed to accept offer',
+        variant: "destructive",
+      });
       console.error('Error accepting offer:', err);
     } finally {
       setResponding(false);
@@ -114,18 +122,30 @@ export default function ClientOfferView() {
 
   const handleReject = async () => {
     if (!token || !rejectionReason.trim()) {
-      toast.error('Please provide a reason for rejection');
+      toast({
+        title: "Error",
+        description: 'Please provide a reason for rejection',
+        variant: "destructive",
+      });
       return;
     }
 
     // Validate date range if blocking a range
     if (blockDateRange && (!blockStartDate || !blockEndDate)) {
-      toast.error('Please provide both start and end dates for the date range');
+      toast({
+        title: "Error",
+        description: 'Please provide both start and end dates for the date range',
+        variant: "destructive",
+      });
       return;
     }
 
     if (blockDateRange && blockStartDate && blockEndDate && new Date(blockStartDate) > new Date(blockEndDate)) {
-      toast.error('Start date cannot be after end date');
+      toast({
+        title: "Error",
+        description: 'Start date cannot be after end date',
+        variant: "destructive",
+      });
       return;
     }
     
@@ -153,7 +173,10 @@ export default function ClientOfferView() {
         throw new Error(data?.error || 'Failed to reject offer');
       }
 
-      toast.success('Offer rejected');
+      toast({
+        title: "Success",
+        description: 'Offer rejected',
+      });
       
       // Update the offer state to show rejection
       if (offer) {
@@ -165,7 +188,11 @@ export default function ClientOfferView() {
       }
 
     } catch (err: any) {
-      toast.error(err.message || 'Failed to reject offer');
+      toast({
+        title: "Error",
+        description: err.message || 'Failed to reject offer',
+        variant: "destructive",
+      });
       console.error('Error rejecting offer:', err);
     } finally {
       setResponding(false);

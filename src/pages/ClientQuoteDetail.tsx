@@ -35,6 +35,7 @@ export default function ClientQuoteDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { toast } = useToast();
   const [quote, setQuote] = useState<Quote | null>(null);
   const [quoteItems, setQuoteItems] = useState<QuoteItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,7 +59,11 @@ export default function ClientQuoteDetail() {
         .single();
 
       if (clientError || !clientData) {
-        toast.error('Failed to load client data');
+        toast({
+          title: "Error",
+          description: 'Failed to load client data',
+          variant: "destructive",
+        });
         navigate('/client');
         return;
       }
@@ -72,7 +77,11 @@ export default function ClientQuoteDetail() {
         .single();
 
       if (quoteError || !quoteData) {
-        toast.error('Quote not found');
+        toast({
+          title: "Error",
+          description: 'Quote not found',
+          variant: "destructive",
+        });
         navigate('/client/quotes');
         return;
       }
@@ -85,7 +94,11 @@ export default function ClientQuoteDetail() {
 
       if (itemsError) {
         console.error('Error loading quote items:', itemsError);
-        toast.error('Failed to load quote items');
+        toast({
+          title: "Error",
+          description: 'Failed to load quote items',
+          variant: "destructive",
+        });
         return;
       }
 
@@ -93,7 +106,11 @@ export default function ClientQuoteDetail() {
       setQuoteItems(itemsData || []);
     } catch (error) {
       console.error('Error in fetchQuoteDetails:', error);
-      toast.error('Failed to load quote details');
+      toast({
+        title: "Error",
+        description: 'Failed to load quote details',
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
@@ -111,7 +128,11 @@ export default function ClientQuoteDetail() {
       
       if (!session) {
         console.log('No session found, redirecting to auth');
-        toast.error('Please log in to accept quotes');
+        toast({
+          title: "Authentication Required",
+          description: 'Please log in to accept quotes',
+          variant: "destructive",
+        });
         navigate('/auth');
         return;
       }
@@ -126,7 +147,10 @@ export default function ClientQuoteDetail() {
 
       if (error) throw error;
 
-      toast.success('Quote accepted! Creating your order...');
+      toast({
+        title: "Success",
+        description: 'Quote accepted! Creating your order...',
+      });
       
       // Add a small delay to ensure database consistency before redirect
       setTimeout(() => {
@@ -134,7 +158,11 @@ export default function ClientQuoteDetail() {
       }, 1500);
     } catch (error) {
       console.error('Error accepting quote:', error);
-      toast.error('Failed to accept quote. Please try logging in again.');
+      toast({
+        title: "Error",
+        description: 'Failed to accept quote. Please try logging in again.',
+        variant: "destructive",
+      });
       setAccepting(false);
     }
   };
@@ -151,11 +179,18 @@ export default function ClientQuoteDetail() {
 
       if (error) throw error;
 
-      toast.success('Quote rejected');
+      toast({
+        title: "Success",
+        description: 'Quote rejected',
+      });
       setQuote({ ...quote, status: 'rejected' });
     } catch (error) {
       console.error('Error rejecting quote:', error);
-      toast.error('Failed to reject quote');
+      toast({
+        title: "Error",
+        description: 'Failed to reject quote',
+        variant: "destructive",
+      });
     } finally {
       setRejecting(false);
     }

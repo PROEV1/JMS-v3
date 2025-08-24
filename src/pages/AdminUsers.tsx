@@ -38,7 +38,11 @@ export default function AdminUsers() {
 
   useEffect(() => {
     if (!permissionsLoading && !canManageUsers) {
-      toast.error('You do not have permission to access user management');
+      toast({
+        title: "Permission Error",
+        description: 'You do not have permission to access user management',
+        variant: "destructive",
+      });
       navigate('/admin');
       return;
     }
@@ -60,7 +64,11 @@ export default function AdminUsers() {
       setUsers(data || []);
     } catch (error) {
       console.error('Error fetching users:', error);
-      toast.error('Failed to fetch users');
+      toast({
+        title: "Error",
+        description: 'Failed to fetch users',
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
@@ -84,17 +92,28 @@ export default function AdminUsers() {
         p_details: { old_status: currentStatus, new_status: newStatus }
       });
 
-      toast.success(`User ${newStatus === 'active' ? 'activated' : 'deactivated'} successfully`);
+      toast({
+        title: "Success",
+        description: `User ${newStatus === 'active' ? 'activated' : 'deactivated'} successfully`,
+      });
       fetchUsers();
     } catch (error) {
       console.error('Error updating user status:', error);
-      toast.error('Failed to update user status');
+      toast({
+        title: "Error",
+        description: 'Failed to update user status',
+        variant: "destructive",
+      });
     }
   };
 
   const handleDeleteUser = async (userId: string, userName: string, userRole: string) => {
     if (!canDeleteUsers) {
-      toast.error('You do not have permission to delete users');
+      toast({
+        title: "Permission Error",
+        description: 'You do not have permission to delete users',
+        variant: "destructive",
+      });
       return;
     }
 
@@ -120,14 +139,21 @@ export default function AdminUsers() {
       if (error) throw error;
 
       if (data?.success) {
-        toast.success(`User ${data.deletedUser?.full_name || data.deletedUser?.email} deleted successfully`);
+        toast({
+          title: "Success",
+          description: `User ${data.deletedUser?.full_name || data.deletedUser?.email} deleted successfully`,
+        });
         fetchUsers();
       } else {
         throw new Error(data?.error || 'Failed to delete user');
       }
     } catch (error: any) {
       console.error('Error deleting user:', error);
-      toast.error(error.message || 'Failed to delete user');
+      toast({
+        title: "Error",
+        description: error.message || 'Failed to delete user',
+        variant: "destructive",
+      });
     }
   };
 

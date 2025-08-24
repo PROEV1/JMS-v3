@@ -46,7 +46,11 @@ export default function AdminUserDetail() {
 
   useEffect(() => {
     if (!permissionsLoading && !canManageUsers) {
-      toast.error('You do not have permission to access user management');
+      toast({
+        title: "Permission Error",
+        description: 'You do not have permission to access user management',
+        variant: "destructive",
+      });
       navigate('/admin/users');
       return;
     }
@@ -77,7 +81,11 @@ export default function AdminUserDetail() {
       });
     } catch (error) {
       console.error('Error fetching user:', error);
-      toast.error('Failed to fetch user details');
+      toast({
+        title: "Error",
+        description: 'Failed to fetch user details',
+        variant: "destructive",
+      });
       navigate('/admin/users');
     } finally {
       setLoading(false);
@@ -111,11 +119,18 @@ export default function AdminUserDetail() {
         }
       });
 
-      toast.success('User updated successfully');
+      toast({
+        title: "Success",
+        description: 'User updated successfully',
+      });
       fetchUser(); // Refresh user data
     } catch (error) {
       console.error('Error updating user:', error);
-      toast.error('Failed to update user');
+      toast({
+        title: "Error",
+        description: 'Failed to update user',
+        variant: "destructive",
+      });
     } finally {
       setSaving(false);
     }
@@ -126,10 +141,17 @@ export default function AdminUserDetail() {
 
     try {
       // This would call an edge function to resend the invite
-      toast.success('Invite email sent');
+      toast({
+        title: "Success",
+        description: 'Invite email sent',
+      });
     } catch (error) {
       console.error('Error resending invite:', error);
-      toast.error('Failed to resend invite');
+      toast({
+        title: "Error",
+        description: 'Failed to resend invite',
+        variant: "destructive",
+      });
     }
   };
 
