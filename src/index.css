@@ -46,25 +46,22 @@ All colors MUST be HSL.
     --light-grey: 0 0% 98%; /* #FAFAFA */
     --link-blue: 211 100% 35%;
     
-    /* Modern Status Colors with backgrounds */
-    --status-pending: 45 98% 72%; /* #FBC02D text */
-    --status-pending-bg: 45 100% 95%; /* #FFF8E1 background */
+    /* Modern Status Colors with backgrounds - Brand aligned */
+    --status-pending: 36 100% 49%; /* #FB8C00 orange text */
+    --status-pending-bg: 36 100% 94%; /* #FFF3E0 light orange background */
     --status-sent: 36 100% 49%; /* #FB8C00 text */
     --status-sent-bg: 36 100% 94%; /* #FFF3E0 background */
-    --status-accepted: 122 39% 49%; /* #43A047 text */
-    --status-accepted-bg: 122 39% 92%; /* #E8F5E9 background */
+    --status-accepted: 4 100% 44%; /* Brand teal text */
+    --status-accepted-bg: 4 100% 95%; /* Light brand teal background */
     --status-rejected: 354 70% 54%;
 
-    /* Legacy brand colors for backward compatibility */
+    /* Brand colors - official palette only */
     --brand-teal: 4 100% 44%;
     --brand-teal-light: 4 100% 50%;
     --brand-teal-dark: 4 100% 38%;
     --brand-pink: 4 100% 44%;
     --brand-pink-light: 4 100% 50%;
     --brand-pink-dark: 4 100% 38%;
-    --brand-green: 134 61% 41%;
-    --brand-green-light: 134 61% 51%;
-    --brand-green-dark: 134 61% 31%;
     --brand-cream: 210 25% 97%;
     --brand-cream-light: 210 25% 99%;
     --brand-cream-dark: 210 25% 94%;
@@ -74,7 +71,6 @@ All colors MUST be HSL.
 
     /* Accent colors */
     --accent-pink: 4 100% 44%;
-    --accent-green: 134 61% 41%;
     --accent-cream: 210 25% 97%;
 
     /* Sidebar variables - Modern SaaS style */
@@ -174,10 +170,6 @@ All colors MUST be HSL.
     background: linear-gradient(135deg, hsl(var(--brand-pink-light)), hsl(var(--brand-pink)));
   }
 
-  .brand-gradient-green {
-    background: linear-gradient(135deg, hsl(var(--brand-green-light)), hsl(var(--brand-green)));
-  }
-
   .brand-gradient-subtle {
     background: linear-gradient(135deg, hsl(var(--background)), hsl(var(--muted)));
   }
@@ -270,10 +262,6 @@ All colors MUST be HSL.
     @apply bg-brand-pink-light/20;
   }
   
-  .icon-bg-green {
-    @apply bg-brand-green-light/20;
-  }
-  
   .icon-bg-cream {
     @apply bg-brand-cream/50;
   }
@@ -310,20 +298,16 @@ All colors MUST be HSL.
   }
   
   .btn-brand-secondary {
-    @apply bg-brand-green hover:bg-brand-green-dark text-white;
+    @apply bg-brand-pink hover:bg-brand-pink-dark text-white;
   }
   
   .btn-brand-accent {
-    @apply bg-brand-pink hover:bg-brand-pink-dark text-white;
+    @apply bg-brand-blue hover:bg-brand-blue-dark text-white;
   }
 
   /* Brand Badge Styles */
   .badge-teal {
     @apply bg-brand-teal text-white;
-  }
-  
-  .badge-green {
-    @apply bg-brand-green text-white;
   }
   
   .badge-pink {
@@ -332,6 +316,10 @@ All colors MUST be HSL.
   
   .badge-cream {
     @apply bg-brand-cream text-primary;
+  }
+  
+  .badge-blue {
+    @apply bg-brand-blue text-white;
   }
 
   /* Brand Container Styles */

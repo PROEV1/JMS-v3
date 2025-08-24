@@ -5,7 +5,7 @@ import { getBadgeVariant, getStatusColor } from '@/lib/brandUtils';
 
 interface BrandBadgeProps {
   children: React.ReactNode;
-  variant?: 'teal' | 'green' | 'pink' | 'cream';
+  variant?: 'teal' | 'pink' | 'cream' | 'blue';
   status?: 'sent' | 'accepted' | 'declined' | 'pending' | 'expired' | 'complete' | 'active';
   className?: string;
 }

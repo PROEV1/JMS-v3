@@ -49,7 +49,7 @@ export default {
 					foreground: 'hsl(var(--accent-foreground))'
 				},
 				'accent-pink': 'hsl(var(--accent-pink))',
-				'accent-green': 'hsl(var(--accent-green))',
+				
 				'accent-cream': 'hsl(var(--accent-cream))',
 				// Brand colors
 				'brand-teal': {
@@ -61,11 +61,6 @@ export default {
 					DEFAULT: 'hsl(var(--brand-pink))',
 					light: 'hsl(var(--brand-pink-light))',
 					dark: 'hsl(var(--brand-pink-dark))'
-				},
-				'brand-green': {
-					DEFAULT: 'hsl(var(--brand-green))',
-					light: 'hsl(var(--brand-green-light))',
-					dark: 'hsl(var(--brand-green-dark))'
 				},
 				'brand-cream': {
 					DEFAULT: 'hsl(var(--brand-cream))',

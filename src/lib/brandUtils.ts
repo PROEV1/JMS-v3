@@ -10,8 +10,8 @@ export const BRAND_COLORS = {
   primary: 'hsl(var(--primary))',
   teal: 'hsl(var(--brand-teal))',
   pink: 'hsl(var(--brand-pink))',
-  green: 'hsl(var(--brand-green))',
   cream: 'hsl(var(--brand-cream))',
+  blue: 'hsl(var(--brand-blue))'
 } as const;
 
 // Status Colors (following brand guidelines)
@@ -29,7 +29,6 @@ export const STATUS_COLORS = {
 export const ICON_BACKGROUNDS = {
   teal: 'icon-bg-teal',
   pink: 'icon-bg-pink', 
-  green: 'icon-bg-green',
   cream: 'icon-bg-cream',
 } as const;
 
@@ -52,9 +51,9 @@ export const BUTTON_VARIANTS = {
 // Badge Variants
 export const BADGE_VARIANTS = {
   teal: 'badge-teal',
-  green: 'badge-green',
   pink: 'badge-pink',
   cream: 'badge-cream',
+  blue: 'badge-blue'
 } as const;
 
 /**
@@ -103,10 +102,10 @@ export const DASHBOARD_TILES = {
     badgeText: 'text-primary',
   },
   projects: {
-    iconBg: getIconBackground('green'),
-    iconColor: 'text-brand-green', 
-    badgeBg: 'bg-brand-green-light/20',
-    badgeText: 'text-brand-green',
+    iconBg: getIconBackground('pink'),
+    iconColor: 'text-brand-pink', 
+    badgeBg: 'bg-brand-pink-light/20',
+    badgeText: 'text-brand-pink',
   },
   messages: {
     iconBg: getIconBackground('pink'),
