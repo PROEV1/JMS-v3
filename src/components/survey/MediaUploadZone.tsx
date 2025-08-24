@@ -56,6 +56,20 @@ export function MediaUploadZone({
     setUploading(true);
     setUploadProgress(0);
 
+    // Get survey token from URL params
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
+
+    if (!token) {
+      toast({
+        title: 'Upload failed',
+        description: 'Missing survey token',
+        variant: 'destructive'
+      });
+      setUploading(false);
+      return;
+    }
+
     for (let i = 0; i < acceptedFiles.length; i++) {
       const file = acceptedFiles[i];
       
@@ -70,48 +84,36 @@ export function MediaUploadZone({
       }
 
       try {
-        // Upload to Supabase Storage
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${uploadType}/${orderId}/${Date.now()}.${fileExt}`;
-        
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('client-documents')
-          .upload(fileName, file);
+        // Use survey-upload edge function for secure upload
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('orderId', orderId);
+        formData.append('surveyId', surveyId || '');
+        formData.append('mediaType', mediaType);
+        formData.append('fieldKey', uploadType);
+        formData.append('token', token);
+        formData.append('position', (files.length + i).toString());
+        formData.append('isMain', (files.length === 0 && i === 0).toString());
 
-        if (uploadError) throw uploadError;
+        const { data, error } = await supabase.functions.invoke('survey-upload', {
+          body: formData,
+        });
 
-        // Get public URL
-        const { data: { publicUrl } } = supabase.storage
-          .from('client-documents')
-          .getPublicUrl(fileName);
+        if (error) throw error;
 
-        // Save to database
-        const { data: mediaData, error: dbError } = await supabase
-          .from('client_survey_media')
-          .insert({
-            survey_id: surveyId,
-            order_id: orderId,
-            media_type: mediaType,
-            file_url: publicUrl,
-            file_name: file.name,
-            file_size: file.size,
-            position: files.length + i,
-            is_main: files.length === 0 && i === 0, // First file is main
-          })
-          .select()
-          .single();
-
-        if (dbError) throw dbError;
+        if (!data.success) {
+          throw new Error(data.error || 'Upload failed');
+        }
 
         // Add to local state
         setFiles(prev => [...prev, {
-          id: mediaData.id,
-          file_url: publicUrl,
-          file_name: file.name,
-          file_size: file.size,
+          id: data.data.id,
+          file_url: data.data.signed_url || '',
+          file_name: data.data.file_name,
+          file_size: data.data.file_size,
           media_type: mediaType,
-          is_main: mediaData.is_main,
-          position: mediaData.position,
+          is_main: data.data.is_main,
+          position: data.data.position,
         }]);
 
         setUploadProgress(((i + 1) / acceptedFiles.length) * 100);
@@ -120,6 +122,7 @@ export function MediaUploadZone({
         console.error('Upload error:', error);
         toast({
           title: `Failed to upload ${file.name}`,
+          description: error.message || 'Unknown error occurred',
           variant: 'destructive'
         });
       }
@@ -289,17 +292,30 @@ export function MediaUploadZone({
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {files.map((file) => (
               <div key={file.id} className="relative group">
-                {file.media_type === 'image' ? (
-                  <img
-                    src={file.file_url}
-                    alt={file.file_name}
-                    className="w-full h-24 object-cover rounded-lg border"
-                  />
-                ) : (
-                  <div className="w-full h-24 bg-slate-100 rounded-lg border flex items-center justify-center">
-                    <Video className="h-6 w-6 text-slate-400" />
-                  </div>
-                )}
+              {file.media_type === 'image' ? (
+                <img
+                  src={file.file_url}
+                  alt={file.file_name}
+                  className="w-full h-24 object-cover rounded-lg border"
+                  onError={(e) => {
+                    const target = e.currentTarget;
+                    target.style.display = 'none';
+                    target.nextElementSibling?.classList.remove('hidden');
+                  }}
+                />
+              ) : (
+                <div className="w-full h-24 bg-slate-100 rounded-lg border flex items-center justify-center">
+                  <Video className="h-6 w-6 text-slate-400" />
+                </div>
+              )}
+              
+              {/* Fallback for broken images */}
+              <div className="hidden w-full h-24 bg-slate-100 rounded-lg border flex items-center justify-center">
+                <div className="text-center text-slate-500">
+                  <Image className="h-6 w-6 mx-auto mb-1" />
+                  <span className="text-xs">Unavailable</span>
+                </div>
+              </div>
                 
                 {/* Overlay */}
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors rounded-lg">

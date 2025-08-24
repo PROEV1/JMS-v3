@@ -36,3 +36,6 @@ verify_jwt = false
 
 [functions.survey-lookup]
 verify_jwt = false
+
+[functions.survey-upload]
+verify_jwt = false

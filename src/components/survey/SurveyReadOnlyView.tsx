@@ -51,12 +51,23 @@ export function SurveyReadOnlyView({ survey, media }: SurveyReadOnlyViewProps) {
                       className="w-full h-full object-cover"
                       alt={item.file_name || 'Survey image'}
                     />
-                  ) : (
+                  ) : item.file_url && !item.file_url.startsWith('blob:') ? (
                     <img
                       src={item.file_url}
                       alt={item.file_name || 'Survey image'}
                       className="w-full h-full object-cover"
+                      onError={(e) => {
+                        const target = e.currentTarget;
+                        target.src = '/placeholder.svg';
+                      }}
                     />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-slate-500">
+                      <div className="text-center">
+                        <Image size={24} className="mx-auto mb-2" />
+                        <p className="text-xs">Image Unavailable</p>
+                      </div>
+                    </div>
                   )}
                   <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-200 flex items-center justify-center">
                     <Image className="text-white opacity-0 group-hover:opacity-100 transition-opacity" size={24} />
@@ -78,11 +89,16 @@ export function SurveyReadOnlyView({ survey, media }: SurveyReadOnlyViewProps) {
                         <span className="text-sm text-center px-2">{item.file_name}</span>
                       </div>
                     </SignedFile>
-                  ) : (
+                  ) : item.file_url && !item.file_url.startsWith('blob:') ? (
                     <a href={item.file_url} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center justify-center h-full text-slate-600 hover:text-slate-800">
                       <Video size={32} className="mb-2" />
                       <span className="text-sm text-center px-2">{item.file_name}</span>
                     </a>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-full text-slate-500">
+                      <Video size={32} className="mb-2" />
+                      <span className="text-sm text-center px-2">Video Unavailable</span>
+                    </div>
                   )}
                 </div>
               ) : (
@@ -101,11 +117,16 @@ export function SurveyReadOnlyView({ survey, media }: SurveyReadOnlyViewProps) {
                         <span className="text-sm text-center px-2">{item.file_name}</span>
                       </div>
                     </SignedFile>
-                  ) : (
+                  ) : item.file_url && !item.file_url.startsWith('blob:') ? (
                     <a href={item.file_url} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center justify-center h-full text-slate-600 hover:text-slate-800">
                       <FileText size={32} className="mb-2" />
                       <span className="text-sm text-center px-2">{item.file_name}</span>
                     </a>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-full text-slate-500">
+                      <FileText size={32} className="mb-2" />
+                      <span className="text-sm text-center px-2">File Unavailable</span>
+                    </div>
                   )}
                 </div>
               )}
