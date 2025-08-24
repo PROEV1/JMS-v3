@@ -11,6 +11,9 @@ import { OrderProgressTimeline } from "@/components/admin/OrderProgressTimeline"
 import { EngineerUploadsSection } from "@/components/admin/sections/EngineerUploadsSection";
 import { EnhancedSurveySection } from "@/components/admin/sections/EnhancedSurveySection";
 import { format } from "date-fns";
+import type { Database } from "@/integrations/supabase/types";
+
+type OrderStatusEnhanced = Database['public']['Enums']['order_status_enhanced'];
 
 export default function EnhancedClientOrderView() {
   const { orderId } = useParams();
@@ -36,7 +39,6 @@ export default function EnhancedClientOrderView() {
             id,
             quote_number,
             total_cost,
-            items,
             created_at
           ),
           order_payments!orders_id_fkey(
@@ -73,14 +75,15 @@ export default function EnhancedClientOrderView() {
 
       if (error) throw error;
       
-      // Transform the data to match our interface, handling nullable relationships
+      // Transform the data to match our interface, handling nullable relationships and ensuring arrays
       return {
         ...data,
         client: data.clients || null,
         quote: data.quotes || null,
         engineer: data.engineers || null,
         partner: data.partners || null,
-        order_payments: data.order_payments || []
+        order_payments: Array.isArray(data.order_payments) ? data.order_payments : [],
+        engineer_uploads: Array.isArray(data.engineer_uploads) ? data.engineer_uploads : []
       };
     },
     enabled: !!orderId,
@@ -262,7 +265,7 @@ export default function EnhancedClientOrderView() {
           {/* Status Management */}
           <OrderStatusManager 
             orderId={order.id}
-            currentStatus={order.status_enhanced}
+            currentStatus={order.status_enhanced as OrderStatusEnhanced}
             manualOverride={order.manual_status_override || false}
             manualNotes={order.manual_status_notes}
             onUpdate={() => window.location.reload()}
