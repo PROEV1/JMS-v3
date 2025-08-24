@@ -28,8 +28,10 @@ export default function Layout({ children }: LayoutProps) {
       // HARDENED: Only persist if it's a meaningful deep path, not just section roots
       const sectionRoots = ['/admin', '/client', '/engineer'];
       const isNotJustSectionRoot = !sectionRoots.includes(location.pathname);
+      // Also persist order detail pages and other deep paths
+      const isDeepPath = isNotJustSectionRoot || location.pathname.match(/^\/orders\/[^\/]+$/);
       
-      if (isNotJustSectionRoot) {
+      if (isDeepPath) {
         console.log('Layout: Persisting deep path:', fullPath);
         sessionStorage.setItem('lastAuthenticatedPath', fullPath);
       } else {
@@ -49,9 +51,14 @@ export default function Layout({ children }: LayoutProps) {
       
       // Check if we're on a section root and have a saved deeper path
       const isOnSectionRoot = sectionRoots.includes(currentPath);
-      const hasSavedDeepPath = savedPath && savedPath !== currentPath && savedPath.startsWith(currentPath + '/');
+      const hasSavedDeepPath = savedPath && savedPath !== currentPath;
       
-      if (isOnSectionRoot && hasSavedDeepPath) {
+      // Also handle cases where user was on an order page but got redirected to admin
+      const wasOnOrderPage = savedPath && savedPath.match(/^\/orders\/[^\/]+$/);
+      const isOnAdminRoot = currentPath === '/admin';
+      
+      if ((isOnSectionRoot && hasSavedDeepPath && savedPath.startsWith(currentPath + '/')) || 
+          (wasOnOrderPage && isOnAdminRoot)) {
         console.log('Layout: STRENGTHENED Self-heal detected - redirecting from', currentPath, 'to saved path:', savedPath);
         
         // Navigate to the saved deeper path
