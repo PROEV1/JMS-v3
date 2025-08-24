@@ -217,29 +217,43 @@ export default function AdminOrders() {
         <CardContent>
           <div className="overflow-x-auto">
             <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Order Number</TableHead>
-                  <TableHead>Client</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Engineer</TableHead>
-                  <TableHead>Scheduled Date</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
+               <TableHeader>
+                 <TableRow>
+                   <TableHead>Order Number</TableHead>
+                   <TableHead>Client</TableHead>
+                   <TableHead>Status</TableHead>
+                   <TableHead>Engineer</TableHead>
+                   <TableHead>Scheduled Date</TableHead>
+                   <TableHead>Amount</TableHead>
+                   <TableHead>Created</TableHead>
+                   <TableHead>Actions</TableHead>
+                 </TableRow>
+               </TableHeader>
               <TableBody>
                 {orders?.map((order) => (
                   <TableRow key={order.id}>
-                    <TableCell className="font-medium">
-                      {order.order_number}
-                      {order.quote?.quote_number && (
-                        <p className="text-sm text-muted-foreground">
-                          Quote: {order.quote.quote_number}
-                        </p>
-                      )}
-                    </TableCell>
+                     <TableCell className="font-medium">
+                       <div>
+                         {order.order_number}
+                         {order.quote?.quote_number && (
+                           <p className="text-sm text-muted-foreground">
+                             Quote: {order.quote.quote_number}
+                           </p>
+                         )}
+                         {order.is_partner_job && order.partner && (
+                           <div className="flex items-center gap-1 mt-1">
+                             <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700">
+                               Partner: {order.partner.name}
+                             </Badge>
+                             {order.partner_status && (
+                               <Badge variant="outline" className="text-xs">
+                                 {order.partner_status}
+                               </Badge>
+                             )}
+                           </div>
+                         )}
+                       </div>
+                     </TableCell>
                     <TableCell>
                       {order.client ? (
                         <div>
