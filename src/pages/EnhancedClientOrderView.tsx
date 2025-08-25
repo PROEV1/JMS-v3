@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -54,6 +54,7 @@ interface Order {
 export default function EnhancedClientOrderView() {
   const { id: orderId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
@@ -62,8 +63,25 @@ export default function EnhancedClientOrderView() {
   useEffect(() => {
     if (orderId) {
       fetchOrder();
+      
+      // Check for payment success/cancellation on page load
+      const urlParams = new URLSearchParams(location.search);
+      const paymentStatus = urlParams.get('payment');
+      const sessionId = urlParams.get('session_id');
+
+      if (paymentStatus === 'success' && sessionId) {
+        verifyPayment(sessionId);
+      } else if (paymentStatus === 'cancelled') {
+        toast({
+          title: "Payment Cancelled",
+          description: "Your payment was cancelled",
+          variant: "destructive",
+        });
+        // Clean up URL
+        window.history.replaceState({}, '', window.location.pathname);
+      }
     }
-  }, [orderId]);
+  }, [orderId, location.search]);
 
   const fetchOrder = async () => {
     if (!orderId) return;
@@ -123,6 +141,36 @@ export default function EnhancedClientOrderView() {
       navigate('/client/orders');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const verifyPayment = async (sessionId: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('verify-payment', {
+        body: { session_id: sessionId }
+      });
+
+      if (error) throw error;
+
+      if (data?.success) {
+        toast({
+          title: "Payment Successful",
+          description: `Payment of £${data.amount_paid} was processed successfully`,
+        });
+        
+        // Refresh order data
+        fetchOrder();
+        
+        // Clean up URL
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+    } catch (error) {
+      console.error('Payment verification error:', error);
+      toast({
+        title: "Payment Verification Error",
+        description: "There was an issue verifying your payment. Please contact support.",
+        variant: "destructive",
+      });
     }
   };
 

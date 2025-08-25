@@ -113,9 +113,11 @@ export default function Layout({ children }: LayoutProps) {
   
   // Partner users should be able to access client routes if they're viewing their own data
   // Only redirect partner users to /partner if they're accessing truly restricted areas
+  // Allow partners to access client order views for their own orders
   if (userRole === 'partner' && !currentPath.startsWith('/partner') && 
       !currentPath.startsWith('/client') && !currentPath.startsWith('/survey') && 
-      !currentPath.startsWith('/offers') && !currentPath.startsWith('/quotes')) {
+      !currentPath.startsWith('/offers') && !currentPath.startsWith('/quotes') &&
+      !currentPath.startsWith('/dashboard') && currentPath !== '/') {
     console.log('Layout: Partner user accessing restricted route, redirecting to /partner');
     return <Navigate to="/partner" replace />;
   }
