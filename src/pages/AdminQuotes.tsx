@@ -184,16 +184,17 @@ export default function AdminQuotes() {
       }
 
       console.log('Quote deletion successful');
+      
+      // Refresh the list and log results
+      console.log('Refreshing quotes after deletion...');
+      await fetchQuotes();
+      console.log('Quotes refreshed, new count should be updated');
 
       toast({
         title: "Success",
         description: "Quote deleted successfully",
       });
       
-      // Refresh the list and log results
-      console.log('Refreshing quotes after deletion...');
-      await fetchQuotes();
-      console.log('Quotes refreshed, new count:', quotes.length);
     } catch (error) {
       console.error('Error deleting quote:', error);
       toast({
