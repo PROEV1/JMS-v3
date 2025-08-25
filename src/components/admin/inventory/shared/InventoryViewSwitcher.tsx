@@ -76,7 +76,7 @@ export function InventoryViewSwitcher({
 }
 
 // Hook for managing view mode with localStorage persistence
-export function useInventoryView(defaultView: ViewMode = 'grid', storageKey = 'inventory-view') {
+export function useInventoryView(defaultView: ViewMode = 'list', storageKey = 'inventory-view') {
   const [viewMode, setViewMode] = React.useState<ViewMode>(() => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem(storageKey);

@@ -109,10 +109,22 @@ export function AddItemModal({ open, onOpenChange, editItem }: AddItemModalProps
 
   const createItemMutation = useMutation({
     mutationFn: async (itemData: typeof formData) => {
+      // Ensure supplier_id is properly handled
+      const supplierIdValue = itemData.supplier_id === 'none' || !itemData.supplier_id ? null : itemData.supplier_id;
+      
       const payload = {
-        ...itemData,
-        supplier_id: itemData.supplier_id === 'none' ? null : itemData.supplier_id || null,
-        description: itemData.description || null
+        name: itemData.name.trim(),
+        sku: itemData.sku.trim(),
+        description: itemData.description?.trim() || null,
+        unit: itemData.unit,
+        default_cost: Number(itemData.default_cost) || 0,
+        min_level: Number(itemData.min_level) || 0,
+        max_level: Number(itemData.max_level) || 0,
+        reorder_point: Number(itemData.reorder_point) || 0,
+        is_serialized: Boolean(itemData.is_serialized),
+        is_charger: Boolean(itemData.is_charger),
+        is_active: true,
+        supplier_id: supplierIdValue
       };
 
       if (isEditing && editItem) {

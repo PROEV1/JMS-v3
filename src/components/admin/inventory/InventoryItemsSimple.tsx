@@ -39,7 +39,7 @@ export const InventoryItemsSimple: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [searchFilters, setSearchFilters] = useState({});
-  const [viewMode, setViewMode] = useInventoryView('grid', 'inventory-items-view');
+  const [viewMode, setViewMode] = useInventoryView('list', 'inventory-items-view');
   
   // Modal states for actions
   const [showAdjustModal, setShowAdjustModal] = useState(false);
@@ -289,13 +289,37 @@ export const InventoryItemsSimple: React.FC = () => {
                   </div>
                   
                   <div className="flex gap-1 pt-2">
-                    <Button variant="outline" size="sm" className="text-xs h-7 px-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="text-xs h-7 px-2"
+                      onClick={() => {
+                        setSelectedItem(item);
+                        setShowAdjustModal(true);
+                      }}
+                    >
                       Adjust
                     </Button>
-                    <Button variant="outline" size="sm" className="text-xs h-7 px-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="text-xs h-7 px-2"
+                      onClick={() => {
+                        setSelectedItem(item);
+                        setShowTransferModal(true);
+                      }}
+                    >
                       Transfer
                     </Button>
-                    <Button variant="outline" size="sm" className="text-xs h-7 px-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="text-xs h-7 px-2"
+                      onClick={() => {
+                        setSelectedItem(item);
+                        setShowQuickView(true);
+                      }}
+                    >
                       View
                     </Button>
                   </div>
@@ -335,6 +359,197 @@ export const InventoryItemsSimple: React.FC = () => {
             />
           ))}
         </div>
+      )}
+
+      {/* List View */}
+      {viewMode === 'list' && (
+        <div className="space-y-2">
+          {filteredItems?.map((item) => (
+            <Card key={item.id} className={`hover:shadow-sm transition-shadow ${selectedIds.includes(item.id) ? 'ring-2 ring-primary' : ''}`}>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4 min-w-0 flex-1">
+                    <Package className="h-8 w-8 text-muted-foreground flex-shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-medium text-sm truncate">{item.name}</h3>
+                        <Badge variant="outline" className="text-xs flex-shrink-0">
+                          {item.sku}
+                        </Badge>
+                      </div>
+                      {item.description && (
+                        <p className="text-xs text-muted-foreground line-clamp-1 mb-2">
+                          {item.description}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                        <span>Unit: {item.unit}</span>
+                        <span>Cost: £{item.default_cost}</span>
+                        <span>Min: {item.min_level}</span>
+                        <span>Max: {item.max_level}</span>
+                        <span>Reorder: {item.reorder_point}</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    <div className="flex items-center gap-2">
+                      <StatusChip status={item.is_active ? "active" : "inactive"}>
+                        {item.is_active ? "Active" : "Inactive"}
+                      </StatusChip>
+                      {item.is_serialized && (
+                        <Badge variant="outline" className="text-xs">
+                          Serialized
+                        </Badge>
+                      )}
+                    </div>
+                    
+                    <div className="flex gap-1">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-8 w-8 p-0"
+                        onClick={() => {
+                          setSelectedItem(item);
+                          setShowAdjustModal(true);
+                        }}
+                        title="Adjust Stock"
+                      >
+                        <span className="text-xs">Adj</span>
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-8 w-8 p-0"
+                        onClick={() => {
+                          setSelectedItem(item);
+                          setShowTransferModal(true);
+                        }}
+                        title="Transfer Stock"
+                      >
+                        <span className="text-xs">Trf</span>
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-8 w-8 p-0"
+                        onClick={() => {
+                          setSelectedItem(item);
+                          setShowQuickView(true);
+                        }}
+                        title="View Details"
+                      >
+                        <span className="text-xs">View</span>
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Table View */}
+      {viewMode === 'table' && (
+        <Card>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b bg-muted/50">
+                    <th className="text-left p-4 font-medium text-sm">Item</th>
+                    <th className="text-left p-4 font-medium text-sm">SKU</th>
+                    <th className="text-left p-4 font-medium text-sm">Cost</th>
+                    <th className="text-left p-4 font-medium text-sm">Stock Levels</th>
+                    <th className="text-left p-4 font-medium text-sm">Status</th>
+                    <th className="text-right p-4 font-medium text-sm">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredItems?.map((item) => (
+                    <tr key={item.id} className="border-b hover:bg-muted/25">
+                      <td className="p-4">
+                        <div>
+                          <div className="font-medium text-sm">{item.name}</div>
+                          {item.description && (
+                            <div className="text-xs text-muted-foreground line-clamp-1">
+                              {item.description}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <Badge variant="outline" className="text-xs">
+                          {item.sku}
+                        </Badge>
+                      </td>
+                      <td className="p-4 text-sm">
+                        £{item.default_cost}
+                        <div className="text-xs text-muted-foreground">{item.unit}</div>
+                      </td>
+                      <td className="p-4 text-sm">
+                        <div className="space-y-1">
+                          <div>Min: {item.min_level} | Max: {item.max_level}</div>
+                          <div className="text-xs text-muted-foreground">Reorder: {item.reorder_point}</div>
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <div className="flex items-center gap-2">
+                          <StatusChip status={item.is_active ? "active" : "inactive"}>
+                            {item.is_active ? "Active" : "Inactive"}
+                          </StatusChip>
+                          {item.is_serialized && (
+                            <Badge variant="outline" className="text-xs">
+                              Serial
+                            </Badge>
+                          )}
+                        </div>
+                      </td>
+                      <td className="p-4 text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-8 px-2 text-xs"
+                            onClick={() => {
+                              setSelectedItem(item);
+                              setShowAdjustModal(true);
+                            }}
+                          >
+                            Adjust
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-8 px-2 text-xs"
+                            onClick={() => {
+                              setSelectedItem(item);
+                              setShowTransferModal(true);
+                            }}
+                          >
+                            Transfer
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-8 px-2 text-xs"
+                            onClick={() => {
+                              setSelectedItem(item);
+                              setShowQuickView(true);
+                            }}
+                          >
+                            View
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {filteredItems?.length === 0 && (

@@ -11,7 +11,7 @@ import { ReturnsRmasList } from "@/components/admin/inventory/ReturnsRmasList";
 import { useState } from "react";
 
 const AdminInventory = () => {
-  const [activeTab, setActiveTab] = useState("dashboard");
+  const [activeTab, setActiveTab] = useState("items");
 
   const handleTabSwitch = (tab: string) => {
     setActiveTab(tab);
