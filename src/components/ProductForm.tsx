@@ -118,7 +118,13 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onSuc
         return;
       }
 
-      setCategories(response.data || []);
+      // Ensure we have valid data before setting state
+      const categoriesData = Array.isArray(response.data) ? response.data : [];
+      const validCategories = categoriesData.filter(item => 
+        item && typeof item === 'object' && 'id' in item && 'name' in item
+      );
+      
+      setCategories(validCategories);
     } catch (error) {
       console.error('Error fetching categories:', error);
       toast({
