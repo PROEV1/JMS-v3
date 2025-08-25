@@ -51,13 +51,28 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     // Check if user is admin
+    console.log('Checking admin status for user:', user.id);
     const { data: profile, error: profileError } = await supabaseAnon
       .from('profiles')
       .select('role')
       .eq('user_id', user.id)
       .single();
 
-    if (profileError || profile?.role !== 'admin') {
+    console.log('Profile query result:', { profile, profileError });
+
+    if (profileError) {
+      console.error('Profile error:', profileError);
+      return new Response(
+        JSON.stringify({ error: 'Failed to verify admin status', details: profileError.message }),
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    if (profile?.role !== 'admin') {
+      console.log('User role is not admin:', profile?.role);
       return new Response(
         JSON.stringify({ error: 'Admin access required' }),
         { 
@@ -66,6 +81,8 @@ const handler = async (req: Request): Promise<Response> => {
         }
       );
     }
+
+    console.log('Admin verification successful');
 
     // Parse request body
     const body: SetPasswordRequest = await req.json();
