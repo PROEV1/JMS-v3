@@ -2,6 +2,10 @@ import { apiClient, buildFunctionUrl } from '@/lib/apiClient';
 
 export async function setUserPassword(email: string, password: string) {
   try {
+    // Reset circuit breaker for this endpoint first
+    const key = new URL(buildFunctionUrl('admin-set-password'), window.location.origin).pathname;
+    (window as any).resetCircuitBreaker?.(key);
+    
     const url = buildFunctionUrl('admin-set-password');
     const response = await apiClient.post(url, { email, password });
     return { success: true, data: response };

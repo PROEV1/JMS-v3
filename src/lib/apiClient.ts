@@ -10,7 +10,7 @@ type ApiError = {
 };
 
 const backoff = [300, 900, 2000];
-const failures: Record<string, { count: number; ts: number }> = {};
+let failures: Record<string, { count: number; ts: number }> = {};
 
 function sleep(ms: number) { 
   return new Promise(r => setTimeout(r, ms)); 
@@ -21,10 +21,17 @@ function shouldTrip(key: string) {
   return w && w.count >= 5 && Date.now() - w.ts < 60_000; 
 }
 
+function resetCircuitBreaker(key: string) {
+  delete failures[key];
+}
+
 function markFail(key: string) { 
   const now = Date.now(); 
   failures[key] = { count: (failures[key]?.count || 0) + 1, ts: now }; 
 }
+
+// Export resetCircuitBreaker globally for debugging
+(window as any).resetCircuitBreaker = resetCircuitBreaker;
 
 export async function headersWithAuth(extra?: Record<string, string>) {
   const h: Record<string, string> = {
