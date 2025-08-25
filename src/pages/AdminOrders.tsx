@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,18 +8,64 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Eye, Search, Filter, Calendar, User, Package } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Eye, Search, Filter, Calendar, User, Package, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
+import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
 
 type OrderStatusEnhanced = Database['public']['Enums']['order_status_enhanced'];
 
 export default function AdminOrders() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [engineerFilter, setEngineerFilter] = useState<string>("all");
+  const [deletingOrderId, setDeletingOrderId] = useState<string | null>(null);
+
+  const deleteMutation = useMutation({
+    mutationFn: async (orderId: string) => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
+
+      const response = await fetch(`https://qvppvstgconmzzjsryna.supabase.co/functions/v1/admin-delete-order`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ orderId })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to delete order');
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-orders'] });
+      toast.success("Order deleted successfully");
+      setDeletingOrderId(null);
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to delete order: ${error.message}`);
+      setDeletingOrderId(null);
+    }
+  });
+
+  const handleDeleteOrder = (orderId: string) => {
+    setDeletingOrderId(orderId);
+  };
+
+  const confirmDelete = () => {
+    if (deletingOrderId) {
+      deleteMutation.mutate(deletingOrderId);
+    }
+  };
 
   const { data: orders, isLoading, error } = useQuery({
     queryKey: ['admin-orders', searchTerm, statusFilter, engineerFilter],
@@ -295,16 +341,27 @@ export default function AdminOrders() {
                     <TableCell>
                       {format(new Date(order.created_at), 'PPP')}
                     </TableCell>
-                    <TableCell>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => navigate(`/admin/orders/${order.id}`)}
-                      >
-                        <Eye className="h-4 w-4 mr-2" />
-                        View
-                      </Button>
-                    </TableCell>
+                     <TableCell>
+                       <div className="flex items-center gap-2">
+                         <Button
+                           variant="outline"
+                           size="sm"
+                           onClick={() => navigate(`/admin/orders/${order.id}`)}
+                         >
+                           <Eye className="h-4 w-4 mr-2" />
+                           View
+                         </Button>
+                         <Button
+                           variant="destructive"
+                           size="sm"
+                           onClick={() => handleDeleteOrder(order.id)}
+                           disabled={deleteMutation.isPending}
+                         >
+                           <Trash2 className="h-4 w-4 mr-2" />
+                           Delete
+                         </Button>
+                       </div>
+                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -312,6 +369,30 @@ export default function AdminOrders() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deletingOrderId} onOpenChange={() => setDeletingOrderId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Order</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this order? This action cannot be undone and will permanently remove all associated data including payments, uploads, and activity history.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              disabled={deleteMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete Order"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
