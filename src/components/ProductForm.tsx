@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -7,9 +8,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, Plus, Upload, Star, StarOff, ArrowUp, ArrowDown, Settings } from 'lucide-react';
+import { Trash2, Plus, Upload, Star, StarOff, ArrowUp, ArrowDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { ManageCategoriesModal } from '@/components/admin/ManageCategoriesModal';
 
 interface Product {
   id: string;
@@ -70,8 +70,6 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onSuc
   const [images, setImages] = useState<ProductImage[]>([]);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [newSpec, setNewSpec] = useState({ key: '', value: '' });
-  const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
-  const [showManageCategories, setShowManageCategories] = useState(false);
   
   const [newConfig, setNewConfig] = useState({
     configuration_type: '',
@@ -96,52 +94,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onSuc
       fetchImages();
     }
     fetchAvailableProducts();
-    fetchCategories();
   }, [product?.id]);
-
-  const fetchCategories = async () => {
-    try {
-      // Use a more direct approach to avoid TypeScript issues
-      const response = await supabase
-        .from('product_categories' as any)
-        .select('id, name')
-        .eq('is_active', true)
-        .order('sort_order', { ascending: true });
-
-      if (response.error) {
-        console.error('Error fetching categories:', response.error);
-        toast({
-          title: "Error",
-          description: "Failed to load categories",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Properly handle the response data with type safety
-      if (response.data && Array.isArray(response.data)) {
-        const validCategories = response.data
-          .filter((item: any): item is { id: string; name: string } => 
-            item !== null && 
-            typeof item === 'object' && 
-            typeof item.id === 'string' && 
-            typeof item.name === 'string'
-          );
-        
-        setCategories(validCategories);
-      } else {
-        setCategories([]);
-      }
-    } catch (error) {
-      console.error('Error fetching categories:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load categories",
-        variant: "destructive",
-      });
-      setCategories([]);
-    }
-  };
 
   const fetchConfigurations = async () => {
     if (!product?.id) return;
@@ -572,33 +525,11 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onSuc
                 
                 <div>
                   <Label htmlFor="category">Category</Label>
-                  <div className="flex gap-2">
-                    <Select
-                      value={formData.category}
-                      onValueChange={(value) => setFormData({ ...formData, category: value })}
-                    >
-                      <SelectTrigger className="flex-1">
-                        <SelectValue placeholder="Select category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="">No category</SelectItem>
-                        {categories.map((category) => (
-                          <SelectItem key={category.id} value={category.name}>
-                            {category.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      onClick={() => setShowManageCategories(true)}
-                      title="Manage categories"
-                    >
-                      <Settings className="h-4 w-4" />
-                    </Button>
-                  </div>
+                  <Input
+                    id="category"
+                    value={formData.category}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                  />
                 </div>
                 
                 <div>
@@ -637,253 +568,254 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onSuc
           </CardContent>
         </Card>
 
+      <Card>
+        <CardHeader>
+          <CardTitle>Specifications</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+              <Input
+                placeholder="Specification Key"
+                value={newSpec.key}
+                onChange={(e) => setNewSpec({ ...newSpec, key: e.target.value })}
+              />
+              <Input
+                placeholder="Specification Value"
+                value={newSpec.value}
+                onChange={(e) => setNewSpec({ ...newSpec, value: e.target.value })}
+              />
+              <Button type="button" onClick={addSpecification}>
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <div className="space-y-2">
+              {Object.entries(formData.specifications || {}).map(([key, value]) => (
+                <div key={key} className="flex items-center justify-between p-2 border rounded">
+                  <div>
+                    <strong>{key}:</strong> {value as string}
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    type="button"
+                    onClick={() => removeSpecification(key)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {!product?.id && (
         <Card>
           <CardHeader>
-            <CardTitle>Specifications</CardTitle>
+            <CardTitle>Product Images</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                <Input
-                  placeholder="Specification Key"
-                  value={newSpec.key}
-                  onChange={(e) => setNewSpec({ ...newSpec, key: e.target.value })}
-                />
-                <Input
-                  placeholder="Specification Value"
-                  value={newSpec.value}
-                  onChange={(e) => setNewSpec({ ...newSpec, value: e.target.value })}
-                />
-                <Button type="button" onClick={addSpecification}>
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-
-              <div className="space-y-2">
-                {Object.entries(formData.specifications || {}).map(([key, value]) => (
-                  <div key={key} className="flex items-center justify-between p-2 border rounded">
-                    <div>
-                      <strong>{key}:</strong> {value as string}
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      type="button"
-                      onClick={() => removeSpecification(key)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <p className="text-muted-foreground">
+              Images can be added after creating the product. Save the product first, then edit it to upload images.
+            </p>
           </CardContent>
         </Card>
+      )}
 
-        {!product?.id && (
+      {product?.id && (
+        <>
           <Card>
             <CardHeader>
               <CardTitle>Product Images</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground">
-                Images can be added after creating the product. Save the product first, then edit it to upload images.
-              </p>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="image-upload">Upload Image</Label>
+                  <Input
+                    id="image-upload"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    disabled={uploadingImage}
+                  />
+                  {uploadingImage && <p className="text-sm text-muted-foreground mt-1">Uploading...</p>}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {images.map((image) => (
+                    <div key={image.id} className="relative border rounded-lg p-2">
+                      <img
+                        src={image.image_url}
+                        alt={image.image_name}
+                        className="w-full h-32 object-cover rounded"
+                      />
+                      <div className="absolute top-2 right-2 flex space-x-1">
+                        <Button
+                          size="sm"
+                          variant={image.is_primary ? "default" : "outline"}
+                          onClick={() => setPrimaryImage(image.id)}
+                        >
+                          {image.is_primary ? <Star className="h-3 w-3" /> : <StarOff className="h-3 w-3" />}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => deleteImage(image.id, image.image_url)}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                      <p className="text-xs mt-1 truncate">{image.image_name}</p>
+                      {image.is_primary && <Badge className="mt-1">Primary</Badge>}
+                    </div>
+                  ))}
+                </div>
+              </div>
             </CardContent>
           </Card>
-        )}
 
-        {product?.id && (
-          <>
-            <Card>
-              <CardHeader>
-                <CardTitle>Product Images</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="image-upload">Upload Image</Label>
-                    <Input
-                      id="image-upload"
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageUpload}
-                      disabled={uploadingImage}
-                    />
-                    {uploadingImage && <p className="text-sm text-muted-foreground mt-1">Uploading...</p>}
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {images.map((image) => (
-                      <div key={image.id} className="relative border rounded-lg p-2">
-                        <img
-                          src={image.image_url}
-                          alt={image.image_name}
-                          className="w-full h-32 object-cover rounded"
-                        />
-                        <div className="absolute top-2 right-2 flex space-x-1">
-                          <Button
-                            size="sm"
-                            variant={image.is_primary ? "default" : "outline"}
-                            onClick={() => setPrimaryImage(image.id)}
-                          >
-                            {image.is_primary ? <Star className="h-3 w-3" /> : <StarOff className="h-3 w-3" />}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => deleteImage(image.id, image.image_url)}
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </div>
-                        <p className="text-xs mt-1 truncate">{image.image_name}</p>
-                        {image.is_primary && <Badge className="mt-1">Primary</Badge>}
-                      </div>
-                    ))}
-                  </div>
+          <Card>
+            <CardHeader>
+              <CardTitle>Product Configurations</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-2">
+                  <Input
+                    placeholder="Configuration Type"
+                    value={newConfig.configuration_type}
+                    onChange={(e) => setNewConfig({ ...newConfig, configuration_type: e.target.value })}
+                  />
+                  <Input
+                    placeholder="Option Name"
+                    value={newConfig.option_name}
+                    onChange={(e) => setNewConfig({ ...newConfig, option_name: e.target.value })}
+                  />
+                  <Input
+                    placeholder="Option Value"
+                    value={newConfig.option_value}
+                    onChange={(e) => setNewConfig({ ...newConfig, option_value: e.target.value })}
+                  />
+                  <Input
+                    type="number"
+                    placeholder="Price Modifier"
+                    value={newConfig.price_modifier}
+                    onChange={(e) => setNewConfig({ ...newConfig, price_modifier: parseFloat(e.target.value) || 0 })}
+                  />
+                  <Button onClick={addConfiguration}>
+                    <Plus className="h-4 w-4" />
+                  </Button>
                 </div>
-              </CardContent>
-            </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Product Configurations</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-2">
-                    <Input
-                      placeholder="Configuration Type"
-                      value={newConfig.configuration_type}
-                      onChange={(e) => setNewConfig({ ...newConfig, configuration_type: e.target.value })}
-                    />
-                    <Input
-                      placeholder="Option Name"
-                      value={newConfig.option_name}
-                      onChange={(e) => setNewConfig({ ...newConfig, option_name: e.target.value })}
-                    />
-                    <Input
-                      placeholder="Option Value"
-                      value={newConfig.option_value}
-                      onChange={(e) => setNewConfig({ ...newConfig, option_value: e.target.value })}
-                    />
-                    <Input
-                      type="number"
-                      placeholder="Price Modifier"
-                      value={newConfig.price_modifier}
-                      onChange={(e) => setNewConfig({ ...newConfig, price_modifier: parseFloat(e.target.value) || 0 })}
-                    />
-                    <Button onClick={addConfiguration}>
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </div>
+                <div className="space-y-2">
+                  {configurations.map((config) => (
+                    <div key={config.id} className="flex items-center justify-between p-2 border rounded">
+                      <div className="flex items-center space-x-2">
+                        <Badge variant="outline">{config.configuration_type}</Badge>
+                        <span>{config.option_name}: {config.option_value}</span>
+                        {config.price_modifier !== 0 && (
+                          <span className="text-sm text-muted-foreground">
+                            (£{config.price_modifier > 0 ? '+' : ''}{config.price_modifier})
+                          </span>
+                        )}
+                        {config.is_default && <Badge>Default</Badge>}
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => deleteConfiguration(config.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-                  <div className="space-y-2">
-                    {configurations.map((config) => (
-                      <div key={config.id} className="flex items-center justify-between p-2 border rounded">
+          <Card>
+            <CardHeader>
+              <CardTitle>Product Compatibility</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+                  <Select
+                    value={newCompatibility.accessory_product_id}
+                    onValueChange={(value) => setNewCompatibility({ ...newCompatibility, accessory_product_id: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select accessory product" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableProducts.map((product) => (
+                        <SelectItem key={product.id} value={product.id}>
+                          {product.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  
+                  <Select
+                    value={newCompatibility.compatibility_type}
+                    onValueChange={(value) => setNewCompatibility({ ...newCompatibility, compatibility_type: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="required">Required</SelectItem>
+                      <SelectItem value="optional">Optional</SelectItem>
+                      <SelectItem value="recommended">Recommended</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  
+                  <Input
+                    placeholder="Notes"
+                    value={newCompatibility.notes}
+                    onChange={(e) => setNewCompatibility({ ...newCompatibility, notes: e.target.value })}
+                  />
+                  
+                  <Button onClick={addCompatibility}>
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                <div className="space-y-2">
+                  {compatibilities.map((compatibility) => {
+                    const accessoryProduct = availableProducts.find(p => p.id === compatibility.accessory_product_id);
+                    return (
+                      <div key={compatibility.id} className="flex items-center justify-between p-2 border rounded">
                         <div className="flex items-center space-x-2">
-                          <Badge variant="outline">{config.configuration_type}</Badge>
-                          <span>{config.option_name}: {config.option_value}</span>
-                          {config.price_modifier !== 0 && (
-                            <span className="text-sm text-muted-foreground">
-                              (£{config.price_modifier > 0 ? '+' : ''}{config.price_modifier})
-                            </span>
+                          <span>{accessoryProduct?.name || 'Unknown Product'}</span>
+                          <Badge variant="outline">{compatibility.compatibility_type}</Badge>
+                          {compatibility.notes && (
+                            <span className="text-sm text-muted-foreground">({compatibility.notes})</span>
                           )}
-                          {config.is_default && <Badge>Default</Badge>}
                         </div>
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => deleteConfiguration(config.id)}
+                          onClick={() => deleteCompatibility(compatibility.id)}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })}
                 </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Product Compatibility</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
-                    <Select
-                      value={newCompatibility.accessory_product_id}
-                      onValueChange={(value) => setNewCompatibility({ ...newCompatibility, accessory_product_id: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select accessory product" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableProducts.map((product) => (
-                          <SelectItem key={product.id} value={product.id}>
-                            {product.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    
-                    <Select
-                      value={newCompatibility.compatibility_type}
-                      onValueChange={(value) => setNewCompatibility({ ...newCompatibility, compatibility_type: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="required">Required</SelectItem>
-                        <SelectItem value="optional">Optional</SelectItem>
-                        <SelectItem value="recommended">Recommended</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    
-                    <Input
-                      placeholder="Notes"
-                      value={newCompatibility.notes}
-                      onChange={(e) => setNewCompatibility({ ...newCompatibility, notes: e.target.value })}
-                    />
-                    
-                    <Button onClick={addCompatibility}>
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </div>
-
-                  <div className="space-y-2">
-                    {compatibilities.map((compatibility) => {
-                      const accessoryProduct = availableProducts.find(p => p.id === compatibility.accessory_product_id);
-                      return (
-                        <div key={compatibility.id} className="flex items-center justify-between p-2 border rounded">
-                          <div className="flex items-center space-x-2">
-                            <span>{accessoryProduct?.name || 'Unknown Product'}</span>
-                            <Badge variant="outline">{compatibility.compatibility_type}</Badge>
-                            {compatibility.notes && (
-                              <span className="text-sm text-muted-foreground">({compatibility.notes})</span>
-                            )}
-                          </div>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => deleteCompatibility(compatibility.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </>
-        )}
+              </div>
+            </CardContent>
+          </Card>
+        </>
+      )}
       </div>
       
+      {/* Sticky Footer with Buttons */}
       <div className="flex-shrink-0 border-t pt-4 mt-6">
         <div className="flex space-x-2 justify-end">
           <Button type="button" variant="outline" onClick={onCancel}>
@@ -894,14 +826,6 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onSuc
           </Button>
         </div>
       </div>
-
-      <ManageCategoriesModal
-        open={showManageCategories}
-        onOpenChange={setShowManageCategories}
-        onCategoryUpdated={() => {
-          fetchCategories();
-        }}
-      />
     </form>
   );
 };
