@@ -10,19 +10,7 @@ export function OfferExpiredListPage() {
   const { data: orders = [], isLoading: ordersLoading } = useQuery({
     queryKey: ['orders', 'offer-expired'],
     queryFn: async () => {
-      // Get expired offers
-      const { data: expiredOffers, error: expiredError } = await supabase
-        .from('job_offers')
-        .select('order_id')
-        .eq('status', 'expired');
-
-      if (expiredError) throw expiredError;
-      
-      if (!expiredOffers?.length) return [];
-
-      const uniqueOrderIds = [...new Set(expiredOffers.map(offer => offer.order_id))];
-
-      // Fetch orders
+      // Query orders directly based on status_enhanced to ensure consistency
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
         .select(`
@@ -31,7 +19,9 @@ export function OfferExpiredListPage() {
           engineer:engineer_id(name, email, region),
           partner:partner_id(name)
         `)
-        .in('id', uniqueOrderIds)
+        .eq('status_enhanced', 'offer_expired')
+        .eq('scheduling_suppressed', false)
+        .is('scheduled_install_date', null) // Extra safeguard to ensure not scheduled
         .order('created_at', { ascending: false });
 
       if (ordersError) throw ordersError;

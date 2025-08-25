@@ -10,20 +10,7 @@ export function DateOfferedListPage() {
   const { data: orders = [], isLoading: ordersLoading } = useQuery({
     queryKey: ['orders', 'date-offered'],
     queryFn: async () => {
-      // First get pending offers that haven't expired
-      const { data: pendingOffers, error: offersError } = await supabase
-        .from('job_offers')
-        .select('order_id')
-        .eq('status', 'pending')
-        .gt('expires_at', new Date().toISOString());
-
-      if (offersError) throw offersError;
-      
-      if (!pendingOffers?.length) return [];
-
-      const uniqueOrderIds = [...new Set(pendingOffers.map(offer => offer.order_id))];
-      
-      // Fetch orders for these offers
+      // Query orders directly based on status_enhanced to ensure consistency
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
         .select(`
@@ -32,7 +19,9 @@ export function DateOfferedListPage() {
           engineer:engineer_id(name, email, region),
           partner:partner_id(name)
         `)
-        .in('id', uniqueOrderIds)
+        .eq('status_enhanced', 'date_offered')
+        .eq('scheduling_suppressed', false)
+        .is('scheduled_install_date', null) // Extra safeguard to ensure not scheduled
         .order('created_at', { ascending: false });
 
       if (ordersError) throw ordersError;

@@ -35,40 +35,19 @@ export function useScheduleStatusCounts() {
     try {
       setLoading(true);
 
-      // Fetch offer-based counts
-      // For date-offered, we need to count pending offers for orders that have engineers and aren't back to awaiting_install_booking
-      const { data: pendingOffers } = await supabase
-        .from('job_offers')
-        .select('order_id')
-        .eq('status', 'pending')
-        .gt('expires_at', new Date().toISOString());
+      // Use status_enhanced for consistent counting with list pages
+      const { count: dateOfferedCount } = await supabase
+        .from('orders')
+        .select('*', { count: 'exact', head: true })
+        .eq('status_enhanced', 'date_offered')
+        .eq('scheduling_suppressed', false);
 
-      let dateOfferedCount = 0;
-      if (pendingOffers?.length) {
-        // Count unique order IDs with pending offers (regardless of order status)
-        const uniqueOrderIds = [...new Set(pendingOffers.map(offer => offer.order_id))];
-        dateOfferedCount = uniqueOrderIds.length;
-      }
-
-      // For date-rejected, count unique orders with rejected offers but no active offers
-      let dateRejectedCount = 0;
-      const { data: rejectedOffers } = await supabase
-        .from('job_offers')
-        .select('order_id')
-        .eq('status', 'rejected');
-
-      if (rejectedOffers?.length) {
-        const { data: activeOffers } = await supabase
-          .from('job_offers')
-          .select('order_id')
-          .in('status', ['pending', 'accepted'])
-          .gt('expires_at', new Date().toISOString());
-
-        const ordersWithActiveOffers = new Set(activeOffers?.map(offer => offer.order_id) || []);
-        const uniqueRejectedOrderIds = [...new Set(rejectedOffers.map(offer => offer.order_id))]
-          .filter(orderId => !ordersWithActiveOffers.has(orderId));
-        dateRejectedCount = uniqueRejectedOrderIds.length;
-      }
+      // For date-rejected, use status_enhanced for consistency
+      const { count: dateRejectedCount } = await supabase
+        .from('orders')
+        .select('*', { count: 'exact', head: true })
+        .eq('status_enhanced', 'date_rejected')
+        .eq('scheduling_suppressed', false);
 
       // Fetch scheduled today count
       const today = new Date();
@@ -164,7 +143,7 @@ export function useScheduleStatusCounts() {
 
       setCounts({
         needsScheduling: needsSchedulingCount,
-        dateOffered: dateOfferedCount,
+        dateOffered: dateOfferedCount || 0,
         readyToBook: readyToBookCount,
         scheduledToday: scheduledTodayCount,
         scheduled: scheduledResult.count || 0,
