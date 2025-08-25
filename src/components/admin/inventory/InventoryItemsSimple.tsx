@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Package, Search, Boxes, AlertTriangle, BarChart3, Hash } from 'lucide-react';
+import { Plus, Package, Search, Boxes, AlertTriangle, BarChart3, Hash, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { AddItemModal } from './AddItemModal';
 import { StockAdjustmentModal } from './StockAdjustmentModal';
@@ -18,6 +18,8 @@ import { BulkActionsBar, inventoryBulkActions } from './shared/BulkActionsBar';
 import { InventoryViewSwitcher, useInventoryView, ViewMode } from './shared/InventoryViewSwitcher';
 import { MobileInventoryCard } from './shared/MobileInventoryCard';
 import { NotificationBanner, createStockNotification } from './shared/NotificationBanner';
+import { useInventoryEnhanced } from '@/hooks/useInventoryEnhanced';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 interface InventoryItem {
   id: string;
@@ -45,7 +47,10 @@ export const InventoryItemsSimple: React.FC = () => {
   const [showAdjustModal, setShowAdjustModal] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [showQuickView, setShowQuickView] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any>(null);
+
+  const { deleteInventoryItem } = useInventoryEnhanced();
 
   const { data: items, isLoading } = useQuery({
     queryKey: ['inventory-items'],
@@ -132,6 +137,18 @@ export const InventoryItemsSimple: React.FC = () => {
         ? [...prev, itemId]
         : prev.filter(id => id !== itemId)
     );
+  };
+
+  const handleDeleteItem = async () => {
+    if (!selectedItem) return;
+    
+    try {
+      await deleteInventoryItem.mutateAsync(selectedItem.id);
+      setShowDeleteDialog(false);
+      setSelectedItem(null);
+    } catch (error: any) {
+      console.error('Delete failed:', error);
+    }
   };
 
   if (isLoading) {
@@ -322,6 +339,17 @@ export const InventoryItemsSimple: React.FC = () => {
                     >
                       View
                     </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="text-xs h-7 px-2 text-destructive hover:text-destructive"
+                      onClick={() => {
+                        setSelectedItem(item);
+                        setShowDeleteDialog(true);
+                      }}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -355,6 +383,10 @@ export const InventoryItemsSimple: React.FC = () => {
               onView={() => {
                 setSelectedItem(item);
                 setShowQuickView(true);
+              }}
+              onDelete={() => {
+                setSelectedItem(item);
+                setShowDeleteDialog(true);
               }}
             />
           ))}
@@ -440,6 +472,18 @@ export const InventoryItemsSimple: React.FC = () => {
                         title="View Details"
                       >
                         <span className="text-xs">View</span>
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                        onClick={() => {
+                          setSelectedItem(item);
+                          setShowDeleteDialog(true);
+                        }}
+                        title="Delete Item"
+                      >
+                        <Trash2 className="h-3 w-3" />
                       </Button>
                     </div>
                   </div>
@@ -541,6 +585,18 @@ export const InventoryItemsSimple: React.FC = () => {
                           >
                             View
                           </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                            onClick={() => {
+                              setSelectedItem(item);
+                              setShowDeleteDialog(true);
+                            }}
+                            title="Delete Item"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -594,6 +650,33 @@ export const InventoryItemsSimple: React.FC = () => {
         onOpenChange={setShowQuickView}
         item={selectedItem}
       />
+      
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Inventory Item</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{selectedItem?.name}"?
+              {selectedItem && (
+                <div className="mt-2 text-sm">
+                  This action cannot be undone. If this item has transaction history, 
+                  it will be archived instead of permanently deleted.
+                </div>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteItem}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteInventoryItem.isPending}
+            >
+              {deleteInventoryItem.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

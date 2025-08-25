@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,8 +21,32 @@ export function StockTransferModal({ open, onOpenChange, itemId, itemName }: Sto
   const [quantity, setQuantity] = useState("");
   const [notes, setNotes] = useState("");
 
-  const { createStockTransfer } = useInventoryEnhanced();
+  const { createStockTransfer, useInventoryLocations, useItemLocationBalances } = useInventoryEnhanced();
   const { toast } = useToast();
+
+  // Fetch locations and balances
+  const { data: locations } = useInventoryLocations();
+  const { data: balances } = useItemLocationBalances(itemId);
+
+  // Reset form when modal opens/closes or item changes
+  useEffect(() => {
+    if (!open || !itemId) {
+      setFromLocationId("");
+      setToLocationId("");
+      setQuantity("");
+      setNotes("");
+    }
+  }, [open, itemId]);
+
+  // Get stock balance for a specific location
+  const getLocationBalance = (locationId: string) => {
+    if (!balances || !itemId) return 0;
+    const balance = balances.find((b: any) => b.location_id === locationId);
+    return balance?.on_hand || 0;
+  };
+
+  // Get available stock at selected from location
+  const availableStock = fromLocationId ? getLocationBalance(fromLocationId) : 0;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,10 +60,30 @@ export function StockTransferModal({ open, onOpenChange, itemId, itemName }: Sto
       return;
     }
 
+    const transferQty = parseInt(quantity);
+
     if (fromLocationId === toLocationId) {
       toast({
         title: "Error",
         description: "Source and destination locations must be different",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (transferQty > availableStock) {
+      toast({
+        title: "Error",
+        description: `Insufficient stock. Available: ${availableStock}, Requested: ${transferQty}`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (transferQty <= 0) {
+      toast({
+        title: "Error",
+        description: "Quantity must be greater than 0",
         variant: "destructive",
       });
       return;
@@ -50,7 +94,7 @@ export function StockTransferModal({ open, onOpenChange, itemId, itemName }: Sto
         itemId: itemId,
         fromLocationId: fromLocationId,
         toLocationId: toLocationId,
-        quantity: parseInt(quantity),
+        quantity: transferQty,
         notes,
       });
 
@@ -60,15 +104,10 @@ export function StockTransferModal({ open, onOpenChange, itemId, itemName }: Sto
       });
 
       onOpenChange(false);
-      // Reset form
-      setFromLocationId("");
-      setToLocationId("");
-      setQuantity("");
-      setNotes("");
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: "Failed to complete stock transfer",
+        description: error.message || "Failed to complete stock transfer",
         variant: "destructive",
       });
     }
@@ -89,11 +128,21 @@ export function StockTransferModal({ open, onOpenChange, itemId, itemName }: Sto
                 <SelectValue placeholder="Select source location" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="main-warehouse">Main Warehouse</SelectItem>
-                <SelectItem value="van-1">Van 1</SelectItem>
-                <SelectItem value="van-2">Van 2</SelectItem>
+                {locations?.map((location) => {
+                  const balance = getLocationBalance(location.id);
+                  return (
+                    <SelectItem key={location.id} value={location.id}>
+                      {location.name} (Stock: {balance})
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
+            {fromLocationId && (
+              <p className="text-sm text-muted-foreground">
+                Available stock: {availableStock} units
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -103,9 +152,19 @@ export function StockTransferModal({ open, onOpenChange, itemId, itemName }: Sto
                 <SelectValue placeholder="Select destination location" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="main-warehouse">Main Warehouse</SelectItem>
-                <SelectItem value="van-1">Van 1</SelectItem>
-                <SelectItem value="van-2">Van 2</SelectItem>
+                {locations?.map((location) => {
+                  const balance = getLocationBalance(location.id);
+                  const isDisabled = location.id === fromLocationId;
+                  return (
+                    <SelectItem 
+                      key={location.id} 
+                      value={location.id}
+                      disabled={isDisabled}
+                    >
+                      {location.name} (Stock: {balance})
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
           </div>
@@ -119,8 +178,14 @@ export function StockTransferModal({ open, onOpenChange, itemId, itemName }: Sto
               onChange={(e) => setQuantity(e.target.value)}
               placeholder="Enter quantity to transfer"
               min="1"
+              max={availableStock}
               required
             />
+            {availableStock > 0 && (
+              <p className="text-sm text-muted-foreground">
+                Maximum: {availableStock} units
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -138,7 +203,10 @@ export function StockTransferModal({ open, onOpenChange, itemId, itemName }: Sto
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={createStockTransfer.isPending}>
+            <Button 
+              type="submit" 
+              disabled={createStockTransfer.isPending || !fromLocationId || !toLocationId || availableStock <= 0}
+            >
               {createStockTransfer.isPending ? "Transferring..." : "Transfer Stock"}
             </Button>
           </div>

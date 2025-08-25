@@ -10,7 +10,8 @@ import {
   Wrench, 
   Eye,
   AlertTriangle,
-  CheckCircle
+  CheckCircle,
+  Trash2
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { StatusChip } from './StatusChip';
@@ -38,6 +39,7 @@ interface MobileInventoryCardProps {
   onTransfer?: () => void;
   onAdjust?: () => void;
   onView?: () => void;
+  onDelete?: () => void;
   showSelection?: boolean;
 }
 
@@ -48,6 +50,7 @@ export function MobileInventoryCard({
   onTransfer,
   onAdjust,
   onView,
+  onDelete,
   showSelection = false
 }: MobileInventoryCardProps) {
   const stockLevel = item.current_stock || 0;
@@ -106,6 +109,15 @@ export function MobileInventoryCard({
                 <DropdownMenuItem onClick={onAdjust}>
                   <Wrench className="h-4 w-4 mr-2" />
                   Adjust Stock
+                </DropdownMenuItem>
+              )}
+              {onDelete && (
+                <DropdownMenuItem 
+                  onClick={onDelete}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete Item
                 </DropdownMenuItem>
               )}
             </DropdownMenuContent>

@@ -160,6 +160,16 @@ export function useInventoryEnhanced() {
       quantity: number;
       notes?: string;
     }) => {
+      // Check if sufficient stock is available at source location
+      const { data: balances } = await supabase.rpc('get_item_location_balances');
+      const sourceBalance = balances?.find((b: any) => 
+        b.item_id === itemId && b.location_id === fromLocationId
+      );
+      
+      if (!sourceBalance || sourceBalance.on_hand < quantity) {
+        throw new Error(`Insufficient stock at source location. Available: ${sourceBalance?.on_hand || 0}, Required: ${quantity}`);
+      }
+
       const reference = `Transfer ${quantity} units`;
 
       // Create outbound transaction
@@ -234,13 +244,97 @@ export function useInventoryEnhanced() {
     queryClient.invalidateQueries({ queryKey: ['low-stock-items'] });
   };
 
+  // Get inventory locations
+  const useInventoryLocations = () => {
+    return useQuery({
+      queryKey: ['inventory-locations'],
+      queryFn: async () => {
+        const { data, error } = await supabase
+          .from('inventory_locations')
+          .select('*')
+          .eq('is_active', true)
+          .order('name');
+        
+        if (error) throw error;
+        return data;
+      },
+      staleTime: 5 * 60 * 1000, // 5 minutes
+    });
+  };
+
+  // Get item balances at all locations
+  const useItemLocationBalances = (itemId?: string) => {
+    return useQuery({
+      queryKey: ['item-location-balances', itemId],
+      queryFn: async () => {
+        const { data, error } = await supabase.rpc('get_item_location_balances');
+        if (error) throw error;
+        
+        // Filter by item if provided
+        if (itemId) {
+          return data?.filter((balance: any) => balance.item_id === itemId) || [];
+        }
+        return data || [];
+      },
+      staleTime: 30 * 1000, // 30 seconds
+    });
+  };
+
+  // Delete inventory item mutation
+  const deleteInventoryItem = useMutation({
+    mutationFn: async (itemId: string) => {
+      // Check if item has any transactions
+      const { data: transactions } = await supabase
+        .from('inventory_txns')
+        .select('id')
+        .eq('item_id', itemId)
+        .limit(1);
+
+      if (transactions && transactions.length > 0) {
+        // Soft delete - archive the item
+        const { error } = await supabase
+          .from('inventory_items')
+          .update({ is_active: false })
+          .eq('id', itemId);
+        
+        if (error) throw error;
+        return { archived: true };
+      } else {
+        // Hard delete - completely remove the item
+        const { error } = await supabase
+          .from('inventory_items')
+          .delete()
+          .eq('id', itemId);
+        
+        if (error) throw error;
+        return { archived: false };
+      }
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['inventory-items'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory-kpis'] });
+      
+      if (result.archived) {
+        showSuccessToast('Item archived (has transaction history)');
+      } else {
+        showSuccessToast('Item deleted permanently');
+      }
+    },
+    onError: (error) => {
+      showErrorToast('Failed to delete item: ' + error.message);
+    }
+  });
+
   return {
     useInventoryItems,
     useLowStockItems,
     useInventoryKPIs,
+    useInventoryLocations,
+    useItemLocationBalances,
     createStockAdjustment,
     createStockTransfer,
     bulkUpdateItems,
+    deleteInventoryItem,
     invalidateInventoryCache
   };
 }
