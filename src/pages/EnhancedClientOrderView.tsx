@@ -131,8 +131,16 @@ export default function EnhancedClientOrderView() {
 
     const status = order.status_enhanced;
     
-    if (['awaiting_survey_submission', 'survey_rework_requested', 'awaiting_survey_review'].includes(status)) {
+    if (status === 'awaiting_survey_submission') {
       return { step: 1, title: 'Survey', description: 'Complete property survey' };
+    }
+    
+    if (status === 'survey_rework_requested') {
+      return { step: 1, title: 'Survey', description: 'Rework required - update survey' };
+    }
+    
+    if (status === 'awaiting_survey_review') {
+      return { step: 1, title: 'Survey', description: 'Survey submitted - being reviewed' };
     }
     
     if (status === 'awaiting_payment') {
