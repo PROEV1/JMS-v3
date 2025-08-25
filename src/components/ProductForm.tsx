@@ -118,13 +118,20 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onSuc
         return;
       }
 
-      // Ensure we have valid data before setting state
-      const categoriesData = Array.isArray(response.data) ? response.data : [];
-      const validCategories = categoriesData.filter(item => 
-        item && typeof item === 'object' && 'id' in item && 'name' in item
-      );
-      
-      setCategories(validCategories);
+      // Properly handle the response data with type safety
+      if (response.data && Array.isArray(response.data)) {
+        const validCategories = response.data
+          .filter((item: any): item is { id: string; name: string } => 
+            item !== null && 
+            typeof item === 'object' && 
+            typeof item.id === 'string' && 
+            typeof item.name === 'string'
+          );
+        
+        setCategories(validCategories);
+      } else {
+        setCategories([]);
+      }
     } catch (error) {
       console.error('Error fetching categories:', error);
       toast({
@@ -132,6 +139,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onSuc
         description: "Failed to load categories",
         variant: "destructive",
       });
+      setCategories([]);
     }
   };
 

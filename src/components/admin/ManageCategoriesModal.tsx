@@ -1,5 +1,3 @@
-
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -67,18 +65,22 @@ export function ManageCategoriesModal({ open, onOpenChange, onCategoryUpdated }:
         return;
       }
 
-      // Ensure we have valid data before setting state
-      const categoriesData = Array.isArray(response.data) ? response.data : [];
-      const validCategories = categoriesData.filter(item => 
-        item && 
-        typeof item === 'object' && 
-        'id' in item && 
-        'name' in item &&
-        'is_active' in item &&
-        'sort_order' in item
-      ) as ProductCategory[];
-      
-      setCategories(validCategories);
+      // Properly handle the response data with type safety
+      if (response.data && Array.isArray(response.data)) {
+        const validCategories = response.data
+          .filter((item: any): item is ProductCategory => 
+            item !== null && 
+            typeof item === 'object' && 
+            typeof item.id === 'string' && 
+            typeof item.name === 'string' &&
+            typeof item.is_active === 'boolean' &&
+            typeof item.sort_order === 'number'
+          );
+        
+        setCategories(validCategories);
+      } else {
+        setCategories([]);
+      }
     } catch (error) {
       console.error('Error fetching categories:', error);
       toast({
@@ -86,6 +88,7 @@ export function ManageCategoriesModal({ open, onOpenChange, onCategoryUpdated }:
         description: "Failed to load categories",
         variant: "destructive",
       });
+      setCategories([]);
     } finally {
       setLoading(false);
     }
@@ -356,4 +359,3 @@ export function ManageCategoriesModal({ open, onOpenChange, onCategoryUpdated }:
     </Dialog>
   );
 }
-
