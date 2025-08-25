@@ -3,13 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Download, Check, X, Shield, Wrench, MessageCircle, CheckCircle, Phone, Mail, HelpCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { ArrowLeft, Check, X, Shield, Wrench, MessageCircle, CheckCircle, Package, Award, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { BrandCard } from '@/components/brand/BrandCard';
-import { Separator } from '@/components/ui/separator';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 interface Quote {
   id: string;
@@ -24,6 +21,24 @@ interface Quote {
   is_shareable: boolean;
 }
 
+interface Product {
+  id: string;
+  name: string;
+  description: string;
+  specifications: any;
+  base_price: number;
+  category: string;
+  images?: ProductImage[];
+}
+
+interface ProductImage {
+  id: string;
+  image_url: string;
+  image_name: string;
+  is_primary: boolean;
+  sort_order: number;
+}
+
 interface QuoteItem {
   id: string;
   product_name: string;
@@ -31,6 +46,7 @@ interface QuoteItem {
   unit_price: number;
   total_price: number;
   configuration: any;
+  product?: Product;
 }
 
 export default function ClientQuoteDetail() {
@@ -43,7 +59,6 @@ export default function ClientQuoteDetail() {
   const [loading, setLoading] = useState(true);
   const [accepting, setAccepting] = useState(false);
   const [rejecting, setRejecting] = useState(false);
-  const [detailsExpanded, setDetailsExpanded] = useState(false);
 
   useEffect(() => {
     if (!user || !id) return;
@@ -89,10 +104,16 @@ export default function ClientQuoteDetail() {
         return;
       }
 
-      // Fetch quote items
+      // Fetch quote items with product details
       const { data: itemsData, error: itemsError } = await supabase
         .from('quote_items')
-        .select('*')
+        .select(`
+          *,
+          product:products(
+            *,
+            images:product_images(*)
+          )
+        `)
         .eq('quote_id', id);
 
       if (itemsError) {
@@ -201,16 +222,28 @@ export default function ClientQuoteDetail() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'sent': return 'bg-blue-100 text-blue-800';
-      case 'accepted': return 'bg-green-100 text-green-800';
-      case 'rejected': return 'bg-red-100 text-red-800';
-      case 'expired': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'sent': return 'bg-orange-50 text-orange-700 border-orange-200';
+      case 'accepted': return 'bg-green-50 text-green-700 border-green-200';
+      case 'rejected': return 'bg-red-50 text-red-700 border-red-200';
+      case 'expired': return 'bg-gray-50 text-gray-700 border-gray-200';
+      default: return 'bg-gray-50 text-gray-700 border-gray-200';
     }
   };
 
   const formatStatus = (status: string) => {
     return status.charAt(0).toUpperCase() + status.slice(1);
+  };
+
+  const getProductImage = (item: QuoteItem) => {
+    if (item.product?.images && item.product.images.length > 0) {
+      const primaryImage = item.product.images.find(img => img.is_primary);
+      return primaryImage ? primaryImage.image_url : item.product.images[0].image_url;
+    }
+    return null;
+  };
+
+  const getProductSpecs = (item: QuoteItem) => {
+    return item.product?.specifications || {};
   };
 
   if (loading) {
@@ -237,260 +270,297 @@ export default function ClientQuoteDetail() {
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-4xl">
-      <div className="space-y-6">
-        {/* Enhanced Header */}
-        <div className="flex items-center gap-4">
+    <div className="min-h-screen bg-background">
+      <div className="container mx-auto px-4 py-6 max-w-5xl">
+        {/* Back Navigation */}
+        <div className="mb-6">
           <Button
             variant="ghost"
-            size="sm"
             onClick={() => navigate('/client/quotes')}
+            className="text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Quotes
           </Button>
         </div>
 
-        {/* Quote Summary Card */}
-        <Card className="border-l-4 border-l-primary bg-gradient-to-r from-primary/5 to-transparent">
-          <CardContent className="p-6">
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <h1 className="text-3xl font-bold text-primary">Your Installation Quote</h1>
-                <p className="text-lg text-muted-foreground mt-1">
-                  {quote.quote_number} • Created {new Date(quote.created_at).toLocaleDateString()}
-                </p>
-                {quote.expires_at && (
-                  <p className="text-sm text-orange-600 font-medium">
-                    Expires {new Date(quote.expires_at).toLocaleDateString()}
-                  </p>
-                )}
-              </div>
-              <Badge className={getStatusColor(quote.status)} variant="secondary">
-                {formatStatus(quote.status)}
-              </Badge>
-            </div>
-            
-            {/* Total Price Highlight */}
-            <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-              <div className="flex justify-between items-center">
-                <span className="text-xl font-semibold">Total Investment</span>
-                <span className="text-3xl font-bold text-primary">£{quote.total_cost.toFixed(2)}</span>
-              </div>
-              <p className="text-sm text-muted-foreground mt-1">All-inclusive professional installation</p>
-            </div>
-
-            {/* Primary CTA - Only show for sent quotes */}
-            {quote.status === 'sent' && (
-              <div className="mt-6 pt-4 border-t">
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <Button
-                    onClick={handleAcceptQuote}
-                    disabled={accepting}
-                    className="flex-1 bg-primary hover:bg-primary/90 text-white font-medium py-3 text-lg"
-                    size="lg"
+        <div className="space-y-6">
+          {/* Header Section */}
+          <Card className="overflow-hidden">
+            <CardContent className="p-0">
+              <div className="bg-gradient-to-r from-primary/5 via-primary/3 to-transparent p-8">
+                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+                  <div className="flex-1">
+                    <h1 className="text-3xl font-bold text-foreground mb-2">
+                      Installation Quote
+                    </h1>
+                    <div className="flex flex-wrap items-center gap-4 text-muted-foreground">
+                      <span className="font-medium">{quote.quote_number}</span>
+                      <span>•</span>
+                      <span>Created {new Date(quote.created_at).toLocaleDateString()}</span>
+                      {quote.expires_at && (
+                        <>
+                          <span>•</span>
+                          <span className="text-orange-600 font-medium">
+                            Expires {new Date(quote.expires_at).toLocaleDateString()}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <Badge 
+                    className={`${getStatusColor(quote.status)} border rounded-full px-4 py-2 font-medium`}
                   >
-                    {accepting ? (
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    ) : (
-                      <Check className="h-5 w-5 mr-2" />
-                    )}
-                    Accept Quote & Continue
-                  </Button>
-                  <Button
-                    onClick={handleRejectQuote}
-                    disabled={rejecting}
-                    variant="outline"
-                    size="lg"
-                    className="text-gray-600 border-gray-300 hover:bg-gray-50"
-                  >
-                    {rejecting ? (
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2"></div>
-                    ) : (
-                      <X className="h-4 w-4 mr-2" />
-                    )}
-                    Decline
-                  </Button>
+                    {formatStatus(quote.status)}
+                  </Badge>
                 </div>
-                <p className="text-sm text-muted-foreground text-center mt-3">
-                  By accepting, you'll move straight to scheduling your installation
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Trust Elements */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card className="p-4 text-center bg-green-50 border-green-200">
-            <Shield className="h-8 w-8 text-green-600 mx-auto mb-2" />
-            <h4 className="font-semibold text-green-800 text-sm">5 Year Warranty</h4>
-            <p className="text-xs text-green-600">Comprehensive coverage</p>
-          </Card>
-          
-          <Card className="p-4 text-center bg-blue-50 border-blue-200">
-            <Wrench className="h-8 w-8 text-blue-600 mx-auto mb-2" />
-            <h4 className="font-semibold text-blue-800 text-sm">Professional Installation</h4>
-            <p className="text-xs text-blue-600">Certified technicians</p>
-          </Card>
-          
-          <Card className="p-4 text-center bg-purple-50 border-purple-200">
-            <MessageCircle className="h-8 w-8 text-purple-600 mx-auto mb-2" />
-            <h4 className="font-semibold text-purple-800 text-sm">Free Consultation</h4>
-            <p className="text-xs text-purple-600">Expert guidance</p>
-          </Card>
-          
-          <Card className="p-4 text-center bg-orange-50 border-orange-200">
-            <CheckCircle className="h-8 w-8 text-orange-600 mx-auto mb-2" />
-            <h4 className="font-semibold text-orange-800 text-sm">Quality Guarantee</h4>
-            <p className="text-xs text-orange-600">100% satisfaction</p>
-          </Card>
-        </div>
-
-        {/* Product Information & Quote Items */}
-        <Card>
-          <CardHeader>
-            <CardTitle>What's Included</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div>
-                <h3 className="font-semibold mb-2">Product Details</h3>
-                <p className="text-muted-foreground">{quote.product_details}</p>
-              </div>
-
-              {quoteItems.length > 0 && (
-                <div>
-                  <h3 className="font-semibold mb-3">Quote Items</h3>
-                  <div className="space-y-3">
-                    {quoteItems.map((item) => (
-                      <div key={item.id} className="flex justify-between items-center p-4 bg-muted rounded-lg">
-                        <div>
-                          <p className="font-medium">{item.product_name}</p>
-                          <p className="text-sm text-muted-foreground">Quantity: {item.quantity}</p>
-                        </div>
-                        <p className="font-semibold text-lg">£{item.total_price.toFixed(2)}</p>
-                      </div>
-                    ))}
+                
+                {/* Total Investment Block */}
+                <div className="mt-8 bg-card rounded-xl p-6 border shadow-sm">
+                  <div className="text-center">
+                    <div className="text-4xl font-bold text-primary mb-2">
+                      £{quote.total_cost.toFixed(2)}
+                    </div>
+                    <p className="text-muted-foreground">All-inclusive professional installation</p>
                   </div>
                 </div>
-              )}
-              
-              {/* What's Always Included */}
-              <div>
-                <h3 className="font-semibold mb-3">Always Included at No Extra Cost</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
-                    <div className="flex items-center space-x-3">
-                      <Wrench className="h-4 w-4 text-green-600" />
-                      <span className="text-sm font-medium">Professional installation</span>
-                    </div>
-                    <span className="text-sm font-semibold text-green-600">Included</span>
-                  </div>
-                  <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
-                    <div className="flex items-center space-x-3">
-                      <Shield className="h-4 w-4 text-green-600" />
-                      <span className="text-sm font-medium">5 year warranty</span>
-                    </div>
-                    <span className="text-sm font-semibold text-green-600">Included</span>
-                  </div>
-                  <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
-                    <div className="flex items-center space-x-3">
-                      <MessageCircle className="h-4 w-4 text-green-600" />
-                      <span className="text-sm font-medium">Free consultation</span>
-                    </div>
-                    <span className="text-sm font-semibold text-green-600">Included</span>
-                  </div>
-                  <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
-                    <div className="flex items-center space-x-3">
-                      <CheckCircle className="h-4 w-4 text-green-600" />
-                      <span className="text-sm font-medium">Quality guarantee</span>
-                    </div>
-                    <span className="text-sm font-semibold text-green-600">Included</span>
-                  </div>
-                </div>
-              </div>
 
-              <Separator />
-              
-              <div className="flex justify-between items-center text-xl font-bold">
-                <span>Total</span>
-                <span className="text-primary">£{quote.total_cost.toFixed(2)}</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Collapsible Quote Details */}
-        <Collapsible open={detailsExpanded} onOpenChange={setDetailsExpanded}>
-          <Card>
-            <CollapsibleTrigger asChild>
-              <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
-                <CardTitle className="flex items-center justify-between">
-                  <span>Quote Details & Notes</span>
-                  {detailsExpanded ? (
-                    <ChevronUp className="h-4 w-4" />
-                  ) : (
-                    <ChevronDown className="h-4 w-4" />
-                  )}
-                </CardTitle>
-              </CardHeader>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <CardContent>
-                {quote.notes ? (
-                  <div>
-                    <h4 className="font-semibold mb-2">Notes</h4>
-                    <p className="text-muted-foreground">{quote.notes}</p>
+                {/* Action Buttons */}
+                {quote.status === 'sent' ? (
+                  <div className="mt-6 flex flex-col sm:flex-row gap-3">
+                    <Button
+                      onClick={handleAcceptQuote}
+                      disabled={accepting}
+                      size="lg"
+                      className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground font-medium rounded-full"
+                    >
+                      {accepting ? (
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2"></div>
+                      ) : (
+                        <Check className="h-5 w-5 mr-2" />
+                      )}
+                      Accept Quote
+                    </Button>
+                    <Button
+                      onClick={handleRejectQuote}
+                      disabled={rejecting}
+                      variant="outline"
+                      size="lg"
+                      className="rounded-full border-2"
+                    >
+                      {rejecting ? (
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2"></div>
+                      ) : (
+                        <X className="h-4 w-4 mr-2" />
+                      )}
+                      Decline
+                    </Button>
                   </div>
                 ) : (
-                  <p className="text-muted-foreground">No additional notes for this quote.</p>
+                  <div className="mt-6 p-4 bg-card rounded-lg border">
+                    <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                      <CheckCircle className="h-5 w-5 text-green-600" />
+                      <span>
+                        You have {quote.status === 'accepted' ? 'accepted' : 'declined'} this quote
+                        {quote.status === 'accepted' && ' - proceeding to installation scheduling'}
+                      </span>
+                    </div>
+                  </div>
                 )}
-              </CardContent>
-            </CollapsibleContent>
+              </div>
+            </CardContent>
           </Card>
-        </Collapsible>
 
-        {/* Help Section */}
-        <Card className="bg-blue-50 border-blue-200">
-          <CardContent className="p-6">
-            <div className="flex items-start space-x-4">
-              <HelpCircle className="h-6 w-6 text-blue-600 mt-1" />
-              <div className="flex-1">
-                <h3 className="font-semibold text-blue-900 mb-2">Need Changes or Have Questions?</h3>
-                <p className="text-blue-700 mb-4">
-                  Our team is here to help! If you'd like to modify this quote or have any questions, get in touch with us.
-                </p>
-                <div className="flex flex-col sm:flex-row gap-3">
+          {/* Trust & Reassurance Row */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card className="p-4 bg-gradient-to-br from-green-50 to-green-100 border-green-200 hover:shadow-md transition-all">
+              <div className="text-center">
+                <div className="inline-flex p-3 bg-green-600 rounded-full mb-3">
+                  <Shield className="h-6 w-6 text-white" />
+                </div>
+                <h4 className="font-semibold text-green-800 mb-1">5 Year Warranty</h4>
+                <p className="text-xs text-green-600">Comprehensive coverage</p>
+              </div>
+            </Card>
+            
+            <Card className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 hover:shadow-md transition-all">
+              <div className="text-center">
+                <div className="inline-flex p-3 bg-blue-600 rounded-full mb-3">
+                  <Wrench className="h-6 w-6 text-white" />
+                </div>
+                <h4 className="font-semibold text-blue-800 mb-1">Professional Installation</h4>
+                <p className="text-xs text-blue-600">Certified engineers</p>
+              </div>
+            </Card>
+            
+            <Card className="p-4 bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 hover:shadow-md transition-all">
+              <div className="text-center">
+                <div className="inline-flex p-3 bg-purple-600 rounded-full mb-3">
+                  <MessageCircle className="h-6 w-6 text-white" />
+                </div>
+                <h4 className="font-semibold text-purple-800 mb-1">Free Consultation</h4>
+                <p className="text-xs text-purple-600">Expert guidance included</p>
+              </div>
+            </Card>
+            
+            <Card className="p-4 bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200 hover:shadow-md transition-all">
+              <div className="text-center">
+                <div className="inline-flex p-3 bg-orange-600 rounded-full mb-3">
+                  <Award className="h-6 w-6 text-white" />
+                </div>
+                <h4 className="font-semibold text-orange-800 mb-1">Quality Guarantee</h4>
+                <p className="text-xs text-orange-600">100% satisfaction</p>
+              </div>
+            </Card>
+          </div>
+
+          {/* Product Details Section */}
+          {quoteItems.length > 0 && (
+            <div className="space-y-6">
+              {quoteItems.map((item) => (
+                <Card key={item.id} className="overflow-hidden">
+                  <CardContent className="p-0">
+                    <div className="lg:grid lg:grid-cols-5 lg:gap-8">
+                      {/* Product Image */}
+                      <div className="lg:col-span-2 p-6">
+                        {getProductImage(item) ? (
+                          <div className="aspect-square bg-muted rounded-xl overflow-hidden">
+                            <img
+                              src={getProductImage(item)}
+                              alt={item.product_name}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        ) : (
+                          <div className="aspect-square bg-muted rounded-xl flex items-center justify-center">
+                            <Package className="h-16 w-16 text-muted-foreground" />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Product Details */}
+                      <div className="lg:col-span-3 p-6">
+                        <div className="space-y-6">
+                          <div>
+                            <h3 className="text-2xl font-bold mb-2">{item.product_name}</h3>
+                            <p className="text-muted-foreground leading-relaxed">
+                              {item.product?.description || quote.product_details}
+                            </p>
+                          </div>
+
+                          {/* Specifications Grid */}
+                          {Object.keys(getProductSpecs(item)).length > 0 && (
+                            <div>
+                              <h4 className="font-semibold mb-4 text-lg">Technical Specifications</h4>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {Object.entries(getProductSpecs(item)).map(([key, value]) => (
+                                  <div key={key} className="flex justify-between items-center py-2 border-b border-border">
+                                    <span className="font-medium text-sm uppercase tracking-wide text-muted-foreground">
+                                      {key}
+                                    </span>
+                                    <span className="font-medium">{String(value)}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Pricing */}
+                          <div className="bg-muted rounded-lg p-4">
+                            <div className="flex justify-between items-center">
+                              <div>
+                                <p className="text-sm text-muted-foreground">Quantity: {item.quantity}</p>
+                                <p className="text-sm text-muted-foreground">Unit Price: £{item.unit_price.toFixed(2)}</p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-2xl font-bold text-primary">£{item.total_price.toFixed(2)}</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+
+              {/* Quote Summary */}
+              <Card className="bg-gradient-to-r from-primary/5 to-transparent border-primary/20">
+                <CardContent className="p-6">
+                  <div className="space-y-4">
+                    <h3 className="text-xl font-bold">Quote Summary</h3>
+                    
+                    {/* Subtotal */}
+                    <div className="space-y-2">
+                      {quoteItems.map((item) => (
+                        <div key={item.id} className="flex justify-between items-center text-sm">
+                          <span>{item.product_name} (x{item.quantity})</span>
+                          <span>£{item.total_price.toFixed(2)}</span>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    <div className="border-t pt-4">
+                      <div className="flex justify-between items-center text-xl font-bold">
+                        <span>Total</span>
+                        <span className="text-primary">£{quote.total_cost.toFixed(2)}</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Including professional installation and 5-year warranty
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* Additional Notes */}
+          {quote.notes && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Additional Information</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground leading-relaxed">{quote.notes}</p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Help Section */}
+          <Card className="bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200">
+            <CardContent className="p-6">
+              <div className="text-center space-y-4">
+                <div className="inline-flex p-3 bg-blue-600 rounded-full">
+                  <MessageCircle className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-blue-900 mb-2">Need to Make Changes?</h3>
+                  <p className="text-blue-700 mb-4">
+                    Our expert team is ready to help customize this quote to perfectly match your needs.
+                  </p>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
                   <Button 
                     variant="outline" 
-                    className="border-blue-300 text-blue-700 hover:bg-blue-100"
-                    onClick={() => window.open('/client/messages', '_blank')}
+                    className="border-blue-300 text-blue-700 hover:bg-blue-200 rounded-full"
+                    onClick={() => navigate('/client/messages')}
                   >
                     <MessageCircle className="h-4 w-4 mr-2" />
-                    Chat with us
+                    Send Message
                   </Button>
                   <Button 
                     variant="outline" 
-                    className="border-blue-300 text-blue-700 hover:bg-blue-100"
-                    onClick={() => window.open('tel:+441234567890')}
+                    className="border-blue-300 text-blue-700 hover:bg-blue-200 rounded-full"
                   >
-                    <Phone className="h-4 w-4 mr-2" />
-                    Call us now
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    className="border-blue-300 text-blue-700 hover:bg-blue-100"
-                    onClick={() => window.open('mailto:support@proev.co.uk')}
-                  >
-                    <Mail className="h-4 w-4 mr-2" />
-                    Email support
+                    <Calendar className="h-4 w-4 mr-2" />
+                    Schedule Call
                   </Button>
                 </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );
