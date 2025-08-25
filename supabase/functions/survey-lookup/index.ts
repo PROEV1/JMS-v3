@@ -32,6 +32,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
+  // First get the order
   const { data: order, error } = await supabase
     .from('orders')
     .select(`
@@ -56,23 +57,39 @@ serve(async (req) => {
     .eq('survey_token', token)
     .maybeSingle();
 
-    if (error || !order) {
-      console.error('Order lookup failed:', error);
-      if (error?.code === 'PGRST116') {
-        return json({ ok: false, error: 'Invalid or expired survey link' }, 404, requestId);
-      }
-      return json({ ok: false, error: 'Database error occurred' }, 500, requestId);
+  if (error || !order) {
+    console.error('Order lookup failed:', error);
+    if (error?.code === 'PGRST116') {
+      return json({ ok: false, error: 'Invalid or expired survey link' }, 404, requestId);
     }
+    return json({ ok: false, error: 'Database error occurred' }, 500, requestId);
+  }
 
-    // Check if survey token has expired
-    if (order.survey_token_expires_at && new Date(order.survey_token_expires_at) < new Date()) {
-      return json({ ok: false, error: 'Survey link has expired' }, 410, requestId);
+  // Get the latest survey for this order
+  const { data: latestSurvey } = await supabase
+    .from('client_surveys')
+    .select('id, status, submitted_at')
+    .eq('order_id', order.id)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  // Check if survey token has expired
+  if (order.survey_token_expires_at && new Date(order.survey_token_expires_at) < new Date()) {
+    return json({ ok: false, error: 'Survey link has expired' }, 410, requestId);
+  }
+
+  // Determine if survey is locked (completed)
+  const isLocked = latestSurvey && ['submitted', 'approved', 'under_review', 'resubmitted'].includes(latestSurvey.status);
+
+  return json({ 
+    ok: true, 
+    data: {
+      ...order,
+      latest_survey: latestSurvey,
+      is_locked: isLocked
     }
-
-    return json({ 
-      ok: true, 
-      data: order 
-    }, 200, requestId);
+  }, 200, requestId);
 
   } catch (error) {
     console.error('Survey lookup error:', error);
