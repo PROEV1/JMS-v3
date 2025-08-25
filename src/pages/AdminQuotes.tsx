@@ -38,6 +38,7 @@ export default function AdminQuotes() {
 
   const fetchQuotes = async () => {
     try {
+      console.log('fetchQuotes: Starting to fetch quotes...');
       const { data, error } = await supabase
         .from('quotes')
         .select(`
@@ -52,6 +53,7 @@ export default function AdminQuotes() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
+      console.log('fetchQuotes: Received data:', data?.length || 0, 'quotes');
       setQuotes(data || []);
     } catch (error) {
       console.error('Error fetching quotes:', error);
@@ -188,7 +190,10 @@ export default function AdminQuotes() {
         description: "Quote deleted successfully",
       });
       
-      fetchQuotes(); // Refresh the list
+      // Refresh the list and log results
+      console.log('Refreshing quotes after deletion...');
+      await fetchQuotes();
+      console.log('Quotes refreshed, new count:', quotes.length);
     } catch (error) {
       console.error('Error deleting quote:', error);
       toast({
