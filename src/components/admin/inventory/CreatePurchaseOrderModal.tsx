@@ -6,6 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { Plus, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -26,14 +28,42 @@ export function CreatePurchaseOrderModal({ open, onOpenChange }: CreatePurchaseO
   const [supplierId, setSupplierId] = useState("");
   const [expectedDelivery, setExpectedDelivery] = useState("");
   const [notes, setNotes] = useState("");
-  const [items, setItems] = useState<POItem[]>([
+  const [poItems, setPoItems] = useState<POItem[]>([
     { id: "1", item_id: "", item_name: "", quantity: 1, unit_cost: 0 }
   ]);
 
   const { toast } = useToast();
 
+  // Fetch suppliers
+  const { data: suppliers = [] } = useQuery({
+    queryKey: ['suppliers'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('inventory_suppliers')
+        .select('id, name')
+        .eq('is_active', true)
+        .order('name');
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  // Fetch inventory items
+  const { data: inventoryItems = [] } = useQuery({
+    queryKey: ['inventory-items'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('inventory_items')
+        .select('id, name, sku')
+        .eq('is_active', true)
+        .order('name');
+      if (error) throw error;
+      return data;
+    }
+  });
+
   const addItem = () => {
-    setItems([...items, { 
+    setPoItems([...poItems, { 
       id: Date.now().toString(), 
       item_id: "", 
       item_name: "", 
@@ -43,21 +73,21 @@ export function CreatePurchaseOrderModal({ open, onOpenChange }: CreatePurchaseO
   };
 
   const removeItem = (id: string) => {
-    setItems(items.filter(item => item.id !== id));
+    setPoItems(poItems.filter(item => item.id !== id));
   };
 
   const updateItem = (id: string, field: keyof POItem, value: any) => {
-    setItems(items.map(item => 
+    setPoItems(poItems.map(item => 
       item.id === id ? { ...item, [field]: value } : item
     ));
   };
 
-  const totalAmount = items.reduce((sum, item) => sum + (item.quantity * item.unit_cost), 0);
+  const totalAmount = poItems.reduce((sum, item) => sum + (item.quantity * item.unit_cost), 0);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!supplierId || items.some(item => !item.item_id || !item.quantity)) {
+    if (!supplierId || poItems.some(item => !item.item_id || !item.quantity)) {
       toast({
         title: "Error",
         description: "Please fill in all required fields",
@@ -68,7 +98,7 @@ export function CreatePurchaseOrderModal({ open, onOpenChange }: CreatePurchaseO
 
     try {
       // TODO: Implement actual API call to create purchase order
-      console.log("Creating PO:", { supplierId, expectedDelivery, notes, items, totalAmount });
+      console.log("Creating PO:", { supplierId, expectedDelivery, notes, poItems, totalAmount });
       
       toast({
         title: "Success",
@@ -80,7 +110,7 @@ export function CreatePurchaseOrderModal({ open, onOpenChange }: CreatePurchaseO
       setSupplierId("");
       setExpectedDelivery("");
       setNotes("");
-      setItems([{ id: "1", item_id: "", item_name: "", quantity: 1, unit_cost: 0 }]);
+      setPoItems([{ id: "1", item_id: "", item_name: "", quantity: 1, unit_cost: 0 }]);
     } catch (error) {
       toast({
         title: "Error",
@@ -106,9 +136,11 @@ export function CreatePurchaseOrderModal({ open, onOpenChange }: CreatePurchaseO
                   <SelectValue placeholder="Select supplier" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="supplier-1">EV Components Ltd</SelectItem>
-                  <SelectItem value="supplier-2">Charging Solutions Inc</SelectItem>
-                  <SelectItem value="supplier-3">Electric Parts Co</SelectItem>
+                  {suppliers.map(supplier => (
+                    <SelectItem key={supplier.id} value={supplier.id}>
+                      {supplier.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -133,7 +165,7 @@ export function CreatePurchaseOrderModal({ open, onOpenChange }: CreatePurchaseO
               </Button>
             </div>
 
-            {items.map((item, index) => (
+            {poItems.map((item, index) => (
               <Card key={item.id}>
                 <CardContent className="p-4">
                   <div className="grid grid-cols-12 gap-3 items-end">
@@ -144,21 +176,21 @@ export function CreatePurchaseOrderModal({ open, onOpenChange }: CreatePurchaseO
                         onValueChange={(value) => {
                           updateItem(item.id, "item_id", value);
                           // Auto-populate name based on selection
-                          const itemNames = {
-                            "item-1": "EV Charger Model A",
-                            "item-2": "Charging Cable 7kW",
-                            "item-3": "Wall Mount Bracket",
-                          };
-                          updateItem(item.id, "item_name", itemNames[value as keyof typeof itemNames] || "");
+                          const selectedItem = inventoryItems.find(i => i.id === value);
+                          if (selectedItem) {
+                            updateItem(item.id, "item_name", selectedItem.name);
+                          }
                         }}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select item" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="item-1">EV Charger Model A</SelectItem>
-                          <SelectItem value="item-2">Charging Cable 7kW</SelectItem>
-                          <SelectItem value="item-3">Wall Mount Bracket</SelectItem>
+                          {inventoryItems.map(inventoryItem => (
+                            <SelectItem key={inventoryItem.id} value={inventoryItem.id}>
+                              {inventoryItem.name} ({inventoryItem.sku})
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -192,7 +224,7 @@ export function CreatePurchaseOrderModal({ open, onOpenChange }: CreatePurchaseO
                     </div>
 
                     <div className="col-span-2">
-                      {items.length > 1 && (
+                      {poItems.length > 1 && (
                         <Button 
                           type="button" 
                           variant="outline" 

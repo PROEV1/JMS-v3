@@ -12,6 +12,8 @@ import { StockRequestWithDetails, StockRequestStatus } from '@/types/stock-reque
 import { format } from 'date-fns';
 import { InventoryKpiTile } from './shared/InventoryKpiTile';
 import { QuickActionsBlock } from './shared/QuickActionsBlock';
+import { CreateStockRequestModal } from './CreateStockRequestModal';
+import { CreateRMAModal } from './CreateRMAModal';
 
 const statusIcons = {
   submitted: Clock,
@@ -269,10 +271,12 @@ const RequestCard: React.FC<RequestCardProps> = ({ request, onStatusChange }) =>
   );
 };
 
-export const AdminStockRequestsBoard: React.FC = () => {
+export const AdminStockRequestsBoard = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<StockRequestStatus | 'all'>('all');
   const [viewMode, setViewMode] = useState<'tiles' | 'board'>('tiles');
+  const [showCreateRequest, setShowCreateRequest] = useState(false);
+  const [showCreateRMA, setShowCreateRMA] = useState(false);
   
   const { data: requests, isLoading } = useStockRequests();
   const updateStatus = useUpdateStockRequestStatus();
@@ -316,13 +320,13 @@ export const AdminStockRequestsBoard: React.FC = () => {
     {
       label: "New Request",
       icon: Plus,
-      onClick: () => {/* TODO: Open create request modal */},
+      onClick: () => setShowCreateRequest(true),
       variant: 'default' as const
     },
     {
-      label: "Bulk Approve",
-      icon: CheckCircle,
-      onClick: () => {/* TODO: Bulk approve */},
+      label: "Create Return/RMA",
+      icon: Package,
+      onClick: () => setShowCreateRMA(true),
       variant: 'secondary' as const
     },
     {
@@ -513,6 +517,17 @@ export const AdminStockRequestsBoard: React.FC = () => {
           })}
         </div>
       )}
+      
+      {/* Modals */}
+      <CreateStockRequestModal
+        open={showCreateRequest}
+        onOpenChange={setShowCreateRequest}
+      />
+      
+      <CreateRMAModal
+        open={showCreateRMA}
+        onOpenChange={setShowCreateRMA}
+      />
     </div>
   );
 };

@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { MapPin, Warehouse, Truck, Building, User, DollarSign, Hash, Plus, Edit } from "lucide-react";
+import { MapPin, Warehouse, Truck, Building, User, DollarSign, Hash, Plus, Edit, Trash2 } from "lucide-react";
 import { AddLocationModal } from './AddLocationModal';
 import { EditLocationModal } from './EditLocationModal';
 import { LocationStockModal } from './LocationStockModal';
@@ -33,7 +33,12 @@ export function LocationsList() {
       try {
         const { data, error } = await supabase
           .from('inventory_locations')
-          .select('*')
+          .select(`
+            *,
+            engineers (
+              name
+            )
+          `)
           .eq('is_active', true)
           .order('name');
         
@@ -44,7 +49,7 @@ export function LocationsList() {
         
         return (data || []).map(location => ({
           ...location,
-          engineer_name: null // We'll handle engineer lookup separately if needed
+          engineer_name: location.engineers?.name || null
         })) as Location[];
       } catch (err) {
         console.error('Query error:', err);
@@ -172,16 +177,37 @@ export function LocationsList() {
               )}
 
               <div className="flex justify-between gap-2 pt-2">
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => {
-                    setSelectedLocation(location);
-                    setShowEditModal(true);
-                  }}
-                >
-                  <Edit className="w-4 h-4" />
-                </Button>
+                <div className="flex gap-1">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => {
+                      setSelectedLocation(location);
+                      setShowEditModal(true);
+                    }}
+                  >
+                    <Edit className="w-4 h-4" />
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={async () => {
+                      if (confirm('Are you sure you want to delete this location?')) {
+                        try {
+                          await supabase
+                            .from('inventory_locations')
+                            .update({ is_active: false })
+                            .eq('id', location.id);
+                          window.location.reload();
+                        } catch (error) {
+                          console.error('Error deleting location:', error);
+                        }
+                      }
+                    }}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
                 <Button 
                   variant="outline" 
                   size="sm"

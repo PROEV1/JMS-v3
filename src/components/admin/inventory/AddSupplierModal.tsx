@@ -33,8 +33,14 @@ export function AddSupplierModal({ open, onOpenChange }: AddSupplierModalProps) 
       is_active: boolean;
     }) => {
       const { data, error } = await supabase
-        .from('suppliers')
-        .insert(supplierData)
+        .from('inventory_suppliers')
+        .insert({
+          name: supplierData.name,
+          contact_email: supplierData.email,
+          contact_phone: supplierData.phone,
+          address: supplierData.address,
+          is_active: supplierData.is_active
+        })
         .select()
         .single();
       

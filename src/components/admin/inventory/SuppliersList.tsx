@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, Building, AlertCircle, Edit, Mail, Phone, TrendingUp, Clock, Star } from "lucide-react";
+import { Plus, Search, Building, AlertCircle, Edit, Mail, Phone, TrendingUp, Clock, Star, Trash2 } from "lucide-react";
 import { AddSupplierModal } from "./AddSupplierModal";
 import { EditSupplierModal } from './EditSupplierModal';
 import { InventoryKpiTile } from './shared/InventoryKpiTile';
@@ -221,16 +221,37 @@ export function SuppliersList() {
                       </StatusChip>
                     </TableCell>
                     <TableCell>
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={() => {
-                          setSelectedSupplier(supplier);
-                          setShowEditModal(true);
-                        }}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
+                      <div className="flex gap-1">
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => {
+                            setSelectedSupplier(supplier);
+                            setShowEditModal(true);
+                          }}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={async () => {
+                            if (confirm('Are you sure you want to delete this supplier?')) {
+                              try {
+                                await supabase
+                                  .from('inventory_suppliers')
+                                  .update({ is_active: false })
+                                  .eq('id', supplier.id);
+                                window.location.reload();
+                              } catch (error) {
+                                console.error('Error deleting supplier:', error);
+                              }
+                            }
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
