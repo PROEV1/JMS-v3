@@ -737,57 +737,6 @@ export const QuoteDetailView: React.FC<QuoteDetailViewProps> = ({ quote, onBack,
         </Card>
       )}
 
-      {/* Enhanced What's Always Included - Icon Checklist Cards */}
-      <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="p-4 bg-gradient-to-br from-green-50 to-green-100 border-green-200">
-          <div className="flex items-center space-x-3">
-            <div className="p-2 bg-green-600 rounded-full">
-              <Shield className="h-4 w-4 text-white" />
-            </div>
-            <div>
-              <h4 className="font-semibold text-green-800">{quote.warranty_period} Warranty</h4>
-              <p className="text-xs text-green-600">Comprehensive coverage</p>
-            </div>
-          </div>
-        </Card>
-        
-        <Card className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
-          <div className="flex items-center space-x-3">
-            <div className="p-2 bg-blue-600 rounded-full">
-              <Wrench className="h-4 w-4 text-white" />
-            </div>
-            <div>
-              <h4 className="font-semibold text-blue-800">Professional Installation</h4>
-              <p className="text-xs text-blue-600">By certified team</p>
-            </div>
-          </div>
-        </Card>
-        
-        <Card className="p-4 bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
-          <div className="flex items-center space-x-3">
-            <div className="p-2 bg-purple-600 rounded-full">
-              <MessageCircle className="h-4 w-4 text-white" />
-            </div>
-            <div>
-              <h4 className="font-semibold text-purple-800">Free Consultation</h4>
-              <p className="text-xs text-purple-600">Expert guidance included</p>
-            </div>
-          </div>
-        </Card>
-        
-        <Card className="p-4 bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
-          <div className="flex items-center space-x-3">
-            <div className="p-2 bg-orange-600 rounded-full">
-              <CheckCircle className="h-4 w-4 text-white" />
-            </div>
-            <div>
-              <h4 className="font-semibold text-orange-800">Quality Guarantee</h4>
-              <p className="text-xs text-orange-600">Satisfaction assured</p>
-            </div>
-          </div>
-        </Card>
-      </div>
-
       {/* Activity Log Panel */}
       <Card>
         <CardHeader>
