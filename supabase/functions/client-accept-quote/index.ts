@@ -201,9 +201,21 @@ serve(async (req) => {
       console.log('Quote accepted successfully')
     }
 
-    // Generate survey token and send survey email for non-partner jobs
+    // Check if survey already exists and is completed
+    const { data: existingSurvey } = await supabaseAdmin
+      .from('client_surveys')
+      .select('status')
+      .eq('order_id', orderId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    // Only send survey email if no completed survey exists
+    const shouldSendSurvey = !existingSurvey || 
+      (existingSurvey.status !== 'approved' && existingSurvey.status !== 'submitted');
+
     let surveyEmailSent = false;
-    if (orderCreated || quote.status !== 'accepted') {
+    if (shouldSendSurvey && (orderCreated || quote.status !== 'accepted')) {
       try {
         // Check if order needs survey
         const { data: orderData } = await supabaseAdmin
@@ -253,6 +265,8 @@ serve(async (req) => {
       } catch (error) {
         console.error('Error in survey setup:', error);
       }
+    } else {
+      console.log('Skipping survey email - survey already completed or in progress');
     }
 
     return new Response(

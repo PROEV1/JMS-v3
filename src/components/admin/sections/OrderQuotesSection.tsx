@@ -41,6 +41,7 @@ export function OrderQuotesSection({ order, onOrderUpdate }: OrderQuotesSectionP
   const [loading, setLoading] = useState(true);
   const [selectedSnapshot, setSelectedSnapshot] = useState<QuoteSnapshot | null>(null);
   const [isCreatingRevision, setIsCreatingRevision] = useState(false);
+  const [sendingQuote, setSendingQuote] = useState<string | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -70,6 +71,40 @@ export function OrderQuotesSection({ order, onOrderUpdate }: OrderQuotesSectionP
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSendRevisedQuote = async (quoteId: string, revisionReason?: string) => {
+    setSendingQuote(quoteId);
+    
+    try {
+      const { error } = await supabase.functions.invoke('send-revised-quote', {
+        body: {
+          quoteId,
+          revisionReason: revisionReason || 'Survey review completed - revised quote based on your requirements'
+        }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Revised quote sent to client",
+      });
+
+      // Refresh snapshots to show updated status
+      fetchQuoteSnapshots();
+      onOrderUpdate?.();
+
+    } catch (error) {
+      console.error('Error sending revised quote:', error);
+      toast({
+        title: "Error",
+        description: "Failed to send revised quote",
+        variant: "destructive",
+      });
+    } finally {
+      setSendingQuote(null);
     }
   };
 
@@ -140,11 +175,11 @@ export function OrderQuotesSection({ order, onOrderUpdate }: OrderQuotesSectionP
           .insert(newItems);
       }
 
-      // Update order status to awaiting payment (revised quote needs acceptance)
+      // Update order status to awaiting_payment (revised quote needs acceptance)
       await supabase
         .from('orders')
         .update({ 
-          status_enhanced: 'awaiting_payment',
+          status_enhanced: 'awaiting_payment' as const,
           quote_id: newQuote.id
         })
         .eq('id', order.id);
@@ -221,14 +256,25 @@ export function OrderQuotesSection({ order, onOrderUpdate }: OrderQuotesSectionP
               <FileText className="h-5 w-5" />
               Quotes
             </div>
-            <Button
-              onClick={handleCreateRevisedQuote}
-              disabled={isCreatingRevision || !order.quote_id}
-              size="sm"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Create Revised Quote
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                onClick={handleCreateRevisedQuote}
+                disabled={isCreatingRevision || !order.quote_id}
+                size="sm"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Create Revised Quote
+              </Button>
+              {snapshots.length > 0 && snapshots[0].quote.status === 'draft' && (
+                <Button
+                  onClick={() => navigate(`/admin/quotes/${snapshots[0].quote.id}/edit`)}
+                  variant="outline"
+                  size="sm"
+                >
+                  Edit Latest Quote
+                </Button>
+              )}
+            </div>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -267,14 +313,31 @@ export function OrderQuotesSection({ order, onOrderUpdate }: OrderQuotesSectionP
                       )}
                     </div>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setSelectedSnapshot(snapshot)}
-                  >
-                    <Eye className="h-4 w-4 mr-2" />
-                    View
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSelectedSnapshot(snapshot)}
+                    >
+                      <Eye className="h-4 w-4 mr-2" />
+                      View
+                    </Button>
+                    {snapshot.quote.status === 'draft' && (
+                      <Button
+                        onClick={() => handleSendRevisedQuote(snapshot.quote.id)}
+                        disabled={sendingQuote === snapshot.quote.id}
+                        size="sm"
+                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                      >
+                        {sendingQuote === snapshot.quote.id ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2"></div>
+                        ) : (
+                          <span className="mr-2">📧</span>
+                        )}
+                        Send to Client
+                      </Button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

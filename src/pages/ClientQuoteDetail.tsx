@@ -59,6 +59,7 @@ export default function ClientQuoteDetail() {
   const [loading, setLoading] = useState(true);
   const [accepting, setAccepting] = useState(false);
   const [rejecting, setRejecting] = useState(false);
+  const [previousSnapshot, setPreviousSnapshot] = useState<any>(null);
 
   useEffect(() => {
     if (!user || !id) return;
@@ -128,6 +129,22 @@ export default function ClientQuoteDetail() {
 
       setQuote(quoteData);
       setQuoteItems(itemsData || []);
+
+      // Fetch previous quote snapshot for comparison
+      if (quoteData.order_id) {
+        const { data: snapshotData } = await supabase
+          .from('order_quote_snapshots')
+          .select('quote_data, created_at, revision_reason')
+          .eq('order_id', quoteData.order_id)
+          .neq('quote_id', id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (snapshotData) {
+          setPreviousSnapshot(snapshotData);
+        }
+      }
     } catch (error) {
       console.error('Error in fetchQuoteDetails:', error);
       toast({
@@ -370,6 +387,59 @@ export default function ClientQuoteDetail() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Changes Since Last Quote */}
+          {previousSnapshot && (
+            <Card className="bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200">
+              <CardContent className="p-6">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
+                    <h3 className="font-semibold text-blue-900">Changes Since Last Quote</h3>
+                  </div>
+                  
+                  {previousSnapshot.revision_reason && (
+                    <div className="bg-white/50 rounded-lg p-4">
+                      <p className="text-sm font-medium text-blue-800 mb-1">Reason for Revision</p>
+                      <p className="text-blue-700">{previousSnapshot.revision_reason}</p>
+                    </div>
+                  )}
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="text-center">
+                      <p className="text-sm text-blue-600 mb-1">Previous Total</p>
+                      <p className="text-xl font-bold text-blue-800">
+                        £{(previousSnapshot.quote_data.total_cost || 0).toFixed(2)}
+                      </p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm text-blue-600 mb-1">New Total</p>
+                      <p className="text-xl font-bold text-blue-800">
+                        £{quote.total_cost.toFixed(2)}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {(() => {
+                    const difference = quote.total_cost - (previousSnapshot.quote_data.total_cost || 0);
+                    const isIncrease = difference > 0;
+                    const absChange = Math.abs(difference);
+                    
+                    if (difference !== 0) {
+                      return (
+                        <div className={`text-center p-3 rounded-lg ${isIncrease ? 'bg-orange-100' : 'bg-green-100'}`}>
+                          <p className={`font-semibold ${isIncrease ? 'text-orange-700' : 'text-green-700'}`}>
+                            Price {isIncrease ? 'increased' : 'decreased'} by £{absChange.toFixed(2)}
+                          </p>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Trust & Reassurance Row */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

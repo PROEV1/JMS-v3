@@ -1490,6 +1490,7 @@ export type Database = {
           pdf_url: string | null
           quote_data: Json
           quote_id: string
+          revision_reason: string | null
           snapshot_type: string
         }
         Insert: {
@@ -1501,6 +1502,7 @@ export type Database = {
           pdf_url?: string | null
           quote_data: Json
           quote_id: string
+          revision_reason?: string | null
           snapshot_type: string
         }
         Update: {
@@ -1512,6 +1514,7 @@ export type Database = {
           pdf_url?: string | null
           quote_data?: Json
           quote_id?: string
+          revision_reason?: string | null
           snapshot_type?: string
         }
         Relationships: [
