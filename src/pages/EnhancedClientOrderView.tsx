@@ -187,8 +187,9 @@ export default function EnhancedClientOrderView() {
       return { step: 1, title: 'Survey', description: 'Rework required - update survey' };
     }
     
+    // When survey is submitted/under review, it's completed from client perspective
     if (status === 'awaiting_survey_review') {
-      return { step: 1, title: 'Survey', description: 'Survey submitted - being reviewed' };
+      return { step: 2, title: 'Survey Review', description: 'Survey submitted - being reviewed by our team' };
     }
     
     if (status === 'awaiting_payment') {
@@ -312,6 +313,7 @@ export default function EnhancedClientOrderView() {
 
   const renderStepContent = () => {
     const currentStep = getCurrentStep();
+    const status = order?.status_enhanced;
     
     if (currentStep.step === 1) {
       return (
@@ -329,6 +331,28 @@ export default function EnhancedClientOrderView() {
             <Button onClick={handleSurveyStart} className="bg-red-500 hover:bg-red-600">
               Start Survey
             </Button>
+          </div>
+        </div>
+      );
+    }
+    
+    if (currentStep.step === 2 && status === 'awaiting_survey_review') {
+      return (
+        <div className="space-y-6">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center">
+                <Clock className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-blue-700">Survey Under Review</h3>
+                <p className="text-sm text-blue-600">Your survey has been submitted and is being reviewed by our team</p>
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              We'll review your survey and contact you if any additional information is needed. 
+              You'll be notified once the review is complete.
+            </p>
           </div>
         </div>
       );
