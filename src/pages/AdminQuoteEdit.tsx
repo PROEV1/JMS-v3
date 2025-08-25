@@ -13,6 +13,7 @@ import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { ArrowLeft, Save, Plus } from 'lucide-react';
 import { ProductSelector } from '@/components/ProductSelector';
+import { AdditionalLineItemsEditor } from '@/components/admin/AdditionalLineItemsEditor';
 
 interface Client {
   id: string;
@@ -52,13 +53,22 @@ interface SelectedProduct {
 
 interface QuoteItem {
   id: string;
-  product_id: string;
+  product_id: string | null;
   product_name: string;
   quantity: number;
   unit_price: number;
   total_price: number;
   configuration: Record<string, string>;
-  product: Product;
+  product: Product | null;
+}
+
+interface AdditionalLineItem {
+  id?: string;
+  description: string;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+  notes?: string;
 }
 
 interface Quote {
@@ -88,6 +98,7 @@ export default function AdminQuoteEdit() {
   const [filteredClients, setFilteredClients] = useState<Client[]>([]);
   const [clientSearch, setClientSearch] = useState('');
   const [selectedProducts, setSelectedProducts] = useState<SelectedProduct[]>([]);
+  const [additionalItems, setAdditionalItems] = useState<AdditionalLineItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [fetchingQuote, setFetchingQuote] = useState(true);
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
@@ -168,15 +179,34 @@ export default function AdminQuoteEdit() {
         expires_at: data.expires_at ? new Date(data.expires_at).toISOString().split('T')[0] : '',
       });
 
-      // Convert quote items to selected products
-      const selectedProds: SelectedProduct[] = data.quote_items.map((item: any) => ({
-        product: item.product,
-        quantity: item.quantity,
-        configuration: (item.configuration as Record<string, string>) || {},
-        totalPrice: item.total_price
-      }));
+      // Separate product-backed items from custom items
+      const selectedProds: SelectedProduct[] = [];
+      const customItems: AdditionalLineItem[] = [];
+
+      data.quote_items.forEach((item: any) => {
+        if (item.product_id && item.product) {
+          // This is a product-backed item
+          selectedProds.push({
+            product: item.product,
+            quantity: item.quantity,
+            configuration: (item.configuration as Record<string, string>) || {},
+            totalPrice: item.total_price
+          });
+        } else {
+          // This is a custom line item (no product_id or product is null)
+          customItems.push({
+            id: item.id,
+            description: item.product_name,
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+            total_price: item.total_price,
+            notes: ''
+          });
+        }
+      });
 
       setSelectedProducts(selectedProds);
+      setAdditionalItems(customItems);
     } catch (error) {
       console.error('Error fetching quote:', error);
       toast({
@@ -296,10 +326,10 @@ export default function AdminQuoteEdit() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.client_id || selectedProducts.length === 0) {
+    if (!formData.client_id || (selectedProducts.length === 0 && additionalItems.length === 0)) {
       toast({
         title: "Validation Error",
-        description: "Please select a client and at least one product",
+        description: "Please select a client and at least one product or line item",
         variant: "destructive",
       });
       return;
@@ -310,14 +340,19 @@ export default function AdminQuoteEdit() {
     try {
       const expiresAt = formData.expires_at ? new Date(formData.expires_at).toISOString() : null;
       
-      // Calculate totals from selected products
-      const totalCost = selectedProducts.reduce((sum, sp) => sum + sp.totalPrice, 0);
+      // Calculate totals from selected products and additional items
+      const productCost = selectedProducts.reduce((sum, sp) => sum + sp.totalPrice, 0);
+      const additionalCost = additionalItems.reduce((sum, item) => sum + item.total_price, 0);
+      const totalCost = productCost + additionalCost;
       
       // Create product details summary
-      const productDetails = selectedProducts.map(sp => {
-        const configText = Object.entries(sp.configuration).map(([type, value]) => `${type}: ${value}`).join(', ');
-        return `${sp.product.name} (Qty: ${sp.quantity})${configText ? ` - ${configText}` : ''}`;
-      }).join('\n');
+      const productDetails = [
+        ...selectedProducts.map(sp => {
+          const configText = Object.entries(sp.configuration).map(([type, value]) => `${type}: ${value}`).join(', ');
+          return `${sp.product.name} (Qty: ${sp.quantity})${configText ? ` - ${configText}` : ''}`;
+        }),
+        ...additionalItems.map(item => `${item.description} (Qty: ${item.quantity})`)
+      ].join('\n');
       
       // Update quote
       const { error: quoteError } = await supabase
@@ -344,22 +379,37 @@ export default function AdminQuoteEdit() {
 
       if (deleteError) throw deleteError;
 
-      // Create new quote items
-      const quoteItems = selectedProducts.map(sp => ({
-        quote_id: id,
-        product_id: sp.product.id,
-        product_name: sp.product.name,
-        quantity: sp.quantity,
-        unit_price: sp.product.base_price,
-        total_price: sp.totalPrice,
-        configuration: sp.configuration
-      }));
+      // Create new quote items (both products and additional items)
+      const quoteItems = [
+        // Product-backed items
+        ...selectedProducts.map(sp => ({
+          quote_id: id,
+          product_id: sp.product.id,
+          product_name: sp.product.name,
+          quantity: sp.quantity,
+          unit_price: sp.product.base_price,
+          total_price: sp.totalPrice,
+          configuration: sp.configuration
+        })),
+        // Additional line items (no product_id)
+        ...additionalItems.map(item => ({
+          quote_id: id,
+          product_id: null,
+          product_name: item.description,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          total_price: item.total_price,
+          configuration: {}
+        }))
+      ];
 
-      const { error: itemsError } = await supabase
-        .from('quote_items')
-        .insert(quoteItems);
+      if (quoteItems.length > 0) {
+        const { error: itemsError } = await supabase
+          .from('quote_items')
+          .insert(quoteItems);
 
-      if (itemsError) throw itemsError;
+        if (itemsError) throw itemsError;
+      }
 
       toast({
         title: "Success",
@@ -433,6 +483,14 @@ export default function AdminQuoteEdit() {
               selectedProducts={selectedProducts}
               onSelectionChange={setSelectedProducts}
             />
+
+            {/* Additional Line Items */}
+            <div className="mt-6">
+              <AdditionalLineItemsEditor
+                items={additionalItems}
+                onItemsChange={setAdditionalItems}
+              />
+            </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Basic Information */}

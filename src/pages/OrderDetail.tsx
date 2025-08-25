@@ -66,6 +66,7 @@ interface Order {
     special_instructions: string | null;
     quote_items: Array<{
       id: string;
+      product_id: string | null;
       product_name: string;
       quantity: number;
       unit_price: number;
@@ -184,6 +185,7 @@ export default function OrderDetail() {
             special_instructions,
             quote_items(
               id,
+              product_id,
               product_name,
               quantity,
               unit_price,

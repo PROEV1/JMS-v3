@@ -22,6 +22,7 @@ interface ProductSummaryProps {
       id: string;
       quote_items: Array<{
         id: string;
+        product_id: string | null;
         product_name: string;
         quantity: number;
         unit_price: number;
@@ -191,47 +192,57 @@ export function ProductSummarySection({ order, onUpdate }: ProductSummaryProps) 
         {/* Product Items */}
         <div className="space-y-3">
           {order.quote?.quote_items?.length ? (
-            order.quote.quote_items.map((item, index) => (
-              <Card key={item.id} className="relative">
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <h5 className="font-medium">{item.product_name}</h5>
-                        <Badge variant="outline">Qty: {item.quantity}</Badge>
+            order.quote.quote_items.map((item, index) => {
+              // Check if this is a product-backed item or additional line item
+              const isProductItem = !!item.product_id;
+              
+              return (
+                <Card key={item.id} className={`relative ${!isProductItem ? 'border-l-4 border-l-orange-500' : ''}`}>
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <h5 className="font-medium">{item.product_name}</h5>
+                          <Badge variant="outline">Qty: {item.quantity}</Badge>
+                          {!isProductItem && (
+                            <Badge variant="secondary" className="bg-orange-100 text-orange-800">
+                              Custom Item
+                            </Badge>
+                          )}
+                        </div>
+                        
+                        {formatConfiguration(item.configuration) && (
+                          <div className="text-sm text-muted-foreground mb-2">
+                            {formatConfiguration(item.configuration)}
+                          </div>
+                        )}
+                        
+                        <div className="flex items-center gap-4 text-sm">
+                          <span className="text-muted-foreground">
+                            Unit Price: {formatCurrency(item.unit_price)}
+                          </span>
+                          <span className="font-semibold">
+                            Total: {formatCurrency(item.total_price)}
+                          </span>
+                        </div>
                       </div>
-                      
-                      {formatConfiguration(item.configuration) && (
-                        <div className="text-sm text-muted-foreground mb-2">
-                          {formatConfiguration(item.configuration)}
+
+                      {isEditing && (
+                        <div className="flex gap-2">
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => handleRemoveItem(item.id)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
                         </div>
                       )}
-                      
-                      <div className="flex items-center gap-4 text-sm">
-                        <span className="text-muted-foreground">
-                          Unit Price: {formatCurrency(item.unit_price)}
-                        </span>
-                        <span className="font-semibold">
-                          Total: {formatCurrency(item.total_price)}
-                        </span>
-                      </div>
                     </div>
-
-                    {isEditing && (
-                      <div className="flex gap-2">
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => handleRemoveItem(item.id)}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))
+                  </CardContent>
+                </Card>
+              );
+            })
           ) : (
             <div className="text-center py-8 text-muted-foreground">
               <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />

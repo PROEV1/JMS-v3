@@ -62,7 +62,7 @@ interface QuoteItem {
       image_name: string;
       is_primary: boolean;
     }>;
-  };
+  } | null;
 }
 
 interface ProductCompatibility {
@@ -281,6 +281,10 @@ export const QuoteDetailView: React.FC<QuoteDetailViewProps> = ({ quote, onBack,
     
     // Fallback to placeholder images
     return getPlaceholderImage(item.product_name);
+  };
+
+  const isCustomLineItem = (item: QuoteItem) => {
+    return !item.product || !item.product.id;
   };
 
   const shareViaEmail = async () => {
