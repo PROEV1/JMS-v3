@@ -155,8 +155,8 @@ serve(async (req) => {
         },
       ],
       mode: 'payment',
-      success_url: `${origin}/orders/${order_id}?payment=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/orders/${order_id}?payment=cancelled`,
+      success_url: `${origin}/client/orders/${order_id}?payment=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}/client/orders/${order_id}?payment=cancelled`,
       metadata: {
         order_id: order_id,
         payment_type: payment_type,
