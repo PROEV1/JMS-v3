@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { ChevronLeft, Download, Share2, Eye, Calendar, Shield, Wrench, CheckCircle, Mail, MessageCircle, Link, Copy } from 'lucide-react';
+import { ChevronLeft, Download, Share2, Eye, Calendar, Shield, Wrench, CheckCircle, Mail, MessageCircle, Link, Copy, Edit, Clock, CheckCircle2, XCircle, User, MapPin, Phone } from 'lucide-react';
 import livingRoomImg from '@/assets/living-room-placeholder.jpg';
 import laptopImg from '@/assets/laptop-placeholder.jpg';
 import workspaceImg from '@/assets/workspace-placeholder.jpg';
@@ -35,6 +35,13 @@ interface Quote {
   special_instructions: string;
   is_shareable: boolean;
   share_token: string;
+  client: {
+    id: string;
+    full_name: string;
+    email: string;
+    phone: string | null;
+    address: string | null;
+  };
 }
 
 interface QuoteItem {
@@ -410,7 +417,7 @@ export const QuoteDetailView: React.FC<QuoteDetailViewProps> = ({ quote, onBack,
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Enhanced Admin Header with Client Metadata */}
       <div className="space-y-4">
         {/* Back Button */}
         <div>
@@ -419,82 +426,152 @@ export const QuoteDetailView: React.FC<QuoteDetailViewProps> = ({ quote, onBack,
             Back to Quotes
           </Button>
         </div>
-        
-        {/* Quote Title and Actions */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold brand-heading-1">Quote {quote.quote_number}</h1>
-            <div className="flex items-center space-x-2 mt-1">
-              <Badge className={getStatusColor(quote.status)}>
-                {quote.status.charAt(0).toUpperCase() + quote.status.slice(1)}
-              </Badge>
-              {quote.expires_at && (
-                <span className="text-sm text-muted-foreground">
-                  Expires: {new Date(quote.expires_at).toLocaleDateString()}
-                </span>
-              )}
+
+        {/* Client & Quote Metadata Header */}
+        <Card className="border-l-4 border-l-primary">
+          <CardContent className="p-6">
+            <div className="flex items-start justify-between mb-4">
+              <div className="space-y-3">
+                <div className="flex items-center space-x-3">
+                  <h1 className="text-2xl font-bold brand-heading-1">Quote {quote.quote_number}</h1>
+                  <Badge className={getStatusColor(quote.status)}>
+                    {quote.status.charAt(0).toUpperCase() + quote.status.slice(1)}
+                  </Badge>
+                </div>
+                
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                  <div className="flex items-center space-x-2">
+                    <User className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-medium">{quote.client.full_name}</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Mail className="h-4 w-4 text-muted-foreground" />
+                    <span>{quote.client.email}</span>
+                  </div>
+                  {quote.client.phone && (
+                    <div className="flex items-center space-x-2">
+                      <Phone className="h-4 w-4 text-muted-foreground" />
+                      <span>{quote.client.phone}</span>
+                    </div>
+                  )}
+                  {quote.client.address && (
+                    <div className="flex items-center space-x-2">
+                      <MapPin className="h-4 w-4 text-muted-foreground" />
+                      <span className="truncate">{quote.client.address}</span>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="flex items-center space-x-4 text-sm text-muted-foreground">
+                  <span>Created: {new Date(quote.created_at).toLocaleDateString()}</span>
+                  <span>Value: {formatCurrency(quote.total_cost)}</span>
+                  {quote.expires_at && (
+                    <span>Expires: {new Date(quote.expires_at).toLocaleDateString()}</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Enhanced Action Buttons with Hierarchy */}
+              <div className="flex flex-col items-end space-y-2">
+                <div className="flex space-x-2">
+                  {quote.status === 'sent' && (
+                    <>
+                      <Button onClick={handleAcceptQuote} size="sm" className="bg-brand-teal hover:bg-brand-teal-dark text-white font-medium">
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Accept Quote
+                      </Button>
+                      <Button onClick={handleRejectQuote} variant="outline" size="sm" className="text-red-600 border-red-200 hover:bg-red-50">
+                        <XCircle className="h-4 w-4 mr-2" />
+                        Reject
+                      </Button>
+                    </>
+                  )}
+                  {quote.status === 'accepted' && order && (
+                    <Button 
+                      onClick={() => window.open(`/orders/${order.id}`, '_blank')}
+                      size="sm"
+                      className="bg-brand-blue hover:bg-brand-blue-dark text-white"
+                    >
+                      <Eye className="h-4 w-4 mr-2" />
+                      View Order
+                    </Button>
+                  )}
+                  {quote.status === 'rejected' && (
+                    <Button onClick={handleAcceptQuote} size="sm" className="bg-brand-teal hover:bg-brand-teal-dark text-white">
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Accept Quote
+                    </Button>
+                  )}
+                </div>
+                
+                {/* Secondary Actions - Smaller Icons */}
+                <div className="flex space-x-1">
+                  <Button variant="ghost" size="sm" onClick={() => window.open(`/admin/quotes/${quote.id}/edit`, '_blank')}>
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => window.open(`/admin/messages?client=${quote.client.id}`, '_blank')}>
+                    <MessageCircle className="h-4 w-4" />
+                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm">
+                        <Share2 className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={shareViaEmail}>
+                        <Mail className="h-4 w-4 mr-2" />
+                        Share via Email
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={copyShareLink}>
+                        <Copy className="h-4 w-4 mr-2" />
+                        Copy Link
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                  <Button variant="ghost" size="sm" onClick={generatePDF} disabled={generating}>
+                    <Download className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
             </div>
-          </div>
-          
-          <div className="flex space-x-2">
-            {quote.status === 'sent' && (
-              <>
-                <Button onClick={handleAcceptQuote} className="bg-brand-teal hover:bg-brand-teal-dark text-white">
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  Accept Quote
-                </Button>
-                <Button onClick={handleRejectQuote} variant="destructive">
-                  Reject Quote
-                </Button>
-              </>
-            )}
-            {quote.status === 'accepted' && order && (
-              <Button 
-                onClick={() => window.open(`/orders/${order.id}`, '_blank')}
-                className="bg-brand-blue hover:bg-brand-blue-dark text-white"
-              >
-                <Eye className="h-4 w-4 mr-2" />
-                View Order
-              </Button>
-            )}
-            {quote.status === 'rejected' && (
-              <Button onClick={handleAcceptQuote} className="bg-brand-teal hover:bg-brand-teal-dark text-white">
-                <CheckCircle className="h-4 w-4 mr-2" />
-                Accept Quote
-              </Button>
-            )}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline">
-                  <Share2 className="h-4 w-4 mr-2" />
-                  Share
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={shareViaEmail}>
-                  <Mail className="h-4 w-4 mr-2" />
-                  Share via Email
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={shareViaWhatsApp}>
-                  <MessageCircle className="h-4 w-4 mr-2" />
-                  Share via WhatsApp
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={copyShareLink}>
-                  <Copy className="h-4 w-4 mr-2" />
-                  Copy Link
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={shareQuote}>
-                  <Link className="h-4 w-4 mr-2" />
-                  Native Share
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <Button onClick={generatePDF} disabled={generating}>
-              <Download className="h-4 w-4 mr-2" />
-              {generating ? 'Generating...' : 'Download'}
-            </Button>
-          </div>
-        </div>
+
+            {/* Workflow Timeline */}
+            <div className="border-t pt-4">
+              <h4 className="text-sm font-medium mb-3 text-muted-foreground">Quote Workflow</h4>
+              <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-1">
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  <span className="text-xs">Created</span>
+                </div>
+                <div className="flex-1 h-px bg-muted"></div>
+                <div className="flex items-center space-x-1">
+                  <div className={`h-4 w-4 rounded-full flex items-center justify-center ${quote.status === 'sent' || quote.status === 'accepted' || quote.status === 'rejected' ? 'bg-green-600' : 'bg-muted'}`}>
+                    {(quote.status === 'sent' || quote.status === 'accepted' || quote.status === 'rejected') ? (
+                      <CheckCircle2 className="h-3 w-3 text-white" />
+                    ) : (
+                      <div className="h-2 w-2 bg-white rounded-full"></div>
+                    )}
+                  </div>
+                  <span className="text-xs">Sent</span>
+                </div>
+                <div className="flex-1 h-px bg-muted"></div>
+                <div className="flex items-center space-x-1">
+                  <div className={`h-4 w-4 rounded-full flex items-center justify-center ${quote.status === 'accepted' ? 'bg-green-600' : quote.status === 'rejected' ? 'bg-red-600' : 'bg-muted'}`}>
+                    {quote.status === 'accepted' ? (
+                      <CheckCircle2 className="h-3 w-3 text-white" />
+                    ) : quote.status === 'rejected' ? (
+                      <XCircle className="h-3 w-3 text-white" />
+                    ) : (
+                      <div className="h-2 w-2 bg-white rounded-full"></div>
+                    )}
+                  </div>
+                  <span className="text-xs">{quote.status === 'accepted' ? 'Accepted' : quote.status === 'rejected' ? 'Rejected' : 'Response'}</span>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Quote Items */}
@@ -660,69 +737,121 @@ export const QuoteDetailView: React.FC<QuoteDetailViewProps> = ({ quote, onBack,
         </Card>
       )}
 
-      {/* What's Always Included */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <Shield className="h-5 w-5 mr-2 text-brand-teal" />
-            What's Always Included
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid md:grid-cols-2 gap-4">
-            <div className="flex items-center space-x-2">
-              <div className="w-2 h-2 bg-brand-teal rounded-full"></div>
-              <span>{quote.warranty_period} warranty</span>
+      {/* Enhanced What's Always Included - Icon Checklist Cards */}
+      <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="p-4 bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+          <div className="flex items-center space-x-3">
+            <div className="p-2 bg-green-600 rounded-full">
+              <Shield className="h-4 w-4 text-white" />
             </div>
-            {quote.includes_installation && (
-              <div className="flex items-center space-x-2">
-                <div className="w-2 h-2 bg-brand-teal rounded-full"></div>
-                <span>Professional installation</span>
-              </div>
-            )}
-            <div className="flex items-center space-x-2">
-              <div className="w-2 h-2 bg-brand-teal rounded-full"></div>
-              <span>Free consultation</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-2 h-2 bg-brand-teal rounded-full"></div>
-              <span>Quality guarantee</span>
+            <div>
+              <h4 className="font-semibold text-green-800">{quote.warranty_period} Warranty</h4>
+              <p className="text-xs text-green-600">Comprehensive coverage</p>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </Card>
+        
+        <Card className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+          <div className="flex items-center space-x-3">
+            <div className="p-2 bg-blue-600 rounded-full">
+              <Wrench className="h-4 w-4 text-white" />
+            </div>
+            <div>
+              <h4 className="font-semibold text-blue-800">Professional Installation</h4>
+              <p className="text-xs text-blue-600">By certified team</p>
+            </div>
+          </div>
+        </Card>
+        
+        <Card className="p-4 bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+          <div className="flex items-center space-x-3">
+            <div className="p-2 bg-purple-600 rounded-full">
+              <MessageCircle className="h-4 w-4 text-white" />
+            </div>
+            <div>
+              <h4 className="font-semibold text-purple-800">Free Consultation</h4>
+              <p className="text-xs text-purple-600">Expert guidance included</p>
+            </div>
+          </div>
+        </Card>
+        
+        <Card className="p-4 bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
+          <div className="flex items-center space-x-3">
+            <div className="p-2 bg-orange-600 rounded-full">
+              <CheckCircle className="h-4 w-4 text-white" />
+            </div>
+            <div>
+              <h4 className="font-semibold text-orange-800">Quality Guarantee</h4>
+              <p className="text-xs text-orange-600">Satisfaction assured</p>
+            </div>
+          </div>
+        </Card>
+      </div>
 
-      {/* What Happens Next */}
+      {/* Activity Log Panel */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center">
-            <Calendar className="h-5 w-5 mr-2 text-primary" />
-            What Happens Next?
+            <Clock className="h-5 w-5 mr-2 text-muted-foreground" />
+            Activity Log
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            <div className="flex items-start space-x-3">
-              <div className="w-6 h-6 bg-primary text-white rounded-full flex items-center justify-center text-sm font-semibold">1</div>
-              <div>
-                <h4 className="font-medium">Accept Your Quote</h4>
-                <p className="text-sm text-muted-foreground">Review and accept your personalized quote</p>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+              <div className="flex items-center space-x-3">
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                <div>
+                  <p className="text-sm font-medium">Quote Created</p>
+                  <p className="text-xs text-muted-foreground">Initial quote generated</p>
+                </div>
               </div>
+              <span className="text-xs text-muted-foreground">
+                {new Date(quote.created_at).toLocaleString()}
+              </span>
             </div>
-            <div className="flex items-start space-x-3">
-              <div className="w-6 h-6 bg-primary text-white rounded-full flex items-center justify-center text-sm font-semibold">2</div>
-              <div>
-                <h4 className="font-medium">Schedule Installation</h4>
-                <p className="text-sm text-muted-foreground">Book a convenient time for professional installation</p>
+            {quote.status !== 'draft' && (
+              <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                <div className="flex items-center space-x-3">
+                  <Mail className="h-4 w-4 text-blue-600" />
+                  <div>
+                    <p className="text-sm font-medium">Quote Sent</p>
+                    <p className="text-xs text-muted-foreground">Delivered to client</p>
+                  </div>
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  {new Date(quote.created_at).toLocaleString()}
+                </span>
               </div>
-            </div>
-            <div className="flex items-start space-x-3">
-              <div className="w-6 h-6 bg-primary text-white rounded-full flex items-center justify-center text-sm font-semibold">3</div>
-              <div>
-                <h4 className="font-medium">Enjoy Your New Space</h4>
-                <p className="text-sm text-muted-foreground">Relax while we transform your space</p>
+            )}
+            {quote.status === 'accepted' && (
+              <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
+                <div className="flex items-center space-x-3">
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                  <div>
+                    <p className="text-sm font-medium text-green-800">Quote Accepted</p>
+                    <p className="text-xs text-green-600">Client accepted the quote</p>
+                  </div>
+                </div>
+                <span className="text-xs text-green-600">
+                  Recently
+                </span>
               </div>
-            </div>
+            )}
+            {quote.status === 'rejected' && (
+              <div className="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-200">
+                <div className="flex items-center space-x-3">
+                  <XCircle className="h-4 w-4 text-red-600" />
+                  <div>
+                    <p className="text-sm font-medium text-red-800">Quote Rejected</p>
+                    <p className="text-xs text-red-600">Client declined the quote</p>
+                  </div>
+                </div>
+                <span className="text-xs text-red-600">
+                  Recently
+                </span>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
