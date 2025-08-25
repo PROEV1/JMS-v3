@@ -32,16 +32,15 @@ const AdminLeads = () => {
   
   console.log('Current statusFilter:', statusFilter);
   
-  const { leads, loading, error, convertToClient, convertToQuote, updateLead, createLead, deleteLead } = useLeads({
-    status: statusFilter === 'all' ? undefined : statusFilter
-  });
+  // Fetch all leads (unfiltered) for both display and KPI calculations
+  const { leads: allLeads, loading, error, convertToClient, convertToQuote, updateLead, createLead, deleteLead, fetchLeads } = useLeads({});
   
-  // Fetch all leads for KPI calculations (unfiltered)
-  const { leads: allLeads } = useLeads({});
+  // Filter leads for display based on status filter
+  const filteredLeads = statusFilter === 'all' ? allLeads : allLeads.filter(lead => lead.status === statusFilter);
   const { toast } = useToast();
   const [converting, setConverting] = useState<string | null>(null);
   
-  console.log('Leads data:', { leads: leads.length, loading, error, filter: statusFilter });
+  console.log('Leads data:', { allLeads: allLeads.length, filteredLeads: filteredLeads.length, loading, error, filter: statusFilter });
 
   // Fetch clients for the create modal
   useEffect(() => {
@@ -62,7 +61,7 @@ const AdminLeads = () => {
   // Helper function to populate missing quote_ids for existing converted leads
   const populateMissingQuoteIds = async () => {
     console.log('Checking for converted leads without quote_id...');
-    const convertedLeadsWithoutQuoteId = leads.filter(lead => 
+    const convertedLeadsWithoutQuoteId = filteredLeads.filter(lead => 
       lead.status === 'converted' && !lead.quote_id && lead.notes
     );
 
@@ -100,6 +99,8 @@ const AdminLeads = () => {
         title: "Success",
         description: "Lead created successfully",
       });
+      // Refresh to ensure KPIs update
+      await fetchLeads();
     } catch (error) {
       toast({
         title: "Error",
@@ -117,6 +118,8 @@ const AdminLeads = () => {
         title: "Success",
         description: "Lead deleted successfully",
       });
+      // Refresh to ensure KPIs update
+      await fetchLeads();
     } catch (error) {
       toast({
         title: "Error",
@@ -158,6 +161,8 @@ const AdminLeads = () => {
         title: "Success",
         description: `Quote ${result.quote_number} created for ${lead.name}`,
       });
+      // Refresh to ensure KPIs update
+      await fetchLeads();
     } catch (error) {
       toast({
         title: "Error",
@@ -176,6 +181,8 @@ const AdminLeads = () => {
         title: "Status updated",
         description: "Lead status has been updated",
       });
+      // Refresh to ensure KPIs update
+      await fetchLeads();
     } catch (error) {
       toast({
         title: "Error",
@@ -208,7 +215,7 @@ const AdminLeads = () => {
               <SelectItem value="closed">Closed</SelectItem>
             </SelectContent>
           </Select>
-          <Badge variant="secondary">{leads.length} leads</Badge>
+          <Badge variant="secondary">{filteredLeads.length} leads</Badge>
         </div>
       </div>
       
@@ -219,7 +226,7 @@ const AdminLeads = () => {
       />
       
       <div className="space-y-4">
-        {leads.map((lead) => (
+        {filteredLeads.map((lead) => (
           <Card key={lead.id} className="border-l-4 border-l-primary">
             <CardHeader className="pb-3">
               <div className="flex justify-between items-start">
