@@ -370,6 +370,21 @@ export default function AdminOrders() {
         </CardContent>
       </Card>
 
+      {/* Empty State */}
+      {orders?.length === 0 && (
+        <Card>
+          <CardContent className="p-12 text-center">
+            <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-semibold">No orders found</h3>
+            <p className="text-muted-foreground">
+              {searchTerm || statusFilter !== 'all' || engineerFilter !== 'all'
+                ? 'Try adjusting your search terms or filters.' 
+                : 'Orders will appear here once quotes are accepted.'}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!deletingOrderId} onOpenChange={() => setDeletingOrderId(null)}>
         <AlertDialogContent>
