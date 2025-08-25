@@ -13,16 +13,10 @@ interface LocationStockModalProps {
 export function LocationStockModal({ open, onOpenChange, location }: LocationStockModalProps) {
   if (!location) return null;
 
-  // Mock stock data for the location
-  const stockItems = [
-    { id: "1", name: "EV Charger Model A", sku: "EVC-001", quantity: 25, reserved: 2, reorderPoint: 10, unit: "each" },
-    { id: "2", name: "Charging Cable 7kW", sku: "CC-7KW", quantity: 15, reserved: 1, reorderPoint: 5, unit: "each" },
-    { id: "3", name: "Wall Mount Bracket", sku: "WMB-001", quantity: 8, reserved: 0, reorderPoint: 10, unit: "each" },
-    { id: "4", name: "Installation Kit", sku: "IK-STD", quantity: 3, reserved: 1, reorderPoint: 5, unit: "kit" },
-  ];
-
-  const totalValue = stockItems.reduce((sum, item) => sum + (item.quantity * 150), 0); // Mock pricing
-  const lowStockItems = stockItems.filter(item => item.quantity <= item.reorderPoint);
+  // TODO: Replace with real data from inventory tables
+  const stockItems: any[] = [];
+  const totalValue = 0;
+  const lowStockItems: any[] = [];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

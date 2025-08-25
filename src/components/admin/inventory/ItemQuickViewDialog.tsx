@@ -13,17 +13,9 @@ interface ItemQuickViewDialogProps {
 export function ItemQuickViewDialog({ open, onOpenChange, item }: ItemQuickViewDialogProps) {
   if (!item) return null;
 
-  const stockLocations = [
-    { location: "Main Warehouse", stock: 45, reserved: 5 },
-    { location: "Van 1", stock: 3, reserved: 0 },
-    { location: "Van 2", stock: 2, reserved: 1 },
-  ];
-
-  const recentTransactions = [
-    { date: "2024-01-15", type: "In", qty: 10, location: "Main Warehouse", reference: "PO-2024-001" },
-    { date: "2024-01-14", type: "Out", qty: -2, location: "Van 1", reference: "Job #12345" },
-    { date: "2024-01-13", type: "Transfer", qty: 5, location: "Van 1 → Van 2", reference: "Stock rebalance" },
-  ];
+  // TODO: Replace with real data from inventory_locations and inventory_txns tables
+  const stockLocations: any[] = [];
+  const recentTransactions: any[] = [];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
