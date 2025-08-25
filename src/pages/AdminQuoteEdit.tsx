@@ -488,7 +488,11 @@ export default function AdminQuoteEdit() {
             <div className="mt-6">
               <AdditionalLineItemsEditor
                 items={additionalItems}
-                onItemsChange={setAdditionalItems}
+                onItemsChange={(items) => {
+                  setAdditionalItems(items);
+                  // Don't close the quote edit form when adding line items
+                }}
+                showTotal={false}
               />
             </div>
 
@@ -626,37 +630,72 @@ export default function AdminQuoteEdit() {
                 </CardContent>
               </Card>
 
-              {/* Selected Products Summary */}
-              {selectedProducts.length > 0 && (
+              {/* Quote Summary */}
+              {(selectedProducts.length > 0 || additionalItems.length > 0) && (
                 <Card>
                   <CardHeader>
-                    <CardTitle>Selected Products</CardTitle>
+                    <CardTitle>Quote Summary</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-3">
-                      {selectedProducts.map((sp, index) => (
-                        <div key={`${sp.product.id}-${index}`} className="flex justify-between items-center p-3 border rounded">
-                          <div>
-                            <div className="font-medium">{sp.product.name}</div>
-                            <div className="text-sm text-muted-foreground">
-                              Quantity: {sp.quantity} | Base Price: £{sp.product.base_price}
-                            </div>
-                            {Object.entries(sp.configuration).length > 0 && (
-                              <div className="text-sm text-muted-foreground">
-                                {Object.entries(sp.configuration).map(([type, value]) => 
-                                  `${type}: ${value}`
-                                ).join(', ')}
+                    <div className="space-y-4">
+                      {/* Products Section */}
+                      {selectedProducts.length > 0 && (
+                        <div>
+                          <h4 className="font-medium text-sm text-muted-foreground mb-2">Products</h4>
+                          <div className="space-y-2">
+                            {selectedProducts.map((sp, index) => (
+                              <div key={`${sp.product.id}-${index}`} className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                                <div>
+                                  <div className="font-medium text-sm">{sp.product.name}</div>
+                                  <div className="text-xs text-muted-foreground">
+                                    Qty: {sp.quantity} × £{sp.product.base_price.toFixed(2)}
+                                  </div>
+                                  {Object.entries(sp.configuration).length > 0 && (
+                                    <div className="text-xs text-muted-foreground">
+                                      {Object.entries(sp.configuration).map(([type, value]) => 
+                                        `${type}: ${value}`
+                                      ).join(', ')}
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="font-semibold text-sm">
+                                  £{sp.totalPrice.toFixed(2)}
+                                </div>
                               </div>
-                            )}
-                          </div>
-                          <div className="text-lg font-semibold">
-                            £{sp.totalPrice.toFixed(2)}
+                            ))}
                           </div>
                         </div>
-                      ))}
-                      <div className="border-t pt-3 flex justify-between items-center font-semibold text-lg">
-                        <span>Total:</span>
-                        <span>£{selectedProducts.reduce((sum, sp) => sum + sp.totalPrice, 0).toFixed(2)}</span>
+                      )}
+
+                      {/* Line Items Section */}
+                      {additionalItems.length > 0 && (
+                        <div>
+                          <h4 className="font-medium text-sm text-muted-foreground mb-2">Additional Line Items</h4>
+                          <div className="space-y-2">
+                            {additionalItems.map((item, index) => (
+                              <div key={index} className="flex justify-between items-center p-2 bg-orange-50 rounded">
+                                <div>
+                                  <div className="font-medium text-sm">{item.description}</div>
+                                  <div className="text-xs text-muted-foreground">
+                                    Qty: {item.quantity} × £{item.unit_price.toFixed(2)}
+                                  </div>
+                                </div>
+                                <div className="font-semibold text-sm">
+                                  £{item.total_price.toFixed(2)}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Total */}
+                      <div className="border-t pt-3 flex justify-between items-center font-semibold">
+                        <span>Total Quote Value:</span>
+                        <span className="text-lg">
+                          £{(selectedProducts.reduce((sum, sp) => sum + sp.totalPrice, 0) + 
+                             additionalItems.reduce((sum, item) => sum + item.total_price, 0)).toFixed(2)}
+                        </span>
                       </div>
                     </div>
                   </CardContent>

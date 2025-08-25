@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { SignedImage } from '@/components/ui/SignedImage';
 import { SignedFile } from '@/components/ui/SignedFile';
 import { Image, Video, FileText } from 'lucide-react';
+import { ImageModal } from '@/components/ui/ImageModal';
 
 interface SurveyReadOnlyViewProps {
   survey: any;
@@ -46,23 +47,35 @@ export function SurveyReadOnlyView({ survey, media }: SurveyReadOnlyViewProps) {
                 {item.media_type === 'image' ? (
                   <div className="aspect-square rounded-lg overflow-hidden bg-slate-100">
                     {item.storage_path && item.storage_bucket ? (
-                      <SignedImage
-                        bucket={item.storage_bucket}
-                        path={item.storage_path}
-                        fallbackUrl="/placeholder.svg"
-                        className="w-full h-full object-cover"
+                      <ImageModal
+                        src={`/api/storage/${item.storage_bucket}/${item.storage_path}`}
                         alt={item.file_name || 'Survey image'}
-                      />
+                        className="w-full h-full"
+                      >
+                        <SignedImage
+                          bucket={item.storage_bucket}
+                          path={item.storage_path}
+                          fallbackUrl="/placeholder.svg"
+                          className="w-full h-full object-cover cursor-pointer"
+                          alt={item.file_name || 'Survey image'}
+                        />
+                      </ImageModal>
                     ) : item.file_url && !item.file_url.startsWith('blob:') && item.file_url.startsWith('http') ? (
-                      <img
+                      <ImageModal
                         src={item.file_url}
                         alt={item.file_name || 'Survey image'}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          const target = e.currentTarget;
-                          target.src = '/placeholder.svg';
-                        }}
-                      />
+                        className="w-full h-full"
+                      >
+                        <img
+                          src={item.file_url}
+                          alt={item.file_name || 'Survey image'}
+                          className="w-full h-full object-cover cursor-pointer"
+                          onError={(e) => {
+                            const target = e.currentTarget;
+                            target.src = '/placeholder.svg';
+                          }}
+                        />
+                      </ImageModal>
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-slate-500">
                         <div className="text-center">
@@ -74,9 +87,6 @@ export function SurveyReadOnlyView({ survey, media }: SurveyReadOnlyViewProps) {
                         </div>
                       </div>
                     )}
-                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-200 flex items-center justify-center">
-                      <Image className="text-white opacity-0 group-hover:opacity-100 transition-opacity" size={24} />
-                    </div>
                   </div>
               ) : item.media_type === 'video' ? (
                 <div className="aspect-video rounded-lg overflow-hidden bg-slate-100 flex items-center justify-center">
@@ -153,15 +163,21 @@ export function SurveyReadOnlyView({ survey, media }: SurveyReadOnlyViewProps) {
           {photos.map((photo: any, index: number) => (
             <div key={index} className="aspect-square rounded-lg overflow-hidden bg-slate-100">
               {photo.url ? (
-                <img 
-                  src={photo.url} 
+                <ImageModal
+                  src={photo.url}
                   alt={photo.name || `${title} ${index + 1}`}
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    const target = e.currentTarget;
-                    target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="%23f3f4f6"/><text x="50" y="50" text-anchor="middle" dy="0.3em" fill="%236b7280">Image</text></svg>';
-                  }}
-                />
+                  className="w-full h-full"
+                >
+                  <img 
+                    src={photo.url} 
+                    alt={photo.name || `${title} ${index + 1}`}
+                    className="w-full h-full object-cover cursor-pointer"
+                    onError={(e) => {
+                      const target = e.currentTarget;
+                      target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="%23f3f4f6"/><text x="50" y="50" text-anchor="middle" dy="0.3em" fill="%236b7280">Image</text></svg>';
+                    }}
+                  />
+                </ImageModal>
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
                   <div className="text-center">

@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { ChevronLeft, Download, Share2, Eye, Calendar, Shield, Wrench, CheckCircle, Mail, MessageCircle, Link, Copy, Edit, Clock, CheckCircle2, XCircle, User, MapPin, Phone } from 'lucide-react';
+import { ImageModal } from '@/components/ui/ImageModal';
 import livingRoomImg from '@/assets/living-room-placeholder.jpg';
 import laptopImg from '@/assets/laptop-placeholder.jpg';
 import workspaceImg from '@/assets/workspace-placeholder.jpg';
@@ -478,6 +479,40 @@ export const QuoteDetailView: React.FC<QuoteDetailViewProps> = ({ quote, onBack,
               {/* Enhanced Action Buttons with Hierarchy */}
               <div className="flex flex-col items-end space-y-2">
                 <div className="flex space-x-2">
+                  {quote.status === 'draft' && (
+                    <Button 
+                      onClick={async () => {
+                        try {
+                          const { error } = await supabase
+                            .from('quotes')
+                            .update({ status: 'sent' })
+                            .eq('id', quote.id);
+                          
+                          if (error) throw error;
+                          
+                          toast({
+                            title: "Quote Sent",
+                            description: "Quote has been sent to client",
+                          });
+                          
+                          // Refresh the page to show updated status
+                          window.location.reload();
+                        } catch (error) {
+                          console.error('Error sending quote:', error);
+                          toast({
+                            title: "Error",
+                            description: "Failed to send quote",
+                            variant: "destructive",
+                          });
+                        }
+                      }}
+                      size="sm" 
+                      className="bg-blue-600 hover:bg-blue-700 text-white font-medium"
+                    >
+                      <Mail className="h-4 w-4 mr-2" />
+                      Send to Client
+                    </Button>
+                  )}
                   {quote.status === 'sent' && (
                     <>
                       <Button onClick={handleAcceptQuote} size="sm" className="bg-brand-teal hover:bg-brand-teal-dark text-white font-medium">
@@ -510,7 +545,7 @@ export const QuoteDetailView: React.FC<QuoteDetailViewProps> = ({ quote, onBack,
                 
                 {/* Secondary Actions - Smaller Icons */}
                 <div className="flex space-x-1">
-                  <Button variant="ghost" size="sm" onClick={() => window.open(`/admin/quotes/${quote.id}/edit`, '_blank')}>
+                  <Button variant="ghost" size="sm" onClick={() => window.location.href = `/admin/quotes/${quote.id}/edit`}>
                     <Edit className="h-4 w-4" />
                   </Button>
                   <Button variant="ghost" size="sm" onClick={() => window.open(`/admin/messages?client=${quote.client.id}`, '_blank')}>
@@ -550,13 +585,13 @@ export const QuoteDetailView: React.FC<QuoteDetailViewProps> = ({ quote, onBack,
                 </div>
                 <div className="flex-1 h-px bg-muted"></div>
                 <div className="flex items-center space-x-1">
-                  <div className={`h-4 w-4 rounded-full flex items-center justify-center ${quote.status === 'sent' || quote.status === 'accepted' || quote.status === 'rejected' ? 'bg-green-600' : 'bg-muted'}`}>
-                    {(quote.status === 'sent' || quote.status === 'accepted' || quote.status === 'rejected') ? (
-                      <CheckCircle2 className="h-3 w-3 text-white" />
-                    ) : (
-                      <div className="h-2 w-2 bg-white rounded-full"></div>
-                    )}
-                  </div>
+                <div className={`h-4 w-4 rounded-full flex items-center justify-center ${quote.status === 'sent' || quote.status === 'accepted' || quote.status === 'rejected' ? 'bg-green-600' : 'bg-muted'}`}>
+                  {(quote.status === 'sent' || quote.status === 'accepted' || quote.status === 'rejected') ? (
+                    <CheckCircle2 className="h-3 w-3 text-white" />
+                  ) : (
+                    <div className="h-2 w-2 bg-white rounded-full"></div>
+                  )}
+                </div>
                   <span className="text-xs">Sent</span>
                 </div>
                 <div className="flex-1 h-px bg-muted"></div>
@@ -601,10 +636,10 @@ export const QuoteDetailView: React.FC<QuoteDetailViewProps> = ({ quote, onBack,
                     {/* Product Image */}
                     <div className="md:w-1/2">
                       <div className="relative h-64 md:h-full">
-                        <img
+                        <ImageModal
                           src={getProductImage(coreItem)}
                           alt={coreItem.product_name}
-                          className="w-full h-full object-cover"
+                          className="w-full h-full"
                         />
                       </div>
                     </div>
@@ -640,14 +675,14 @@ export const QuoteDetailView: React.FC<QuoteDetailViewProps> = ({ quote, onBack,
                             <h4 className="font-medium mb-3">Accessories</h4>
                             <div className="space-y-2">
                               {relatedAccessories.map((accessory) => (
-                                <div key={accessory.id} className="flex items-center space-x-3 p-2 bg-gray-50 rounded-lg">
-                                  <div className="w-12 h-12 flex-shrink-0">
-                                    <img
-                                      src={getProductImage(accessory)}
-                                      alt={accessory.product_name}
-                                      className="w-full h-full object-cover rounded"
-                                    />
-                                  </div>
+                                 <div key={accessory.id} className="flex items-center space-x-3 p-2 bg-gray-50 rounded-lg">
+                                   <div className="w-12 h-12 flex-shrink-0">
+                                     <ImageModal
+                                       src={getProductImage(accessory)}
+                                       alt={accessory.product_name}
+                                       className="w-full h-full rounded"
+                                     />
+                                   </div>
                                   <div className="flex-1">
                                     <p className="text-sm font-medium">{accessory.product_name}</p>
                                     <p className="text-xs text-muted-foreground">Qty: {accessory.quantity}</p>
@@ -763,7 +798,7 @@ export const QuoteDetailView: React.FC<QuoteDetailViewProps> = ({ quote, onBack,
                 {new Date(quote.created_at).toLocaleString()}
               </span>
             </div>
-            {quote.status !== 'draft' && (
+            {quote.status === 'sent' && (
               <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
                 <div className="flex items-center space-x-3">
                   <Mail className="h-4 w-4 text-blue-600" />
@@ -774,6 +809,20 @@ export const QuoteDetailView: React.FC<QuoteDetailViewProps> = ({ quote, onBack,
                 </div>
                 <span className="text-xs text-muted-foreground">
                   {new Date(quote.created_at).toLocaleString()}
+                </span>
+              </div>
+            )}
+            {quote.status === 'draft' && (
+              <div className="flex items-center justify-between p-3 bg-orange-50 rounded-lg border border-orange-200">
+                <div className="flex items-center space-x-3">
+                  <Edit className="h-4 w-4 text-orange-600" />
+                  <div>
+                    <p className="text-sm font-medium text-orange-800">Quote Draft</p>
+                    <p className="text-xs text-orange-600">Quote created but not yet sent to client</p>
+                  </div>
+                </div>
+                <span className="text-xs text-orange-600">
+                  Ready to send
                 </span>
               </div>
             )}
