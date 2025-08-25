@@ -111,9 +111,12 @@ export default function Layout({ children }: LayoutProps) {
     return <Navigate to={redirectTo} replace />;
   }
   
-  // Partner users can only access partner routes
-  if (userRole === 'partner' && !currentPath.startsWith('/partner')) {
-    console.log('Layout: Partner user accessing non-partner route, redirecting to /partner');
+  // Partner users should be able to access client routes if they're viewing their own data
+  // Only redirect partner users to /partner if they're accessing truly restricted areas
+  if (userRole === 'partner' && !currentPath.startsWith('/partner') && 
+      !currentPath.startsWith('/client') && !currentPath.startsWith('/survey') && 
+      !currentPath.startsWith('/offers') && !currentPath.startsWith('/quotes')) {
+    console.log('Layout: Partner user accessing restricted route, redirecting to /partner');
     return <Navigate to="/partner" replace />;
   }
   
@@ -126,8 +129,8 @@ export default function Layout({ children }: LayoutProps) {
     }
   }
   
-  // Protect client routes from non-clients
-  if (userRole !== 'client' && currentPath.startsWith('/client')) {
+  // Protect client routes from non-clients (but allow partners to access)
+  if (userRole !== 'client' && userRole !== 'partner' && currentPath.startsWith('/client')) {
     const redirectTo = userRole === 'admin' ? '/admin' : userRole === 'engineer' ? '/engineer' : '/partner';
     console.log(`Layout: ${userRole} accessing client route, redirecting to ${redirectTo}`);
     return <Navigate to={redirectTo} replace />;
