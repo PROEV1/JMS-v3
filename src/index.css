@@ -370,4 +370,125 @@ All colors MUST be HSL.
     border-radius: 8px;
     box-shadow: 0 10px 30px rgba(0,0,0,0.15);
   }
+
+/* ==============================================
+   DESIGN V2 OVERRIDES
+   ============================================== */
+
+/* Only apply these styles when data-design="v2" is set on <html> */
+[data-design="v2"] {
+  /* Enhanced color palette for v2 */
+  --primary: 198 93% 60%;
+  --primary-foreground: 0 0% 98%;
+  --secondary: 210 40% 98%;
+  --secondary-foreground: 222.2 84% 4.9%;
+  --accent: 210 40% 96%;
+  --accent-foreground: 222.2 84% 4.9%;
+  
+  /* Enhanced brand colors */
+  --brand-teal: 174 72% 56%;
+  --brand-pink: 330 81% 60%;
+  --brand-cream: 48 100% 88%;
+  --brand-blue: 221 83% 53%;
+  
+  /* Modern shadows and effects */
+  --shadow-elegant: 0 10px 40px -12px hsl(var(--primary) / 0.25);
+  --shadow-glow: 0 0 30px hsl(var(--brand-teal) / 0.3);
+  
+  /* Enhanced border radius */
+  --radius: 0.75rem;
+}
+
+/* V2 Typography enhancements */
+[data-design="v2"] h1 {
+  @apply text-4xl font-bold tracking-tight bg-gradient-to-r from-primary to-brand-teal bg-clip-text text-transparent;
+}
+
+[data-design="v2"] h2 {
+  @apply text-3xl font-semibold tracking-tight;
+  color: hsl(var(--foreground));
+}
+
+[data-design="v2"] h3 {
+  @apply text-2xl font-semibold;
+  color: hsl(var(--foreground));
+}
+
+/* V2 Card enhancements */
+[data-design="v2"] .brand-card {
+  @apply border-0 shadow-lg;
+  background: linear-gradient(135deg, hsl(var(--card)) 0%, hsl(var(--accent)) 100%);
+  box-shadow: var(--shadow-elegant);
+}
+
+[data-design="v2"] .brand-card-interactive {
+  @apply transition-all duration-300;
+}
+
+[data-design="v2"] .brand-card-interactive:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-glow);
+}
+
+/* V2 Button enhancements */
+[data-design="v2"] .btn-brand-primary {
+  @apply bg-gradient-to-r from-primary to-brand-teal border-0 shadow-lg;
+  box-shadow: 0 4px 15px hsl(var(--primary) / 0.3);
+}
+
+[data-design="v2"] .btn-brand-primary:hover {
+  @apply shadow-xl;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 25px hsl(var(--primary) / 0.4);
+}
+
+[data-design="v2"] .btn-brand-secondary {
+  @apply bg-gradient-to-r from-secondary to-accent border border-primary/20;
+  color: hsl(var(--primary));
+}
+
+[data-design="v2"] .btn-brand-accent {
+  @apply bg-gradient-to-r from-brand-pink to-brand-teal text-white border-0;
+}
+
+/* V2 Badge enhancements */
+[data-design="v2"] .badge-teal {
+  @apply bg-gradient-to-r from-brand-teal/10 to-brand-teal/20 text-brand-teal border-brand-teal/30;
+}
+
+[data-design="v2"] .badge-pink {
+  @apply bg-gradient-to-r from-brand-pink/10 to-brand-pink/20 text-brand-pink border-brand-pink/30;
+}
+
+[data-design="v2"] .badge-blue {
+  @apply bg-gradient-to-r from-brand-blue/10 to-brand-blue/20 text-brand-blue border-brand-blue/30;
+}
+
+/* V2 Status indicators with enhanced styling */
+[data-design="v2"] .status-accepted {
+  @apply bg-gradient-to-r from-green-50 to-emerald-50 text-emerald-700 border-emerald-200;
+}
+
+[data-design="v2"] .status-pending {
+  @apply bg-gradient-to-r from-amber-50 to-yellow-50 text-amber-700 border-amber-200;
+}
+
+[data-design="v2"] .status-sent {
+  @apply bg-gradient-to-r from-blue-50 to-cyan-50 text-blue-700 border-blue-200;
+}
+
+/* V2 Navigation and layout enhancements */
+[data-design="v2"] .brand-container {
+  @apply bg-gradient-to-br from-background via-accent/30 to-secondary/50;
+}
+
+/* V2 Form enhancements */
+[data-design="v2"] input, [data-design="v2"] textarea, [data-design="v2"] select {
+  @apply border-input/60 focus:border-primary/60 focus:ring-primary/20;
+  transition: all 0.2s ease-in-out;
+}
+
+[data-design="v2"] input:focus, [data-design="v2"] textarea:focus, [data-design="v2"] select:focus {
+  box-shadow: 0 0 0 3px hsl(var(--primary) / 0.1);
+}
 }

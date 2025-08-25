@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { BrandPage, BrandContainer, BrandHeading1 } from '@/components/brand';
+import { DesignVersionToggle } from '@/components/admin/DesignVersionToggle';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,7 +12,7 @@ import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Save, Settings, CreditCard, Mail, MessageSquare, Bell, AlertTriangle, Calendar, Shield } from 'lucide-react';
+import { Save, Settings, CreditCard, Mail, MessageSquare, Bell, AlertTriangle, Calendar, Shield, Palette } from 'lucide-react';
 import { SchedulingSettingsPanel } from '@/components/admin/SchedulingSettingsPanel';
 import { useAdminCommsSetting } from '@/hooks/useAdminCommsSetting';
 
@@ -321,7 +322,7 @@ export default function AdminSettings() {
           )}
 
           <Tabs defaultValue="quotes" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-8">
+            <TabsList className="grid w-full grid-cols-9">
               <TabsTrigger value="quotes" className="flex items-center space-x-2">
                 <Settings className="h-4 w-4" />
                 <span>Quotes</span>
@@ -349,6 +350,10 @@ export default function AdminSettings() {
               <TabsTrigger value="comms" className="flex items-center space-x-2">
                 <Shield className="h-4 w-4" />
                 <span>Test Mode</span>
+              </TabsTrigger>
+              <TabsTrigger value="design" className="flex items-center space-x-2">
+                <Palette className="h-4 w-4" />
+                <span>Design</span>
               </TabsTrigger>
               <TabsTrigger value="system" className="flex items-center space-x-2">
                 <Settings className="h-4 w-4" />
@@ -970,6 +975,11 @@ export default function AdminSettings() {
                   </div>
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            {/* Design Version Control */}
+            <TabsContent value="design" className="space-y-6">
+              <DesignVersionToggle />
             </TabsContent>
 
             {/* System Settings */}

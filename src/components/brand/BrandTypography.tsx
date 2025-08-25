@@ -1,6 +1,7 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { getTypographyClass } from '@/lib/brandUtils';
+import { useDesignVersion } from '@/contexts/DesignVersionContext';
 
 interface BrandTypographyProps {
   variant: 'heading1' | 'heading2' | 'heading3' | 'body' | 'title';
@@ -15,8 +16,13 @@ export const BrandTypography: React.FC<BrandTypographyProps> = ({
   className,
   as: Component = 'div',
 }) => {
+  const { isV2 } = useDesignVersion();
+  
+  // Only apply brand typography classes in v2
+  const typographyClass = isV2 ? getTypographyClass(variant) : '';
+  
   return (
-    <Component className={cn(getTypographyClass(variant), className)}>
+    <Component className={cn(typographyClass, className)}>
       {children}
     </Component>
   );
