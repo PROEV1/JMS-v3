@@ -49,9 +49,6 @@ interface FormData {
   product_name: string;
   product_price: string;
   total_price: string;
-  width_cm: string;
-  finish: string;
-  luxe_upgrade: boolean;
   accessories_data: any[];
   configuration: any;
   product_details: string;
@@ -82,9 +79,6 @@ export function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLeadModalP
     product_name: '',
     product_price: '',
     total_price: '',
-    width_cm: '',
-    finish: '',
-    luxe_upgrade: false,
     accessories_data: [],
     configuration: {},
     product_details: ''
@@ -95,10 +89,6 @@ export function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLeadModalP
     'Website', 'Phone', 'Email', 'Referral', 'Social Media', 'Advertisement', 'Other'
   ];
 
-  // Available finishes
-  const finishes = [
-    'White', 'Black', 'Chrome', 'Brushed Steel', 'Wood Effect', 'Custom'
-  ];
 
   useEffect(() => {
     if (isOpen) {
@@ -212,6 +202,7 @@ export function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLeadModalP
       ...prev,
       product_name: product.name,
       product_price: product.base_price.toString(),
+      total_price: product.base_price.toString(), // Auto-populate total price
       product_details: product.description || ''
     }));
     setProductSearchOpen(false);
@@ -280,9 +271,6 @@ export function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLeadModalP
       product_name: '',
       product_price: '',
       total_price: '',
-      width_cm: '',
-      finish: '',
-      luxe_upgrade: false,
       accessories_data: [],
       configuration: {},
       product_details: ''
@@ -316,15 +304,12 @@ export function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLeadModalP
       source: formData.source,
       product_name: formData.product_name,
       product_details: formData.product_details,
-      finish: formData.finish,
-      luxe_upgrade: formData.luxe_upgrade,
       accessories_data: formData.accessories_data,
       configuration: formData.configuration,
       client_id: selectedClient?.id || null,
       status: 'new',
       product_price: formData.product_price ? parseFloat(formData.product_price) : null,
       total_price: formData.total_price ? parseFloat(formData.total_price) : null,
-      width_cm: formData.width_cm ? parseFloat(formData.width_cm) : null,
     };
 
     const errors = validateLeadData(leadData, hasSelectedClient);
@@ -642,34 +627,6 @@ export function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLeadModalP
                  )}
                 </div>
 
-                {/* Product Details Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="finish">Finish</Label>
-                    <Select value={formData.finish} onValueChange={(value) => setFormData(prev => ({ ...prev, finish: value }))}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select finish" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {finishes.map((finish) => (
-                          <SelectItem key={finish} value={finish}>
-                            {finish}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="width_cm">Width (cm)</Label>
-                    <Input
-                      id="width_cm"
-                      type="number"
-                      value={formData.width_cm}
-                      onChange={(e) => setFormData(prev => ({ ...prev, width_cm: e.target.value }))}
-                      placeholder="e.g. 150"
-                    />
-                  </div>
-                </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
@@ -679,7 +636,14 @@ export function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLeadModalP
                       type="number"
                       step="0.01"
                       value={formData.product_price}
-                      onChange={(e) => setFormData(prev => ({ ...prev, product_price: e.target.value }))}
+                      onChange={(e) => {
+                        const price = e.target.value;
+                        setFormData(prev => ({ 
+                          ...prev, 
+                          product_price: price,
+                          total_price: price // Auto-populate total price
+                        }));
+                      }}
                       placeholder="0.00"
                       disabled={!!selectedProduct}
                     />
@@ -697,19 +661,10 @@ export function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLeadModalP
                       onChange={(e) => setFormData(prev => ({ ...prev, total_price: e.target.value }))}
                       placeholder="0.00"
                     />
+                    <p className="text-xs text-muted-foreground mt-1">Auto-populated from product price</p>
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="luxe_upgrade"
-                    checked={formData.luxe_upgrade}
-                    onCheckedChange={(checked) => setFormData(prev => ({ ...prev, luxe_upgrade: checked as boolean }))}
-                  />
-                  <Label htmlFor="luxe_upgrade" className="text-sm font-medium">
-                    Luxe Upgrade
-                  </Label>
-                </div>
 
                 <div>
                   <Label htmlFor="product_details">Product Details</Label>

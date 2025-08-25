@@ -59,14 +59,11 @@ export const saveLeadHistory = async (lead: Lead, clientId: string) => {
       lead_notes: lead.notes || null,
       product_name: lead.product_name || null,
       product_price: lead.product_price || null,
-      width_cm: lead.width_cm || null,
       lead_created_at: lead.created_at,
       source: lead.source || null,
       status: lead.status,
       total_price: lead.total_price || null,
-      accessories_data: lead.accessories_data || null,
-      finish: lead.finish || lead.configuration?.finish || null,
-      luxe_upgrade: lead.luxe_upgrade || lead.configuration?.luxe_upgrade || null
+      accessories_data: lead.accessories_data || null
     });
 
   if (historyError) {

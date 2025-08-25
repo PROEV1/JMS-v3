@@ -278,12 +278,6 @@ const AdminLeads = () => {
                     <p className="font-medium">£{lead.total_price || lead.product_price}</p>
                   </div>
                 )}
-                {lead.width_cm && (
-                  <div>
-                    <span className="text-muted-foreground">Width</span>
-                    <p className="font-medium">{lead.width_cm}cm</p>
-                  </div>
-                )}
               </div>
 
               {(lead.configuration || lead.accessories_data || lead.accessories) && (
@@ -297,17 +291,13 @@ const AdminLeads = () => {
                       </div>
                     )}
                     
-                    {lead.configuration && (
+                    {lead.configuration && Object.keys(lead.configuration).length > 0 && (
                       <div className="space-y-1 text-sm text-muted-foreground">
-                        {lead.configuration.width && (
-                          <div><span className="font-medium">Width:</span> {lead.configuration.width}</div>
-                        )}
-                        {lead.configuration.finish && (
-                          <div><span className="font-medium">Finish:</span> {lead.configuration.finish}</div>
-                        )}
-                        {lead.configuration.luxe_upgrade !== undefined && (
-                          <div><span className="font-medium">Luxe Upgrade:</span> {lead.configuration.luxe_upgrade ? 'Yes' : 'No'}</div>
-                        )}
+                        {Object.entries(lead.configuration).map(([key, value]) => (
+                          <div key={key}>
+                            <span className="font-medium">{key}:</span> {String(value)}
+                          </div>
+                        ))}
                       </div>
                     )}
                     
@@ -434,13 +424,13 @@ const AdminLeads = () => {
                 </div>
                 
                 <div className="flex gap-2">
-                  {lead.status === 'converted' && (
+                  {lead.status === 'converted' && lead.quote_id && (
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => window.location.href = `/admin/quotes`}
+                      onClick={() => window.location.href = `/admin/quotes/${lead.quote_id}`}
                     >
-                      View Quotes
+                      View Quote
                     </Button>
                   )}
                   <Button

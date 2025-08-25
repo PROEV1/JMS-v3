@@ -15,14 +15,12 @@ export interface Lead {
   source?: string;
   notes?: string;
   quote_number?: string;
+  quote_id?: string; // Add quote_id to track converted quotes
   total_cost?: number;
   total_price?: number;
   product_details?: string;
   product_name?: string;
   product_price?: number;
-  width_cm?: number;
-  finish?: string;
-  luxe_upgrade?: boolean;
   accessories_data?: any;
   accessories?: Array<{
     name: string;
@@ -223,9 +221,7 @@ export const useLeads = (options: UseLeadsOptions = {}) => {
       }
 
       // Create basic quote data from lead
-      const productDetails = lead.product_name ? 
-        `${lead.product_name}${lead.width_cm ? ` (Width: ${lead.width_cm}cm)` : ''}${lead.finish ? ` - ${lead.finish}` : ''}` :
-        'Lead product details';
+      const productDetails = lead.product_name || 'Lead product details';
 
       const { data: quote, error: quoteError } = await supabase
         .from('quotes')
@@ -269,6 +265,7 @@ export const useLeads = (options: UseLeadsOptions = {}) => {
       // Update the lead status to converted
       await updateLead(lead.id, { 
         status: 'converted',
+        quote_id: quote.id,
         notes: `${lead.notes || ''} - Converted to quote #${quote.quote_number}`
       });
 
