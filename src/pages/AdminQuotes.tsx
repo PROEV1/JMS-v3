@@ -185,6 +185,23 @@ export default function AdminQuotes() {
 
       console.log('Quote deletion successful');
       
+      // Check if the quote still exists after deletion
+      const { data: checkData, error: checkError } = await supabase
+        .from('quotes')
+        .select('id, quote_number')
+        .eq('id', quoteId);
+        
+      if (checkError) {
+        console.error('Error checking if quote still exists:', checkError);
+      } else {
+        console.log('Checking if quote still exists after deletion:', checkData);
+        if (checkData && checkData.length > 0) {
+          console.error('ERROR: Quote still exists after deletion attempt!');
+        } else {
+          console.log('SUCCESS: Quote no longer exists in database');
+        }
+      }
+      
       // Refresh the list and log results
       console.log('Refreshing quotes after deletion...');
       await fetchQuotes();
