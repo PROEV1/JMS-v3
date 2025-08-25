@@ -483,16 +483,19 @@ export const QuoteDetailView: React.FC<QuoteDetailViewProps> = ({ quote, onBack,
                     <Button 
                       onClick={async () => {
                         try {
-                          const { error } = await supabase
-                            .from('quotes')
-                            .update({ status: 'sent' })
-                            .eq('id', quote.id);
+                          // Send quote via email
+                          const { error: emailError } = await supabase.functions.invoke('send-revised-quote', {
+                            body: {
+                              quoteId: quote.id,
+                              revisionReason: 'Quote sent to client'
+                            }
+                          });
                           
-                          if (error) throw error;
+                          if (emailError) throw emailError;
                           
                           toast({
                             title: "Quote Sent",
-                            description: "Quote has been sent to client",
+                            description: "Quote has been emailed to client and status updated",
                           });
                           
                           // Refresh the page to show updated status

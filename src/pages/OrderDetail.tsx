@@ -18,6 +18,7 @@ import { JobStatusTimelineSection } from '@/components/admin/sections/JobStatusT
 import { ActivityHistorySection } from '@/components/admin/sections/ActivityHistorySection';
 import { EngineerUploadsSection } from '@/components/admin/sections/EngineerUploadsSection';
 import { SurveySection } from '@/components/admin/sections/SurveySection';
+import { SurveyReviewSection } from '@/components/admin/sections/SurveyReviewSection';
 import { ClientBlockedDatesSection } from '@/components/admin/sections/ClientBlockedDatesSection';
 import { OrderQuotesSection } from '@/components/admin/sections/OrderQuotesSection';
 import { OrderStatusEnhanced } from '@/components/admin/EnhancedJobStatusBadge';
@@ -103,6 +104,14 @@ interface Order {
   } | null;
   is_partner_job: boolean;
   scheduling_suppressed: boolean;
+  survey?: {
+    id: string;
+    status: string;
+    responses: any;
+    submitted_at: string;
+    review_notes?: string;
+    reviewed_at?: string;
+  };
 }
 
 interface PaymentConfig {
@@ -219,6 +228,14 @@ export default function OrderDetail() {
             client_payment_required, 
             client_agreement_required, 
             client_survey_required
+          ),
+          client_surveys(
+            id,
+            status,
+            responses,
+            submitted_at,
+            review_notes,
+            reviewed_at
           )
         `)
         .eq('id', orderId)
@@ -250,7 +267,8 @@ export default function OrderDetail() {
         client: data.clients || null,
         quote: data.quotes || null,
         engineer: data.engineers || null,
-        partner: data.partners || null
+        partner: data.partners || null,
+        survey: data.client_surveys?.[0] || null
       };
       
       setOrder(transformedOrder as any);
@@ -738,6 +756,20 @@ export default function OrderDetail() {
             
             {/* Survey Section */}
             <SurveySection orderId={orderId!} />
+            
+            {/* Survey Review Section - for orders with submitted surveys */}
+            {order.status_enhanced === 'awaiting_survey_review' && order.client?.id && order.quote_id && (
+              <SurveyReviewSection
+                order={{
+                  id: order.id,
+                  client_id: order.client.id,
+                  quote_id: order.quote_id,
+                  status_enhanced: order.status_enhanced
+                }}
+                survey={order.survey}
+                onUpdate={fetchOrder}
+              />
+            )}
 
             {/* Engineer Uploads & Completion */}
             <EngineerUploadsSection 

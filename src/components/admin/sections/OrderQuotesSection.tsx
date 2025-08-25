@@ -175,11 +175,10 @@ export function OrderQuotesSection({ order, onOrderUpdate }: OrderQuotesSectionP
           .insert(newItems);
       }
 
-      // Update order status to awaiting_payment (revised quote needs acceptance)
+      // Update order with new quote_id (keep current status until quote is sent)
       await supabase
         .from('orders')
         .update({ 
-          status_enhanced: 'awaiting_payment' as const,
           quote_id: newQuote.id
         })
         .eq('id', order.id);

@@ -87,8 +87,8 @@ serve(async (req: Request) => {
       .maybeSingle();
 
     // Calculate changes summary
-    const currentTotal = quote.total_amount || 0;
-    const previousTotal = previousSnapshot?.quote_data?.total_amount || 0;
+    const currentTotal = quote.total_cost || 0;
+    const previousTotal = previousSnapshot?.quote_data?.total_cost || 0;
     const totalDifference = currentTotal - previousTotal;
 
     // Create quote snapshot
