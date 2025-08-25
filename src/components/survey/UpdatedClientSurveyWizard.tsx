@@ -13,19 +13,26 @@ interface ClientSurveyWizardProps {
     name: string;
     logo_url?: string;
   };
+  surveyToken?: string;
+  existingSurvey?: any;
 }
 
-export function ClientSurveyWizard({ orderId, clientId, partnerId, partnerBrand }: ClientSurveyWizardProps) {
+export function ClientSurveyWizard({ orderId, clientId, partnerId, partnerBrand, surveyToken: initialSurveyToken, existingSurvey: initialExistingSurvey }: ClientSurveyWizardProps) {
   const { toast } = useToast();
   const contextType = partnerId ? 'partner' : 'direct';
   const { data: activeForm, isLoading } = useActiveSurveyForm(contextType);
   const [existingSurvey, setExistingSurvey] = useState<any>(null);
   const [surveyId, setSurveyId] = useState<string | null>(null);
-  const [surveyToken, setSurveyToken] = useState<string | null>(null);
+  const [surveyToken, setSurveyToken] = useState<string | null>(initialSurveyToken || null);
 
   useEffect(() => {
-    loadExistingSurvey();
-  }, [orderId]);
+    if (initialExistingSurvey) {
+      setExistingSurvey(initialExistingSurvey);
+      setSurveyId(initialExistingSurvey.id);
+    } else {
+      loadExistingSurvey();
+    }
+  }, [orderId, initialExistingSurvey]);
 
   const loadExistingSurvey = async () => {
     try {
@@ -75,39 +82,54 @@ export function ClientSurveyWizard({ orderId, clientId, partnerId, partnerBrand 
 
   const saveDraft = async (responses: Record<string, any>, media: Record<string, any[]>) => {
     try {
-      let currentSurveyId = surveyId;
+      if (surveyToken) {
+        // Use token-based saving for public access
+        const { data, error } = await supabase.functions.invoke('survey-save', {
+          body: { 
+            token: surveyToken, 
+            responses, 
+            surveyId 
+          }
+        });
 
-      if (!currentSurveyId) {
-        // Create new survey
-        const { data: survey, error: surveyError } = await supabase
-          .from('client_surveys')
-          .insert({
-            order_id: orderId,
-            client_id: clientId,
-            partner_id: partnerId,
-            form_version_id: activeForm?.version_id,
-            responses,
-            status: 'draft'
-          })
-          .select()
-          .single();
-
-        if (surveyError) throw surveyError;
-        currentSurveyId = survey.id;
-        setSurveyId(currentSurveyId);
+        if (error) throw new Error(error.message || 'Failed to save survey');
+        if (!data.ok) throw new Error(data.error || 'Failed to save survey');
+        
+        if (data.data.surveyId && !surveyId) {
+          setSurveyId(data.data.surveyId);
+        }
       } else {
-        // Update existing survey
-        const { error: updateError } = await supabase
-          .from('client_surveys')
-          .update({ responses })
-          .eq('id', currentSurveyId);
+        // Use authenticated saving
+        let currentSurveyId = surveyId;
 
-        if (updateError) throw updateError;
+        if (!currentSurveyId) {
+          // Create new survey
+          const { data: survey, error: surveyError } = await supabase
+            .from('client_surveys')
+            .insert({
+              order_id: orderId,
+              client_id: clientId,
+              partner_id: partnerId,
+              form_version_id: activeForm?.version_id,
+              responses,
+              status: 'draft'
+            })
+            .select()
+            .single();
+
+          if (surveyError) throw surveyError;
+          currentSurveyId = survey.id;
+          setSurveyId(currentSurveyId);
+        } else {
+          // Update existing survey
+          const { error: updateError } = await supabase
+            .from('client_surveys')
+            .update({ responses })
+            .eq('id', currentSurveyId);
+
+          if (updateError) throw updateError;
+        }
       }
-
-      // Note: Media files are now uploaded directly via MediaUploadField
-      // No need to handle blob URLs or temporary media here anymore
-      // The media is already saved to the database when uploaded
 
       toast({
         title: "Draft saved",
@@ -125,29 +147,43 @@ export function ClientSurveyWizard({ orderId, clientId, partnerId, partnerBrand 
 
   const submitSurvey = async (responses: Record<string, any>, media: Record<string, any[]>) => {
     try {
-      // Save final responses
-      await saveDraft(responses, media);
+      if (surveyToken) {
+        // Use token-based submission for public access
+        const { data, error } = await supabase.functions.invoke('survey-submit', {
+          body: { 
+            token: surveyToken, 
+            responses, 
+            surveyId 
+          }
+        });
 
-      // Update survey status to submitted
-      const { error: statusError } = await supabase
-        .from('client_surveys')
-        .update({
-          status: 'submitted',
-          submitted_at: new Date().toISOString()
-        })
-        .eq('id', surveyId);
+        if (error) throw new Error(error.message || 'Failed to submit survey');
+        if (!data.ok) throw new Error(data.error || 'Failed to submit survey');
+      } else {
+        // Use authenticated submission
+        await saveDraft(responses, media);
 
-      if (statusError) throw statusError;
+        // Update survey status to submitted
+        const { error: statusError } = await supabase
+          .from('client_surveys')
+          .update({
+            status: 'submitted',
+            submitted_at: new Date().toISOString()
+          })
+          .eq('id', surveyId);
 
-      // Update order status
-      const { error: orderError } = await supabase
-        .from('orders')
-        .update({
-          status_enhanced: 'awaiting_survey_review'
-        })
-        .eq('id', orderId);
+        if (statusError) throw statusError;
 
-      if (orderError) throw orderError;
+        // Update order status
+        const { error: orderError } = await supabase
+          .from('orders')
+          .update({
+            status_enhanced: 'awaiting_survey_review'
+          })
+          .eq('id', orderId);
+
+        if (orderError) throw orderError;
+      }
 
       // Redirect to success page
       window.location.href = `/survey/${orderId}/success`;

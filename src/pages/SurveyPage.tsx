@@ -58,7 +58,7 @@ export default function SurveyPage() {
         .maybeSingle();
 
       if (error) throw error;
-      return data;
+      return { ...data, is_locked: false }; // No survey status for authenticated access
     },
     enabled: !!(actualOrderId || surveyToken),
   });
@@ -113,6 +113,34 @@ export default function SurveyPage() {
     );
   }
 
+  // Check if survey is already completed (locked)
+  if (orderData.is_locked) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="max-w-md">
+          <CardContent className="p-6 text-center">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <h1 className="text-xl font-semibold text-slate-900 mb-2">
+              Survey Already Submitted
+            </h1>
+            <p className="text-slate-600 mb-4">
+              This survey has already been completed and submitted for review.
+            </p>
+            {orderData.latest_survey?.submitted_at && (
+              <p className="text-sm text-slate-500">
+                Submitted on {new Date(orderData.latest_survey.submitted_at).toLocaleDateString()}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   const partnerBrand = orderData.partners ? {
     name: orderData.partners.name,
     logo_url: orderData.partners.logo_url,
@@ -125,6 +153,8 @@ export default function SurveyPage() {
       clientId={orderData.client_id}
       partnerId={orderData.partner_id}
       partnerBrand={partnerBrand}
+      surveyToken={surveyToken}
+      existingSurvey={orderData.latest_survey}
     />
   );
 }
