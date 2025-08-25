@@ -1,8 +1,10 @@
-import React from 'react';
-import { useLocation } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { useLocation, useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { CheckCircle, Clock, ArrowRight } from 'lucide-react';
 import { DualBrandHeader } from '@/components/survey/DualBrandHeader';
+import { Button } from '@/components/ui/button';
+import { useUserRole } from '@/hooks/useUserRole';
 
 interface SurveySuccessProps {
   orderNumber?: string;
@@ -15,7 +17,29 @@ interface SurveySuccessProps {
 
 export default function SurveySuccess() {
   const location = useLocation();
+  const { orderId } = useParams();
+  const navigate = useNavigate();
+  const { role } = useUserRole();
   const { orderNumber, partnerBrand } = location.state || {};
+
+  const getReturnUrl = () => {
+    if (role === 'partner') {
+      return '/partner';
+    }
+    if (orderId) {
+      return `/client/orders/${orderId}`;
+    }
+    return '/client/orders';
+  };
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      navigate(getReturnUrl());
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, [navigate, role, orderId]);
+
   return (
     <div className="min-h-screen bg-background">
       <DualBrandHeader partnerBrand={partnerBrand} />
@@ -85,9 +109,23 @@ export default function SurveySuccess() {
               </div>
             </div>
 
-            <p className="text-sm text-muted-foreground font-montserrat">
-              If you have any questions or need to make changes, please contact our support team.
-            </p>
+            <div className="space-y-4">
+              <Button
+                onClick={() => navigate(getReturnUrl())}
+                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
+              >
+                Return to your portal
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
+              
+              <p className="text-center text-sm text-muted-foreground font-montserrat">
+                Redirecting you to your portal in a few seconds...
+              </p>
+              
+              <p className="text-center text-sm text-muted-foreground font-montserrat">
+                If you have any questions or need to make changes, please contact our support team.
+              </p>
+            </div>
           </CardContent>
         </Card>
       </div>

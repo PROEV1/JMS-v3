@@ -141,7 +141,9 @@ export function ClientSurveyWizard({ orderId, clientId, partnerId, partnerBrand 
       }
 
       toast({ title: 'Survey submitted successfully!' });
-      navigate('/survey-success');
+      navigate(`/survey/${orderId}/success`, { 
+        state: { orderNumber: orderId, partnerBrand } 
+      });
     } catch (error) {
       console.error('Error submitting survey:', error);
       toast({ title: 'Error submitting survey', variant: 'destructive' });
