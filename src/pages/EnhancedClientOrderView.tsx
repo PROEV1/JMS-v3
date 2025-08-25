@@ -425,7 +425,7 @@ export default function EnhancedClientOrderView() {
           </div>
         </div>
         <div className="flex items-center gap-4">
-          <Button variant="outline">Refresh</Button>
+          <Button variant="outline" onClick={fetchOrder}>Refresh</Button>
           <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300">
             {order.status_enhanced?.replace(/_/g, ' ').toUpperCase()}
           </Badge>
