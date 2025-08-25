@@ -50,13 +50,13 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Check if user is admin
+    // Check if user is admin using admin client to bypass RLS
     console.log('Checking admin status for user:', user.id);
-    const { data: profile, error: profileError } = await supabaseAnon
+    const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
       .select('role')
       .eq('user_id', user.id)
-      .maybeSingle();
+      .single();
 
     console.log('Profile query result:', { profile, profileError });
 
