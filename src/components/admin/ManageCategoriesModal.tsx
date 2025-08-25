@@ -50,13 +50,23 @@ export function ManageCategoriesModal({ open, onOpenChange, onCategoryUpdated }:
   const fetchCategories = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('product_categories')
+      // Use a more direct approach to avoid TypeScript issues
+      const response = await supabase
+        .from('product_categories' as any)
         .select('*')
         .order('sort_order', { ascending: true });
 
-      if (error) throw error;
-      setCategories(data || []);
+      if (response.error) {
+        console.error('Error fetching categories:', response.error);
+        toast({
+          title: "Error",
+          description: "Failed to load categories",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setCategories(response.data || []);
     } catch (error) {
       console.error('Error fetching categories:', error);
       toast({
@@ -87,28 +97,32 @@ export function ManageCategoriesModal({ open, onOpenChange, onCategoryUpdated }:
         sort_order: formData.sort_order
       };
 
+      let response;
       if (editingId) {
-        const { error } = await supabase
-          .from('product_categories')
+        response = await supabase
+          .from('product_categories' as any)
           .update(categoryData)
           .eq('id', editingId);
-
-        if (error) throw error;
-        toast({
-          title: "Success",
-          description: "Category updated successfully",
-        });
       } else {
-        const { error } = await supabase
-          .from('product_categories')
+        response = await supabase
+          .from('product_categories' as any)
           .insert([categoryData]);
-
-        if (error) throw error;
-        toast({
-          title: "Success",
-          description: "Category created successfully",
-        });
       }
+
+      if (response.error) {
+        console.error('Error saving category:', response.error);
+        toast({
+          title: "Error",
+          description: "Failed to save category",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({
+        title: "Success",
+        description: `Category ${editingId ? 'updated' : 'created'} successfully`,
+      });
 
       resetForm();
       fetchCategories();
@@ -140,12 +154,20 @@ export function ManageCategoriesModal({ open, onOpenChange, onCategoryUpdated }:
     }
 
     try {
-      const { error } = await supabase
-        .from('product_categories')
+      const response = await supabase
+        .from('product_categories' as any)
         .delete()
         .eq('id', categoryId);
 
-      if (error) throw error;
+      if (response.error) {
+        console.error('Error deleting category:', response.error);
+        toast({
+          title: "Error",
+          description: "Failed to delete category",
+          variant: "destructive",
+        });
+        return;
+      }
 
       toast({
         title: "Success",

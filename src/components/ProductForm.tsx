@@ -70,7 +70,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onSuc
   const [images, setImages] = useState<ProductImage[]>([]);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [newSpec, setNewSpec] = useState({ key: '', value: '' });
-  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+  const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
   const [showManageCategories, setShowManageCategories] = useState(false);
   
   const [newConfig, setNewConfig] = useState({
@@ -101,14 +101,24 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onSuc
 
   const fetchCategories = async () => {
     try {
-      const { data, error } = await supabase
-        .from('product_categories')
+      // Use a more direct approach to avoid TypeScript issues
+      const response = await supabase
+        .from('product_categories' as any)
         .select('id, name')
         .eq('is_active', true)
         .order('sort_order', { ascending: true });
 
-      if (error) throw error;
-      setCategories(data || []);
+      if (response.error) {
+        console.error('Error fetching categories:', response.error);
+        toast({
+          title: "Error",
+          description: "Failed to load categories",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setCategories(response.data || []);
     } catch (error) {
       console.error('Error fetching categories:', error);
       toast({
