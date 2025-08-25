@@ -1179,6 +1179,7 @@ export type Database = {
           product_details: string | null
           product_name: string | null
           product_price: number | null
+          quote_id: string | null
           quote_number: string | null
           source: string | null
           status: string
@@ -1205,6 +1206,7 @@ export type Database = {
           product_details?: string | null
           product_name?: string | null
           product_price?: number | null
+          quote_id?: string | null
           quote_number?: string | null
           source?: string | null
           status?: string
@@ -1231,6 +1233,7 @@ export type Database = {
           product_details?: string | null
           product_name?: string | null
           product_price?: number | null
+          quote_id?: string | null
           quote_number?: string | null
           source?: string | null
           status?: string
@@ -1245,6 +1248,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
             referencedColumns: ["id"]
           },
         ]

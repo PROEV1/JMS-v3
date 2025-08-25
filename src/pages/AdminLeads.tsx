@@ -59,6 +59,39 @@ const AdminLeads = () => {
     fetchClients();
   }, []);
 
+  // Helper function to populate missing quote_ids for existing converted leads
+  const populateMissingQuoteIds = async () => {
+    console.log('Checking for converted leads without quote_id...');
+    const convertedLeadsWithoutQuoteId = leads.filter(lead => 
+      lead.status === 'converted' && !lead.quote_id && lead.notes
+    );
+
+    for (const lead of convertedLeadsWithoutQuoteId) {
+      // Extract quote number from notes (e.g., "Converted to quote #Q2025-1977")
+      const quoteMatch = lead.notes?.match(/quote #(Q\d{4}-\d{4,})/);
+      if (quoteMatch) {
+        const quoteNumber = quoteMatch[1];
+        console.log(`Found quote number ${quoteNumber} for lead ${lead.id}`);
+        
+        // Find the quote in the database
+        const { data: quote } = await supabase
+          .from('quotes')
+          .select('id')
+          .eq('quote_number', quoteNumber)
+          .single();
+          
+        if (quote) {
+          console.log(`Updating lead ${lead.id} with quote_id ${quote.id}`);
+          await updateLead(lead.id, { quote_id: quote.id });
+          toast({
+            title: "Quote Link Restored",
+            description: `Linked ${lead.name} to quote ${quoteNumber}`,
+          });
+        }
+      }
+    }
+  };
+
   const handleCreateLead = async (leadData: Lead) => {
     try {
       await createLead(leadData);
@@ -424,6 +457,22 @@ const AdminLeads = () => {
                 </div>
                 
                 <div className="flex gap-2">
+                  {/* Debug: Show quote_id status */}
+                  {lead.status === 'converted' && (
+                    <span className="text-xs text-gray-500">
+                      Quote ID: {lead.quote_id || 'Missing'}
+                    </span>
+                  )}
+                  {lead.status === 'converted' && !lead.quote_id && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={populateMissingQuoteIds}
+                      className="text-xs text-blue-600 hover:text-blue-700"
+                    >
+                      Fix Quote Link
+                    </Button>
+                  )}
                   {lead.status === 'converted' && lead.quote_id && (
                     <Button
                       variant="outline"
