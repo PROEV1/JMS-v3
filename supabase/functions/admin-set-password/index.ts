@@ -56,7 +56,7 @@ const handler = async (req: Request): Promise<Response> => {
       .from('profiles')
       .select('role')
       .eq('user_id', user.id)
-      .single();
+      .maybeSingle();
 
     console.log('Profile query result:', { profile, profileError });
 
@@ -71,8 +71,8 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    if (profile?.role !== 'admin') {
-      console.log('User role is not admin:', profile?.role);
+    if (!profile || profile.role !== 'admin') {
+      console.log('User role is not admin:', profile?.role || 'no profile found');
       return new Response(
         JSON.stringify({ error: 'Admin access required' }),
         { 
