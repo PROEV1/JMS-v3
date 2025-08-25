@@ -8,10 +8,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { UserPlus, Search, Edit, Trash2, MoreHorizontal } from 'lucide-react';
+import { UserPlus, Search, Edit, Trash2, MoreHorizontal, KeyRound } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import { ResetPasswordModal } from '@/components/admin/ResetPasswordModal';
 
 interface UserProfile {
   id: string;
@@ -35,6 +36,11 @@ export default function AdminUsers() {
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [regionFilter, setRegionFilter] = useState<string>('all');
+  const [resetPasswordModal, setResetPasswordModal] = useState<{
+    isOpen: boolean;
+    userEmail: string;
+    userName: string;
+  }>({ isOpen: false, userEmail: '', userName: '' });
 
   useEffect(() => {
     if (!permissionsLoading && !canManageUsers) {
@@ -320,11 +326,21 @@ export default function AdminUsers() {
                           <Edit className="h-4 w-4 mr-2" />
                           Edit User
                         </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          onClick={() => handleStatusToggle(user.user_id, user.status)}
-                        >
-                          {user.status === 'active' ? 'Deactivate' : 'Activate'}
-                        </DropdownMenuItem>
+                         <DropdownMenuItem 
+                           onClick={() => handleStatusToggle(user.user_id, user.status)}
+                         >
+                           {user.status === 'active' ? 'Deactivate' : 'Activate'}
+                         </DropdownMenuItem>
+                         <DropdownMenuItem 
+                           onClick={() => setResetPasswordModal({
+                             isOpen: true,
+                             userEmail: user.email,
+                             userName: user.full_name || user.email
+                           })}
+                         >
+                           <KeyRound className="h-4 w-4 mr-2" />
+                           Reset Password
+                         </DropdownMenuItem>
                         {canDeleteUsers && (
                           <DropdownMenuItem 
                             onClick={() => handleDeleteUser(user.user_id, user.full_name || user.email, user.role)}
@@ -343,6 +359,13 @@ export default function AdminUsers() {
           </Table>
         </CardContent>
       </Card>
+
+      <ResetPasswordModal
+        isOpen={resetPasswordModal.isOpen}
+        onClose={() => setResetPasswordModal({ isOpen: false, userEmail: '', userName: '' })}
+        userEmail={resetPasswordModal.userEmail}
+        userName={resetPasswordModal.userName}
+      />
     </div>
   );
 }
