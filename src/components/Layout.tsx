@@ -91,7 +91,17 @@ export default function Layout({ children }: LayoutProps) {
 
   // Centralized role-based routing and protection
   const currentPath = location.pathname;
-  console.log('Layout: Current path:', currentPath, 'User role:', userRole);
+  console.log('Layout: Current path:', currentPath, 'User role:', userRole, 'User ID:', user?.id);
+  
+  // DEBUGGING: Check if there's a role mismatch
+  if (userRole === 'partner' && currentPath.startsWith('/client')) {
+    console.warn('⚠️ Role mismatch detected: Partner user accessing client route', {
+      userRole,
+      currentPath,
+      userEmail: user?.email,
+      userId: user?.id
+    });
+  }
   
   // Handle root path - redirect to role-appropriate section
   if (currentPath === '/') {
