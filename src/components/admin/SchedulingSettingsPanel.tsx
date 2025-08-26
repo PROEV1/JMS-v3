@@ -113,7 +113,7 @@ export function SchedulingSettingsPanel() {
         allow_weekend_bookings: settings.allow_weekend_bookings,
         allow_holiday_bookings: settings.allow_holiday_bookings,
         require_client_confirmation: settings.require_client_confirmation,
-        require_service_area_match: settings.require_service_area_match,
+        require_service_area_match: settings.require_service_area_match ?? true,
         max_travel_minutes_fallback: settings.max_travel_minutes_fallback,
       };
 

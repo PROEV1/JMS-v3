@@ -89,8 +89,8 @@ export function AutoScheduleReviewModal({
   const cancelledRef = useRef(false);
   // Snapshot of orders when generation starts (to prevent flickering from prop changes)
   const ordersSnapshotRef = useRef<Order[]>([]);
-  // Multi-pass scheduling options
-  const [guaranteeSchedule, setGuaranteeSchedule] = useState(false);
+  // Multi-pass scheduling options (default to ON for better success)
+  const [guaranteeSchedule, setGuaranteeSchedule] = useState(true);
   // Diagnostics
   const [diagnostics, setDiagnostics] = useState<{
     mapbox429Count: number;
