@@ -241,11 +241,11 @@ serve(async (req) => {
 
     // Order statuses distribution - focused on scheduling pipeline
     const orderStatuses = [
-      { status: 'awaiting_install_booking', weight: 30 }, // Main unscheduled status
-      { status: 'scheduled', weight: 35 }, // Main scheduled status  
-      { status: 'in_progress', weight: 15 }, // Currently being worked on
-      { status: 'install_completed_pending_qa', weight: 10 }, // Pending QA
-      { status: 'completed', weight: 8 }, // Finished jobs
+      { status: 'awaiting_install_booking', weight: 50 }, // Main unscheduled status - increased for more "Needs Scheduling" jobs
+      { status: 'scheduled', weight: 25 }, // Main scheduled status  
+      { status: 'in_progress', weight: 12 }, // Currently being worked on
+      { status: 'install_completed_pending_qa', weight: 8 }, // Pending QA
+      { status: 'completed', weight: 3 }, // Finished jobs
       { status: 'awaiting_payment', weight: 2 } // Few payment issues
     ];
 
