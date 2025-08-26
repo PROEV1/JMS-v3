@@ -60,13 +60,15 @@ export default function ClientOfferView() {
           body: { token }
         });
 
-        if (error || data?.error) {
+        if (error || !data || data?.error) {
           setError(data?.error || 'Failed to load offer details');
           if (data?.expired) {
             setError('This offer has expired');
           }
+        } else if (data?.data) {
+          setOffer(data.data);
         } else {
-          setOffer(data);
+          setError('Invalid offer data received');
         }
       } catch (err: any) {
         setError('Failed to load offer details');

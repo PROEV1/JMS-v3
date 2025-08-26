@@ -138,13 +138,14 @@ serve(async (req: Request) => {
         throw new Error('Failed to update offer status');
       }
 
-      // Assign engineer and date to the order
+      // Assign engineer and date to the order - trigger status recalculation
       const { error: updateOrderError } = await supabase
         .from('orders')
         .update({
           engineer_id: jobOffer.engineer_id,
           scheduled_install_date: jobOffer.offered_date,
-          time_window: jobOffer.time_window
+          time_window: jobOffer.time_window,
+          status_enhanced: 'scheduled'  // Force immediate status update
         })
         .eq('id', jobOffer.order_id);
 
