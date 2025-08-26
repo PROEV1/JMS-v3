@@ -177,7 +177,7 @@ export default function OrderDetail() {
         .from('orders')
         .select(`
           *,
-          clients(
+          client:clients!orders_client_id_fkey(
             id, 
             full_name, 
             email, 
@@ -185,7 +185,7 @@ export default function OrderDetail() {
             postcode, 
             phone
           ),
-          quotes(
+          quote:quotes!orders_quote_id_fkey(
             id,
             quote_number,
             total_cost,
@@ -210,7 +210,7 @@ export default function OrderDetail() {
             paid_at,
             created_at
           ),
-          engineers(
+          engineer:engineers!orders_engineer_id_fkey(
             id,
             name,
             email
@@ -223,13 +223,13 @@ export default function OrderDetail() {
             description,
             uploaded_at
           ),
-          partners(
+          partner:partners!orders_partner_id_fkey(
             name, 
             client_payment_required, 
             client_agreement_required, 
             client_survey_required
           ),
-          client_surveys(
+          survey:client_surveys(
             id,
             status,
             responses,
@@ -258,17 +258,13 @@ export default function OrderDetail() {
       }
       
       console.log('Order data fetched:', data);
-      console.log('Client data:', data.clients);
-      console.log('Quote data:', data.quotes);
+      console.log('Client data:', data.client);
+      console.log('Quote data:', data.quote);
       
-      // Transform the data to match our interface, handling nullable relationships
+      // Transform the data to match our interface
       const transformedOrder = {
         ...data,
-        client: data.clients || null,
-        quote: data.quotes || null,
-        engineer: data.engineers || null,
-        partner: data.partners || null,
-        survey: data.client_surveys?.[0] || null
+        survey: data.survey?.[0] || null // Get first survey if exists
       };
       
       setOrder(transformedOrder as any);
