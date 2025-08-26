@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, Trash2, Upload, X } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCreateStockRequest } from '@/hooks/useStockRequests';
@@ -22,7 +22,7 @@ const StockRequestSchema = z.object({
   priority: z.enum(['low','medium','high']).default('medium'),
   needed_by_date: z.string().nullable().optional(),
   notes: z.string().optional(),
-  attachments: z.array(z.object({ name: z.string(), path: z.string() })).optional(),
+  
   lines: z.array(z.object({
     item_id: z.string().min(1, 'Please select an item'),
     qty: z.number().min(1, 'Quantity must be at least 1')
@@ -37,7 +37,7 @@ const defaults: DefaultValues<StockRequestFormValues> = {
   priority: 'medium',
   needed_by_date: null,
   notes: '',
-  attachments: [],
+  
   lines: [{ item_id: '', qty: 1 }]
 };
 
@@ -59,6 +59,9 @@ interface ItemData {
   name: string;
   sku: string;
   unit: string;
+  min_level: number | null;
+  max_level: number | null;
+  reorder_point: number | null;
 }
 
 export const StockRequestForm: React.FC<StockRequestFormProps> = ({
@@ -67,7 +70,7 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({
   onClose,
   prefilledItems = []
 }) => {
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  
   const createRequest = useCreateStockRequest();
   const { toast } = useToast();
 
@@ -107,7 +110,7 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({
         // Fetch items - cast to avoid deep type instantiation
         const itemResponse: any = await (supabase as any)
           .from('inventory_items')
-          .select('id, name, sku, unit')
+          .select('id, name, sku, unit, min_level, max_level, reorder_point')
           .eq('is_active', true)
           .order('name');
 
@@ -124,7 +127,10 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({
           id: item.id,
           name: item.name,
           sku: item.sku,
-          unit: item.unit
+          unit: item.unit,
+          min_level: item.min_level,
+          max_level: item.max_level,
+          reorder_point: item.reorder_point
         })));
       } catch (error) {
         console.error('Failed to fetch data:', error);
@@ -136,39 +142,9 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({
     fetchData();
   }, [engineerId]);
 
-  const uploadPhoto = async (file: File): Promise<string | null> => {
-    try {
-      const fileName = `${Date.now()}-${file.name}`;
-      const uploadError = await (supabase as any).storage
-        .from('stock-request-attachments')
-        .upload(fileName, file);
-
-      if (uploadError.error) throw uploadError.error;
-
-      const { data } = (supabase as any).storage
-        .from('stock-request-attachments')
-        .getPublicUrl(fileName);
-
-      return data?.publicUrl || null;
-    } catch (error) {
-      console.error('Photo upload failed:', error);
-        toast({
-          title: "Something went wrong",
-          description: 'Failed to upload photo',
-          variant: "destructive",
-        });
-      return null;
-    }
-  };
 
   const onSubmit = async (values: StockRequestFormValues) => {
     try {
-      let photoUrl: string | undefined;
-      
-      if (photoFile) {
-        photoUrl = await uploadPhoto(photoFile) || undefined;
-      }
-
       // Map to lightweight DTO; avoid DB/Prisma/Supabase heavy types here
       const dto = {
         destination_location_id: values.destination_location_id,
@@ -176,7 +152,7 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({
         needed_by: values.needed_by_date ?? null,
         priority: values.priority,
         notes: values.notes ?? '',
-        photo_url: photoUrl,
+        photo_url: undefined,
         lines: values.lines.map(l => ({ 
           item_id: l.item_id, 
           qty: Number(l.qty),
@@ -192,11 +168,6 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setPhotoFile(e.target.files[0]);
-    }
-  };
 
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -280,7 +251,12 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({
                     <SelectContent>
                       {items?.map((item) => (
                         <SelectItem key={item.id} value={item.id}>
-                          {item.name} ({item.sku})
+                          <div className="flex flex-col">
+                            <span className="font-medium">{item.name} ({item.sku})</span>
+                            <span className="text-xs text-muted-foreground">
+                              Min: {item.min_level ?? 'N/A'} | Max: {item.max_level ?? 'N/A'} | Reorder: {item.reorder_point ?? 'N/A'}
+                            </span>
+                          </div>
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -323,30 +299,6 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({
         )}
       </div>
 
-      <div>
-        <Label htmlFor="photo">Attach Photo (Optional)</Label>
-        <div className="flex items-center gap-4 mt-2">
-          <Input
-            type="file"
-            accept="image/*"
-            onChange={handleFileChange}
-            className="flex-1"
-          />
-          {photoFile && (
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-green-600">{photoFile.name}</span>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => setPhotoFile(null)}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-          )}
-        </div>
-      </div>
 
       <div className="flex gap-3 justify-end">
         <Button type="button" variant="outline" onClick={onClose}>
