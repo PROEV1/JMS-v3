@@ -25,7 +25,12 @@ export function ItemPickerModal({ open, onOpenChange, location, onItemAdded }: I
 
   const { toast } = useToast();
   const { useInventoryItems, createStockAdjustment } = useInventoryEnhanced();
-  const { data: allItems = [] } = useInventoryItems();
+  const { data: allItems = [], isLoading, error } = useInventoryItems();
+
+  // Debug logging
+  console.log('ItemPickerModal - allItems:', allItems);
+  console.log('ItemPickerModal - isLoading:', isLoading);
+  console.log('ItemPickerModal - error:', error);
 
   // Filter items by search term
   const filteredItems = allItems.filter(item => {
@@ -135,14 +140,24 @@ export function ItemPickerModal({ open, onOpenChange, location, onItemAdded }: I
               </Card>
             ))}
             
-            {filteredItems.length === 0 && (
+            {filteredItems.length === 0 && !isLoading && (
               <Card className="border-dashed">
                 <CardContent className="p-8 text-center">
                   <Package className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
                   <h3 className="text-lg font-medium mb-2">No Items Found</h3>
                   <p className="text-muted-foreground">
-                    {searchTerm ? 'No items match your search criteria.' : 'No inventory items available.'}
+                    {searchTerm ? 'No items match your search criteria.' : error ? `Error loading items: ${error.message}` : 'No inventory items available.'}
                   </p>
+                </CardContent>
+              </Card>
+            )}
+
+            {isLoading && (
+              <Card className="border-dashed">
+                <CardContent className="p-8 text-center">
+                  <Package className="h-12 w-12 mx-auto mb-4 text-muted-foreground animate-pulse" />
+                  <h3 className="text-lg font-medium mb-2">Loading Items...</h3>
+                  <p className="text-muted-foreground">Fetching inventory data...</p>
                 </CardContent>
               </Card>
             )}
