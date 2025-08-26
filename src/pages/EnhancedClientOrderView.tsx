@@ -77,8 +77,19 @@ export default function EnhancedClientOrderView() {
           description: "Your payment was cancelled",
           variant: "destructive",
         });
-        // Clean up URL
+        // Clean up URL and localStorage
         window.history.replaceState({}, '', window.location.pathname);
+        localStorage.removeItem('pending_payment_session');
+        localStorage.removeItem('pending_payment_order');
+      } else {
+        // Check for fallback payment verification using localStorage
+        const pendingSessionId = localStorage.getItem('pending_payment_session');
+        const pendingOrderId = localStorage.getItem('pending_payment_order');
+        
+        if (pendingSessionId && pendingOrderId === orderId) {
+          console.log('Checking fallback payment verification for session:', pendingSessionId);
+          verifyPayment(pendingSessionId);
+        }
       }
     }
   }, [orderId, location.search]);
@@ -158,8 +169,12 @@ export default function EnhancedClientOrderView() {
           description: `Payment of £${data.amount_paid} was processed successfully`,
         });
         
-        // Refresh order data
-        fetchOrder();
+        // Clean up localStorage
+        localStorage.removeItem('pending_payment_session');
+        localStorage.removeItem('pending_payment_order');
+        
+        // Force refresh order data to get updated status
+        await fetchOrder();
         
         // Clean up URL
         window.history.replaceState({}, '', window.location.pathname);
@@ -296,8 +311,13 @@ export default function EnhancedClientOrderView() {
       });
 
       if (error) throw error;
-      if (data?.url) {
-        window.open(data.url, '_blank');
+      if (data?.url && data?.session_id) {
+        // Store session_id for fallback verification
+        localStorage.setItem('pending_payment_session', data.session_id);
+        localStorage.setItem('pending_payment_order', order.id);
+        
+        // Redirect in same tab instead of opening new tab
+        window.location.href = data.url;
       }
     } catch (error) {
       console.error('Error creating payment session:', error);

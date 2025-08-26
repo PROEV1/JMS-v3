@@ -121,8 +121,18 @@ export default function ClientOrders() {
 
       if (error) throw error;
 
-      if (data.url) {
-        window.open(data.url, '_blank');
+      if (data.url && data.session_id) {
+        // Store session_id for fallback verification
+        localStorage.setItem('pending_payment_session', data.session_id);
+        localStorage.setItem('pending_payment_order', orderId);
+        
+        // Redirect to detailed order view for better payment flow
+        navigate(`/client/orders/${orderId}`);
+        
+        // Then redirect to Stripe in same tab
+        setTimeout(() => {
+          window.location.href = data.url;
+        }, 100);
       }
     } catch (error) {
       console.error('Error creating payment session:', error);
