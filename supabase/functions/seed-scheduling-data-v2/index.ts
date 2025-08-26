@@ -528,6 +528,13 @@ serve(async (req) => {
               manualStatusOverride = true; // Override auto-calculation
             }
 
+            // For awaiting_install_booking status, disable survey requirement to bypass survey gates
+            let surveyRequired = true;
+            if (selectedStatus === 'awaiting_install_booking') {
+              surveyRequired = false; // Disable survey to reach "Needs Scheduling"
+              manualStatusOverride = true;
+            }
+
             // Generate scheduled date and engineer assignment based on status
             let scheduledDate = null;
             let assignedEngineer = null;
@@ -574,6 +581,7 @@ serve(async (req) => {
                 status_enhanced: selectedStatus,
                 manual_status_override: manualStatusOverride,
                 manual_status_notes: manualStatusOverride ? 'Status manually set by seeding function' : null,
+                survey_required: surveyRequired,
                 total_amount: totalCost,
                 deposit_amount: depositAmount,
                 amount_paid: amountPaid,
