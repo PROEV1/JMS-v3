@@ -161,7 +161,7 @@ export default function OrderDetail() {
 
   const fetchOrder = async () => {
     if (!orderId) {
-      console.error('No orderId provided');
+      console.error('[OrderDetail] No orderId provided');
       toast({
         title: "Error",
         description: "Invalid order ID",
@@ -171,13 +171,15 @@ export default function OrderDetail() {
       return;
     }
 
-    console.log('Fetching order with ID:', orderId);
+    console.log('[OrderDetail] Fetching order with ID:', orderId);
+    console.log('[OrderDetail] User role:', userRole);
+    
     try {
       const { data, error } = await supabase
         .from('orders')
         .select(`
           *,
-          client:clients!orders_client_id_fkey(
+          client:clients(
             id, 
             full_name, 
             email, 
@@ -185,7 +187,7 @@ export default function OrderDetail() {
             postcode, 
             phone
           ),
-          quote:quotes!orders_quote_id_fkey(
+          quote:quotes(
             id,
             quote_number,
             total_cost,
@@ -210,7 +212,7 @@ export default function OrderDetail() {
             paid_at,
             created_at
           ),
-          engineer:engineers!orders_engineer_id_fkey(
+          engineer:engineers(
             id,
             name,
             email
@@ -223,13 +225,13 @@ export default function OrderDetail() {
             description,
             uploaded_at
           ),
-          partner:partners!orders_partner_id_fkey(
+          partner:partners(
             name, 
             client_payment_required, 
             client_agreement_required, 
             client_survey_required
           ),
-          survey:client_surveys(
+          client_surveys(
             id,
             status,
             responses,
@@ -241,13 +243,20 @@ export default function OrderDetail() {
         .eq('id', orderId)
         .maybeSingle();
 
+      console.log('[OrderDetail] Raw query result:', { data, error });
+
       if (error) {
-        console.error('Database error:', error);
+        console.error('[OrderDetail] Database error:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        });
         throw error;
       }
       
       if (!data) {
-        console.error('Order not found for ID:', orderId);
+        console.error('[OrderDetail] Order not found for ID:', orderId);
         toast({
           title: "Error",
           description: "Order not found",
@@ -257,22 +266,65 @@ export default function OrderDetail() {
         return;
       }
       
-      console.log('Order data fetched:', data);
-      console.log('Client data:', data.client);
-      console.log('Quote data:', data.quote);
+      console.log('[OrderDetail] Order data structure:', {
+        id: data.id,
+        order_number: data.order_number,
+        hasClient: !!data.client,
+        hasQuote: !!data.quote,
+        hasEngineer: !!data.engineer,
+        hasPartner: !!data.partner,
+        surveysCount: data.client_surveys?.length || 0,
+        paymentsCount: data.order_payments?.length || 0,
+        uploadsCount: data.engineer_uploads?.length || 0
+      });
+      
+      // Detailed logging for each relation
+      if (data.client) {
+        console.log('[OrderDetail] Client data:', data.client);
+      } else {
+        console.warn('[OrderDetail] No client data found');
+      }
+      
+      if (data.quote) {
+        console.log('[OrderDetail] Quote data:', {
+          id: data.quote.id,
+          quote_number: data.quote.quote_number,
+          itemsCount: data.quote.quote_items?.length || 0
+        });
+      } else {
+        console.warn('[OrderDetail] No quote data found');
+      }
+      
+      if (data.engineer) {
+        console.log('[OrderDetail] Engineer data:', data.engineer);
+      } else {
+        console.log('[OrderDetail] No engineer assigned');
+      }
+      
+      if (data.partner) {
+        console.log('[OrderDetail] Partner data:', data.partner);
+      } else {
+        console.log('[OrderDetail] No partner data');
+      }
       
       // Transform the data to match our interface
       const transformedOrder = {
         ...data,
-        survey: data.survey?.[0] || null // Get first survey if exists
+        survey: data.client_surveys?.[0] || null // Get first survey if exists
       };
       
+      console.log('[OrderDetail] Transformed order ready to set:', transformedOrder);
       setOrder(transformedOrder as any);
-    } catch (error) {
-      console.error('Error fetching order:', error);
+      
+    } catch (error: any) {
+      console.error('[OrderDetail] Error fetching order:', {
+        message: error?.message || 'Unknown error',
+        stack: error?.stack,
+        orderId
+      });
       toast({
-        title: "Error",
-        description: "Failed to load order details",
+        title: "Something went wrong",
+        description: "We couldn't complete that action. Nothing has been lost.",
         variant: "destructive",
       });
     } finally {
