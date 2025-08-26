@@ -9,8 +9,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { CalendarDays, Clock, User, CheckCircle, XCircle, AlertTriangle, Calendar } from 'lucide-react';
-import Layout from '@/components/Layout';
+
 import { BrandTypography } from '@/components/brand/BrandTypography';
+import { ProEVLogo } from '@/components/ProEVLogo';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -231,20 +232,26 @@ export default function ClientOfferView() {
 
   if (loading) {
     return (
-      <Layout>
-        <div className="flex justify-center items-center min-h-screen">
+      <div className="min-h-screen bg-background">
+        <header className="h-16 flex items-center border-b bg-white shadow-sm px-4">
+          <ProEVLogo size="md" />
+        </header>
+        <div className="flex justify-center items-center min-h-[calc(100vh-4rem)]">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
             <p className="text-muted-foreground">Loading offer details...</p>
           </div>
         </div>
-      </Layout>
+      </div>
     );
   }
 
   if (error || !offer) {
     return (
-      <Layout>
+      <div className="min-h-screen bg-background">
+        <header className="h-16 flex items-center border-b bg-white shadow-sm px-4">
+          <ProEVLogo size="md" />
+        </header>
         <div className="container mx-auto px-4 py-8">
           <Card className="max-w-md mx-auto">
             <CardHeader className="text-center">
@@ -267,7 +274,7 @@ export default function ClientOfferView() {
             </CardContent>
           </Card>
         </div>
-      </Layout>
+      </div>
     );
   }
 
@@ -276,7 +283,10 @@ export default function ClientOfferView() {
   const isExpired = new Date() > expiresAt;
 
   return (
-    <Layout>
+    <div className="min-h-screen bg-background">
+      <header className="h-16 flex items-center border-b bg-white shadow-sm px-4">
+        <ProEVLogo size="md" />
+      </header>
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-2xl mx-auto">
           {/* Header */}
@@ -519,6 +529,6 @@ export default function ClientOfferView() {
           )}
         </div>
       </div>
-    </Layout>
+    </div>
   );
 }
