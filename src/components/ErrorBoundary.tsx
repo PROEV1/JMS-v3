@@ -53,7 +53,14 @@ export class ErrorBoundary extends Component<Props, State> {
   };
 
   handleGoHome = () => {
-    window.location.href = '/';
+    // Try to navigate to appropriate dashboard based on current path
+    if (window.location.pathname.includes('/engineer')) {
+      window.location.href = '/engineer/jobs';
+    } else if (window.location.pathname.includes('/admin')) {
+      window.location.href = '/admin';
+    } else {
+      window.location.href = '/';
+    }
   };
 
   render() {

@@ -653,6 +653,7 @@ export type Database = {
           created_at: string
           email: string
           id: string
+          is_active: boolean | null
           max_installs_per_day: number
           name: string
           region: string | null
@@ -665,6 +666,7 @@ export type Database = {
           created_at?: string
           email: string
           id?: string
+          is_active?: boolean | null
           max_installs_per_day?: number
           name: string
           region?: string | null
@@ -677,6 +679,7 @@ export type Database = {
           created_at?: string
           email?: string
           id?: string
+          is_active?: boolean | null
           max_installs_per_day?: number
           name?: string
           region?: string | null
