@@ -1340,6 +1340,8 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
           onOffersSubmitted={() => {
             if (onUpdate) onUpdate();
             refetchOffers();
+            // Dispatch global refresh event for all scheduling components
+            window.dispatchEvent(new CustomEvent('scheduling:refresh'));
           }}
         />
       )}

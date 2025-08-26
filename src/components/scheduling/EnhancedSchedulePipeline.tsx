@@ -313,6 +313,8 @@ export function EnhancedSchedulePipeline() {
         onOffersSubmitted={() => {
           fetchData();
           refetchOffers();
+          // Dispatch global refresh event for all scheduling components
+          window.dispatchEvent(new CustomEvent('scheduling:refresh'));
         }}
       />
     </div>
