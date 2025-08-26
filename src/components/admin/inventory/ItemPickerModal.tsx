@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Search, Package, Plus } from "lucide-react";
+import { Search, Package, Plus, Trash2 } from "lucide-react";
 import { useInventoryEnhanced } from '@/hooks/useInventoryEnhanced';
 import { useToast } from '@/hooks/use-toast';
 
@@ -24,7 +24,7 @@ export function ItemPickerModal({ open, onOpenChange, location, onItemAdded }: I
   const [notes, setNotes] = useState<string>('');
 
   const { toast } = useToast();
-  const { useInventoryItems, createStockAdjustment } = useInventoryEnhanced();
+  const { useInventoryItems, createStockAdjustment, deleteInventoryItem } = useInventoryEnhanced();
   const { data: allItems = [], isLoading, error } = useInventoryItems();
 
   // Debug logging
@@ -82,6 +82,32 @@ export function ItemPickerModal({ open, onOpenChange, location, onItemAdded }: I
     }
   };
 
+  const handleDeleteItem = async (item: any, event: React.MouseEvent) => {
+    event.stopPropagation(); // Prevent selecting the item when clicking delete
+    
+    if (window.confirm(`Are you sure you want to delete "${item.name}"? This action cannot be undone.`)) {
+      try {
+        await deleteInventoryItem.mutateAsync(item.id);
+        
+        toast({
+          title: "Item Deleted",
+          description: `Successfully deleted ${item.name}`,
+        });
+        
+        // Clear selection if the deleted item was selected
+        if (selectedItem?.id === item.id) {
+          setSelectedItem(null);
+        }
+      } catch (error: any) {
+        toast({
+          title: "Failed to Delete Item",
+          description: error.message || "Failed to delete item. Please try again.",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[800px] max-h-[80vh] overflow-y-auto">
@@ -135,6 +161,15 @@ export function ItemPickerModal({ open, onOpenChange, location, onItemAdded }: I
                         <span>Cost: £{item.default_cost || 0}</span>
                       </div>
                     </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={(e) => handleDeleteItem(item, e)}
+                      disabled={deleteInventoryItem.isPending}
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -176,8 +211,22 @@ export function ItemPickerModal({ open, onOpenChange, location, onItemAdded }: I
                       id="quantity"
                       type="number"
                       min="1"
+                      step="1"
                       value={quantity}
-                      onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (value === '') {
+                          setQuantity(0);
+                        } else {
+                          setQuantity(Math.max(1, parseInt(value) || 1));
+                        }
+                      }}
+                      onBlur={(e) => {
+                        // Ensure minimum value of 1 on blur
+                        if (quantity < 1) {
+                          setQuantity(1);
+                        }
+                      }}
                       placeholder="Enter quantity"
                     />
                   </div>
