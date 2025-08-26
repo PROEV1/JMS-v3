@@ -726,15 +726,15 @@ export default function OrderDetail() {
                 </Button>
                 <div>
                   <div className="flex items-center gap-3">
-                    <BrandHeading1>Order {order.order_number}</BrandHeading1>
-                    {order.is_partner_job && order.partner?.name && (
+                    <BrandHeading1>Order {order?.order_number || 'Unknown'}</BrandHeading1>
+                    {order?.is_partner_job && order?.partner?.name && (
                       <Badge variant="secondary" className="bg-blue-100 text-blue-700">
                         Partner: {order.partner.name}
                       </Badge>
                     )}
                   </div>
                   <p className="text-muted-foreground">
-                    Created on {new Date(order.created_at).toLocaleDateString()}
+                    Created on {order?.created_at ? new Date(order.created_at).toLocaleDateString() : 'Unknown date'}
                   </p>
                 </div>
               </div>
@@ -745,16 +745,20 @@ export default function OrderDetail() {
 
           <div className="space-y-6">
             {/* Order Overview */}
-            <AdminOrderOverview order={order} />
+            {order && (
+              <AdminOrderOverview order={order} />
+            )}
 
             {/* Client Information */}
-            <ClientDetailsSection 
-              order={order} 
-              onUpdate={fetchOrder}
-            />
+            {order && (
+              <ClientDetailsSection 
+                order={order} 
+                onUpdate={fetchOrder}
+              />
+            )}
 
             {/* Product Summary */}
-            {order.quote && (
+            {order?.quote && (
               <ProductSummarySection 
                 order={order} 
                 onUpdate={fetchOrder}
@@ -762,39 +766,53 @@ export default function OrderDetail() {
             )}
 
             {/* Quote History & Management */}
-            <OrderQuotesSection 
-              order={order} 
-              onOrderUpdate={fetchOrder}
-            />
+            {order && (
+              <OrderQuotesSection 
+                order={order} 
+                onOrderUpdate={fetchOrder}
+              />
+            )}
 
             {/* Payment Management */}
-            <PaymentSection order={order} />
+            {order && (
+              <PaymentSection order={order} />
+            )}
 
             {/* Service Agreement */}
-            <AgreementSection order={order} />
+            {order && (
+              <AgreementSection order={order} />
+            )}
 
             {/* Installation Management */}
-            <InstallationManagementSection 
-              order={order} 
-              onUpdate={fetchOrder}
-              paymentRequired={order.partner?.client_payment_required ?? true}
-              agreementRequired={order.partner?.client_agreement_required ?? true}
-            />
+            {order && (
+              <InstallationManagementSection 
+                order={order} 
+                onUpdate={fetchOrder}
+                paymentRequired={order.partner?.client_payment_required ?? true}
+                agreementRequired={order.partner?.client_agreement_required ?? true}
+              />
+            )}
 
             {/* Offer Link Widget */}
-            <OfferLinkWidget orderId={orderId!} />
+            {orderId && (
+              <OfferLinkWidget orderId={orderId} />
+            )}
 
             {/* Job Status & Timeline */}
-            <JobStatusTimelineSection 
-              order={order} 
-              onUpdate={fetchOrder}
-            />
+            {order && (
+              <JobStatusTimelineSection 
+                order={order} 
+                onUpdate={fetchOrder}
+              />
+            )}
 
             {/* Activity & History */}
-            <ActivityHistorySection orderId={orderId!} />
+            {orderId && (
+              <ActivityHistorySection orderId={orderId} />
+            )}
 
             {/* Client Blocked Dates */}
-            {order.client?.id && (
+            {order?.client?.id && (
               <ClientBlockedDatesSection 
                 clientId={order.client.id}
                 onDataChange={fetchOrder}
@@ -803,10 +821,12 @@ export default function OrderDetail() {
 
             
             {/* Survey Section */}
-            <SurveySection orderId={orderId!} />
+            {orderId && (
+              <SurveySection orderId={orderId} />
+            )}
             
             {/* Survey Review Section - for orders with submitted surveys */}
-            {order.status_enhanced === 'awaiting_survey_review' && order.client?.id && order.quote_id && (
+            {order?.status_enhanced === 'awaiting_survey_review' && order?.client?.id && order?.quote_id && (
               <SurveyReviewSection
                 order={{
                   id: order.id,
@@ -820,10 +840,12 @@ export default function OrderDetail() {
             )}
 
             {/* Engineer Uploads & Completion */}
-            <EngineerUploadsSection 
-              order={order} 
-              onUpdate={fetchOrder}
-            />
+            {order && (
+              <EngineerUploadsSection 
+                order={order} 
+                onUpdate={fetchOrder}
+              />
+            )}
           </div>
           </div>
         </BrandContainer>
