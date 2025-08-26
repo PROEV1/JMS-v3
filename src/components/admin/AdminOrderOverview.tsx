@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle, AlertCircle, User, Calendar, FileText, CreditCard } from 'lucide-react';
+import { CheckCircle, AlertCircle, User, Calendar, FileText, CreditCard, Check } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Order {
   id: string;
@@ -40,12 +41,42 @@ interface AdminOrderOverviewProps {
 }
 
 export function AdminOrderOverview({ order }: AdminOrderOverviewProps) {
+  const [acceptedOffer, setAcceptedOffer] = useState<any>(null);
+  
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-GB', {
       style: 'currency',
       currency: 'GBP'
     }).format(amount);
   };
+
+  // Fetch accepted offer details
+  useEffect(() => {
+    const fetchAcceptedOffer = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('job_offers')
+          .select(`
+            *,
+            engineer:engineer_id (
+              name
+            )
+          `)
+          .eq('order_id', order.id)
+          .eq('status', 'accepted')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (error) throw error;
+        setAcceptedOffer(data);
+      } catch (error) {
+        console.error('Error fetching accepted offer:', error);
+      }
+    };
+
+    fetchAcceptedOffer();
+  }, [order.id]);
 
   const getStatusIcon = (completed: boolean) => {
     return completed ? (
@@ -146,6 +177,12 @@ export function AdminOrderOverview({ order }: AdminOrderOverviewProps) {
               <span className="text-sm">
                 {order.engineer?.name || 'Not Assigned'}
               </span>
+              {acceptedOffer && (
+                <Badge variant="outline" className="text-xs border-green-300 text-green-700">
+                  <Check className="w-3 h-3 mr-1" />
+                  Accepted Offer
+                </Badge>
+              )}
             </div>
           </div>
           

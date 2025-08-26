@@ -272,6 +272,33 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
     return orderOffers.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
   };
 
+  // Helper function to get accepted offer details for display
+  const getAcceptedOfferDetails = (orderId: string) => {
+    const acceptedOffer = offers.find(offer => 
+      offer.order_id === orderId && offer.status === 'accepted'
+    );
+    
+    if (!acceptedOffer) return null;
+    
+    const engineer = engineers.find(e => e.id === acceptedOffer.engineer_id);
+    const offerDate = new Date(acceptedOffer.offered_date);
+    const formattedDate = offerDate.toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+    
+    const isPastDate = offerDate < new Date();
+    
+    return {
+      engineerName: engineer?.name || 'Unknown Engineer',
+      date: formattedDate,
+      timeWindow: acceptedOffer.time_window || 'All Day',
+      isPastDate,
+      acceptedAt: acceptedOffer.accepted_at
+    };
+  };
+
   const handleResendOffer = async (orderId: string) => {
     const latestOffer = getLatestOfferForOrder(orderId);
     if (!latestOffer) return;
@@ -783,27 +810,48 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                         )}
                       </div>
 
-                       {/* Status - Horizontal Badges */}
-                       <div className="col-span-2">
-                         <div className="flex items-center gap-1 flex-wrap">
-                            <Badge 
-                              variant={getJobStatusChip(order).variant} 
-                              className="text-xs px-2 py-1 bg-slate-100 text-slate-600 border-slate-200"
-                            >
-                              {getJobStatusChip(order).label}
+                        {/* Status - Horizontal Badges */}
+                        <div className="col-span-2">
+                          <div className="flex items-center gap-1 flex-wrap">
+                             <Badge 
+                               variant={getJobStatusChip(order).variant} 
+                               className="text-xs px-2 py-1 bg-slate-100 text-slate-600 border-slate-200"
+                             >
+                               {getJobStatusChip(order).label}
+                             </Badge>
+                             {order.is_partner_job && (
+                               <Badge variant="outline" className={`text-xs px-1 py-0 ${order.partner_status ? 'border-blue-300 text-blue-600' : 'border-blue-300 text-blue-600'}`}>
+                                 {order.partner_status ? `Partner: ${order.partner_status}` : 'Partner'}
+                               </Badge>
+                             )}
+                            <Badge variant="outline" className="text-xs px-2 py-1 border-slate-300 text-slate-600">
+                              {getOffersChip(order).label}
                             </Badge>
-                            {order.is_partner_job && (
-                              <Badge variant="outline" className={`text-xs px-1 py-0 ${order.partner_status ? 'border-blue-300 text-blue-600' : 'border-blue-300 text-blue-600'}`}>
-                                {order.partner_status ? `Partner: ${order.partner_status}` : 'Partner'}
-                              </Badge>
-                            )}
-                           <Badge variant="outline" className="text-xs px-2 py-1 border-slate-300 text-slate-600">
-                             {offersStatus.label}
-                           </Badge>
+                          </div>
+                          
+                          {/* Show accepted offer details if available */}
+                          {(() => {
+                            const acceptedDetails = getAcceptedOfferDetails(order.id);
+                            if (acceptedDetails) {
+                              return (
+                                <div className={`text-xs mt-1 flex items-center gap-1 ${acceptedDetails.isPastDate ? 'text-amber-600' : 'text-green-600'}`}>
+                                  <Check className="w-3 h-3" />
+                                  <span>
+                                    Accepted: {acceptedDetails.engineerName} on {acceptedDetails.date} ({acceptedDetails.timeWindow})
+                                  </span>
+                                  {acceptedDetails.isPastDate && (
+                                    <Badge variant="outline" className="ml-1 text-xs px-1 py-0 text-amber-600 border-amber-300">
+                                      Past Date
+                                    </Badge>
+                                  )}
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
                          </div>
-                       </div>
 
-                      {/* Created */}
+                       {/* Created */}
                       <div className="col-span-1">
                         <span className="text-sm text-muted-foreground">
                           {order.created_at ? new Date(order.created_at).toLocaleDateString() : '—'}
