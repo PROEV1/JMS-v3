@@ -1,5 +1,5 @@
 import React from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { ScheduleStatusNavigation } from './ScheduleStatusNavigation';
 import { ScheduleStatusListPage } from './ScheduleStatusListPage';
@@ -7,12 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CheckCircle } from 'lucide-react';
 
 export function ReadyToBookListPage() {
-  const queryClient = useQueryClient();
-  
-  const { data: orders = [], isLoading: ordersLoading, refetch: refetchOrders } = useQuery({
+  const { data: orders = [], isLoading: ordersLoading } = useQuery({
     queryKey: ['orders', 'ready-to-book'],
     queryFn: async () => {
-      console.log('Fetching ready-to-book orders...');
       // First get accepted offers
       const { data: acceptedOffers, error: offersError } = await supabase
         .from('job_offers')
@@ -21,13 +18,9 @@ export function ReadyToBookListPage() {
 
       if (offersError) throw offersError;
       
-      if (!acceptedOffers?.length) {
-        console.log('No accepted offers found');
-        return [];
-      }
+      if (!acceptedOffers?.length) return [];
 
       const uniqueOrderIds = [...new Set(acceptedOffers.map(offer => offer.order_id))];
-      console.log('Found accepted offers for orders:', uniqueOrderIds);
       
       // Fetch orders with accepted offers that haven't been scheduled yet
       const { data: ordersData, error: ordersError } = await supabase
@@ -45,7 +38,6 @@ export function ReadyToBookListPage() {
         .order('created_at', { ascending: false });
 
       if (ordersError) throw ordersError;
-      console.log('Ready-to-book orders fetched:', ordersData?.length || 0);
       return ordersData || [];
     }
   });
@@ -63,17 +55,6 @@ export function ReadyToBookListPage() {
       return data || [];
     }
   });
-
-  const handleUpdate = async () => {
-    console.log('Update triggered - invalidating queries...');
-    // Invalidate both orders and offers queries to ensure fresh data
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['orders', 'ready-to-book'] }),
-      queryClient.invalidateQueries({ queryKey: ['job-offers'] }),
-      refetchOrders()
-    ]);
-    console.log('Queries invalidated and refetched');
-  };
 
   if (ordersLoading || engineersLoading) {
     return (
@@ -100,7 +81,6 @@ export function ReadyToBookListPage() {
             engineers={engineers}
             title="Ready to Book"
             showAutoSchedule={true}
-            onUpdate={handleUpdate}
           />
         </CardContent>
       </Card>
