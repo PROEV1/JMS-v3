@@ -331,6 +331,8 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
     const activeOffer = getActiveOfferForOrder(orderId);
     if (!activeOffer) return;
 
+    console.log('Accepting offer:', { orderId, activeOffer });
+
     try {
       // Update the job offer status to accepted (don't schedule yet)
       const { error: offerError } = await supabase
@@ -342,6 +344,21 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
         .eq('id', activeOffer.id);
 
       if (offerError) throw offerError;
+
+      // CRITICAL: Also update the order to clear any manual override and trigger status recalculation
+      const { error: orderError } = await supabase
+        .from('orders')
+        .update({
+          manual_status_override: false,
+          manual_status_notes: null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', orderId);
+
+      if (orderError) {
+        console.error('Failed to update order:', orderError);
+        throw orderError;
+      }
 
       // Log the activity
       await supabase.rpc('log_order_activity', {
@@ -356,6 +373,7 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
         }
       });
 
+      console.log('Offer accepted successfully, refreshing data...');
       toast.success('Offer accepted - job moved to Ready to Book');
       refetchOffers();
       if (onUpdate) onUpdate();
@@ -406,6 +424,8 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
   };
 
   const handleConfirmAndSchedule = async (orderId: string) => {
+    console.log('Confirming and scheduling order:', orderId);
+    
     try {
       // Get the accepted offer for this order
       const acceptedOffer = offers.find(offer => 
@@ -417,13 +437,16 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
         return;
       }
 
+      console.log('Found accepted offer:', acceptedOffer);
+
       // Update the order to scheduled status
       const { error: orderError } = await supabase
         .from('orders')
         .update({
           engineer_id: acceptedOffer.engineer_id,
           scheduled_install_date: acceptedOffer.offered_date,
-          status_enhanced: 'scheduled'
+          status_enhanced: 'scheduled',
+          time_window: acceptedOffer.time_window
         })
         .eq('id', orderId);
 
@@ -442,18 +465,25 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
         }
       });
 
-      // Send confirmation emails to client and engineer
-      await supabase.functions.invoke('send-order-status-email', {
+      console.log('Order scheduled successfully, refreshing data...');
+      toast.success('Installation confirmed and scheduled');
+      refetchOffers();
+      if (onUpdate) onUpdate();
+
+      // Send confirmation emails in background (non-blocking)
+      supabase.functions.invoke('send-order-status-email', {
         body: {
           order_id: orderId,
           status: 'scheduled',
           recipient_type: 'both'
         }
+      }).then(() => {
+        console.log('Confirmation emails sent successfully');
+      }).catch((emailError) => {
+        console.error('Failed to send confirmation emails (non-critical):', emailError);
+        // Don't show error toast for email failures as the main action succeeded
       });
 
-      toast.success('Installation confirmed and scheduled. Confirmation emails sent.');
-      refetchOffers();
-      if (onUpdate) onUpdate();
     } catch (error) {
       console.error('Failed to confirm and schedule:', error);
       toast.error('Failed to confirm and schedule installation');
