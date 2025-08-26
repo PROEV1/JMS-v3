@@ -125,7 +125,7 @@ serve(async (req: Request) => {
     const responseTime = now.toISOString();
 
     if (response === 'accept') {
-      // Accept the offer and assign engineer/date to order
+      // Accept the offer
       const { error: updateOfferError } = await supabase
         .from('job_offers')
         .update({
