@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Package, AlertTriangle, Plus, Minus } from "lucide-react";
+import { Package, AlertTriangle, Plus, Minus, Trash2 } from "lucide-react";
 import { useInventoryEnhanced } from '@/hooks/useInventoryEnhanced';
 import { useToast } from '@/hooks/use-toast';
 import { ItemPickerModal } from './ItemPickerModal';
@@ -56,6 +56,38 @@ export function LocationStockModal({ open, onOpenChange, location }: LocationSto
     // Refresh data after item added
     await refetchBalances();
     await refetchItems();
+  };
+
+  const handleRemoveFromLocation = async (itemId: string, itemName: string, currentStock: number) => {
+    if (currentStock <= 0) return;
+    
+    if (window.confirm(`Remove all ${itemName} from ${location.name}? This will set stock to 0.`)) {
+      try {
+        await createStockAdjustment.mutateAsync({
+          itemId,
+          locationId: location.id,
+          quantity: -currentStock,
+          reason: 'Remove from location',
+          notes: `Removed all stock from ${location.name}`
+        });
+
+        toast({
+          title: "Item Removed",
+          description: `Removed all ${itemName} from ${location.name}`,
+        });
+
+        // Refresh the data to show updated stock levels
+        await invalidateInventoryCache();
+        await refetchBalances();
+        await refetchItems();
+      } catch (error: any) {
+        toast({
+          title: "Failed to Remove Item",
+          description: error.message || "Failed to remove item from location. Please try again.",
+          variant: "destructive",
+        });
+      }
+    }
   };
 
   const handleAdjustStock = async (itemId: string, adjustment: number, adjustmentReason: string) => {
@@ -196,6 +228,16 @@ export function LocationStockModal({ open, onOpenChange, location }: LocationSto
                             title="Remove 1 unit"
                           >
                             <Minus className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleRemoveFromLocation(item.id, item.name, item.currentStock || 0)}
+                            disabled={(item.currentStock || 0) <= 0 || createStockAdjustment.isPending}
+                            title="Remove all from location"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                          >
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
                       </div>
