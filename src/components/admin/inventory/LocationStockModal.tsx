@@ -37,27 +37,37 @@ export function LocationStockModal({ open, onOpenChange, location }: LocationSto
 
   if (!location) return null;
 
-  // Filter balances for this location
+  // Filter balances for this location only
   const currentLocationBalances = locationBalances.filter(
-    balance => balance.location_id === location.id && balance.on_hand > 0
+    balance => balance.location_id === location.id
   );
 
-  // Get items not yet in this location for adding
-  const availableItems = allItems.filter(item => 
-    !currentLocationBalances.some(balance => balance.item_id === item.id) &&
-    (searchTerm === '' || 
-     item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-     item.sku?.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  // Get items not yet in this location for adding (only show items with zero stock here)
+  const availableItems = allItems.filter(item => {
+    const hasStockHere = currentLocationBalances.some(balance => 
+      balance.item_id === item.id && balance.on_hand > 0
+    );
+    return !hasStockHere &&
+      (searchTerm === '' || 
+       item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+       item.sku?.toLowerCase().includes(searchTerm.toLowerCase()));
+  });
 
-  const totalValue = currentLocationBalances.reduce((sum, balance) => {
-    const item = allItems.find(item => item.id === balance.item_id);
-    return sum + (balance.on_hand * (item?.cost_price || 0));
+  // Show items that have any stock (even zero) at this location for management
+  const itemsWithBalance = locationBalances
+    .filter(balance => balance.location_id === location.id)
+    .map(balance => {
+      const item = allItems.find(i => i.id === balance.item_id);
+      return item ? { ...item, currentStock: balance.on_hand } : null;
+    })
+    .filter(Boolean);
+
+  const totalValue = itemsWithBalance.reduce((sum, item) => {
+    return sum + ((item?.currentStock || 0) * (item?.default_cost || 0));
   }, 0);
 
-  const lowStockItems = currentLocationBalances.filter(balance => {
-    const item = allItems.find(item => item.id === balance.item_id);
-    return item && balance.on_hand <= (item.reorder_point || 5);
+  const lowStockItems = itemsWithBalance.filter(item => {
+    return item && (item.currentStock || 0) <= (item.reorder_point || 5);
   });
 
   const handleAddItem = async () => {
@@ -139,7 +149,7 @@ export function LocationStockModal({ open, onOpenChange, location }: LocationSto
           <div className="grid grid-cols-3 gap-4">
             <Card>
               <CardContent className="p-4 text-center">
-                <p className="text-2xl font-bold">{currentLocationBalances.length}</p>
+                <p className="text-2xl font-bold">{itemsWithBalance.length}</p>
                 <p className="text-sm text-muted-foreground">Items</p>
               </CardContent>
             </Card>
@@ -185,15 +195,21 @@ export function LocationStockModal({ open, onOpenChange, location }: LocationSto
                       <SelectTrigger>
                         <SelectValue placeholder="Choose item to add" />
                       </SelectTrigger>
-                      <SelectContent>
-                        {availableItems.map((item) => (
-                          <SelectItem key={item.id} value={item.id}>
-                            <div className="flex flex-col">
-                              <span className="font-medium">{item.name}</span>
-                              <span className="text-xs text-muted-foreground">SKU: {item.sku}</span>
-                            </div>
-                          </SelectItem>
-                        ))}
+                      <SelectContent className="max-h-60">
+                        {availableItems.length === 0 ? (
+                          <div className="p-4 text-center text-muted-foreground">
+                            {searchTerm ? 'No items match your search' : 'All items are already stocked here'}
+                          </div>
+                        ) : (
+                          availableItems.map((item) => (
+                            <SelectItem key={item.id} value={item.id}>
+                              <div className="flex flex-col">
+                                <span className="font-medium">{item.name}</span>
+                                <span className="text-xs text-muted-foreground">SKU: {item.sku}</span>
+                              </div>
+                            </SelectItem>
+                          ))
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
@@ -273,20 +289,19 @@ export function LocationStockModal({ open, onOpenChange, location }: LocationSto
               )}
             </div>
             
-            {currentLocationBalances.map((balance) => {
-              const item = allItems.find(i => i.id === balance.item_id);
+            {itemsWithBalance.map((item) => {
               if (!item) return null;
               
-              const isLowStock = balance.on_hand <= (item.reorder_point || 5);
+              const isLowStock = (item.currentStock || 0) <= (item.reorder_point || 5);
               
               return (
-                <Card key={balance.item_id} className={isLowStock ? "border-orange-200" : ""}>
+                <Card key={item.id} className={isLowStock ? "border-orange-200" : ""}>
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
                           <p className="font-medium">{item.name}</p>
-                          {isLowStock && (
+                          {isLowStock && (item.currentStock || 0) > 0 && (
                             <Badge variant="outline" className="text-orange-600 border-orange-200">
                               Low Stock
                             </Badge>
@@ -294,7 +309,7 @@ export function LocationStockModal({ open, onOpenChange, location }: LocationSto
                         </div>
                         <p className="text-sm text-muted-foreground">SKU: {item.sku}</p>
                         <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
-                          <span>Available: {balance.on_hand}</span>
+                          <span>Available: {item.currentStock || 0}</span>
                           <span>Reorder at: {item.reorder_point || 5}</span>
                           <span>Unit: {item.unit || 'units'}</span>
                         </div>
@@ -302,7 +317,7 @@ export function LocationStockModal({ open, onOpenChange, location }: LocationSto
                       
                       <div className="flex items-center gap-3">
                         <div className="text-right">
-                          <p className="text-lg font-semibold">{balance.on_hand}</p>
+                          <p className="text-lg font-semibold">{item.currentStock || 0}</p>
                           <p className="text-sm text-muted-foreground">{item.unit || 'units'}</p>
                         </div>
                         
@@ -319,7 +334,7 @@ export function LocationStockModal({ open, onOpenChange, location }: LocationSto
                             variant="outline" 
                             size="sm"
                             onClick={() => handleAdjustStock(item.id, -1, 'Quick remove')}
-                            disabled={balance.on_hand <= 0}
+                            disabled={(item.currentStock || 0) <= 0}
                             title="Remove 1 unit"
                           >
                             <Minus className="h-4 w-4" />
@@ -332,7 +347,7 @@ export function LocationStockModal({ open, onOpenChange, location }: LocationSto
               );
             })}
             
-            {currentLocationBalances.length === 0 && (
+            {itemsWithBalance.length === 0 && (
               <Card className="border-dashed">
                 <CardContent className="p-8 text-center">
                   <Package className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
