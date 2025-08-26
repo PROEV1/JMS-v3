@@ -824,7 +824,8 @@ async function getSmartEngineerRecommendationsFast(
         let availableDate: Date | null = null;
         let dailyWorkloadThatDay = 0;
         let checkDate = new Date(minimumDate);
-        const maxCheckDays = Math.min(settings.recommendation_search_horizon_days || 30, 30); // Limit to 30 days in fast mode
+        // Extended search window - allow up to 90 days for better results when clients have blocked dates
+        const maxCheckDays = Math.min(settings.recommendation_search_horizon_days || 90, 90);
         let daysChecked = 0;
 
         while (!availableDate && daysChecked < maxCheckDays) {

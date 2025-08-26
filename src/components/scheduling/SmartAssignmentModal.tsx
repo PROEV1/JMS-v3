@@ -169,8 +169,30 @@ export function SmartAssignmentModal({
     const loadSuggestions = async () => {
       setLoading(true);
       try {
+        // Calculate earliest available start date based on client blocked dates
+        const { data: clientBlockedDates } = await supabase
+          .from('client_blocked_dates')
+          .select('blocked_date')
+          .eq('client_id', order.client_id)
+          .order('blocked_date', { ascending: false })
+          .limit(1);
+
+        let startDate = new Date();
+        if (clientBlockedDates && clientBlockedDates.length > 0) {
+          const lastBlockedDate = new Date(clientBlockedDates[0].blocked_date);
+          const dayAfterLastBlocked = new Date(lastBlockedDate);
+          dayAfterLastBlocked.setDate(dayAfterLastBlocked.getDate() + 1);
+          
+          // Use the later date between today and day after last blocked date
+          if (dayAfterLastBlocked > startDate) {
+            startDate = dayAfterLastBlocked;
+            console.log(`Client has blocked dates until ${clientBlockedDates[0].blocked_date}, starting search from ${startDate.toISOString().split('T')[0]}`);
+          }
+        }
+
         const result = await getSmartEngineerRecommendations(order, getBestPostcode(order), {
-          fastMode: true
+          fastMode: true,
+          startDate: startDate
         });
         setSuggestions(result.recommendations);
         

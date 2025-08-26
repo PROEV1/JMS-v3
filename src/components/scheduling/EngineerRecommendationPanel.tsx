@@ -7,6 +7,7 @@ import { Separator } from '@/components/ui/separator';
 import { Order, Engineer, getSmartEngineerRecommendations, clearDistanceCache } from '@/utils/schedulingUtils';
 import { getLocationDisplayText, getBestPostcode } from '@/utils/postcodeUtils';
 import { MapPin, Clock, User, Star, Zap, CheckCircle, X, RefreshCw } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface EngineerSuggestion {
   engineer: Engineer;
@@ -48,7 +49,31 @@ export function EngineerRecommendationPanel({
     setDebugInfo(`Job: ${order.order_number} | Checking postcode sources...`);
     
     try {
-      const result = await getSmartEngineerRecommendations(order, getBestPostcode(order), { fastMode: true });
+      // Calculate earliest available start date based on client blocked dates
+      const { data: clientBlockedDates } = await supabase
+        .from('client_blocked_dates')
+        .select('blocked_date')
+        .eq('client_id', order.client_id)
+        .order('blocked_date', { ascending: false })
+        .limit(1);
+
+      let startDate = new Date();
+      if (clientBlockedDates && clientBlockedDates.length > 0) {
+        const lastBlockedDate = new Date(clientBlockedDates[0].blocked_date);
+        const dayAfterLastBlocked = new Date(lastBlockedDate);
+        dayAfterLastBlocked.setDate(dayAfterLastBlocked.getDate() + 1);
+        
+        // Use the later date between today and day after last blocked date
+        if (dayAfterLastBlocked > startDate) {
+          startDate = dayAfterLastBlocked;
+          console.log(`Client has blocked dates until ${clientBlockedDates[0].blocked_date}, starting search from ${startDate.toISOString().split('T')[0]}`);
+        }
+      }
+
+      const result = await getSmartEngineerRecommendations(order, getBestPostcode(order), { 
+        fastMode: true,
+        startDate: startDate
+      });
       setSuggestions(result.recommendations);
       setSettings(result.settings);
       

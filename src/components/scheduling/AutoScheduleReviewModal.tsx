@@ -288,8 +288,26 @@ export function AutoScheduleReviewModal({
               startDate.setDate(startDate.getDate() - (passNumber - 1) * 10);
             }
             
+            // Calculate earliest available start date based on client blocked dates
+            let enhancedStartDate = startDate;
+            const clientBlockedDatesSet = clientBlockedDatesMap.get(order.client_id);
+            if (clientBlockedDatesSet && clientBlockedDatesSet.size > 0) {
+              const blockDatesArray = Array.from(clientBlockedDatesSet).sort().reverse();
+              if (blockDatesArray.length > 0) {
+                const lastBlockedDate = new Date(blockDatesArray[0]);
+                const dayAfterLastBlocked = new Date(lastBlockedDate);
+                dayAfterLastBlocked.setDate(dayAfterLastBlocked.getDate() + 1);
+                
+                // Use the later date between current startDate and day after last blocked date
+                if (dayAfterLastBlocked > enhancedStartDate) {
+                  enhancedStartDate = dayAfterLastBlocked;
+                  console.log(`Order ${order.order_number}: Client blocked until ${blockDatesArray[0]}, starting from ${enhancedStartDate.toISOString().split('T')[0]}`);
+                }
+              }
+            }
+
             const recommendations = await getSmartEngineerRecommendations(order, order.postcode, {
-              startDate,
+              startDate: enhancedStartDate,
               preloadedEngineers: allEngineers, // 🚀 USE PRELOADED
               workloadLookup, // 🚀 USE PRECOMPUTED WORKLOAD
               clientBlockedDatesMap, // 🚀 USE PRELOADED BLOCKED DATES
