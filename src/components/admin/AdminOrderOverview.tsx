@@ -22,7 +22,7 @@ interface Order {
   };
   quote: {
     quote_number: string;
-  };
+  } | null;
   order_payments: Array<{
     status: string;
     amount: number;
@@ -83,7 +83,7 @@ export function AdminOrderOverview({ order }: AdminOrderOverviewProps) {
           <div>
             <h4 className="font-medium text-sm text-muted-foreground">Order Reference</h4>
             <p className="font-semibold">{order.order_number}</p>
-            <p className="text-sm text-muted-foreground">Quote: {order.quote.quote_number}</p>
+            <p className="text-sm text-muted-foreground">Quote: {order.quote?.quote_number || 'No Quote'}</p>
             {order.is_partner_job && order.partner && (
               <div className="flex items-center gap-2 mt-1">
                 <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700">
