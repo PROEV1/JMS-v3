@@ -91,6 +91,8 @@ export function AutoScheduleReviewModal({
   const ordersSnapshotRef = useRef<Order[]>([]);
   // Multi-pass scheduling options (default to ON for better success)
   const [guaranteeSchedule, setGuaranteeSchedule] = useState(true);
+  // Auto-fix preflight failures option
+  const [autoFixPreflightFailures, setAutoFixPreflightFailures] = useState(true);
   // Diagnostics
   const [diagnostics, setDiagnostics] = useState<{
     mapbox429Count: number;
@@ -251,11 +253,11 @@ export function AutoScheduleReviewModal({
     maxPasses: number
   ) => {
     try {
-      // Configure pass-specific parameters
+      // Configure pass-specific parameters - tuned for higher success rates
       const passConfig = {
-        1: { maxCandidates: 6, searchDays: 30, travelRelaxation: 1.0, allowOverfill: false },
-        2: { maxCandidates: 12, searchDays: 60, travelRelaxation: 1.15, allowOverfill: false },
-        3: { maxCandidates: 24, searchDays: 90, travelRelaxation: 1.3, allowOverfill: true }
+        1: { maxCandidates: 8, searchDays: 45, travelRelaxation: 1.0, allowOverfill: false },
+        2: { maxCandidates: 16, searchDays: 75, travelRelaxation: 1.25, allowOverfill: false },
+        3: { maxCandidates: 32, searchDays: 120, travelRelaxation: 1.5, allowOverfill: true }
       };
       
       const config = passConfig[passNumber as keyof typeof passConfig] || passConfig[1];
@@ -579,8 +581,8 @@ export function AutoScheduleReviewModal({
     toast.success(`Switched to ${newCandidate.engineer.name} for order ${proposal.order.order_number}`);
   };
 
-  // Perform preflight checks before sending offers
-  const runPreflightChecks = async () => {
+  // Perform preflight checks before sending offers - returns updated proposals
+  const runPreflightChecks = async (): Promise<ProposedAssignment[]> => {
     setPreflightChecking(true);
     console.log('Running preflight capacity checks for all proposals...');
     
@@ -649,36 +651,139 @@ export function AutoScheduleReviewModal({
         }
       }
       
+      // Auto-fix preflight failures by switching to fallbacks
+      if (autoFixPreflightFailures) {
+        for (let i = 0; i < updatedAssignments.length; i++) {
+          const proposal = updatedAssignments[i];
+          if (proposal.status === 'preflight_failed' && proposal.alternatives.length > 1) {
+            console.log(`Auto-fixing preflight failure for order ${proposal.order.order_number}...`);
+            
+            // Try each fallback until we find one that passes preflight
+            for (let fallbackIndex = 1; fallbackIndex < Math.min(proposal.alternatives.length, 4); fallbackIndex++) {
+              const fallbackCandidate = proposal.alternatives[fallbackIndex];
+              
+              // Check if this fallback passes preflight
+              const fallbackVirtualOrders = Array.from(virtualLedger.values())
+                .filter(entry => 
+                  entry.engineerId === fallbackCandidate.engineer.id && 
+                  entry.date === fallbackCandidate.availableDate
+                )
+                .flatMap(entry => entry.orders.filter(o => o.id !== proposal.order.id))
+                .map(order => ({
+                  id: order.id,
+                  estimated_duration_hours: getOrderEstimatedHours(order)
+                }));
+              
+              const { data: fallbackResult, error: fallbackError } = await supabase.functions.invoke('preflight-capacity-check', {
+                body: {
+                  order_id: proposal.order.id,
+                  engineer_id: fallbackCandidate.engineer.id,
+                  offered_date: fallbackCandidate.availableDate,
+                  virtual_orders: fallbackVirtualOrders
+                }
+              });
+              
+              if (!fallbackError && fallbackResult?.canFit) {
+                console.log(`Auto-fix successful: switched to ${fallbackCandidate.engineer.name} for order ${proposal.order.order_number}`);
+                
+                // Update virtual ledger
+                const oldLedgerKey = `${proposal.selectedCandidate.engineer.id}_${proposal.selectedCandidate.availableDate}`;
+                const newLedgerKey = `${fallbackCandidate.engineer.id}_${fallbackCandidate.availableDate}`;
+                
+                // Remove from old ledger entry
+                const oldEntry = virtualLedger.get(oldLedgerKey);
+                if (oldEntry && oldEntry.jobCount > 0) {
+                  const updatedOldEntry = {
+                    ...oldEntry,
+                    jobCount: oldEntry.jobCount - 1,
+                    estimatedMinutes: oldEntry.estimatedMinutes - getOrderEstimatedMinutes(proposal.order),
+                    orders: oldEntry.orders.filter(o => o.id !== proposal.order.id)
+                  };
+                  
+                  if (updatedOldEntry.jobCount === 0) {
+                    virtualLedger.delete(oldLedgerKey);
+                  } else {
+                    virtualLedger.set(oldLedgerKey, updatedOldEntry);
+                  }
+                }
+                
+                // Add to new ledger entry
+                const newEntry = virtualLedger.get(newLedgerKey) || {
+                  engineerId: fallbackCandidate.engineer.id,
+                  date: fallbackCandidate.availableDate,
+                  jobCount: 0,
+                  estimatedMinutes: 0,
+                  orders: []
+                };
+                
+                virtualLedger.set(newLedgerKey, {
+                  ...newEntry,
+                  jobCount: newEntry.jobCount + 1,
+                  estimatedMinutes: newEntry.estimatedMinutes + getOrderEstimatedMinutes(proposal.order),
+                  orders: [...newEntry.orders, proposal.order]
+                });
+                
+                // Update the proposal
+                updatedAssignments[i] = {
+                  ...proposal,
+                  selectedCandidate: fallbackCandidate,
+                  proposedDate: new Date(fallbackCandidate.availableDate),
+                  usedFallback: fallbackIndex,
+                  status: 'ready',
+                  statusMessage: `Auto-fixed: switched to ${fallbackCandidate.engineer.name}`
+                };
+                
+                break; // Found a working fallback, stop trying
+              }
+            }
+          }
+        }
+      }
+      
       setProposedAssignments(updatedAssignments);
+      return updatedAssignments;
       
     } catch (error) {
       console.error('Error running preflight checks:', error);
       toast.error('Failed to run preflight capacity checks');
+      return proposedAssignments;
     } finally {
       setPreflightChecking(false);
     }
   };
 
   const handleSubmitOffers = async () => {
-    // First run preflight checks
-    await runPreflightChecks();
+    // First run preflight checks and get updated proposals
+    const preflightedProposals = await runPreflightChecks();
     
-    // Check if any proposals failed preflight
-    const failedPreflights = proposedAssignments.filter(p => p.status === 'preflight_failed');
-    if (failedPreflights.length > 0) {
-      toast.error(`${failedPreflights.length} proposal(s) failed preflight checks. Please use fallback options or adjust assignments.`);
+    // Filter to only ready proposals
+    const readyProposals = preflightedProposals.filter(p => p.status === 'ready');
+    const failedProposals = preflightedProposals.filter(p => p.status === 'preflight_failed');
+    
+    if (readyProposals.length === 0) {
+      toast.error('No proposals are ready to send. All failed preflight checks.');
       return;
     }
     
+    if (failedProposals.length > 0) {
+      toast.warning(`${failedProposals.length} proposal(s) failed preflight checks and will be skipped. Sending ${readyProposals.length} offers.`);
+    }
+    
     setSubmitting(true);
-    console.log('Starting resilient offer submission with automatic fallbacks for', proposedAssignments.length, 'proposals');
+    console.log('Starting resilient offer submission for', readyProposals.length, 'ready proposals');
     
     try {
       let successCount = 0;
       let failureCount = 0;
-      const updatedAssignments = [...proposedAssignments];
+      const updatedAssignments = [...preflightedProposals];
 
-      for (let i = 0; i < updatedAssignments.length; i++) {
+      // Process only ready proposals for sending
+      const readyIndices = updatedAssignments
+        .map((proposal, index) => ({ proposal, index }))
+        .filter(({ proposal }) => proposal.status === 'ready')
+        .map(({ index }) => index);
+      
+      for (const i of readyIndices) {
         const proposal = updatedAssignments[i];
         let offerSent = false;
         
@@ -757,7 +862,7 @@ export function AutoScheduleReviewModal({
       setProposedAssignments(updatedAssignments);
       
       if (successCount > 0) {
-        toast.success(`Successfully sent ${successCount} of ${proposedAssignments.length} offers`);
+        toast.success(`Successfully sent ${successCount} of ${readyProposals.length} ready offers`);
         if (onOffersSubmitted) {
           onOffersSubmitted();
         }
@@ -805,7 +910,7 @@ export function AutoScheduleReviewModal({
               <Bot className="h-5 w-5" />
               AI Scheduling Review
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-4">
               <label className="text-sm font-normal flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -815,11 +920,21 @@ export function AutoScheduleReviewModal({
                 />
                 Guarantee schedule (multi-pass)
               </label>
+              <label className="text-sm font-normal flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={autoFixPreflightFailures}
+                  onChange={(e) => setAutoFixPreflightFailures(e.target.checked)}
+                  className="rounded"
+                />
+                Auto-fix preflight failures
+              </label>
             </div>
           </DialogTitle>
           <DialogDescription>
             Review and submit the automatically generated scheduling proposals for {orders.length} orders.
             {guaranteeSchedule && " Multi-pass mode will attempt to schedule all jobs using expanded criteria."}
+            {autoFixPreflightFailures && " Auto-fix will automatically switch to fallback options if preflight checks fail."}
             {progressTotal > 0 && (
               <div className="flex items-center gap-2 mt-2">
                 <div className="text-xs text-muted-foreground">
@@ -1119,11 +1234,16 @@ export function AutoScheduleReviewModal({
             </Button>
             <Button
               onClick={handleSubmitOffers}
-              disabled={submitting || proposedAssignments.length === 0}
+              disabled={submitting || proposedAssignments.length === 0 || preflightChecking}
               className="flex items-center gap-2"
             >
               <Send className="w-4 h-4" />
-              {submitting ? 'Sending...' : `Send ${proposedAssignments.filter(p => p.status === 'ready').length} Offers`}
+              {submitting 
+                ? 'Sending...' 
+                : proposedAssignments.filter(p => p.status === 'ready').length > 0
+                  ? `Send ${proposedAssignments.filter(p => p.status === 'ready').length} Offers`
+                  : `Send ${proposedAssignments.length} Offers`
+              }
             </Button>
           </div>
         </div>
