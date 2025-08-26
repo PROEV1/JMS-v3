@@ -99,48 +99,51 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({
       try {
         setIsLoadingData(true);
         
-        // Fetch locations - cast to avoid deep type instantiation
-        const locationResponse: any = await (supabase as any)
+        // Fetch locations
+        const { data: locationData, error: locationError } = await supabase
           .from('inventory_locations')
           .select('id, name, code')
           .eq('type', 'van')
           .eq('engineer_id', engineerId)
           .eq('is_active', true);
         
-        // Fetch items - cast to avoid deep type instantiation
-        const itemResponse: any = await (supabase as any)
+        if (locationError) {
+          console.error('Location fetch error:', locationError);
+          throw locationError;
+        }
+        
+        // Fetch ALL active inventory items
+        const { data: itemData, error: itemError } = await supabase
           .from('inventory_items')
           .select('id, name, sku, unit, min_level, max_level, reorder_point')
           .eq('is_active', true)
           .order('name');
 
-        const locationData = locationResponse?.data || [];
-        const itemData = itemResponse?.data || [];
+        if (itemError) {
+          console.error('Items fetch error:', itemError);
+          throw itemError;
+        }
 
-        setLocations(locationData.map((item: any) => ({
-          id: item.id,
-          name: item.name,
-          code: item.code
-        })));
+        console.log('Fetched locations:', locationData);
+        console.log('Fetched items:', itemData);
+
+        setLocations(locationData || []);
+        setItems(itemData || []);
         
-        setItems(itemData.map((item: any) => ({
-          id: item.id,
-          name: item.name,
-          sku: item.sku,
-          unit: item.unit,
-          min_level: item.min_level,
-          max_level: item.max_level,
-          reorder_point: item.reorder_point
-        })));
       } catch (error) {
         console.error('Failed to fetch data:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load inventory data",
+          variant: "destructive",
+        });
       } finally {
         setIsLoadingData(false);
       }
     };
 
     fetchData();
-  }, [engineerId]);
+  }, [engineerId, toast]);
 
 
   const onSubmit = async (values: StockRequestFormValues) => {
