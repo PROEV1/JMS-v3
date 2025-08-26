@@ -21,11 +21,12 @@ export function LocationStockModal({ open, onOpenChange, location }: LocationSto
   const { 
     useInventoryItems,
     useItemLocationBalances, 
-    createStockAdjustment
+    createStockAdjustment,
+    invalidateInventoryCache
   } = useInventoryEnhanced();
 
-  const { data: allItems = [] } = useInventoryItems();
-  const { data: locationBalances = [] } = useItemLocationBalances();
+  const { data: allItems = [], refetch: refetchItems } = useInventoryItems();
+  const { data: locationBalances = [], refetch: refetchBalances } = useItemLocationBalances();
 
   if (!location) return null;
 
@@ -51,9 +52,10 @@ export function LocationStockModal({ open, onOpenChange, location }: LocationSto
     return item && (item.currentStock || 0) <= (item.reorder_point || 5);
   });
 
-  const handleItemAdded = () => {
-    // This will trigger a refetch of the location balances
-    // The useItemLocationBalances hook should automatically refresh
+  const handleItemAdded = async () => {
+    // Refresh data after item added
+    await refetchBalances();
+    await refetchItems();
   };
 
   const handleAdjustStock = async (itemId: string, adjustment: number, adjustmentReason: string) => {
@@ -71,6 +73,11 @@ export function LocationStockModal({ open, onOpenChange, location }: LocationSto
         title: "Stock Updated",
         description: `${adjustment > 0 ? 'Added' : 'Removed'} ${Math.abs(adjustment)} units of ${item?.name}`,
       });
+
+      // Refresh the data to show updated stock levels
+      await invalidateInventoryCache();
+      await refetchBalances();
+      await refetchItems();
     } catch (error: any) {
       toast({
         title: "Stock Update Failed",
@@ -176,6 +183,7 @@ export function LocationStockModal({ open, onOpenChange, location }: LocationSto
                             variant="outline" 
                             size="sm"
                             onClick={() => handleAdjustStock(item.id, 1, 'Quick add')}
+                            disabled={createStockAdjustment.isPending}
                             title="Add 1 unit"
                           >
                             <Plus className="h-4 w-4" />
@@ -184,7 +192,7 @@ export function LocationStockModal({ open, onOpenChange, location }: LocationSto
                             variant="outline" 
                             size="sm"
                             onClick={() => handleAdjustStock(item.id, -1, 'Quick remove')}
-                            disabled={(item.currentStock || 0) <= 0}
+                            disabled={(item.currentStock || 0) <= 0 || createStockAdjustment.isPending}
                             title="Remove 1 unit"
                           >
                             <Minus className="h-4 w-4" />
