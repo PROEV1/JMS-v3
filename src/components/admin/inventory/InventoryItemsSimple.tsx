@@ -5,12 +5,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Package, Search, Boxes, AlertTriangle, BarChart3, Hash, Trash2 } from 'lucide-react';
+import { Plus, Package, Search, Boxes, AlertTriangle, BarChart3, Hash, Trash2, MapPin } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { AddItemModal } from './AddItemModal';
 import { StockAdjustmentModal } from './StockAdjustmentModal';
 import { StockTransferModal } from './StockTransferModal';
 import { ItemQuickViewDialog } from './ItemQuickViewDialog';
+import { LocationInventoryModal } from './LocationInventoryModal';
 import { InventoryKpiTile } from './shared/InventoryKpiTile';
 import { StatusChip } from './shared/StatusChip';
 import { AdvancedSearchModal } from './shared/AdvancedSearchModal';
@@ -48,6 +49,7 @@ export const InventoryItemsSimple: React.FC = () => {
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [showQuickView, setShowQuickView] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showLocationInventory, setShowLocationInventory] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any>(null);
 
   const { deleteInventoryItem } = useInventoryEnhanced();
@@ -312,21 +314,12 @@ export const InventoryItemsSimple: React.FC = () => {
                       className="text-xs h-7 px-2"
                       onClick={() => {
                         setSelectedItem(item);
-                        setShowAdjustModal(true);
+                        setShowLocationInventory(true);
                       }}
+                      title="Manage locations"
                     >
-                      Adjust
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="text-xs h-7 px-2"
-                      onClick={() => {
-                        setSelectedItem(item);
-                        setShowTransferModal(true);
-                      }}
-                    >
-                      Transfer
+                      <MapPin className="h-3 w-3 mr-1" />
+                      Locations
                     </Button>
                     <Button 
                       variant="outline" 
@@ -443,23 +436,11 @@ export const InventoryItemsSimple: React.FC = () => {
                         className="h-8 w-8 p-0"
                         onClick={() => {
                           setSelectedItem(item);
-                          setShowAdjustModal(true);
+                          setShowLocationInventory(true);
                         }}
-                        title="Adjust Stock"
+                        title="Manage Locations"
                       >
-                        <span className="text-xs">Adj</span>
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="h-8 w-8 p-0"
-                        onClick={() => {
-                          setSelectedItem(item);
-                          setShowTransferModal(true);
-                        }}
-                        title="Transfer Stock"
-                      >
-                        <span className="text-xs">Trf</span>
+                        <MapPin className="h-3 w-3" />
                       </Button>
                       <Button 
                         variant="ghost" 
@@ -558,21 +539,12 @@ export const InventoryItemsSimple: React.FC = () => {
                             className="h-8 px-2 text-xs"
                             onClick={() => {
                               setSelectedItem(item);
-                              setShowAdjustModal(true);
+                              setShowLocationInventory(true);
                             }}
+                            title="Manage Locations"
                           >
-                            Adjust
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="h-8 px-2 text-xs"
-                            onClick={() => {
-                              setSelectedItem(item);
-                              setShowTransferModal(true);
-                            }}
-                          >
-                            Transfer
+                            <MapPin className="h-4 w-4 mr-1" />
+                            Locations
                           </Button>
                           <Button 
                             variant="ghost" 
@@ -649,6 +621,13 @@ export const InventoryItemsSimple: React.FC = () => {
         open={showQuickView}
         onOpenChange={setShowQuickView}
         item={selectedItem}
+      />
+      
+      <LocationInventoryModal
+        open={showLocationInventory}
+        onOpenChange={setShowLocationInventory}
+        itemId={selectedItem?.id}
+        itemName={selectedItem?.name}
       />
       
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
