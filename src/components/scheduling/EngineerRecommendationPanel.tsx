@@ -57,13 +57,21 @@ export function EngineerRecommendationPanel({
         .order('blocked_date', { ascending: false })
         .limit(1);
 
-      let startDate = new Date();
+      // First fetch scheduling settings
+      const { getSchedulingSettings } = await import('@/utils/schedulingUtils');
+      const settings = await getSchedulingSettings();
+      
+      // Calculate minimum start date based on advance notice settings
+      const now = new Date();
+      let startDate = new Date(now.getTime() + (settings.minimum_advance_hours * 60 * 60 * 1000));
+      
+      // Also consider client blocked dates
       if (clientBlockedDates && clientBlockedDates.length > 0) {
         const lastBlockedDate = new Date(clientBlockedDates[0].blocked_date);
         const dayAfterLastBlocked = new Date(lastBlockedDate);
         dayAfterLastBlocked.setDate(dayAfterLastBlocked.getDate() + 1);
         
-        // Use the later date between today and day after last blocked date
+        // Use the later date between minimum advance date and day after last blocked date
         if (dayAfterLastBlocked > startDate) {
           startDate = dayAfterLastBlocked;
           console.log(`Client has blocked dates until ${clientBlockedDates[0].blocked_date}, starting search from ${startDate.toISOString().split('T')[0]}`);

@@ -283,11 +283,16 @@ export function AutoScheduleReviewModal({
             console.log(`\n🔄 Pass ${passNumber}: Processing order ${order.order_number} (${orderIndex + 1}/${ordersToProcess.length})`);
             setProgressCurrent(orderIndex + 1);
             
-            // Get all recommendations for this order using preloaded data
-            const startDate = new Date();
+            // Calculate minimum start date based on advance notice settings
+            const now = new Date();
+            let startDate = new Date(now.getTime() + (settings.minimum_advance_hours * 60 * 60 * 1000));
+            
             if (passNumber > 1) {
-              // Expand search horizon for later passes
-              startDate.setDate(startDate.getDate() - (passNumber - 1) * 10);
+              // Expand search horizon for later passes - but don't go before minimum advance notice
+              const expandedStart = new Date();
+              expandedStart.setDate(expandedStart.getDate() - (passNumber - 1) * 10);
+              const minimumAdvanceDate = new Date(now.getTime() + (settings.minimum_advance_hours * 60 * 60 * 1000));
+              startDate = expandedStart > minimumAdvanceDate ? expandedStart : minimumAdvanceDate;
             }
             
             // Calculate earliest available start date based on client blocked dates
@@ -300,7 +305,7 @@ export function AutoScheduleReviewModal({
                 const dayAfterLastBlocked = new Date(lastBlockedDate);
                 dayAfterLastBlocked.setDate(dayAfterLastBlocked.getDate() + 1);
                 
-                // Use the later date between current startDate and day after last blocked date
+                // Use the later date between minimum advance date and day after last blocked date
                 if (dayAfterLastBlocked > enhancedStartDate) {
                   enhancedStartDate = dayAfterLastBlocked;
                   console.log(`Order ${order.order_number}: Client blocked until ${blockDatesArray[0]}, starting from ${enhancedStartDate.toISOString().split('T')[0]}`);
