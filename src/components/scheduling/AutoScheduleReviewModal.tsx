@@ -9,7 +9,7 @@ import { CalendarDays, Clock, User, AlertTriangle, CheckCircle, Bot, Send, Packa
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Order, EngineerSettings, getOrderEstimatedHours, getOrderEstimatedMinutes } from '@/utils/schedulingUtils';
-import { getSmartEngineerRecommendations, getSchedulingSettings, getAllEngineersForSchedulingFast, getEngineerDailyWorkload, getClientBlockedDatesMap, getWorkloadMap } from '@/utils/schedulingUtils';
+import { getSmartEngineerRecommendations, getSchedulingSettings, getAllEngineersForSchedulingFast, getEngineerDailyWorkload, getClientBlockedDatesMap, getWorkloadMap, getEngineerSlotPool } from '@/utils/schedulingUtils';
 import { calculateDayFit, getWorkingDayInfo } from '@/utils/dayFitUtils';
 import { getLocationDisplayText } from '@/utils/postcodeUtils';
 
@@ -352,42 +352,71 @@ export function AutoScheduleReviewModal({
             // Limit candidates based on pass number
             const candidatesToCheck = recommendations.recommendations.slice(0, config.maxCandidates);
 
-            // Try each candidate in order of preference
-            for (let i = 0; i < candidatesToCheck.length; i++) {
-              const candidate = candidatesToCheck[i];
-              const ledgerKey = `${candidate.engineer.id}_${candidate.availableDate}`;
+          // Generate slot pools for all candidates and try each candidate with their available slots
+          const candidateSlotPools = new Map();
+          
+          // Pre-generate slot pools for all candidates
+          for (const candidate of candidatesToCheck) {
+            const engineerSettings = allEngineers.find(e => e.id === candidate.engineer.id);
+            if (!engineerSettings) continue;
+            
+            if (!candidateSlotPools.has(candidate.engineer.id)) {
+              const slotPool = await getEngineerSlotPool(
+                engineerSettings,
+                new Date(candidate.availableDate),
+                config.searchDays || 90,
+                settings,
+                workloadLookup
+              );
+              candidateSlotPools.set(candidate.engineer.id, slotPool);
+            }
+          }
+          
+          // Try each candidate, but now iterate through their slot pool if first date fails
+          for (let i = 0; i < candidatesToCheck.length; i++) {
+            const candidate = candidatesToCheck[i];
+            
+            console.log(`  🔍 Checking candidate ${i + 1}: ${candidate.engineer.name}`);
+            
+            // Get engineer settings and slot pool
+            const engineerSettings = allEngineers.find(e => e.id === candidate.engineer.id);
+            if (!engineerSettings) {
+              console.log(`  ❌ Engineer settings not found`);
+              alternatives.push(candidate);
+              continue;
+            }
+            
+            const slotPool = candidateSlotPools.get(candidate.engineer.id) || [];
+            let assignedToSlot = false;
+            
+            // Try slots in chronological order (nearest first)
+            for (const slot of slotPool) {
+              const ledgerKey = `${candidate.engineer.id}_${slot.date}`;
               
-              console.log(`  🔍 Checking candidate ${i + 1}: ${candidate.engineer.name} on ${candidate.availableDate}`);
+              console.log(`    📅 Trying slot: ${slot.date} (${slot.remainingJobs} remaining slots)`);
               
               // Get current virtual ledger entry for this engineer/date
               const virtualEntry = ledger.get(ledgerKey) || {
                 engineerId: candidate.engineer.id,
-                date: candidate.availableDate,
+                date: slot.date,
                 jobCount: 0,
                 estimatedMinutes: 0,
                 orders: []
               };
 
-              // Get current database workload using precomputed lookup
-              const currentWorkload = workloadLookup(candidate.engineer.id, candidate.availableDate);
-              const totalVirtualJobs = currentWorkload + virtualEntry.jobCount;
+              // Calculate total jobs including virtual assignments
+              const totalVirtualJobs = slot.dbWorkload + virtualEntry.jobCount;
+              
+              // Get engineer's daily limit - use engineer.max_installs_per_day if available
+              const engineerMaxJobs = (engineerSettings as any).max_installs_per_day || settings.max_jobs_per_day;
               
               // Check job count limit (soft constraint in later passes)
-              const jobLimitExceeded = totalVirtualJobs >= settings.max_jobs_per_day;
+              const jobLimitExceeded = totalVirtualJobs >= engineerMaxJobs;
               const allowOverfillForThisPass = config.allowOverfill && passNumber >= 3;
               
               if (jobLimitExceeded && !allowOverfillForThisPass) {
-                console.log(`  ❌ Job limit exceeded: ${totalVirtualJobs}/${settings.max_jobs_per_day} jobs (Pass ${passNumber})`);
-                alternatives.push(candidate); // Still keep as alternative
-                continue;
-              }
-
-              // Find engineer settings for capacity check
-              const engineerSettings = allEngineers.find(e => e.id === candidate.engineer.id);
-              if (!engineerSettings) {
-                console.log(`  ❌ Engineer settings not found`);
-                alternatives.push(candidate);
-                continue;
+                console.log(`    ❌ Job limit exceeded: ${totalVirtualJobs}/${engineerMaxJobs} jobs (Pass ${passNumber})`);
+                continue; // Try next slot
               }
 
               // Check if adding this order would exceed daily capacity using virtual orders
@@ -399,7 +428,7 @@ export function AutoScheduleReviewModal({
               try {
                 const dayFit = await calculateDayFit(
                   engineerSettings,
-                  new Date(candidate.availableDate),
+                  new Date(slot.date),
                   order,
                   settings.day_lenience_minutes || 15,
                   virtualOrders,
@@ -407,47 +436,59 @@ export function AutoScheduleReviewModal({
                   config.allowOverfill ? 1 : 0 // allow 1 extra job if overfill
                 );
 
-              if (!dayFit.canFit) {
-                console.log(`  ❌ Capacity exceeded: ${dayFit.reasons.join(', ')}`);
-                alternatives.push(candidate);
-                continue;
-              }
+                if (!dayFit.canFit) {
+                  console.log(`    ❌ Capacity exceeded: ${dayFit.reasons.join(', ')}`);
+                  continue; // Try next slot
+                }
 
-              // ✅ This candidate fits! Update virtual ledger
-              const updatedEntry: VirtualLedgerEntry = {
-                ...virtualEntry,
-                jobCount: virtualEntry.jobCount + 1,
-                estimatedMinutes: virtualEntry.estimatedMinutes + getOrderEstimatedMinutes(order),
-                orders: [...virtualEntry.orders, order]
-              };
-              
-              ledger.set(ledgerKey, updatedEntry);
-              assignedCandidate = candidate;
-              
-              // Update capacity info for UI
-              const existingCapacityIndex = capacityInfo.findIndex(info => 
-                info.engineerName === candidate.engineer.name && info.date === candidate.availableDate
-              );
-              
-              if (existingCapacityIndex >= 0) {
-                capacityInfo[existingCapacityIndex].reservedInBatch++;
-              } else {
-                capacityInfo.push({
-                  engineerName: candidate.engineer.name,
-                  date: candidate.availableDate,
-                  currentJobs: currentWorkload,
-                  maxJobs: settings.max_jobs_per_day,
-                  reservedInBatch: 1
-                });
-              }
+                // ✅ This slot works! Update virtual ledger
+                const updatedEntry: VirtualLedgerEntry = {
+                  ...virtualEntry,
+                  jobCount: virtualEntry.jobCount + 1,
+                  estimatedMinutes: virtualEntry.estimatedMinutes + getOrderEstimatedMinutes(order),
+                  orders: [...virtualEntry.orders, order]
+                };
+                
+                ledger.set(ledgerKey, updatedEntry);
+                
+                // Create assigned candidate with the slot date
+                assignedCandidate = {
+                  ...candidate,
+                  availableDate: slot.date
+                };
+                
+                // Update capacity info for UI
+                const existingCapacityIndex = capacityInfo.findIndex(info => 
+                  info.engineerName === candidate.engineer.name && info.date === slot.date
+                );
+                
+                if (existingCapacityIndex >= 0) {
+                  capacityInfo[existingCapacityIndex].reservedInBatch++;
+                } else {
+                  capacityInfo.push({
+                    engineerName: candidate.engineer.name,
+                    date: slot.date,
+                    currentJobs: slot.dbWorkload,
+                    maxJobs: engineerMaxJobs,
+                    reservedInBatch: 1
+                  });
+                }
 
-              console.log(`  ✅ Assigned to ${candidate.engineer.name} on ${candidate.availableDate} (${totalVirtualJobs + 1}/${settings.max_jobs_per_day} jobs)`);
-              break;
-              
-            } catch (error) {
-              console.error(`  ❌ Error checking day fit:`, error);
+                console.log(`    ✅ Assigned to ${candidate.engineer.name} on ${slot.date} (${totalVirtualJobs + 1}/${engineerMaxJobs} jobs)`);
+                assignedToSlot = true;
+                break; // Exit slot loop - found a fit!
+                
+              } catch (error) {
+                console.error(`    ❌ Error checking day fit for slot ${slot.date}:`, error);
+                continue; // Try next slot
+              }
+            }
+            
+            if (assignedToSlot) {
+              break; // Exit candidate loop - assigned successfully
+            } else {
+              // No slots worked for this candidate, add to alternatives
               alternatives.push(candidate);
-              continue;
             }
           }
 

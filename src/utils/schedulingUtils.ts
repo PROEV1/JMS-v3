@@ -1578,6 +1578,77 @@ export async function getAllEngineersForScheduling(): Promise<EngineerSettings[]
   }
 }
 
+export interface EngineerSlot {
+  date: string;
+  dbWorkload: number;
+  virtualWorkload: number;
+  remainingJobs: number;
+  workMinutesTotal: number;
+  workMinutesUsed: number;
+}
+
+/**
+ * Generate slot pool for an engineer across the scheduling horizon
+ */
+export async function getEngineerSlotPool(
+  engineer: EngineerSettings,
+  startDate: Date,
+  horizonDays: number,
+  settings: any,
+  workloadLookup?: (engineerId: string, date: string) => number
+): Promise<EngineerSlot[]> {
+  const slots: EngineerSlot[] = [];
+  const checkDate = new Date(startDate);
+  
+  // Get engineer's daily limit - use engineer.max_installs_per_day if available, otherwise fallback to global setting
+  const engineerMaxJobs = (engineer as any).max_installs_per_day || settings.max_jobs_per_day;
+  
+  for (let day = 0; day < horizonDays; day++) {
+    // Check if engineer is available on this date
+    if (!isEngineerAvailableOnDate(engineer, checkDate)) {
+      checkDate.setDate(checkDate.getDate() + 1);
+      continue;
+    }
+    
+    const dateStr = checkDate.toISOString().split('T')[0];
+    
+    // Get current workload for this date
+    const dbWorkload = workloadLookup 
+      ? workloadLookup(engineer.id, dateStr)
+      : await getEngineerDailyWorkload(engineer.id, dateStr);
+    
+    // Calculate remaining job slots
+    const remainingJobs = Math.max(0, engineerMaxJobs - dbWorkload);
+    
+    // Get working hours for this day
+    const dayOfWeek = checkDate.getDay();
+    const workingHoursForDay = engineer.working_hours.find(wh => wh.day_of_week === dayOfWeek);
+    
+    let workMinutesTotal = 0;
+    if (workingHoursForDay && workingHoursForDay.is_available) {
+      const startTime = new Date(`1970-01-01T${workingHoursForDay.start_time}`);
+      const endTime = new Date(`1970-01-01T${workingHoursForDay.end_time}`);
+      workMinutesTotal = (endTime.getTime() - startTime.getTime()) / (1000 * 60);
+    }
+    
+    // Only add slots with available capacity
+    if (remainingJobs > 0 && workMinutesTotal > 0) {
+      slots.push({
+        date: dateStr,
+        dbWorkload,
+        virtualWorkload: 0, // Will be updated as jobs are assigned
+        remainingJobs,
+        workMinutesTotal,
+        workMinutesUsed: 0 // Will be calculated when needed
+      });
+    }
+    
+    checkDate.setDate(checkDate.getDate() + 1);
+  }
+  
+  return slots;
+}
+
 /**
  * Check if engineer is available on a specific date
  */
