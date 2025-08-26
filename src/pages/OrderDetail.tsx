@@ -74,7 +74,7 @@ interface Order {
       total_price: number;
       configuration: Record<string, string>;
     }>;
-  };
+  } | null;
   order_payments: Array<{
     id: string;
     amount: number;
@@ -307,10 +307,18 @@ export default function OrderDetail() {
         console.log('[OrderDetail] No partner data');
       }
       
-      // Transform the data to match our interface
+      // Transform the data to match our interface with proper null handling
       const transformedOrder = {
         ...data,
-        survey: data.client_surveys?.[0] || null // Get first survey if exists
+        // Ensure all nested objects have defaults
+        client: data.client || { id: '', full_name: '', email: '', address: null, postcode: null },
+        quote: data.quote || null,
+        engineer: data.engineer || null,
+        partner: data.partner || null,
+        order_payments: data.order_payments || [],
+        engineer_uploads: data.engineer_uploads || [],
+        client_surveys: data.client_surveys || [],
+        survey: data.client_surveys?.[0] || null
       };
       
       console.log('[OrderDetail] Transformed order ready to set:', transformedOrder);
