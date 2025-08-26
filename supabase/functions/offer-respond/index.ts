@@ -138,12 +138,14 @@ serve(async (req: Request) => {
         throw new Error('Failed to update offer status');
       }
 
-      // Assign engineer to the order but leave date unset - triggers will set status to awaiting_install_booking (Ready to Book)
+      // Assign engineer to the order and clear manual override so triggers can calculate status
       const { error: updateOrderError } = await supabase
         .from('orders')
         .update({
           engineer_id: jobOffer.engineer_id,
-          time_window: jobOffer.time_window
+          time_window: jobOffer.time_window,
+          manual_status_override: false,
+          manual_status_notes: null
           // Don't set scheduled_install_date or status_enhanced - let triggers handle status calculation
         })
         .eq('id', jobOffer.order_id);
