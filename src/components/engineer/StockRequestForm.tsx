@@ -251,17 +251,27 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({
                     <SelectTrigger>
                       <SelectValue placeholder="Select item" />
                     </SelectTrigger>
-                    <SelectContent>
-                      {items?.map((item) => (
-                        <SelectItem key={item.id} value={item.id}>
-                          <div className="flex flex-col">
-                            <span className="font-medium">{item.name} ({item.sku})</span>
-                            <span className="text-xs text-muted-foreground">
-                              Min: {item.min_level ?? 'N/A'} | Max: {item.max_level ?? 'N/A'} | Reorder: {item.reorder_point ?? 'N/A'}
-                            </span>
-                          </div>
+                    <SelectContent className="bg-background border border-border shadow-lg z-50 max-h-[200px] overflow-y-auto">
+                      {isLoadingData ? (
+                        <SelectItem value="loading" disabled>
+                          Loading items...
                         </SelectItem>
-                      ))}
+                      ) : items?.length === 0 ? (
+                        <SelectItem value="no-items" disabled>
+                          No items available
+                        </SelectItem>
+                      ) : (
+                        items?.map((item) => (
+                          <SelectItem key={item.id} value={item.id} className="bg-background hover:bg-accent">
+                            <div className="flex flex-col">
+                              <span className="font-medium">{item.name} ({item.sku})</span>
+                              <span className="text-xs text-muted-foreground">
+                                Min: {item.min_level ?? 'N/A'} | Max: {item.max_level ?? 'N/A'} | Reorder: {item.reorder_point ?? 'N/A'}
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
