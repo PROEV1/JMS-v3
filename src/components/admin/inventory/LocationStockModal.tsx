@@ -42,15 +42,11 @@ export function LocationStockModal({ open, onOpenChange, location }: LocationSto
     balance => balance.location_id === location.id
   );
 
-  // Get items not yet in this location for adding (only show items with zero stock here)
+  // Show all items when adding - filter only by search term
   const availableItems = allItems.filter(item => {
-    const hasStockHere = currentLocationBalances.some(balance => 
-      balance.item_id === item.id && balance.on_hand > 0
-    );
-    return !hasStockHere &&
-      (searchTerm === '' || 
-       item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-       item.sku?.toLowerCase().includes(searchTerm.toLowerCase()));
+    return searchTerm === '' || 
+           item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+           item.sku?.toLowerCase().includes(searchTerm.toLowerCase());
   });
 
   // Show items that have any stock (even zero) at this location for management
