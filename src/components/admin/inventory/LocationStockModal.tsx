@@ -35,9 +35,9 @@ export function LocationStockModal({ open, onOpenChange, location }: LocationSto
     balance => balance.location_id === location.id
   );
 
-  // Show items that have any stock (even zero) at this location for management
+  // Show items that have stock at this location (exclude zero/negative stock)
   const itemsWithBalance = locationBalances
-    .filter(balance => balance.location_id === location.id)
+    .filter(balance => balance.location_id === location.id && balance.on_hand > 0)
     .map(balance => {
       const item = allItems.find(i => i.id === balance.item_id);
       return item ? { ...item, currentStock: balance.on_hand } : null;
