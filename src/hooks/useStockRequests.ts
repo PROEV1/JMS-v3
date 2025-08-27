@@ -9,7 +9,9 @@ export const useStockRequests = (engineerId?: string, limit = 30) => {
   return useQuery({
     queryKey: ['stock-requests', engineerId, limit],
     queryFn: async () => {
-      let query = (supabase as any)
+      console.log('useStockRequests: Fetching stock requests', { engineerId, limit });
+      
+      let query = supabase
         .from('stock_requests')
         .select(`
           *,
@@ -25,11 +27,18 @@ export const useStockRequests = (engineerId?: string, limit = 30) => {
         .limit(limit);
 
       if (engineerId) {
+        console.log('useStockRequests: Filtering by engineer_id:', engineerId);
         query = query.eq('engineer_id', engineerId);
       }
 
       const { data, error } = await query;
-      if (error) throw error;
+      
+      console.log('useStockRequests: Query result', { data, error, dataLength: data?.length });
+      
+      if (error) {
+        console.error('useStockRequests: Query error:', error);
+        throw error;
+      }
       
       return (data as unknown) as StockRequestWithDetails[];
     }

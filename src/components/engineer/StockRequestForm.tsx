@@ -148,7 +148,7 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({
 
   const onSubmit = async (values: StockRequestFormValues) => {
     try {
-      console.log('Form submission values:', values);
+      console.log('StockRequestForm: Form submission values:', values);
       
       // Validate that destination is selected
       if (!values.destination_location_id) {
@@ -187,11 +187,18 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({
         engineer_id: engineerId
       };
 
-      console.log('Submitting DTO:', dto);
-      await createRequest.mutateAsync(dto);
+      console.log('StockRequestForm: Submitting DTO:', dto);
+      const result = await createRequest.mutateAsync(dto);
+      console.log('StockRequestForm: Submission result:', result);
+      
+      toast({
+        title: "Success",
+        description: "Stock request submitted successfully",
+      });
+      
       onClose();
     } catch (error) {
-      console.error('Failed to create stock request:', error);
+      console.error('StockRequestForm: Failed to create stock request:', error);
       toast({
         title: "Error",
         description: "Failed to submit stock request. Please try again.",
