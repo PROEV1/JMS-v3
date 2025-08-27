@@ -26,55 +26,63 @@ export function useUserRole() {
       try {
         console.log('useUserRole: Fetching role for user ID:', user.id);
         
-        // First check if user is a partner user (prevent 406 errors)
-        const { data: partnerUser, error: partnerError } = await supabase
-          .from('partner_users')
-          .select('partner_id, role')
-          .eq('user_id', user.id)
-          .eq('is_active', true)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+        // Fetch both partner and profile data in parallel
+        const [partnerResult, profileResult] = await Promise.all([
+          supabase
+            .from('partner_users')
+            .select('partner_id, role')
+            .eq('user_id', user.id)
+            .eq('is_active', true)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+          supabase
+            .from('profiles')
+            .select('role, status')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+        ]);
+
+        const { data: partnerUser, error: partnerError } = partnerResult;
+        const { data: profileData, error: profileError } = profileResult;
 
         console.log('useUserRole: Partner user check:', { partnerUser, partnerError });
+        console.log('useUserRole: Profile query result:', { profileData, profileError });
 
-        // If they're a partner user, return 'partner' role
-        if (partnerUser) {
-          console.log('useUserRole: User is a partner, setting role to partner');
-          setRole('partner');
-          setLoading(false);
-          return;
+        if (profileError) {
+          console.error('useUserRole: Profile database error:', profileError);
+          throw profileError;
         }
 
-        // Otherwise check their profile role (prevent 406 errors)
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('role, status')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+        // Apply role precedence: admin/manager first, then partner, then others
+        let finalRole: UserRole = null;
 
-        console.log('useUserRole: Profile query result:', { data, error });
-
-        if (error) {
-          console.error('useUserRole: Database error:', error);
-          throw error;
-        }
-        
-        if (data) {
-          console.log('useUserRole: Found profile, role:', data.role, 'status:', data.status);
-          if (data.status === 'active') {
-            setRole(data.role as UserRole);
-            console.log('useUserRole: Set role to:', data.role);
+        // Check profile role first (admin/manager takes precedence)
+        if (profileData && profileData.status === 'active') {
+          const profileRole = profileData.role as UserRole;
+          console.log('useUserRole: Found active profile, role:', profileRole);
+          
+          if (profileRole === 'admin' || profileRole === 'manager') {
+            finalRole = profileRole;
+            console.log('useUserRole: Setting high-precedence role:', finalRole);
           } else {
-            console.log('useUserRole: User is inactive, setting role to null');
-            setRole(null);
+            // Store other profile roles as fallback
+            finalRole = profileRole;
           }
-        } else {
-          console.log('useUserRole: No profile found, setting role to null');
-          setRole(null);
         }
+
+        // If no high-precedence profile role, check partner role
+        if (!finalRole || (finalRole !== 'admin' && finalRole !== 'manager')) {
+          if (partnerUser && !partnerError) {
+            console.log('useUserRole: User is a partner, considering partner role');
+            finalRole = 'partner';
+          }
+        }
+
+        console.log('useUserRole: Final role determined:', finalRole);
+        setRole(finalRole);
       } catch (error) {
         console.error('useUserRole: Error fetching user role:', error);
         setRole(null);
