@@ -94,23 +94,23 @@ export function SchedulingHub({}: SchedulingHubProps) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-xl">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Scheduling Hub</h1>
-          <p className="text-muted-foreground">Your central command for job scheduling and workflow management</p>
+      <div className="flex items-start justify-between">
+        <div className="space-y-sm">
+          <h1 className="brand-heading-1">Scheduling Hub</h1>
+          <p className="brand-small text-muted-foreground">Your central command for job scheduling and workflow management</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-sm">
           <Button variant="outline" size="sm" onClick={handleRefresh}>
-            <RefreshCw className="h-4 w-4 mr-2" />
+            <RefreshCw className="icon-sm mr-2" />
             Refresh
           </Button>
         </div>
       </div>
 
       {/* KPI Strip */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-md">
         <KpiCard
           title="Needs Scheduling"
           value={counts.needsScheduling}
@@ -153,25 +153,25 @@ export function SchedulingHub({}: SchedulingHubProps) {
       />
 
       {/* Quick Actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Zap className="h-5 w-5" />
+      <Card className="brand-card">
+        <CardHeader className="pb-md">
+          <CardTitle className="flex items-center gap-sm text-lg font-semibold">
+            <Zap className="icon-md" />
             Quick Actions
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-3">
-            <Button onClick={handleAutoSchedule} variant="default">
-              <Zap className="h-4 w-4 mr-2" />
+        <CardContent className="pt-0">
+          <div className="flex flex-wrap gap-md">
+            <Button onClick={handleAutoSchedule} variant="default" className="h-10">
+              <Zap className="icon-sm mr-2" />
               Auto-Schedule Available Jobs
             </Button>
-            <Button onClick={handleSmartAssignment} variant="outline">
-              <Users className="h-4 w-4 mr-2" />
+            <Button onClick={handleSmartAssignment} variant="outline" className="h-10">
+              <Users className="icon-sm mr-2" />
               Smart Engineer Assignment
             </Button>
-            <Button onClick={handleWeekView} variant="outline">
-              <Eye className="h-4 w-4 mr-2" />
+            <Button onClick={handleWeekView} variant="outline" className="h-10">
+              <Eye className="icon-sm mr-2" />
               Week View Calendar
             </Button>
           </div>
@@ -193,7 +193,7 @@ export function SchedulingHub({}: SchedulingHubProps) {
       </div>
 
       {/* Week at a Glance + Recent Activity Below */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-lg">
         <WeekAtAGlance />
         <RecentActivity />
       </div>

@@ -156,19 +156,30 @@ export default function AdminOrders() {
     { value: 'completed', label: 'Completed' },
   ];
 
-  const getStatusColor = (status: string) => {
-    const colors: Record<string, string> = {
-      'awaiting_payment': 'bg-red-100 text-red-800',
-      'awaiting_agreement': 'bg-orange-100 text-orange-800',
-      'awaiting_survey_submission': 'bg-yellow-100 text-yellow-800',
-      'awaiting_survey_review': 'bg-blue-100 text-blue-800',
-      'awaiting_install_booking': 'bg-purple-100 text-purple-800',
-      'scheduled': 'bg-indigo-100 text-indigo-800',
-      'in_progress': 'bg-cyan-100 text-cyan-800',
-      'install_completed_pending_qa': 'bg-lime-100 text-lime-800',
-      'completed': 'bg-green-100 text-green-800',
+  const getStatusClassName = (status: string) => {
+    const classes: Record<string, string> = {
+      'awaiting_payment': 'status-cancelled',
+      'awaiting_agreement': 'status-pending',
+      'awaiting_survey_submission': 'status-pending',
+      'awaiting_survey_review': 'status-in_progress',
+      'awaiting_install_booking': 'status-draft',
+      'scheduled': 'status-scheduled',
+      'in_progress': 'status-in_progress',
+      'install_completed_pending_qa': 'status-accepted',
+      'completed': 'status-completed',
     };
-    return colors[status] || 'bg-gray-100 text-gray-800';
+    return classes[status] || 'status-draft';
+  };
+
+  const formatStatusText = (status: string) => {
+    const formatted = status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    const shortNames: Record<string, string> = {
+      'Awaiting Survey Submission': 'Survey Needed',
+      'Awaiting Survey Review': 'Survey Review',
+      'Awaiting Install Booking': 'Ready to Book',
+      'Install Completed Pending Qa': 'Pending QA',
+    };
+    return shortNames[formatted] || formatted;
   };
 
   if (isLoading) {
@@ -190,37 +201,37 @@ export default function AdminOrders() {
   }
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">Orders Management</h1>
-          <p className="text-muted-foreground">
+    <div className="container mx-auto py-section space-y-lg">
+      <div className="flex justify-between items-start">
+        <div className="space-y-sm">
+          <h1 className="brand-heading-1">Orders Management</h1>
+          <p className="brand-small text-muted-foreground">
             Manage and track all orders in the system
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Package className="h-5 w-5" />
-          <span className="font-medium">{orders?.length || 0} Total Orders</span>
+        <div className="flex items-center gap-sm px-card py-compact bg-muted/50 rounded-lg">
+          <Package className="icon-sm text-muted-foreground" />
+          <span className="text-sm font-medium">{orders?.length || 0} Total Orders</span>
         </div>
       </div>
 
       {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Filter className="h-5 w-5" />
-            Filters
+      <Card className="border-0 shadow-sm">
+        <CardHeader className="pb-md">
+          <CardTitle className="flex items-center gap-sm text-lg font-semibold">
+            <Filter className="icon-sm" />
+            Filters & Search
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <CardContent className="pt-0">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-md">
             <div className="relative">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-3 icon-sm text-muted-foreground" />
               <Input
                 placeholder="Search orders, clients, or quote numbers..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-10 h-10"
               />
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -253,14 +264,14 @@ export default function AdminOrders() {
       </Card>
 
       {/* Orders Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Orders</CardTitle>
-          <CardDescription>
+      <Card className="border-0 shadow-sm">
+        <CardHeader className="pb-md">
+          <CardTitle className="text-lg font-semibold">Orders Overview</CardTitle>
+          <CardDescription className="text-sm text-muted-foreground">
             All orders with their current status and details
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-0">
           <div className="overflow-x-auto">
             <Table>
                <TableHeader>
@@ -310,31 +321,31 @@ export default function AdminOrders() {
                         <span className="text-muted-foreground">No client</span>
                       )}
                     </TableCell>
-                    <TableCell>
-                      <Badge className={getStatusColor(order.status_enhanced || 'unknown')}>
-                        {order.status_enhanced?.replace(/_/g, ' ').toUpperCase() || 'UNKNOWN'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {order.engineer ? (
-                        <div className="flex items-center gap-2">
-                          <User className="h-4 w-4" />
-                          {order.engineer.name}
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground">Unassigned</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {order.scheduled_install_date ? (
-                        <div className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4" />
-                          {format(new Date(order.scheduled_install_date), 'PPP')}
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground">Not scheduled</span>
-                      )}
-                    </TableCell>
+                     <TableCell>
+                       <span className={`status-base ${getStatusClassName(order.status_enhanced || 'unknown')}`}>
+                         {formatStatusText(order.status_enhanced || 'unknown')}
+                       </span>
+                     </TableCell>
+                     <TableCell>
+                       {order.engineer ? (
+                         <div className="flex items-center gap-sm">
+                           <User className="icon-sm text-muted-foreground" />
+                           <span className="text-sm font-medium">{order.engineer.name}</span>
+                         </div>
+                       ) : (
+                         <span className="text-sm text-muted-foreground">Unassigned</span>
+                       )}
+                     </TableCell>
+                     <TableCell>
+                       {order.scheduled_install_date ? (
+                         <div className="flex items-center gap-sm">
+                           <Calendar className="icon-sm text-muted-foreground" />
+                           <span className="text-sm font-medium">{format(new Date(order.scheduled_install_date), 'PP')}</span>
+                         </div>
+                       ) : (
+                         <span className="text-sm text-muted-foreground">Not scheduled</span>
+                       )}
+                     </TableCell>
                     <TableCell className="font-medium">
                       £{order.total_amount}
                     </TableCell>
