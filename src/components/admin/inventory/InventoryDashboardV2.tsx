@@ -22,6 +22,7 @@ import { QuickActionsBlock } from './shared/QuickActionsBlock';
 import { StatusChip } from './shared/StatusChip';
 import { StockTransferModal } from './StockTransferModal';
 import { StockAdjustmentModal } from './StockAdjustmentModal';
+import { useInventoryEnhanced } from '@/hooks/useInventoryEnhanced';
 
 interface InventoryDashboardV2Props {
   onSwitchTab: (tab: string) => void;
@@ -87,22 +88,8 @@ export function InventoryDashboardV2({ onSwitchTab }: InventoryDashboardV2Props)
     }
   });
 
-  // Low stock items for priority table
-  const { data: lowStockData } = useQuery({
-    queryKey: ['low-stock-items'],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('inventory_items')
-        .select(`
-          id, name, sku, reorder_point,
-          inventory_suppliers(name)
-        `)
-        .eq('is_active', true)
-        .limit(5);
-      
-      return data || [];
-    }
-  });
+  // Low stock engineer details for actual location-based low stock
+  const { data: lowStockData } = useInventoryEnhanced().useLowStockEngineerDetails();
 
   // Recent stock requests for priority table
   const { data: recentRequests } = useQuery({
@@ -185,11 +172,11 @@ export function InventoryDashboardV2({ onSwitchTab }: InventoryDashboardV2Props)
 
         <InventoryKpiTile
           title="Low Stock"
-          value={kpiStats?.lowStockItems || 0}
+          value={lowStockData?.length || 0}
           icon={AlertTriangle}
-          variant={kpiStats?.lowStockItems > 0 ? "warning" : "success"}
+          variant={lowStockData?.length > 0 ? "warning" : "success"}
           onClick={() => onSwitchTab('items')}
-          subtitle="At/below reorder point"
+          subtitle="Engineer locations low"
         />
 
         <InventoryKpiTile
@@ -261,16 +248,17 @@ export function InventoryDashboardV2({ onSwitchTab }: InventoryDashboardV2Props)
           <CardContent>
             {lowStockData?.length ? (
               <div className="space-y-3">
-                {lowStockData.map((item: any) => (
-                  <div key={item.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                {lowStockData.slice(0, 5).map((item: any) => (
+                  <div key={`${item.location_id}-${item.item_id}`} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
                     <div className="space-y-1">
-                      <div className="font-medium text-sm">{item.name}</div>
-                      <div className="text-xs text-muted-foreground">{item.sku}</div>
+                      <div className="font-medium text-sm">{item.item_name}</div>
+                      <div className="text-xs text-muted-foreground">{item.engineer_name} - {item.location_name}</div>
                     </div>
                     <div className="text-right">
-                      <div className="text-sm font-medium">Reorder: {item.reorder_point}</div>
-                      <Button variant="outline" size="sm" className="text-xs h-6 mt-1">
-                        Create PO
+                      <div className="text-sm font-medium">Stock: {item.current_stock} / {item.reorder_point}</div>
+                      <Button variant="outline" size="sm" className="text-xs h-6 mt-1"
+                              onClick={() => window.open(`/engineer/stock-requests`, '_blank')}>
+                        Request Stock
                       </Button>
                     </div>
                   </div>
@@ -278,7 +266,7 @@ export function InventoryDashboardV2({ onSwitchTab }: InventoryDashboardV2Props)
               </div>
             ) : (
               <div className="text-center py-6 text-muted-foreground">
-                No low stock items
+                No low stock locations
               </div>
             )}
           </CardContent>
