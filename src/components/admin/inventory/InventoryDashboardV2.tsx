@@ -14,14 +14,12 @@ import {
   TrendingDown,
   Plus,
   ArrowUpDown,
-  Wrench,
   FileText
 } from 'lucide-react';
 import { InventoryKpiTile } from './shared/InventoryKpiTile';
 import { QuickActionsBlock } from './shared/QuickActionsBlock';
 import { StatusChip } from './shared/StatusChip';
-import { StockTransferModal } from './StockTransferModal';
-import { StockAdjustmentModal } from './StockAdjustmentModal';
+import { EnhancedStockTransferModal } from './EnhancedStockTransferModal';
 import { LocationStockModal } from './LocationStockModal';
 import { useInventoryEnhanced } from '@/hooks/useInventoryEnhanced';
 
@@ -31,7 +29,6 @@ interface InventoryDashboardV2Props {
 
 export function InventoryDashboardV2({ onSwitchTab }: InventoryDashboardV2Props) {
   const [transferModalOpen, setTransferModalOpen] = useState(false);
-  const [adjustmentModalOpen, setAdjustmentModalOpen] = useState(false);
   const [locationModalOpen, setLocationModalOpen] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<any>(null);
 
@@ -123,12 +120,6 @@ export function InventoryDashboardV2({ onSwitchTab }: InventoryDashboardV2Props)
       label: "Transfer Stock",
       icon: ArrowUpDown,
       onClick: () => setTransferModalOpen(true),
-      variant: 'secondary' as const
-    },
-    {
-      label: "Stock Adjustment",
-      icon: Wrench,
-      onClick: () => setAdjustmentModalOpen(true),
       variant: 'secondary' as const
     },
     {
@@ -359,8 +350,7 @@ export function InventoryDashboardV2({ onSwitchTab }: InventoryDashboardV2Props)
       </div>
 
       {/* Modals */}
-      <StockTransferModal open={transferModalOpen} onOpenChange={setTransferModalOpen} />
-      <StockAdjustmentModal open={adjustmentModalOpen} onOpenChange={setAdjustmentModalOpen} />
+      <EnhancedStockTransferModal open={transferModalOpen} onOpenChange={setTransferModalOpen} />
       <LocationStockModal 
         open={locationModalOpen} 
         onOpenChange={setLocationModalOpen} 
