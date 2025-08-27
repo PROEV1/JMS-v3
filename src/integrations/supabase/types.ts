@@ -2593,6 +2593,7 @@ export type Database = {
           order_date: string
           po_number: string
           status: Database["public"]["Enums"]["purchase_order_status"]
+          stock_request_id: string | null
           supplier_id: string | null
           total_amount: number
           updated_at: string
@@ -2607,6 +2608,7 @@ export type Database = {
           order_date?: string
           po_number: string
           status?: Database["public"]["Enums"]["purchase_order_status"]
+          stock_request_id?: string | null
           supplier_id?: string | null
           total_amount?: number
           updated_at?: string
@@ -2621,6 +2623,7 @@ export type Database = {
           order_date?: string
           po_number?: string
           status?: Database["public"]["Enums"]["purchase_order_status"]
+          stock_request_id?: string | null
           supplier_id?: string | null
           total_amount?: number
           updated_at?: string
@@ -2632,6 +2635,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_stock_request_id_fkey"
+            columns: ["stock_request_id"]
+            isOneToOne: false
+            referencedRelation: "stock_requests"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "purchase_orders_supplier_id_fkey"
@@ -3013,6 +3023,7 @@ export type Database = {
           order_id: string | null
           photo_url: string | null
           priority: string
+          purchase_order_id: string | null
           status: string
           updated_at: string
         }
@@ -3027,6 +3038,7 @@ export type Database = {
           order_id?: string | null
           photo_url?: string | null
           priority?: string
+          purchase_order_id?: string | null
           status?: string
           updated_at?: string
         }
@@ -3041,6 +3053,7 @@ export type Database = {
           order_id?: string | null
           photo_url?: string | null
           priority?: string
+          purchase_order_id?: string | null
           status?: string
           updated_at?: string
         }
@@ -3064,6 +3077,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_requests_purchase_order_id_fkey"
+            columns: ["purchase_order_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
             referencedColumns: ["id"]
           },
         ]

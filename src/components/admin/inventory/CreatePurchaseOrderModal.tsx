@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,10 +10,12 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Plus, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { StockRequestWithDetails } from '@/types/stock-request';
 
 interface CreatePurchaseOrderModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  stockRequest?: StockRequestWithDetails | null;
 }
 
 interface POItem {
@@ -24,13 +26,14 @@ interface POItem {
   unit_cost: number;
 }
 
-export function CreatePurchaseOrderModal({ open, onOpenChange }: CreatePurchaseOrderModalProps) {
+export function CreatePurchaseOrderModal({ open, onOpenChange, stockRequest }: CreatePurchaseOrderModalProps) {
   const [supplierId, setSupplierId] = useState("");
   const [expectedDelivery, setExpectedDelivery] = useState("");
   const [notes, setNotes] = useState("");
   const [poItems, setPoItems] = useState<POItem[]>([
     { id: "1", item_id: "", item_name: "", quantity: 1, unit_cost: 0 }
   ]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -49,6 +52,20 @@ export function CreatePurchaseOrderModal({ open, onOpenChange }: CreatePurchaseO
     }
   });
 
+  // Pre-populate with stock request data when provided
+  React.useEffect(() => {
+    if (stockRequest && open) {
+      setNotes(`Created from stock request #${stockRequest.id.slice(0, 8)} for ${stockRequest.engineer.name}`);
+      const stockRequestItems = stockRequest.lines.map((line, index) => ({
+        id: (index + 1).toString(),
+        item_id: line.item_id,
+        item_name: line.item.name,
+        quantity: line.qty,
+        unit_cost: 0
+      }));
+      setPoItems(stockRequestItems);
+    }
+  }, [stockRequest, open]);
   // Fetch inventory items
   const { data: inventoryItems = [] } = useQuery({
     queryKey: ['inventory-items'],
@@ -88,6 +105,8 @@ export function CreatePurchaseOrderModal({ open, onOpenChange }: CreatePurchaseO
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (isSubmitting) return; // Prevent double submission
+    
     if (!supplierId || poItems.some(item => !item.item_id || !item.quantity)) {
       toast({
         title: "Error",
@@ -96,6 +115,8 @@ export function CreatePurchaseOrderModal({ open, onOpenChange }: CreatePurchaseO
       });
       return;
     }
+
+    setIsSubmitting(true);
 
     try {
       // Create the purchase order with auto-generated PO number (handled by database trigger)
@@ -107,7 +128,8 @@ export function CreatePurchaseOrderModal({ open, onOpenChange }: CreatePurchaseO
           expected_delivery_date: expectedDelivery || null,
           notes,
           total_amount: totalAmount,
-          status: 'pending' as const
+          status: 'pending' as const,
+          stock_request_id: stockRequest?.id || null
         })
         .select()
         .single();
@@ -132,15 +154,29 @@ export function CreatePurchaseOrderModal({ open, onOpenChange }: CreatePurchaseO
 
         if (linesError) throw linesError;
       }
+
+      // If this PO was created from a stock request, update the stock request to link to this PO
+      if (stockRequest) {
+        const { error: updateError } = await supabase
+          .from('stock_requests')
+          .update({ purchase_order_id: poData.id })
+          .eq('id', stockRequest.id);
+
+        if (updateError) {
+          console.error('Error linking stock request to PO:', updateError);
+          // Don't fail the entire operation for this
+        }
+      }
       
       toast({
         title: "Success",
-        description: `Purchase order ${poData.po_number} created successfully`,
+        description: `Purchase order ${poData.po_number} created successfully${stockRequest ? ' from stock request' : ''}`,
       });
 
-      // Refresh the purchase orders list
+      // Refresh the purchase orders list and stock requests list
       queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
       queryClient.invalidateQueries({ queryKey: ['po-metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['stock-requests'] });
 
       onOpenChange(false);
       // Reset form
@@ -155,6 +191,8 @@ export function CreatePurchaseOrderModal({ open, onOpenChange }: CreatePurchaseO
         description: error.message || "Failed to create purchase order",
         variant: "destructive",
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -162,7 +200,9 @@ export function CreatePurchaseOrderModal({ open, onOpenChange }: CreatePurchaseO
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[700px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Create Purchase Order</DialogTitle>
+          <DialogTitle>
+            Create Purchase Order{stockRequest ? ` from Stock Request #${stockRequest.id.slice(0, 8)}` : ''}
+          </DialogTitle>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -298,8 +338,8 @@ export function CreatePurchaseOrderModal({ open, onOpenChange }: CreatePurchaseO
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit">
-              Create Purchase Order
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Creating...' : 'Create Purchase Order'}
             </Button>
           </div>
         </form>

@@ -13,6 +13,7 @@ export interface StockRequest {
   notes?: string;
   photo_url?: string;
   idempotency_key?: string;
+  purchase_order_id?: string;
   created_at: string;
   updated_at: string;
 }

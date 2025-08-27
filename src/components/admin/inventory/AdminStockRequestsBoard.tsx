@@ -14,6 +14,7 @@ import { InventoryKpiTile } from './shared/InventoryKpiTile';
 import { QuickActionsBlock } from './shared/QuickActionsBlock';
 import { CreateStockRequestModal } from './CreateStockRequestModal';
 import { CreateRMAModal } from './CreateRMAModal';
+import { CreatePurchaseOrderModal } from './CreatePurchaseOrderModal';
 
 const statusIcons = {
   submitted: Clock,
@@ -34,9 +35,10 @@ const formatStatus = (status: StockRequestStatus) => {
 interface RequestCardProps {
   request: StockRequestWithDetails;
   onStatusChange: (id: string, status: StockRequestStatus, notes?: string) => void;
+  onCreatePurchaseOrder?: (request: StockRequestWithDetails) => void;
 }
 
-const RequestCard: React.FC<RequestCardProps> = ({ request, onStatusChange }) => {
+const RequestCard: React.FC<RequestCardProps> = ({ request, onStatusChange, onCreatePurchaseOrder }) => {
   const [showDetails, setShowDetails] = useState(false);
   const [showStatusChange, setShowStatusChange] = useState(false);
   const [newStatus, setNewStatus] = useState<StockRequestStatus | ''>('');
@@ -142,6 +144,16 @@ const RequestCard: React.FC<RequestCardProps> = ({ request, onStatusChange }) =>
                 onClick={() => setShowStatusChange(true)}
               >
                 Update
+              </Button>
+            )}
+            {request.status === 'in_transit' && !request.purchase_order_id && (
+              <Button
+                variant="secondary"
+                size="sm"
+                className="text-xs h-6 px-2"
+                onClick={() => onCreatePurchaseOrder?.(request)}
+              >
+                Create PO
               </Button>
             )}
           </div>
@@ -277,12 +289,19 @@ export const AdminStockRequestsBoard = () => {
   const [viewMode, setViewMode] = useState<'tiles' | 'board'>('tiles');
   const [showCreateRequest, setShowCreateRequest] = useState(false);
   const [showCreateRMA, setShowCreateRMA] = useState(false);
+  const [showCreatePO, setShowCreatePO] = useState(false);
+  const [selectedStockRequest, setSelectedStockRequest] = useState<StockRequestWithDetails | null>(null);
   
   const { data: requests, isLoading } = useStockRequests();
   const updateStatus = useUpdateStockRequestStatus();
 
   const handleStatusChange = (id: string, status: StockRequestStatus, notes?: string) => {
     updateStatus.mutate({ id, status, notes });
+  };
+
+  const handleCreatePurchaseOrder = (request: StockRequestWithDetails) => {
+    setSelectedStockRequest(request);
+    setShowCreatePO(true);
   };
 
   // Calculate metrics
@@ -473,6 +492,7 @@ export const AdminStockRequestsBoard = () => {
                     key={request.id}
                     request={request}
                     onStatusChange={handleStatusChange}
+                    onCreatePurchaseOrder={handleCreatePurchaseOrder}
                   />
                 ))}
               </div>
@@ -504,6 +524,7 @@ export const AdminStockRequestsBoard = () => {
                       key={request.id}
                       request={request}
                       onStatusChange={handleStatusChange}
+                      onCreatePurchaseOrder={handleCreatePurchaseOrder}
                     />
                   ))}
                   {requestsForStatus.length === 0 && (
@@ -527,6 +548,15 @@ export const AdminStockRequestsBoard = () => {
       <CreateRMAModal
         open={showCreateRMA}
         onOpenChange={setShowCreateRMA}
+      />
+      
+      <CreatePurchaseOrderModal
+        open={showCreatePO}
+        onOpenChange={(open) => {
+          setShowCreatePO(open);
+          if (!open) setSelectedStockRequest(null);
+        }}
+        stockRequest={selectedStockRequest}
       />
     </div>
   );
