@@ -75,7 +75,7 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({
   const { toast } = useToast();
 
   const form = useForm<StockRequestFormValues>({
-    resolver: zodResolver(StockRequestSchema) as any, // prevent deep generic instantiation
+    resolver: zodResolver(StockRequestSchema),
     defaultValues: {
       ...defaults,
       job_id: orderId || null,
@@ -86,7 +86,7 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
-    name: 'lines' as const
+    name: 'lines'
   });
 
   // Get van locations for engineer - completely avoid complex types
@@ -148,6 +148,29 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({
 
   const onSubmit = async (values: StockRequestFormValues) => {
     try {
+      console.log('Form submission values:', values);
+      
+      // Validate that destination is selected
+      if (!values.destination_location_id) {
+        toast({
+          title: "Error",
+          description: "Please select a destination location",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Validate that at least one item is selected
+      const validLines = values.lines.filter(line => line.item_id && line.qty > 0);
+      if (validLines.length === 0) {
+        toast({
+          title: "Error", 
+          description: "Please add at least one item with quantity > 0",
+          variant: "destructive",
+        });
+        return;
+      }
+
       // Map to lightweight DTO; avoid DB/Prisma/Supabase heavy types here
       const dto = {
         destination_location_id: values.destination_location_id,
@@ -156,7 +179,7 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({
         priority: values.priority,
         notes: values.notes ?? '',
         photo_url: undefined,
-        lines: values.lines.map(l => ({ 
+        lines: validLines.map(l => ({ 
           item_id: l.item_id, 
           qty: Number(l.qty),
           notes: undefined
@@ -164,10 +187,16 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({
         engineer_id: engineerId
       };
 
+      console.log('Submitting DTO:', dto);
       await createRequest.mutateAsync(dto);
       onClose();
     } catch (error) {
       console.error('Failed to create stock request:', error);
+      toast({
+        title: "Error",
+        description: "Failed to submit stock request. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -177,7 +206,10 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({
       <div className="grid grid-cols-2 gap-4">
         <div>
           <Label htmlFor="destination_location_id">Destination Location *</Label>
-          <Select onValueChange={(value) => form.setValue('destination_location_id', value)}>
+          <Select 
+            value={form.watch('destination_location_id')} 
+            onValueChange={(value) => form.setValue('destination_location_id', value)}
+          >
             <SelectTrigger>
               <SelectValue placeholder="Select location" />
             </SelectTrigger>
@@ -198,7 +230,10 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({
 
         <div>
           <Label htmlFor="priority">Priority</Label>
-          <Select onValueChange={(value: 'low' | 'medium' | 'high') => form.setValue('priority', value)}>
+          <Select 
+            value={form.watch('priority')}
+            onValueChange={(value: 'low' | 'medium' | 'high') => form.setValue('priority', value)}
+          >
             <SelectTrigger>
               <SelectValue placeholder="Select priority" />
             </SelectTrigger>
@@ -247,7 +282,10 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({
               <div className="grid grid-cols-12 gap-3 items-start">
                 <div className="col-span-5">
                   <Label className="text-sm">Item</Label>
-                  <Select onValueChange={(value) => form.setValue(`lines.${index}.item_id`, value)}>
+                  <Select 
+                    value={form.watch(`lines.${index}.item_id`) || ''}
+                    onValueChange={(value) => form.setValue(`lines.${index}.item_id`, value)}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Select item" />
                     </SelectTrigger>

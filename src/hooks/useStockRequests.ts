@@ -46,8 +46,10 @@ export const useCreateStockRequest = () => {
       // Generate idempotency key
       const idempotencyKey = crypto.randomUUID();
       
+      console.log('Creating stock request with data:', { ...requestFields, idempotency_key: idempotencyKey });
+      
       // Create the main request
-      const { data: request, error: requestError } = await (supabase as any)
+      const { data: request, error: requestError } = await supabase
         .from('stock_requests')
         .insert([{
           ...requestFields,
@@ -56,11 +58,17 @@ export const useCreateStockRequest = () => {
         .select()
         .single();
 
-      if (requestError) throw requestError;
+      if (requestError) {
+        console.error('Stock request creation error:', requestError);
+        throw requestError;
+      }
+
+      console.log('Stock request created:', request);
 
       // Create the lines
       if (lines.length > 0) {
-        const { error: linesError } = await (supabase as any)
+        console.log('Creating stock request lines:', lines);
+        const { error: linesError } = await supabase
           .from('stock_request_lines')
           .insert(
             lines.map(line => ({
@@ -69,7 +77,10 @@ export const useCreateStockRequest = () => {
             }))
           );
 
-        if (linesError) throw linesError;
+        if (linesError) {
+          console.error('Stock request lines creation error:', linesError);
+          throw linesError;
+        }
       }
 
       return request;

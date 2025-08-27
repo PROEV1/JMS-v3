@@ -5,7 +5,6 @@ export type StockRequestPriority = 'low' | 'medium' | 'high';
 export interface StockRequest {
   id: string;
   engineer_id: string;
-  requested_by: string;
   destination_location_id: string;
   order_id?: string;
   needed_by?: string;
@@ -13,7 +12,7 @@ export interface StockRequest {
   status: StockRequestStatus;
   notes?: string;
   photo_url?: string;
-  idempotency_key: string;
+  idempotency_key?: string;
   created_at: string;
   updated_at: string;
 }
