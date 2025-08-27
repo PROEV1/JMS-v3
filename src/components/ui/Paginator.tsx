@@ -80,7 +80,7 @@ export function Paginator({
   }
 
   return (
-    <div className={`sticky bottom-0 bg-background/95 backdrop-blur-sm border-t py-4 ${className}`}>
+    <div className={`border-t py-4 ${className}`}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <p className="text-sm text-muted-foreground">
