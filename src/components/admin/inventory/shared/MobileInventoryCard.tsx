@@ -9,6 +9,7 @@ import {
   ArrowUpDown, 
   Wrench, 
   Eye,
+  Edit,
   AlertTriangle,
   CheckCircle,
   Trash2
@@ -28,6 +29,7 @@ interface InventoryItem {
   reorder_point: number;
   is_active: boolean;
   is_serialized: boolean;
+  is_charger: boolean;
   current_stock?: number;
   supplier_name?: string;
 }
@@ -39,6 +41,7 @@ interface MobileInventoryCardProps {
   onTransfer?: () => void;
   onAdjust?: () => void;
   onView?: () => void;
+  onEdit?: () => void;
   onDelete?: () => void;
   showSelection?: boolean;
 }
@@ -50,6 +53,7 @@ export function MobileInventoryCard({
   onTransfer,
   onAdjust,
   onView,
+  onEdit,
   onDelete,
   showSelection = false
 }: MobileInventoryCardProps) {
@@ -97,6 +101,12 @@ export function MobileInventoryCard({
                 <DropdownMenuItem onClick={onView}>
                   <Eye className="h-4 w-4 mr-2" />
                   View Details
+                </DropdownMenuItem>
+              )}
+              {onEdit && (
+                <DropdownMenuItem onClick={onEdit}>
+                  <Edit className="h-4 w-4 mr-2" />
+                  Edit Item
                 </DropdownMenuItem>
               )}
               {onTransfer && (

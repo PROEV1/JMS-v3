@@ -35,9 +35,14 @@ interface InventoryItem {
   is_active: boolean;
   supplier_id?: string;
   is_serialized: boolean;
+  is_charger: boolean;
 }
 
-export const InventoryItemsSimple: React.FC = () => {
+interface InventoryItemsSimpleProps {
+  onSwitchTab?: (tab: string) => void;
+}
+
+export const InventoryItemsSimple: React.FC<InventoryItemsSimpleProps> = ({ onSwitchTab }) => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -51,6 +56,7 @@ export const InventoryItemsSimple: React.FC = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showLocationInventory, setShowLocationInventory] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [editItem, setEditItem] = useState<InventoryItem | null>(null);
 
   const { deleteInventoryItem } = useInventoryEnhanced();
 
@@ -206,6 +212,7 @@ export const InventoryItemsSimple: React.FC = () => {
             icon={AlertTriangle}
             variant={metrics.lowStockItems > 0 ? "warning" : "success"}
             subtitle="Need reordering"
+            onClick={() => onSwitchTab?.('locations')}
           />
           <InventoryKpiTile
             title="Serialized"
@@ -335,6 +342,18 @@ export const InventoryItemsSimple: React.FC = () => {
                     <Button 
                       variant="outline" 
                       size="sm" 
+                      className="text-xs h-7 px-2"
+                      onClick={() => {
+                        setEditItem(item);
+                        setShowAddModal(true);
+                      }}
+                      title="Edit item"
+                    >
+                      Edit
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
                       className="text-xs h-7 px-2 text-destructive hover:text-destructive"
                       onClick={() => {
                         setSelectedItem(item);
@@ -376,6 +395,10 @@ export const InventoryItemsSimple: React.FC = () => {
               onView={() => {
                 setSelectedItem(item);
                 setShowQuickView(true);
+              }}
+              onEdit={() => {
+                setEditItem(item);
+                setShowAddModal(true);
               }}
               onDelete={() => {
                 setSelectedItem(item);
@@ -453,6 +476,18 @@ export const InventoryItemsSimple: React.FC = () => {
                         title="View Details"
                       >
                         <span className="text-xs">View</span>
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-8 w-8 p-0"
+                        onClick={() => {
+                          setEditItem(item);
+                          setShowAddModal(true);
+                        }}
+                        title="Edit Item"
+                      >
+                        <span className="text-xs">Edit</span>
                       </Button>
                       <Button 
                         variant="ghost" 
@@ -560,6 +595,18 @@ export const InventoryItemsSimple: React.FC = () => {
                           <Button 
                             variant="ghost" 
                             size="sm" 
+                            className="h-8 px-2 text-xs"
+                            onClick={() => {
+                              setEditItem(item);
+                              setShowAddModal(true);
+                            }}
+                            title="Edit Item"
+                          >
+                            Edit
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
                             className="h-8 w-8 p-0 text-destructive hover:text-destructive"
                             onClick={() => {
                               setSelectedItem(item);
@@ -600,7 +647,13 @@ export const InventoryItemsSimple: React.FC = () => {
 
       <AddItemModal
         open={showAddModal}
-        onOpenChange={setShowAddModal}
+        onOpenChange={(open) => {
+          setShowAddModal(open);
+          if (!open) {
+            setEditItem(null);
+          }
+        }}
+        editItem={editItem as any}
       />
       
       <StockAdjustmentModal

@@ -43,7 +43,7 @@ const AdminInventory = () => {
         </TabsContent>
 
         <TabsContent value="items">
-          <InventoryItemsSimple />
+          <InventoryItemsSimple onSwitchTab={handleTabSwitch} />
         </TabsContent>
 
         <TabsContent value="locations">
