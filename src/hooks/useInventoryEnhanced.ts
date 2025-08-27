@@ -325,12 +325,83 @@ export function useInventoryEnhanced() {
     }
   });
 
+  // Get detailed low stock information by engineer
+  const useLowStockEngineerDetails = () => {
+    return useQuery({
+      queryKey: ['low-stock-engineer-details'],
+      queryFn: async () => {
+        const { data, error } = await supabase
+          .from('inventory_locations')
+          .select(`
+            id,
+            name,
+            type,
+            engineer_id,
+            engineers(name, email)
+          `)
+          .eq('is_active', true)
+          .eq('type', 'van');
+
+        if (error) throw error;
+
+        const vanLocations = data || [];
+        const { data: balances } = await supabase.rpc('get_item_location_balances');
+        const { data: items } = await supabase
+          .from('inventory_items')
+          .select('id, name, sku, reorder_point')
+          .eq('is_active', true);
+
+        if (!balances || !items) return [];
+
+        const lowStockDetails: any[] = [];
+
+        vanLocations.forEach(location => {
+          const locationBalances = balances.filter((b: any) => b.location_id === location.id);
+          
+          locationBalances.forEach((balance: any) => {
+            const item = items.find(i => i.id === balance.item_id);
+            if (item && balance.on_hand <= item.reorder_point) {
+              const shortage = item.reorder_point - balance.on_hand;
+              const status = balance.on_hand === 0 ? 'out_of_stock' : 
+                           balance.on_hand < item.reorder_point * 0.5 ? 'critical_low' : 'low_stock';
+              
+              lowStockDetails.push({
+                location_id: location.id,
+                location_name: location.name,
+                engineer_id: location.engineer_id,
+                engineer_name: location.engineers?.name || 'Unassigned',
+                engineer_email: location.engineers?.email,
+                item_id: item.id,
+                item_name: item.name,
+                item_sku: item.sku,
+                current_stock: balance.on_hand,
+                reorder_point: item.reorder_point,
+                shortage,
+                status
+              });
+            }
+          });
+        });
+
+        return lowStockDetails.sort((a, b) => {
+          // Sort by status severity first, then by engineer name
+          const statusOrder = { out_of_stock: 0, critical_low: 1, low_stock: 2 };
+          const statusDiff = statusOrder[a.status as keyof typeof statusOrder] - statusOrder[b.status as keyof typeof statusOrder];
+          if (statusDiff !== 0) return statusDiff;
+          return a.engineer_name.localeCompare(b.engineer_name);
+        });
+      },
+      staleTime: 60 * 1000, // 1 minute
+    });
+  };
+
   return {
     useInventoryItems,
     useLowStockItems,
     useInventoryKPIs,
     useInventoryLocations,
     useItemLocationBalances,
+    useLowStockEngineerDetails,
     createStockAdjustment,
     createStockTransfer,
     bulkUpdateItems,

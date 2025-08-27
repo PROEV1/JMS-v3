@@ -21,6 +21,7 @@ import { MobileInventoryCard } from './shared/MobileInventoryCard';
 import { NotificationBanner, createStockNotification } from './shared/NotificationBanner';
 import { useInventoryEnhanced } from '@/hooks/useInventoryEnhanced';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { LowStockDetailsTable } from './LowStockDetailsTable';
 
 interface InventoryItem {
   id: string;
@@ -644,6 +645,9 @@ export const InventoryItemsSimple: React.FC<InventoryItemsSimpleProps> = ({ onSw
           </CardContent>
         </Card>
       )}
+
+      {/* Low Stock Engineer Details Table */}
+      <LowStockDetailsTable className="mt-6" />
 
       <AddItemModal
         open={showAddModal}
