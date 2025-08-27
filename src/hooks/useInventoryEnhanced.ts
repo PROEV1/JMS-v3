@@ -331,7 +331,7 @@ export function useInventoryEnhanced() {
     return useQuery({
       queryKey: ['low-stock-engineer-details'],
       queryFn: async () => {
-        // First get van locations with engineers
+        // Get van locations with engineers
         const { data: vanLocations, error: locationsError } = await supabase
           .from('inventory_locations')
           .select(`
@@ -346,7 +346,11 @@ export function useInventoryEnhanced() {
 
         if (locationsError) throw locationsError;
 
-        // Get all items
+        // Get stock balances (only items that have transactions at van locations)
+        const { data: balances, error: balancesError } = await supabase.rpc('get_item_location_balances');
+        if (balancesError) throw balancesError;
+
+        // Get items data
         const { data: items, error: itemsError } = await supabase
           .from('inventory_items')
           .select('id, name, sku, reorder_point')
@@ -354,28 +358,22 @@ export function useInventoryEnhanced() {
 
         if (itemsError) throw itemsError;
 
-        // Get stock balances
-        const { data: balances, error: balancesError } = await supabase.rpc('get_item_location_balances');
-        if (balancesError) throw balancesError;
-
-        if (!vanLocations || !items) return [];
+        if (!vanLocations || !items || !balances) return [];
 
         const lowStockDetails: any[] = [];
 
         vanLocations.forEach(location => {
-          items.forEach(item => {
-            // Find balance for this item at this location
-            const balance = balances?.find((b: any) => 
-              b.item_id === item.id && b.location_id === location.id
-            );
+          // Only get balances for items that actually exist at this van location
+          const locationBalances = balances.filter((b: any) => b.location_id === location.id);
+          
+          locationBalances.forEach((balance: any) => {
+            const item = items.find(i => i.id === balance.item_id);
             
-            const currentStock = balance ? balance.on_hand : 0;
-            
-            // Check if stock is at or below reorder point
-            if (currentStock <= item.reorder_point) {
-              const shortage = Math.max(0, item.reorder_point - currentStock);
-              const status = currentStock === 0 ? 'out_of_stock' : 
-                           currentStock < item.reorder_point * 0.5 ? 'critical_low' : 'low_stock';
+            // Only show if item exists and current stock is at or below reorder point
+            if (item && balance.on_hand <= item.reorder_point) {
+              const shortage = Math.max(0, item.reorder_point - balance.on_hand);
+              const status = balance.on_hand === 0 ? 'out_of_stock' : 
+                           balance.on_hand < item.reorder_point * 0.5 ? 'critical_low' : 'low_stock';
               
               lowStockDetails.push({
                 location_id: location.id,
@@ -386,7 +384,7 @@ export function useInventoryEnhanced() {
                 item_id: item.id,
                 item_name: item.name,
                 item_sku: item.sku,
-                current_stock: currentStock,
+                current_stock: balance.on_hand,
                 reorder_point: item.reorder_point,
                 shortage,
                 status
