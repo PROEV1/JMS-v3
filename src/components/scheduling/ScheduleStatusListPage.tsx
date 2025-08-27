@@ -19,6 +19,7 @@ import { AutoScheduleReviewModal } from './AutoScheduleReviewModal';
 import { OfferStatusBadge } from './OfferStatusBadge';
 import { useJobOffers } from '@/hooks/useJobOffers';
 import { getBestPostcode } from '@/utils/postcodeUtils';
+import { Paginator } from '@/components/ui/Paginator';
 
 interface ScheduleStatusListPageProps {
   orders: Order[];
@@ -26,9 +27,26 @@ interface ScheduleStatusListPageProps {
   onUpdate?: () => void;
   title: string;
   showAutoSchedule?: boolean;
+  pagination?: {
+    page: number;
+    pageSize: number;
+  };
+  totalCount?: number;
+  onPageChange?: (page: number) => void;
+  onPageSizeChange?: (pageSize: number) => void;
 }
 
-export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, showAutoSchedule = false }: ScheduleStatusListPageProps) {
+export function ScheduleStatusListPage({ 
+  orders, 
+  engineers, 
+  onUpdate, 
+  title, 
+  showAutoSchedule = false,
+  pagination,
+  totalCount,
+  onPageChange,
+  onPageSizeChange
+}: ScheduleStatusListPageProps) {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -1363,8 +1381,19 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
           <p className="text-sm text-red-500 mt-2">
             Orders: {orders?.length || 0}, Engineers: {engineers?.length || 0}
           </p>
-        </div>
       </div>
-    );
+
+      {/* Pagination */}
+      {pagination && totalCount && onPageChange && onPageSizeChange && (
+        <Paginator
+          currentPage={pagination.page}
+          pageSize={pagination.pageSize}
+          totalItems={totalCount}
+          onPageChange={onPageChange}
+          onPageSizeChange={onPageSizeChange}
+        />
+      )}
+    </div>
+  );
   }
 }

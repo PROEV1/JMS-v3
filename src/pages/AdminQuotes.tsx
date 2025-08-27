@@ -1,5 +1,6 @@
 
 import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,6 +12,9 @@ import { Search, FileText, Calendar, Plus, Eye, CheckCircle, Clock, XCircle, Sen
 import { BrandPage, BrandContainer, BrandHeading1, BrandLoading, BrandBadge } from '@/components/brand';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
+import { useServerPagination } from '@/hooks/useServerPagination';
+import { Paginator } from '@/components/ui/Paginator';
+import { keepPreviousData } from '@tanstack/react-query';
 
 interface Quote {
   id: string;
@@ -27,21 +31,22 @@ interface Quote {
 }
 
 export default function AdminQuotes() {
-  const [quotes, setQuotes] = useState<Quote[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { pagination, controls } = useServerPagination();
 
+  // Reset to first page when filters change
   useEffect(() => {
-    fetchQuotes();
-  }, []);
+    controls.resetToFirstPage();
+  }, [searchTerm, statusFilter]);
 
-  const fetchQuotes = async () => {
-    try {
-      console.log('fetchQuotes: Starting to fetch quotes...');
-      const { data, error } = await supabase
+  // Fetch quotes with pagination
+  const { data: quotesResponse, isLoading, error } = useQuery({
+    queryKey: ['quotes', pagination.page, pagination.pageSize, searchTerm, statusFilter],
+    queryFn: async () => {
+      let query = supabase
         .from('quotes')
         .select(`
           *,
@@ -50,32 +55,56 @@ export default function AdminQuotes() {
             full_name,
             email
           )
-        `)
+        `, { count: 'exact' })
         .neq('quote_template', 'partner_import') // Hide partner import placeholder quotes
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      console.log('fetchQuotes: Received data:', data?.length || 0, 'quotes');
-      setQuotes(data || []);
-    } catch (error) {
-      console.error('Error fetching quotes:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load quotes",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+      // Apply filters
+      if (statusFilter !== 'all') {
+        query = query.eq('status', statusFilter);
+      }
 
-  const filteredQuotes = quotes.filter(quote => {
-    const matchesSearch = quote.quote_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      quote.client?.full_name.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesStatus = statusFilter === 'all' || quote.status === statusFilter;
-    
-    return matchesSearch && matchesStatus;
+      if (searchTerm) {
+        query = query.or(`quote_number.ilike.%${searchTerm}%,client.full_name.ilike.%${searchTerm}%`);
+      }
+
+      // Apply pagination
+      query = query.range(pagination.offset, pagination.offset + pagination.pageSize - 1);
+
+      const { data, error, count } = await query;
+      if (error) throw error;
+
+      return { data: data || [], count: count || 0 };
+    },
+    placeholderData: keepPreviousData,
+  });
+
+  const quotes = quotesResponse?.data || [];
+  const totalCount = quotesResponse?.count || 0;
+
+  // Fetch global KPI counts (not affected by pagination)
+  const { data: kpiCounts } = useQuery({
+    queryKey: ['quotes-kpi-counts'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('quotes')
+        .select('status')
+        .neq('quote_template', 'partner_import');
+
+      if (error) throw error;
+      
+      const counts = data?.reduce((acc, quote) => {
+        acc[quote.status] = (acc[quote.status] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>) || {};
+
+      return {
+        total: data?.length || 0,
+        accepted: counts.accepted || 0,
+        sent: counts.sent || 0,
+        declined: counts.declined || 0,
+      };
+    }
   });
 
   const formatCurrency = (amount: number) => {
@@ -86,13 +115,13 @@ export default function AdminQuotes() {
   };
 
   const getQuotesByStatus = (status: string) => {
-    return quotes.filter(quote => quote.status === status).length;
+    return kpiCounts?.[status] || 0;
   };
 
   const kpiData = [
     {
       title: 'Total Quotes',
-      value: quotes.length,
+      value: kpiCounts?.total || 0,
       icon: FileText,
       color: 'text-primary',
       bgColor: 'bg-primary/10',
@@ -206,7 +235,7 @@ export default function AdminQuotes() {
       
       // Refresh the list and log results
       console.log('Refreshing quotes after deletion...');
-      await fetchQuotes();
+      // No need to call fetchQuotes since we're using React Query now
       console.log('Quotes refreshed, new count should be updated');
 
       toast({
@@ -237,7 +266,7 @@ export default function AdminQuotes() {
     navigate(`/admin/quotes/${quoteId}/edit`);
   };
 
-  if (loading) {
+  if (isLoading) {
     return <BrandLoading />;
   }
 
@@ -328,7 +357,7 @@ export default function AdminQuotes() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredQuotes.map((quote) => (
+                    {quotes.map((quote) => (
                       <TableRow 
                         key={quote.id}
                         className="border-b border-border hover:bg-muted/50 transition-colors h-16 cursor-pointer"
@@ -416,12 +445,20 @@ export default function AdminQuotes() {
                       </TableRow>
                     ))}
                   </TableBody>
-                </Table>
-              </div>
-            </CardContent>
+              </Table>
+            </div>
+            
+            <Paginator
+              currentPage={pagination.page}
+              pageSize={pagination.pageSize}
+              totalItems={totalCount}
+              onPageChange={controls.setPage}
+              onPageSizeChange={controls.setPageSize}
+            />
+          </CardContent>
           </Card>
 
-          {filteredQuotes.length === 0 && (
+          {quotes.length === 0 && totalCount === 0 && (
             <Card>
               <CardContent className="p-12 text-center">
                 <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />

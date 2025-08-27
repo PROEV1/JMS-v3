@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,6 +14,9 @@ import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
+import { useServerPagination } from '@/hooks/useServerPagination';
+import { Paginator } from '@/components/ui/Paginator';
+import { keepPreviousData } from '@tanstack/react-query';
 
 type OrderStatusEnhanced = Database['public']['Enums']['order_status_enhanced'];
 
@@ -24,6 +27,12 @@ export default function AdminOrders() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [engineerFilter, setEngineerFilter] = useState<string>("all");
   const [deletingOrderId, setDeletingOrderId] = useState<string | null>(null);
+  const { pagination, controls } = useServerPagination();
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    controls.resetToFirstPage();
+  }, [searchTerm, statusFilter, engineerFilter]);
 
   const deleteMutation = useMutation({
     mutationFn: async (orderId: string) => {
@@ -67,8 +76,8 @@ export default function AdminOrders() {
     }
   };
 
-  const { data: orders, isLoading, error } = useQuery({
-    queryKey: ['admin-orders', searchTerm, statusFilter, engineerFilter],
+  const { data: ordersResponse, isLoading, error } = useQuery({
+    queryKey: ['admin-orders', pagination.page, pagination.pageSize, searchTerm, statusFilter, engineerFilter],
     queryFn: async () => {
       let query = supabase
         .from('orders')
@@ -91,7 +100,7 @@ export default function AdminOrders() {
           partners!orders_partner_id_fkey(
             name
           )
-        `)
+        `, { count: 'exact' })
         .order('created_at', { ascending: false });
 
       if (statusFilter !== 'all') {
@@ -102,32 +111,33 @@ export default function AdminOrders() {
         query = query.eq('engineer_id', engineerFilter);
       }
 
-      const { data, error } = await query;
+      // Apply search filter at database level if possible
+      if (searchTerm) {
+        query = query.or(`order_number.ilike.%${searchTerm}%,clients.full_name.ilike.%${searchTerm}%,clients.email.ilike.%${searchTerm}%,quotes.quote_number.ilike.%${searchTerm}%`);
+      }
+
+      // Apply pagination
+      query = query.range(pagination.offset, pagination.offset + pagination.pageSize - 1);
+
+      const { data, error, count } = await query;
       if (error) throw error;
 
-      // Transform and filter data
-      let transformedData = data.map(order => ({
+      // Transform data
+      const transformedData = data?.map(order => ({
         ...order,
         client: order.clients || null,
         quote: order.quotes || null,
         engineer: order.engineers || null,
         partner: order.partners || null
-      }));
+      })) || [];
 
-      // Apply search filter
-      if (searchTerm) {
-        const lowerSearchTerm = searchTerm.toLowerCase();
-        transformedData = transformedData.filter(order =>
-          order.order_number?.toLowerCase().includes(lowerSearchTerm) ||
-          order.client?.full_name?.toLowerCase().includes(lowerSearchTerm) ||
-          order.client?.email?.toLowerCase().includes(lowerSearchTerm) ||
-          order.quote?.quote_number?.toLowerCase().includes(lowerSearchTerm)
-        );
-      }
-
-      return transformedData;
+      return { data: transformedData, count: count || 0 };
     },
+    placeholderData: keepPreviousData,
   });
+
+  const orders = ordersResponse?.data || [];
+  const totalCount = ordersResponse?.count || 0;
 
   const { data: engineers } = useQuery({
     queryKey: ['engineers-list'],
@@ -211,7 +221,7 @@ export default function AdminOrders() {
         </div>
         <div className="flex items-center gap-sm px-card py-compact bg-muted/50 rounded-lg">
           <Package className="icon-sm text-muted-foreground" />
-          <span className="text-sm font-medium">{orders?.length || 0} Total Orders</span>
+          <span className="text-sm font-medium">{totalCount} Total Orders</span>
         </div>
       </div>
 
@@ -368,11 +378,19 @@ export default function AdminOrders() {
                </TableBody>
             </Table>
           </div>
+          
+          <Paginator
+            currentPage={pagination.page}
+            pageSize={pagination.pageSize}
+            totalItems={totalCount}
+            onPageChange={controls.setPage}
+            onPageSizeChange={controls.setPageSize}
+          />
         </CardContent>
       </Card>
 
       {/* Empty State */}
-      {orders?.length === 0 && (
+      {orders?.length === 0 && totalCount === 0 && (
         <Card>
           <CardContent className="p-12 text-center">
             <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />

@@ -5,28 +5,37 @@ import { ScheduleStatusNavigation } from './ScheduleStatusNavigation';
 import { ScheduleStatusListPage } from './ScheduleStatusListPage';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Calendar } from 'lucide-react';
+import { useServerPagination } from '@/hooks/useServerPagination';
+import { keepPreviousData } from '@tanstack/react-query';
 
 export function NeedsSchedulingListPage() {
   console.log('NeedsSchedulingListPage: Starting component render');
   const queryClient = useQueryClient();
+  const { pagination, controls } = useServerPagination();
   
-  const { data: orders = [], isLoading: ordersLoading, error: ordersError, refetch: refetchOrders } = useQuery({
-    queryKey: ['orders', 'needs-scheduling'],
+  const { data: ordersResponse = { data: [], count: 0 }, isLoading: ordersLoading, error: ordersError, refetch: refetchOrders } = useQuery({
+    queryKey: ['orders', 'needs-scheduling', pagination.page, pagination.pageSize],
     queryFn: async () => {
       console.log('NeedsSchedulingListPage: Fetching orders...');
-      // First get orders that need scheduling (matching the count calculation)
-      const { data: ordersData, error: ordersError } = await supabase
+      
+      // Base query for orders that need scheduling
+      let query = supabase
         .from('orders')
         .select(`
           *,
           client:client_id(full_name, email, phone, postcode, address),
           engineer:engineer_id(name, email, region),
           partner:partner_id(name)
-        `)
+        `, { count: 'exact' })
         .eq('status_enhanced', 'awaiting_install_booking')
         .is('engineer_id', null)
         .eq('scheduling_suppressed', false)
         .order('created_at', { ascending: false });
+
+      // Apply pagination
+      query = query.range(pagination.offset, pagination.offset + pagination.pageSize - 1);
+
+      const { data: ordersData, error: ordersError, count } = await query;
 
       if (ordersError) {
         console.error('NeedsSchedulingListPage: Error fetching orders:', ordersError);
@@ -35,23 +44,30 @@ export function NeedsSchedulingListPage() {
       
       console.log('NeedsSchedulingListPage: Got orders:', ordersData?.length);
       
-      if (!ordersData?.length) return [];
+      if (!ordersData?.length) return { data: [], count: count || 0 };
 
-      // Get active offers to exclude orders that have them
+      // Get active offers to exclude orders that have them (for the paginated results only)
+      const orderIds = ordersData.map(order => order.id);
       const { data: activeOffers } = await supabase
         .from('job_offers')
         .select('order_id')
         .eq('status', 'pending')
-        .gt('expires_at', new Date().toISOString());
+        .gt('expires_at', new Date().toISOString())
+        .in('order_id', orderIds);
 
       const ordersWithActiveOffers = new Set(activeOffers?.map(offer => offer.order_id) || []);
       
       // Filter out orders that have active offers
       const filteredOrders = ordersData.filter(order => !ordersWithActiveOffers.has(order.id));
       console.log('NeedsSchedulingListPage: Filtered orders:', filteredOrders.length);
-      return filteredOrders;
-    }
+      
+      return { data: filteredOrders, count: count || 0 };
+    },
+    placeholderData: keepPreviousData,
   });
+
+  const orders = ordersResponse?.data || [];
+  const totalCount = ordersResponse?.count || 0;
 
   const { data: engineers = [], isLoading: engineersLoading, error: engineersError } = useQuery({
     queryKey: ['engineers'],
@@ -160,7 +176,7 @@ export function NeedsSchedulingListPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Calendar className="h-5 w-5" />
-            Needs Scheduling ({orders.length})
+            Needs Scheduling ({totalCount})
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -169,6 +185,10 @@ export function NeedsSchedulingListPage() {
             engineers={engineers}
             title="Needs Scheduling"
             showAutoSchedule={true}
+            pagination={pagination}
+            totalCount={totalCount}
+            onPageChange={controls.setPage}
+            onPageSizeChange={controls.setPageSize}
             onUpdate={() => {
               console.log('NeedsSchedulingListPage: Manual update requested, refetching...');
               refetchOrders();

@@ -30,7 +30,7 @@ export interface JobOffer {
   };
 }
 
-export function useJobOffers(orderId?: string) {
+export function useJobOffers(orderId?: string | string[]) {
   const [offers, setOffers] = useState<JobOffer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -52,7 +52,11 @@ export function useJobOffers(orderId?: string) {
         .order('created_at', { ascending: false });
 
       if (orderId) {
-        query = query.eq('order_id', orderId);
+        if (Array.isArray(orderId)) {
+          query = query.in('order_id', orderId);
+        } else {
+          query = query.eq('order_id', orderId);
+        }
       }
 
       const { data, error } = await query;
