@@ -136,12 +136,12 @@ All colors MUST be HSL.
   .icon-lg { width: 1.5rem; height: 1.5rem; } /* 24px */
   .icon-xl { width: 2rem; height: 2rem; } /* 32px */
 
-  /* Typography - Modern SaaS style with consistent hierarchy */
+  /* Typography - Modern SaaS style with UI cleanup hierarchy */
   .brand-heading-1, h1 {
     font-family: 'Montserrat', sans-serif;
     font-weight: 700; /* Bold for page titles */
     color: hsl(0 0% 15%); /* Darker for better contrast */
-    font-size: 2.25rem; /* 36px */
+    font-size: 1.75rem; /* 28px - reduced from 36px */
     line-height: 1.2;
     letter-spacing: -0.025em;
     margin-bottom: 0.5rem;
@@ -151,9 +151,8 @@ All colors MUST be HSL.
     font-family: 'Montserrat', sans-serif;
     font-weight: 600; /* Semi-bold */
     color: hsl(0 0% 20%); /* #333333 - dark grey */
-    font-size: 1.875rem; /* 30px */
+    font-size: 1.375rem; /* 22px - reduced from 30px */
     line-height: 1.3;
-    letter-spacing: -0.015em;
     margin-bottom: 0.75rem;
   }
 
@@ -161,7 +160,7 @@ All colors MUST be HSL.
     font-family: 'Montserrat', sans-serif;
     font-weight: 600; /* Semi-Bold */
     color: hsl(0 0% 20%); /* #333333 - dark grey */
-    font-size: 1.5rem; /* 24px */
+    font-size: 1.125rem; /* 18px - reduced from 24px */
     line-height: 1.4;
     margin-bottom: 0.5rem;
   }
@@ -181,6 +180,20 @@ All colors MUST be HSL.
     color: hsl(0 0% 40%); /* Muted color for small text */
     font-size: 0.875rem; /* 14px */
     line-height: 1.5;
+  }
+
+  /* Meta text utility classes */
+  .text-meta {
+    font-size: 0.875rem; /* 14px */
+    font-weight: 400;
+    color: hsl(0 0% 45%); /* Muted for labels, tags, timestamps */
+  }
+
+  .text-micro {
+    font-size: 0.75rem; /* 12px */
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
   }
 
   .brand-title {
@@ -392,7 +405,21 @@ All colors MUST be HSL.
   }
   
   .brand-container {
-    @apply container mx-auto px-6 py-8;
+    @apply container mx-auto px-6 py-5; /* Reduced from py-8 to py-5 (20px) */
+  }
+
+  /* Table helper classes for consistent styling */
+  .cell-meta {
+    @apply text-sm text-muted-foreground;
+  }
+
+  .cell-icon {
+    @apply w-4 h-4 inline-flex items-center justify-center;
+  }
+
+  /* Button group with proper spacing */
+  .button-group {
+    @apply flex items-center gap-2; /* 8px gap between buttons */
   }
 
   /* Brand Loading Spinner */
