@@ -79,22 +79,29 @@ export function useInventoryEnhanced() {
     return useQuery({
       queryKey: ['inventory-kpis'],
       queryFn: async () => {
-        const [itemsRes, balancesRes, requestsRes] = await Promise.all([
+        const [itemsRes, balancesRes, requestsRes, vanLocationsRes] = await Promise.all([
           supabase.from('inventory_items').select('id, is_active, reorder_point').eq('is_active', true),
           supabase.rpc('get_item_location_balances'),
-          supabase.from('stock_requests').select('status, created_at')
+          supabase.from('stock_requests').select('status, created_at'),
+          supabase.from('inventory_locations').select('id').eq('is_active', true).eq('type', 'van')
         ]);
 
         const items = itemsRes.data || [];
         const balances = balancesRes.data || [];
         const requests = requestsRes.data || [];
+        const vanLocations = vanLocationsRes.data || [];
 
         // Calculate KPIs
         const activeItems = items.length;
+        
+        // Count low stock items specifically at engineer van locations
         const lowStockItems = items.filter(item => {
-          const itemBalances = balances.filter((b: any) => b.item_id === item.id);
-          const totalStock = itemBalances.reduce((sum: number, balance: any) => sum + balance.on_hand, 0);
-          return totalStock <= item.reorder_point;
+          return vanLocations.some(vanLocation => {
+            const balance = balances.find((b: any) => 
+              b.item_id === item.id && b.location_id === vanLocation.id
+            );
+            return balance && balance.on_hand <= item.reorder_point;
+          });
         }).length;
 
         const today = new Date().toISOString().split('T')[0];
