@@ -32,7 +32,8 @@ export default {
 				'compact': '0.75rem', /* 12px - compact elements */
 			},
 			fontFamily: {
-				'montserrat': ['Montserrat', 'sans-serif'],
+				'sans': ['Inter', 'system-ui', 'sans-serif'],
+				'inter': ['Inter', 'system-ui', 'sans-serif'],
 			},
 			colors: {
 				border: 'hsl(var(--border))',

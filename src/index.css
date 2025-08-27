@@ -1,5 +1,5 @@
 
-@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -124,7 +124,7 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Montserrat', sans-serif;
+    font-family: 'Inter', system-ui, sans-serif;
     font-size: 1rem;
     line-height: 1.5;
   }
@@ -138,7 +138,7 @@ All colors MUST be HSL.
 
   /* Typography - Modern SaaS style with UI cleanup hierarchy */
   .brand-heading-1, h1 {
-    font-family: 'Montserrat', sans-serif;
+    font-family: 'Inter', system-ui, sans-serif;
     font-weight: 700; /* Bold for page titles */
     color: hsl(0 0% 15%); /* Darker for better contrast */
     font-size: 1.75rem; /* 28px - reduced from 36px */
@@ -148,7 +148,7 @@ All colors MUST be HSL.
   }
 
   .brand-heading-2, h2 {
-    font-family: 'Montserrat', sans-serif;
+    font-family: 'Inter', system-ui, sans-serif;
     font-weight: 600; /* Semi-bold */
     color: hsl(0 0% 20%); /* #333333 - dark grey */
     font-size: 1.375rem; /* 22px - reduced from 30px */
@@ -157,7 +157,7 @@ All colors MUST be HSL.
   }
 
   .brand-heading-3, h3 {
-    font-family: 'Montserrat', sans-serif;
+    font-family: 'Inter', system-ui, sans-serif;
     font-weight: 600; /* Semi-Bold */
     color: hsl(0 0% 20%); /* #333333 - dark grey */
     font-size: 1.125rem; /* 18px - reduced from 24px */
@@ -166,7 +166,7 @@ All colors MUST be HSL.
   }
 
   .brand-body, .body-text, p {
-    font-family: 'Montserrat', sans-serif;
+    font-family: 'Inter', system-ui, sans-serif;
     font-weight: 400; /* Regular */
     color: hsl(0 0% 30%); /* Slightly lighter for body text */
     font-size: 1rem; /* 16px */
@@ -175,7 +175,7 @@ All colors MUST be HSL.
   }
 
   .brand-small, small {
-    font-family: 'Montserrat', sans-serif;
+    font-family: 'Inter', system-ui, sans-serif;
     font-weight: 400;
     color: hsl(0 0% 40%); /* Muted color for small text */
     font-size: 0.875rem; /* 14px */
@@ -197,7 +197,7 @@ All colors MUST be HSL.
   }
 
   .brand-title {
-    font-family: 'Montserrat', sans-serif;
+    font-family: 'Inter', system-ui, sans-serif;
     font-weight: 700; /* Bold for brand elements */
     color: hsl(0 0% 0%); /* #000000 - black for Pro EV title */
   }

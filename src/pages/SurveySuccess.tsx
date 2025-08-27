@@ -49,17 +49,17 @@ export default function SurveySuccess() {
           <CardContent className="p-8 text-center">
             <div className="mb-6">
               <CheckCircle className="h-16 w-16 text-[hsl(var(--status-accepted))] mx-auto mb-4" />
-              <h1 className="text-2xl font-semibold font-montserrat text-foreground mb-2">
+              <h1 className="text-2xl font-semibold text-foreground mb-2">
                 Survey Submitted Successfully!
               </h1>
-              <p className="text-muted-foreground font-montserrat">
+              <p className="text-muted-foreground">
                 Thank you for completing your installation survey
                 {orderNumber && ` for order #${orderNumber}`}.
               </p>
             </div>
 
             <div className="bg-card rounded-lg p-6 mb-6 border border-border shadow-sm">
-              <h2 className="font-semibold font-montserrat text-foreground mb-4">What happens next?</h2>
+              <h2 className="font-semibold text-foreground mb-4">What happens next?</h2>
               
               <div className="space-y-4 text-left">
                 <div className="flex items-start space-x-3">
@@ -67,8 +67,8 @@ export default function SurveySuccess() {
                     <span className="text-xs font-medium text-primary">1</span>
                   </div>
                   <div>
-                    <p className="font-medium font-montserrat text-foreground">Review Process</p>
-                    <p className="text-sm text-muted-foreground font-montserrat">
+                    <p className="font-medium text-foreground">Review Process</p>
+                    <p className="text-sm text-muted-foreground">
                       Our team will review your survey responses and photos within 1-2 business days.
                     </p>
                   </div>
@@ -79,8 +79,8 @@ export default function SurveySuccess() {
                     <span className="text-xs font-medium text-primary">2</span>
                   </div>
                   <div>
-                    <p className="font-medium font-montserrat text-foreground">Installation Scheduling</p>
-                    <p className="text-sm text-muted-foreground font-montserrat">
+                    <p className="font-medium text-foreground">Installation Scheduling</p>
+                    <p className="text-sm text-muted-foreground">
                       Once approved, we'll contact you to schedule your EV charger installation.
                     </p>
                   </div>
@@ -91,8 +91,8 @@ export default function SurveySuccess() {
                     <span className="text-xs font-medium text-primary">3</span>
                   </div>
                   <div>
-                    <p className="font-medium font-montserrat text-foreground">Professional Installation</p>
-                    <p className="text-sm text-muted-foreground font-montserrat">
+                    <p className="font-medium text-foreground">Professional Installation</p>
+                    <p className="text-sm text-muted-foreground">
                       Our certified engineers will complete your installation on the scheduled date.
                     </p>
                   </div>
@@ -103,7 +103,7 @@ export default function SurveySuccess() {
             <div className="bg-[hsl(var(--status-pending-bg))] border border-[hsl(var(--status-pending-bg))] rounded-lg p-4 mb-6">
               <div className="flex items-center justify-center space-x-2 text-[hsl(var(--status-pending))]">
                 <Clock className="h-4 w-4" />
-                <span className="text-sm font-medium font-montserrat">
+                <span className="text-sm font-medium">
                   We may contact you if we need any additional information
                 </span>
               </div>
@@ -118,11 +118,11 @@ export default function SurveySuccess() {
                 <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
               
-              <p className="text-center text-sm text-muted-foreground font-montserrat">
+              <p className="text-center text-sm text-muted-foreground">
                 Redirecting you to your portal in a few seconds...
               </p>
               
-              <p className="text-center text-sm text-muted-foreground font-montserrat">
+              <p className="text-center text-sm text-muted-foreground">
                 If you have any questions or need to make changes, please contact our support team.
               </p>
             </div>
