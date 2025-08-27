@@ -5,10 +5,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { Search, FileText, Calendar, Plus, Eye, CheckCircle, Clock, XCircle, Send, Trash2, Edit } from 'lucide-react';
 import { BrandPage, BrandContainer, BrandHeading1, BrandLoading, BrandBadge } from '@/components/brand';
 import { useNavigate } from 'react-router-dom';
+import { format } from 'date-fns';
 
 interface Quote {
   id: string;
@@ -299,70 +301,111 @@ export default function AdminQuotes() {
             </Select>
           </div>
 
-          {/* Quotes List */}
-          <div className="space-y-3">
-            {filteredQuotes.map((quote) => (
-              <Card 
-                key={quote.id} 
-                className="brand-card cursor-pointer hover:shadow-md transition-shadow"
-                onClick={() => handleQuoteClick(quote.id)}
-              >
-                <CardHeader className="pb-3">
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-3 mb-1">
-                        <h3 className="text-sm font-medium text-foreground leading-none">Quote {quote.quote_number}</h3>
-                        <span className="text-sm font-semibold text-foreground">£{quote.total_cost.toLocaleString()}</span>
+          {/* Quotes Table */}
+          <div className="border rounded-lg overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[160px]">Quote</TableHead>
+                  <TableHead>Client</TableHead>
+                  <TableHead className="hidden sm:table-cell">Email</TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
+                  <TableHead className="hidden md:table-cell">Created</TableHead>
+                  <TableHead className="hidden lg:table-cell">Expires</TableHead>
+                  <TableHead className="w-[100px]">Status</TableHead>
+                  <TableHead className="w-[140px] text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredQuotes.map((quote) => (
+                  <TableRow 
+                    key={quote.id}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => handleQuoteClick(quote.id)}
+                  >
+                    <TableCell>
+                      <div className="space-y-1">
+                        <div className="text-sm font-medium leading-none truncate">
+                          Quote {quote.quote_number}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <span>For</span>
-                        <button 
-                          className="text-primary hover:text-[hsl(var(--primary-hover))] underline font-medium" 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleClientClick(quote.client.id);
-                          }}
-                        >
-                          {quote.client?.full_name}
-                        </button>
-                        <span>•</span>
-                        <span className="truncate max-w-[200px]">{quote.client?.email}</span>
-                        <span>•</span>
-                        <span>Created: {new Date(quote.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                        {quote.expires_at && (
-                          <>
-                            <span>•</span>
-                            <span>Expires: {new Date(quote.expires_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                          </>
-                        )}
+                    </TableCell>
+                    <TableCell>
+                      <button 
+                        className="text-sm font-medium text-primary hover:text-[hsl(var(--primary-hover))] underline leading-none truncate block max-w-[160px]" 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleClientClick(quote.client.id);
+                        }}
+                      >
+                        {quote.client?.full_name}
+                      </button>
+                    </TableCell>
+                    <TableCell className="hidden sm:table-cell">
+                      <div className="text-xs text-muted-foreground truncate max-w-[180px]">
+                        {quote.client?.email}
                       </div>
-                    </div>
-                    <div className="flex items-center gap-2 ml-4">
-                      <BrandBadge status={quote.status as 'sent' | 'accepted' | 'declined' | 'pending'}>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="text-sm font-semibold">
+                        {formatCurrency(quote.total_cost)}
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      <div className="text-xs text-muted-foreground">
+                        {format(new Date(quote.created_at), 'dd MMM yyyy')}
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden lg:table-cell">
+                      <div className="text-xs text-muted-foreground">
+                        {quote.expires_at ? format(new Date(quote.expires_at), 'dd MMM yyyy') : '-'}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <BrandBadge 
+                        status={quote.status as 'sent' | 'accepted' | 'declined' | 'pending'}
+                        className="text-[10px] uppercase font-medium px-2 py-1"
+                      >
                         {quote.status === 'sent' ? 'Pending' : 
                          quote.status === 'declined' ? 'Rejected' :
                          quote.status.charAt(0).toUpperCase() + quote.status.slice(1)}
                       </BrandBadge>
-                      <Button variant="outline" size="sm" className="h-8 px-2 text-xs font-medium" onClick={(e) => {
-                        e.stopPropagation();
-                        handleQuoteClick(quote.id);
-                      }}>
-                        <Eye className="h-4 w-4" />
-                        <span className="ml-1 hidden sm:inline">View</span>
-                      </Button>
-                      <Button variant="outline" size="sm" className="h-8 px-2 text-xs font-medium" onClick={(e) => handleEditQuote(quote.id, e)}>
-                        <Edit className="h-4 w-4" />
-                        <span className="ml-1 hidden sm:inline">Edit</span>
-                      </Button>
-                      <Button variant="destructive" size="sm" className="h-8 px-2 text-xs font-medium" onClick={(e) => handleDeleteQuote(quote.id, e)}>
-                        <Trash2 className="h-4 w-4" />
-                        <span className="ml-1 hidden sm:inline">Delete</span>
-                      </Button>
-                    </div>
-                  </div>
-                </CardHeader>
-              </Card>
-            ))}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1 justify-end">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="h-8 px-2 text-xs font-medium" 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleQuoteClick(quote.id);
+                          }}
+                        >
+                          <Eye className="h-3 w-3" />
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="h-8 px-2 text-xs font-medium" 
+                          onClick={(e) => handleEditQuote(quote.id, e)}
+                        >
+                          <Edit className="h-3 w-3" />
+                        </Button>
+                        <Button 
+                          variant="destructive" 
+                          size="sm" 
+                          className="h-8 px-2 text-xs font-medium" 
+                          onClick={(e) => handleDeleteQuote(quote.id, e)}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </div>
 
           {filteredQuotes.length === 0 && (
