@@ -22,6 +22,7 @@ import { QuickActionsBlock } from './shared/QuickActionsBlock';
 import { StatusChip } from './shared/StatusChip';
 import { StockTransferModal } from './StockTransferModal';
 import { StockAdjustmentModal } from './StockAdjustmentModal';
+import { LocationStockModal } from './LocationStockModal';
 import { useInventoryEnhanced } from '@/hooks/useInventoryEnhanced';
 
 interface InventoryDashboardV2Props {
@@ -31,6 +32,8 @@ interface InventoryDashboardV2Props {
 export function InventoryDashboardV2({ onSwitchTab }: InventoryDashboardV2Props) {
   const [transferModalOpen, setTransferModalOpen] = useState(false);
   const [adjustmentModalOpen, setAdjustmentModalOpen] = useState(false);
+  const [locationModalOpen, setLocationModalOpen] = useState(false);
+  const [selectedLocation, setSelectedLocation] = useState<any>(null);
 
   // Main KPI stats
   const { data: kpiStats, isLoading: kpiLoading } = useQuery({
@@ -236,7 +239,7 @@ export function InventoryDashboardV2({ onSwitchTab }: InventoryDashboardV2Props)
       <QuickActionsBlock actions={quickActions} />
 
       {/* Priority Tables */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-1 xl:grid-cols-2">
         {/* Low Stock Items Table */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
@@ -292,7 +295,14 @@ export function InventoryDashboardV2({ onSwitchTab }: InventoryDashboardV2Props)
                             <Button 
                               variant="outline" 
                               size="sm"
-                              onClick={() => window.location.href = `/admin/engineers/${item.engineer_id}`}
+                              onClick={() => {
+                                setSelectedLocation({
+                                  id: item.location_id,
+                                  name: item.location_name,
+                                  type: 'engineer_van'
+                                });
+                                setLocationModalOpen(true);
+                              }}
                             >
                               View Location
                             </Button>
@@ -351,6 +361,11 @@ export function InventoryDashboardV2({ onSwitchTab }: InventoryDashboardV2Props)
       {/* Modals */}
       <StockTransferModal open={transferModalOpen} onOpenChange={setTransferModalOpen} />
       <StockAdjustmentModal open={adjustmentModalOpen} onOpenChange={setAdjustmentModalOpen} />
+      <LocationStockModal 
+        open={locationModalOpen} 
+        onOpenChange={setLocationModalOpen} 
+        location={selectedLocation}
+      />
     </div>
   );
 }
