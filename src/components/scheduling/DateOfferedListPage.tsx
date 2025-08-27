@@ -5,29 +5,40 @@ import { ScheduleStatusNavigation } from './ScheduleStatusNavigation';
 import { ScheduleStatusListPage } from './ScheduleStatusListPage';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Clock } from 'lucide-react';
+import { useServerPagination } from '@/hooks/useServerPagination';
+import { keepPreviousData } from '@tanstack/react-query';
 
 export function DateOfferedListPage() {
-  const { data: orders = [], isLoading: ordersLoading } = useQuery({
-    queryKey: ['orders', 'date-offered'],
+  const { pagination, controls } = useServerPagination();
+
+  const { data: ordersResponse = { data: [], count: 0 }, isLoading: ordersLoading } = useQuery({
+    queryKey: ['orders', 'date-offered', pagination.page, pagination.pageSize],
     queryFn: async () => {
-      // Query orders directly based on status_enhanced to ensure consistency
-      const { data: ordersData, error: ordersError } = await supabase
+      let query = supabase
         .from('orders')
         .select(`
           *,
           client:client_id(full_name, email, phone, postcode, address),
           engineer:engineer_id(name, email, region),
           partner:partner_id(name)
-        `)
+        `, { count: 'exact' })
         .eq('status_enhanced', 'date_offered')
         .eq('scheduling_suppressed', false)
         .is('scheduled_install_date', null) // Extra safeguard to ensure not scheduled
         .order('created_at', { ascending: false });
 
-      if (ordersError) throw ordersError;
-      return ordersData || [];
-    }
+      query = query.range(pagination.offset, pagination.offset + pagination.pageSize - 1);
+
+      const { data, error, count } = await query;
+      if (error) throw error;
+      
+      return { data: data || [], count: count || 0 };
+    },
+    placeholderData: keepPreviousData,
   });
+
+  const orders = ordersResponse?.data || [];
+  const totalCount = ordersResponse?.count || 0;
 
   const { data: engineers = [], isLoading: engineersLoading } = useQuery({
     queryKey: ['engineers'],
@@ -59,7 +70,7 @@ export function DateOfferedListPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Clock className="h-5 w-5" />
-            Date Offered ({orders.length})
+            Date Offered ({totalCount})
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -68,6 +79,10 @@ export function DateOfferedListPage() {
             engineers={engineers}
             title="Date Offered"
             showAutoSchedule={false}
+            pagination={pagination}
+            totalCount={totalCount}
+            onPageChange={controls.setPage}
+            onPageSizeChange={controls.setPageSize}
           />
         </CardContent>
       </Card>

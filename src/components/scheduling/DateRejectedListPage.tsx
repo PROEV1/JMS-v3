@@ -5,10 +5,14 @@ import { ScheduleStatusNavigation } from './ScheduleStatusNavigation';
 import { ScheduleStatusListPage } from './ScheduleStatusListPage';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { XCircle } from 'lucide-react';
+import { useServerPagination } from '@/hooks/useServerPagination';
+import { keepPreviousData } from '@tanstack/react-query';
 
 export function DateRejectedListPage() {
-  const { data: orders = [], isLoading: ordersLoading } = useQuery({
-    queryKey: ['orders', 'date-rejected'],
+  const { pagination, controls } = useServerPagination();
+
+  const { data: ordersResponse = { data: [], count: 0 }, isLoading: ordersLoading } = useQuery({
+    queryKey: ['orders', 'date-rejected', pagination.page, pagination.pageSize],
     queryFn: async () => {
       // Get rejected offers
       const { data: rejectedOffers, error: rejectedError } = await supabase
@@ -18,7 +22,7 @@ export function DateRejectedListPage() {
 
       if (rejectedError) throw rejectedError;
       
-      if (!rejectedOffers?.length) return [];
+      if (!rejectedOffers?.length) return { data: [], count: 0 };
 
       // Get active offers to exclude orders that have them
       const { data: activeOffers } = await supabase
@@ -31,24 +35,32 @@ export function DateRejectedListPage() {
       const uniqueRejectedOrderIds = [...new Set(rejectedOffers.map(offer => offer.order_id))]
         .filter(orderId => !ordersWithActiveOffers.has(orderId));
 
-      if (!uniqueRejectedOrderIds.length) return [];
+      if (!uniqueRejectedOrderIds.length) return { data: [], count: 0 };
 
-      // Fetch orders
-      const { data: ordersData, error: ordersError } = await supabase
+      // Fetch orders with pagination
+      let query = supabase
         .from('orders')
         .select(`
           *,
           client:client_id(full_name, email, phone, postcode, address),
           engineer:engineer_id(name, email, region),
           partner:partner_id(name)
-        `)
+        `, { count: 'exact' })
         .in('id', uniqueRejectedOrderIds)
         .order('created_at', { ascending: false });
 
-      if (ordersError) throw ordersError;
-      return ordersData || [];
-    }
+      query = query.range(pagination.offset, pagination.offset + pagination.pageSize - 1);
+
+      const { data, error, count } = await query;
+      if (error) throw error;
+      
+      return { data: data || [], count: count || 0 };
+    },
+    placeholderData: keepPreviousData,
   });
+
+  const orders = ordersResponse?.data || [];
+  const totalCount = ordersResponse?.count || 0;
 
   const { data: engineers = [], isLoading: engineersLoading } = useQuery({
     queryKey: ['engineers'],
@@ -80,7 +92,7 @@ export function DateRejectedListPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <XCircle className="h-5 w-5" />
-            Date Rejected ({orders.length})
+            Date Rejected ({totalCount})
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -89,6 +101,10 @@ export function DateRejectedListPage() {
             engineers={engineers}
             title="Date Rejected"
             showAutoSchedule={true}
+            pagination={pagination}
+            totalCount={totalCount}
+            onPageChange={controls.setPage}
+            onPageSizeChange={controls.setPageSize}
           />
         </CardContent>
       </Card>

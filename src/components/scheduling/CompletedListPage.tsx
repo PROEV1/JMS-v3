@@ -5,26 +5,38 @@ import { ScheduleStatusNavigation } from './ScheduleStatusNavigation';
 import { ScheduleStatusListPage } from './ScheduleStatusListPage';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CheckCircle } from 'lucide-react';
+import { useServerPagination } from '@/hooks/useServerPagination';
+import { keepPreviousData } from '@tanstack/react-query';
 
 export function CompletedListPage() {
-  const { data: orders = [], isLoading: ordersLoading } = useQuery({
-    queryKey: ['orders', 'completed'],
+  const { pagination, controls } = useServerPagination();
+
+  const { data: ordersResponse = { data: [], count: 0 }, isLoading: ordersLoading } = useQuery({
+    queryKey: ['orders', 'completed', pagination.page, pagination.pageSize],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('orders')
         .select(`
           *,
           client:client_id(full_name, email, phone, postcode, address),
           engineer:engineer_id(name, email, region),
           partner:partner_id(name)
-        `)
+        `, { count: 'exact' })
         .eq('status_enhanced', 'completed')
         .order('created_at', { ascending: false });
 
+      query = query.range(pagination.offset, pagination.offset + pagination.pageSize - 1);
+
+      const { data, error, count } = await query;
       if (error) throw error;
-      return data || [];
-    }
+      
+      return { data: data || [], count: count || 0 };
+    },
+    placeholderData: keepPreviousData,
   });
+
+  const orders = ordersResponse?.data || [];
+  const totalCount = ordersResponse?.count || 0;
 
   const { data: engineers = [], isLoading: engineersLoading } = useQuery({
     queryKey: ['engineers'],
@@ -56,7 +68,7 @@ export function CompletedListPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <CheckCircle className="h-5 w-5" />
-            Completed ({orders.length})
+            Completed ({totalCount})
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -65,6 +77,10 @@ export function CompletedListPage() {
             engineers={engineers}
             title="Completed"
             showAutoSchedule={false}
+            pagination={pagination}
+            totalCount={totalCount}
+            onPageChange={controls.setPage}
+            onPageSizeChange={controls.setPageSize}
           />
         </CardContent>
       </Card>
