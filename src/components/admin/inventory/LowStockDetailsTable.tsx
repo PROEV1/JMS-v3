@@ -12,7 +12,7 @@ interface LowStockDetailsTableProps {
 
 export const LowStockDetailsTable: React.FC<LowStockDetailsTableProps> = ({ className }) => {
   const { useLowStockEngineerDetails } = useInventoryEnhanced();
-  const { data: lowStockDetails, isLoading } = useLowStockEngineerDetails();
+  const { data: lowStockDetails, isLoading, error } = useLowStockEngineerDetails();
 
   if (isLoading) {
     return (
