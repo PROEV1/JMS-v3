@@ -11,6 +11,7 @@ import { AlertsPanel } from './AlertsPanel';
 import { WeekAtAGlance } from './WeekAtAGlance';
 import { RecentActivity } from './RecentActivity';
 import { WeeklyCapacityView } from './WeeklyCapacityView';
+import { EngineerLowStockPanel } from './EngineerLowStockPanel';
 import { useScheduleStatusCounts } from '@/hooks/useScheduleStatusCounts';
 import { 
   Calendar, 
@@ -177,6 +178,9 @@ export function SchedulingHub({}: SchedulingHubProps) {
           </div>
         </CardContent>
       </Card>
+
+      {/* Engineer Low Stock Status */}
+      <EngineerLowStockPanel />
 
       {/* Full Width Capacity View */}
       <WeeklyCapacityView />

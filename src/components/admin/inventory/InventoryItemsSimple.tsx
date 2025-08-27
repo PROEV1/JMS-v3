@@ -18,10 +18,9 @@ import { AdvancedSearchModal } from './shared/AdvancedSearchModal';
 import { BulkActionsBar, inventoryBulkActions } from './shared/BulkActionsBar';
 import { InventoryViewSwitcher, useInventoryView, ViewMode } from './shared/InventoryViewSwitcher';
 import { MobileInventoryCard } from './shared/MobileInventoryCard';
-import { NotificationBanner, createStockNotification } from './shared/NotificationBanner';
 import { useInventoryEnhanced } from '@/hooks/useInventoryEnhanced';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { LowStockDetailsTable } from './LowStockDetailsTable';
+
 
 interface InventoryItem {
   id: string;
@@ -127,11 +126,6 @@ export const InventoryItemsSimple: React.FC<InventoryItemsSimpleProps> = ({ onSw
     return matchesSearch && matchesFilters;
   });
 
-  // Mock notifications for low stock items
-  const notifications = items?.filter(item => 50 <= item.reorder_point).map(item => 
-    createStockNotification(item.name, 50, item.reorder_point)
-  ) || [];
-
   const handleSelectAll = () => {
     setSelectedIds(filteredItems?.map(item => item.id) || []);
   };
@@ -170,14 +164,6 @@ export const InventoryItemsSimple: React.FC<InventoryItemsSimpleProps> = ({ onSw
 
   return (
     <div className="space-y-6">
-      {/* Notifications */}
-      {notifications.length > 0 && (
-        <NotificationBanner 
-          notifications={notifications}
-          onDismiss={(id) => console.log('Dismiss:', id)}
-          maxDisplay={2}
-        />
-      )}
 
       <div className="flex items-center justify-between">
         <div>
@@ -647,7 +633,7 @@ export const InventoryItemsSimple: React.FC<InventoryItemsSimpleProps> = ({ onSw
       )}
 
       {/* Low Stock Engineer Details Table */}
-      <LowStockDetailsTable className="mt-6" />
+      
 
       <AddItemModal
         open={showAddModal}
