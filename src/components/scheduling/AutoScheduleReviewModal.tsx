@@ -14,6 +14,7 @@ import { calculateDayFit, getWorkingDayInfo } from '@/utils/dayFitUtils';
 import { getLocationDisplayText } from '@/utils/postcodeUtils';
 import { getMapboxUsageStats, type MapboxUsageSummary } from '@/utils/mapboxUsageTracker';
 import { MapboxUsageDisplay } from './MapboxUsageDisplay';
+import { EngineerRecommendationPanel } from './EngineerRecommendationPanel';
 
 interface Engineer {
   id: string;
@@ -1289,32 +1290,39 @@ export function AutoScheduleReviewModal({
           </ScrollArea>
         </div>
 
-        <div className="flex-shrink-0 flex items-center justify-between pt-3 border-t bg-background">
-          <Button variant="outline" onClick={handleClose} disabled={submitting}>
-            Cancel
-          </Button>
-          <div className="flex items-center gap-3">
-            <Button
-              variant="outline"
-              onClick={runPreflightChecks}
-              disabled={submitting || preflightChecking || proposedAssignments.length === 0}
-            >
-              <Clock className="w-4 h-4 mr-2" />
-              {preflightChecking ? 'Checking...' : 'Run Preflight'}
+        <div className="flex-shrink-0 flex flex-col gap-3 pt-3 border-t bg-background">
+          {/* Mapbox Usage Stats */}
+          <div className="px-6">
+            <MapboxUsageDisplay />
+          </div>
+          
+          <div className="flex items-center justify-between px-6">
+            <Button variant="outline" onClick={handleClose} disabled={submitting}>
+              Cancel
             </Button>
-            <Button
-              onClick={handleSubmitOffers}
-              disabled={submitting || proposedAssignments.length === 0 || preflightChecking}
-              className="flex items-center gap-2"
-            >
-              <Send className="w-4 h-4" />
-              {submitting 
-                ? 'Sending...' 
-                : proposedAssignments.filter(p => p.status === 'ready').length > 0
-                  ? `Send ${proposedAssignments.filter(p => p.status === 'ready').length} Offers`
-                  : `Send ${proposedAssignments.length} Offers`
-              }
-            </Button>
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                onClick={runPreflightChecks}
+                disabled={submitting || preflightChecking || proposedAssignments.length === 0}
+              >
+                <Clock className="w-4 h-4 mr-2" />
+                {preflightChecking ? 'Checking...' : 'Run Preflight'}
+              </Button>
+              <Button
+                onClick={handleSubmitOffers}
+                disabled={submitting || proposedAssignments.length === 0 || preflightChecking}
+                className="flex items-center gap-2"
+              >
+                <Send className="w-4 h-4" />
+                {submitting 
+                  ? 'Sending...' 
+                  : proposedAssignments.filter(p => p.status === 'ready').length > 0
+                    ? `Send ${proposedAssignments.filter(p => p.status === 'ready').length} Offers`
+                    : `Send ${proposedAssignments.length} Offers`
+                }
+              </Button>
+            </div>
           </div>
         </div>
       </DialogContent>

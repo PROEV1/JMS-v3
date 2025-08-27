@@ -196,18 +196,30 @@ export async function calculateDayFitMatrix(
  */
 async function getTravelMatrix(locations: string[]): Promise<number[][]> {
   try {
-    const response = await apiClient.post('/mapbox-distance', {
-      origins: locations,
-      destinations: locations
+    const { supabase } = await import('@/integrations/supabase/client');
+    
+    console.log(`Getting travel matrix for ${locations.length} locations`);
+    
+    const { data, error } = await supabase.functions.invoke('mapbox-matrix', {
+      body: {
+        sources: locations,
+        sessionId: crypto.randomUUID()
+      }
     });
 
-    if (!response.ok) {
-      throw new Error(`Matrix API error: ${response.error}`);
+    if (error) {
+      console.error('Matrix API error:', error);
+      throw new Error(`Matrix API failed: ${error.message}`);
     }
 
-    return response.data.durations; // Minutes
+    if (!data?.durations) {
+      throw new Error('Invalid matrix response: missing durations');
+    }
+
+    console.log(`Matrix API returned ${data.durations.length}×${data.durations[0]?.length || 0} matrix`);
+    return data.durations;
   } catch (error) {
-    console.error('Matrix API call failed:', error);
+    console.error('Error getting travel matrix:', error);
     throw error;
   }
 }
@@ -219,19 +231,27 @@ async function getSingleTravelTime(from: string, to: string): Promise<number> {
   if (from === to) return 0;
 
   try {
-    const response = await apiClient.post('/mapbox-distance', {
-      origins: [from],
-      destinations: [to]
+    const { supabase } = await import('@/integrations/supabase/client');
+    
+    console.log(`Getting travel time from ${from} to ${to}`);
+    
+    const { data, error } = await supabase.functions.invoke('mapbox-distance', {
+      body: {
+        from,
+        to,
+        sessionId: crypto.randomUUID()
+      }
     });
 
-    if (!response.ok) {
-      throw new Error(`Travel time API error: ${response.error}`);
+    if (error) {
+      console.error('Distance API error:', error);
+      return 45; // Fallback time
     }
 
-    return response.data.durations[0][0] || 0;
+    return data?.duration || 45;
   } catch (error) {
-    console.error('Single travel time failed:', error);
-    return 30; // Fallback assumption
+    console.error('Error getting single travel time:', error);
+    return 45; // Default fallback
   }
 }
 
