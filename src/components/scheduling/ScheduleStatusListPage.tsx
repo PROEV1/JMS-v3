@@ -680,77 +680,81 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
         </div>
       </div>
 
-      {/* Search and Filters */}
-      <div className="flex flex-col gap-4">
-        {/* Search Bar */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-          <Input
-            placeholder="Search by order number, client name, or email..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-        
-        {/* Quick Filters */}
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-muted-foreground" />
-            <span className="text-sm font-medium">Filters:</span>
+      {/* Unified Filter Bar */}
+      <Card className="border border-border shadow-sm rounded-lg">
+        <CardContent className="px-6 py-4">
+          <div className="flex flex-col gap-4">
+            {/* Top Row: Search Bar */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+              <Input
+                placeholder="Search by order number, client name, or email..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 h-10 text-sm"
+              />
+            </div>
+            
+            {/* Bottom Row: Filters and Sort */}
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2">
+                <Filter className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Filters:</span>
+              </div>
+              
+              <Select value={jobTypeFilter} onValueChange={setJobTypeFilter}>
+                <SelectTrigger className="w-[140px] h-10 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="installation">Installation</SelectItem>
+                  <SelectItem value="service_call">Service Call</SelectItem>
+                  <SelectItem value="assessment">Assessment</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              <Select value={valueFilter} onValueChange={setValueFilter}>
+                <SelectTrigger className="w-[130px] h-10 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Values</SelectItem>
+                  <SelectItem value="high">High (£300+)</SelectItem>
+                  <SelectItem value="low">Lower (£300-)</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              <Select value={urgencyFilter} onValueChange={setUrgencyFilter}>
+                <SelectTrigger className="w-[120px] h-10 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Jobs</SelectItem>
+                  <SelectItem value="urgent">Urgent (3 days)</SelectItem>
+                  <SelectItem value="normal">Normal</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              <div className="flex items-center gap-2 ml-4">
+                <ArrowUpDown className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Sort:</span>
+              </div>
+              
+              <Select value={sortBy} onValueChange={setSortBy}>
+                <SelectTrigger className="w-[120px] h-10 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="date">Date</SelectItem>
+                  <SelectItem value="value">Value</SelectItem>
+                  <SelectItem value="postcode">Postcode</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-          
-          <Select value={jobTypeFilter} onValueChange={setJobTypeFilter}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Types</SelectItem>
-              <SelectItem value="installation">Installation</SelectItem>
-              <SelectItem value="service_call">Service Call</SelectItem>
-              <SelectItem value="assessment">Assessment</SelectItem>
-            </SelectContent>
-          </Select>
-          
-          <Select value={valueFilter} onValueChange={setValueFilter}>
-            <SelectTrigger className="w-[130px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Values</SelectItem>
-              <SelectItem value="high">High (£300+)</SelectItem>
-              <SelectItem value="low">Lower (£300-)</SelectItem>
-            </SelectContent>
-          </Select>
-          
-          <Select value={urgencyFilter} onValueChange={setUrgencyFilter}>
-            <SelectTrigger className="w-[120px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Jobs</SelectItem>
-              <SelectItem value="urgent">Urgent (3 days)</SelectItem>
-              <SelectItem value="normal">Normal</SelectItem>
-            </SelectContent>
-          </Select>
-          
-          <div className="flex items-center gap-2 ml-4">
-            <ArrowUpDown className="w-4 h-4 text-muted-foreground" />
-            <span className="text-sm font-medium">Sort:</span>
-          </div>
-          
-          <Select value={sortBy} onValueChange={setSortBy}>
-            <SelectTrigger className="w-[120px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="date">Date</SelectItem>
-              <SelectItem value="value">Value</SelectItem>
-              <SelectItem value="postcode">Postcode</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Jobs List with Column Headers and Hybrid Table-Card Layout */}
       <div className="space-y-3">
@@ -843,20 +847,20 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                         {/* Status - Horizontal Badges */}
                         <div className="col-span-2">
                           <div className="flex items-center gap-1 flex-wrap">
-                             <Badge 
-                               variant={getJobStatusChip(order).variant} 
-                               className="text-xs px-2 py-1 bg-slate-100 text-slate-600 border-slate-200"
-                             >
-                               {getJobStatusChip(order).label}
-                             </Badge>
+                              <Badge 
+                                variant={getJobStatusChip(order).variant} 
+                                className="text-xs font-semibold uppercase px-2 py-1"
+                              >
+                                {getJobStatusChip(order).label}
+                              </Badge>
                              {order.is_partner_job && (
                                <Badge variant="outline" className={`text-xs px-1 py-0 ${order.partner_status ? 'border-blue-300 text-blue-600' : 'border-blue-300 text-blue-600'}`}>
                                  {order.partner_status ? `Partner: ${order.partner_status}` : 'Partner'}
                                </Badge>
                              )}
-                            <Badge variant="outline" className="text-xs px-2 py-1 border-slate-300 text-slate-600">
-                              {getOffersChip(order).label}
-                            </Badge>
+                             <Badge variant="outline" className="text-xs font-semibold uppercase px-2 py-1">
+                               {getOffersChip(order).label}
+                             </Badge>
                           </div>
                           
                           {/* Show accepted offer details if available */}
@@ -900,34 +904,34 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                             
                              if (title === 'Ready to Book') {
                                return (
-                                 <div className="flex gap-2">
-                                    <Button
-                                      size="sm"
-                                      onClick={() => order?.id && handleConfirmAndSchedule(order.id)}
-                                      className="text-xs px-3 py-1 h-7"
-                                      disabled={!order?.id}
-                                    >
-                                      Confirm & Schedule
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => order?.id && handleCancelAndRestart(order.id)}
-                                      className="text-xs px-3 py-1 h-7"
-                                      disabled={!order?.id}
-                                    >
-                                      Cancel
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => order?.id && navigate(`/orders/${order.id}`)}
-                                      className="text-xs px-3 py-1 h-7"
-                                      disabled={!order?.id}
-                                    >
-                                      View Job
-                                    </Button>
-                                 </div>
+                                  <div className="flex gap-2">
+                                     <Button
+                                       size="sm"
+                                       onClick={() => order?.id && handleConfirmAndSchedule(order.id)}
+                                       className="text-xs px-3 py-1 h-8"
+                                       disabled={!order?.id}
+                                     >
+                                       Confirm & Schedule
+                                     </Button>
+                                     <Button
+                                       size="sm"
+                                       variant="outline"
+                                       onClick={() => order?.id && handleCancelAndRestart(order.id)}
+                                       className="text-xs px-3 py-1 h-8"
+                                       disabled={!order?.id}
+                                     >
+                                       Cancel
+                                     </Button>
+                                     <Button
+                                       size="sm"
+                                       variant="outline"
+                                       onClick={() => order?.id && navigate(`/orders/${order.id}`)}
+                                       className="text-xs px-3 py-1 h-8"
+                                       disabled={!order?.id}
+                                     >
+                                       <Eye className="h-3 w-3" />
+                                     </Button>
+                                  </div>
                                );
                              } else if (activeOffer && title === 'Date Offered') {
                                const timeRemaining = getTimeRemaining(activeOffer.expires_at);
@@ -936,89 +940,43 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                                    <div className="text-xs text-muted-foreground">
                                      Expires: {timeRemaining}
                                    </div>
-                                   <div className="flex gap-2">
-                                      <Button
-                                        size="sm"
-                                        onClick={() => order?.id && handleAcceptOffer(order.id)}
-                                        className="text-xs px-3 py-1 h-7 bg-green-600 hover:bg-green-700"
-                                        disabled={!order?.id}
-                                      >
-                                        Accept
-                                      </Button>
-                                      <Button
-                                        size="sm"
-                                        variant="destructive"
-                                        onClick={() => order?.id && handleRejectOffer(order.id)}
-                                        className="text-xs px-3 py-1 h-7"
-                                        disabled={!order?.id}
-                                      >
-                                        Reject
-                                      </Button>
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => order?.id && navigate(`/orders/${order.id}`)}
-                                        className="text-xs px-3 py-1 h-7"
-                                        disabled={!order?.id}
-                                      >
-                                        View Job
-                                      </Button>
-                                   </div>
+                                    <div className="flex gap-2">
+                                       <Button
+                                         size="sm"
+                                         onClick={() => order?.id && handleAcceptOffer(order.id)}
+                                         className="text-xs px-3 py-1 h-8 bg-green-600 hover:bg-green-700"
+                                         disabled={!order?.id}
+                                       >
+                                         Accept
+                                       </Button>
+                                       <Button
+                                         size="sm"
+                                         variant="destructive"
+                                         onClick={() => order?.id && handleRejectOffer(order.id)}
+                                         className="text-xs px-3 py-1 h-8"
+                                         disabled={!order?.id}
+                                       >
+                                         Reject
+                                       </Button>
+                                       <Button
+                                         size="sm"
+                                         variant="outline"
+                                         onClick={() => order?.id && navigate(`/orders/${order.id}`)}
+                                         className="text-xs px-3 py-1 h-8"
+                                         disabled={!order?.id}
+                                       >
+                                         <Eye className="h-3 w-3" />
+                                       </Button>
+                                    </div>
                                  </div>
                                );
                              } else if (title === 'Date Rejected') {
                                return (
-                                 <div className="flex gap-2">
-                                    <Button
-                                      onClick={() => order && handleSmartAssign(order)}
-                                      size="sm"
-                                      className="text-xs px-3 py-1 h-7"
-                                      disabled={!order}
-                                    >
-                                      Smart Assign
-                                    </Button>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => order?.id && navigate(`/orders/${order.id}`)}
-                                      className="text-xs px-3 py-1 h-7"
-                                      disabled={!order?.id}
-                                    >
-                                      View Job
-                                    </Button>
-                                 </div>
-                               );
-                            } else if (order.status_enhanced === 'awaiting_install_booking') {
-                              if (activeOffer) {
-                                return (
-                                  <>
-                                     <Button
-                                       size="sm"
-                                       variant="outline"
-                                       onClick={() => order?.id && handleResendOffer(order.id)}
-                                       className="text-xs px-3 py-1 h-7"
-                                       disabled={!order?.id}
-                                     >
-                                       Resend
-                                     </Button>
-                                     <Button
-                                       size="sm"
-                                       variant="outline"
-                                       onClick={() => order?.id && handleReleaseOffer(order.id)}
-                                       className="text-xs px-3 py-1 h-7"
-                                       disabled={!order?.id}
-                                     >
-                                       Release
-                                     </Button>
-                                  </>
-                                );
-                              } else {
-                                return (
-                                  <>
+                                  <div className="flex gap-2">
                                      <Button
                                        onClick={() => order && handleSmartAssign(order)}
                                        size="sm"
-                                       className="text-xs px-3 py-1 h-7"
+                                       className="text-xs px-3 py-1 h-8"
                                        disabled={!order}
                                      >
                                        Smart Assign
@@ -1027,27 +985,73 @@ export function ScheduleStatusListPage({ orders, engineers, onUpdate, title, sho
                                        variant="outline"
                                        size="sm"
                                        onClick={() => order?.id && navigate(`/orders/${order.id}`)}
-                                       className="text-xs px-3 py-1 h-7"
+                                       className="text-xs px-3 py-1 h-8"
                                        disabled={!order?.id}
                                      >
-                                       View Job
+                                       <Eye className="h-3 w-3" />
                                      </Button>
-                                  </>
-                                );
-                              }
-                            } else {
-                               return (
-                                 <Button
-                                   size="sm"
-                                   variant="outline"
-                                   onClick={() => order?.id && navigate(`/orders/${order.id}`)}
-                                   className="text-xs px-3 py-1 h-7"
-                                   disabled={!order?.id}
-                                 >
-                                   View Job
-                                 </Button>
+                                  </div>
                                );
-                            }
+                            } else if (order.status_enhanced === 'awaiting_install_booking') {
+                              if (activeOffer) {
+                                return (
+                                   <>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => order?.id && handleResendOffer(order.id)}
+                                        className="text-xs px-3 py-1 h-8"
+                                        disabled={!order?.id}
+                                      >
+                                        Resend
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => order?.id && handleReleaseOffer(order.id)}
+                                        className="text-xs px-3 py-1 h-8"
+                                        disabled={!order?.id}
+                                      >
+                                        Release
+                                      </Button>
+                                   </>
+                                 );
+                               } else {
+                                 return (
+                                   <>
+                                      <Button
+                                        onClick={() => order && handleSmartAssign(order)}
+                                        size="sm"
+                                        className="text-xs px-3 py-1 h-8"
+                                        disabled={!order}
+                                      >
+                                        Smart Assign
+                                      </Button>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => order?.id && navigate(`/orders/${order.id}`)}
+                                        className="text-xs px-3 py-1 h-8"
+                                        disabled={!order?.id}
+                                      >
+                                        <Eye className="h-3 w-3" />
+                                      </Button>
+                                   </>
+                                 );
+                               }
+                             } else {
+                                return (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => order?.id && navigate(`/orders/${order.id}`)}
+                                    className="text-xs px-3 py-1 h-8"
+                                    disabled={!order?.id}
+                                  >
+                                    <Eye className="h-3 w-3" />
+                                  </Button>
+                                );
+                             }
                           })()}
                         </div>
                       </div>

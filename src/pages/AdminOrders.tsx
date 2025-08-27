@@ -215,166 +215,157 @@ export default function AdminOrders() {
         </div>
       </div>
 
-      {/* Filters */}
-      <Card className="border-0 shadow-sm">
-        <CardHeader className="pb-md">
-          <CardTitle className="flex items-center gap-sm text-lg font-semibold">
-            <Filter className="icon-sm" />
-            Filters & Search
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-md">
-            <div className="relative">
-              <Search className="absolute left-3 top-3 icon-sm text-muted-foreground" />
+      {/* Unified Filter Bar */}
+      <Card className="border border-border shadow-sm rounded-lg">
+        <CardContent className="px-6 py-4">
+          <div className="flex flex-col md:flex-row gap-4">
+            {/* Left: Search Bar */}
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search orders, clients, or quote numbers..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 h-10"
+                className="pl-10 h-10 text-sm"
               />
             </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                {statusOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={engineerFilter} onValueChange={setEngineerFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Filter by engineer" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Engineers</SelectItem>
-                {engineers?.map((engineer) => (
-                  <SelectItem key={engineer.id} value={engineer.id}>
-                    {engineer.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            
+            {/* Right: Filters */}
+            <div className="flex gap-3">
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-48 h-10 text-sm">
+                  <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                  {statusOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={engineerFilter} onValueChange={setEngineerFilter}>
+                <SelectTrigger className="w-48 h-10 text-sm">
+                  <SelectValue placeholder="Filter by engineer" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Engineers</SelectItem>
+                  {engineers?.map((engineer) => (
+                    <SelectItem key={engineer.id} value={engineer.id}>
+                      {engineer.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Orders Table */}
-      <Card className="border-0 shadow-sm">
-        <CardHeader className="pb-compact">
-          <CardTitle className="brand-heading-3">Orders Overview</CardTitle>
-          <CardDescription className="brand-small text-muted-foreground">
-            All orders with their current status and details
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="pt-0">
+      <Card className="border border-border shadow-sm rounded-lg">
+        <CardContent className="px-6 py-0">
           <div className="overflow-x-auto">
             <Table>
                <TableHeader>
-                 <TableRow className="border-b">
-                   <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wide py-2 h-9">Order</TableHead>
-                   <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wide py-2 h-9">Client</TableHead>
-                   <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wide py-2 h-9">Status</TableHead>
-                   <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wide py-2 h-9 hidden lg:table-cell">Engineer</TableHead>
-                   <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wide py-2 h-9">Scheduled</TableHead>
-                   <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wide py-2 h-9">Amount</TableHead>
-                   <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wide py-2 h-9 hidden xl:table-cell">Created</TableHead>
-                   <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wide py-2 h-9 text-right">Actions</TableHead>
+                 <TableRow className="border-b border-border hover:bg-transparent">
+                   <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide py-4 h-auto">Order</TableHead>
+                   <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide py-4 h-auto">Client</TableHead>
+                   <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide py-4 h-auto">Status</TableHead>
+                   <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide py-4 h-auto hidden lg:table-cell">Engineer</TableHead>
+                   <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide py-4 h-auto">Scheduled</TableHead>
+                   <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide py-4 h-auto">Amount</TableHead>
+                   <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide py-4 h-auto hidden xl:table-cell">Created</TableHead>
+                   <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide py-4 h-auto text-right">Actions</TableHead>
                  </TableRow>
                </TableHeader>
-              <TableBody>
-                {orders?.map((order, index) => (
-                  <TableRow key={order.id} className={`border-b hover:bg-muted/30 transition-colors ${index % 2 === 0 ? 'bg-background' : 'bg-muted/10'}`}>
-                     <TableCell className="py-2 align-middle">
-                       <div className="flex items-center gap-2">
-                         <span className="text-sm font-medium text-foreground leading-none">{order.order_number}</span>
-                         {order.quote?.quote_number && (
-                           <span className="text-xs text-muted-foreground opacity-75">
-                             Q{order.quote.quote_number.replace(/^Q/, '')}
-                           </span>
-                         )}
-                         {order.is_partner_job && order.partner && (
-                           <Badge variant="secondary" className="text-[10px] font-medium px-1.5 py-0.5 h-4 leading-none bg-blue-50 text-blue-700 border-blue-200">
-                             {order.partner.name}
-                           </Badge>
-                         )}
-                       </div>
-                     </TableCell>
-                    <TableCell className="py-2 align-middle">
-                      {order.client ? (
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="text-sm font-medium text-foreground leading-none truncate">{order.client.full_name}</span>
-                          <span className="text-xs text-muted-foreground opacity-75 truncate max-w-[120px]">{order.client.email}</span>
+               <TableBody>
+                 {orders?.map((order, index) => (
+                   <TableRow key={order.id} className="border-b border-border hover:bg-muted/50 transition-colors h-16">
+                      <TableCell className="py-4 align-middle">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-foreground leading-none truncate">{order.order_number}</span>
+                          {order.quote?.quote_number && (
+                            <span className="text-xs text-muted-foreground">
+                              Q{order.quote.quote_number.replace(/^Q/, '')}
+                            </span>
+                          )}
+                          {order.is_partner_job && order.partner && (
+                            <Badge variant="secondary" className="text-xs font-semibold uppercase px-2 py-1 bg-blue-50 text-blue-700 border-blue-200">
+                              {order.partner.name}
+                            </Badge>
+                          )}
                         </div>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">No client</span>
-                      )}
-                    </TableCell>
-                     <TableCell className="py-2 align-middle">
-                       <Badge className={`text-[10px] font-medium uppercase px-2 py-0.5 h-5 leading-none ${getStatusClassName(order.status_enhanced || 'unknown')}`}>
-                         {formatStatusText(order.status_enhanced || 'unknown')}
-                       </Badge>
-                     </TableCell>
-                     <TableCell className="py-2 align-middle hidden lg:table-cell">
-                       {order.engineer ? (
-                         <div className="flex items-center gap-1.5">
-                           <User className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                           <span className="text-xs font-medium text-foreground truncate leading-none">{order.engineer.name}</span>
+                      </TableCell>
+                     <TableCell className="py-4 align-middle">
+                       {order.client ? (
+                         <div className="space-y-1">
+                           <div className="text-sm font-medium text-foreground leading-none truncate">{order.client.full_name}</div>
+                           <div className="text-xs text-muted-foreground truncate">{order.client.email}</div>
                          </div>
                        ) : (
-                         <span className="text-xs text-muted-foreground">Unassigned</span>
+                         <span className="text-xs text-muted-foreground">No client</span>
                        )}
                      </TableCell>
-                     <TableCell className="py-2 align-middle">
-                       {order.scheduled_install_date ? (
-                         <div className="flex items-center gap-1.5">
-                           <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                           <span className="text-xs font-medium text-foreground whitespace-nowrap leading-none">
-                             {format(new Date(order.scheduled_install_date), 'd MMM yyyy')}
-                           </span>
-                         </div>
-                       ) : (
-                         <span className="text-xs text-muted-foreground">Not scheduled</span>
-                       )}
+                      <TableCell className="py-4 align-middle">
+                        <Badge className={`text-xs font-semibold uppercase px-2 py-1 ${getStatusClassName(order.status_enhanced || 'unknown')}`}>
+                          {formatStatusText(order.status_enhanced || 'unknown')}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="py-4 align-middle hidden lg:table-cell">
+                        {order.engineer ? (
+                          <div className="flex items-center gap-1.5">
+                            <User className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                            <span className="text-sm font-medium text-foreground truncate">{order.engineer.name}</span>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Unassigned</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="py-4 align-middle">
+                        {order.scheduled_install_date ? (
+                          <div className="flex items-center gap-1.5">
+                            <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                            <span className="text-sm font-medium text-foreground whitespace-nowrap">
+                              {format(new Date(order.scheduled_install_date), 'd MMM yyyy')}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Not scheduled</span>
+                        )}
+                      </TableCell>
+                     <TableCell className="py-4 align-middle">
+                       <span className="text-sm font-semibold text-foreground">£{order.total_amount.toLocaleString()}</span>
                      </TableCell>
-                    <TableCell className="py-2 align-middle">
-                      <span className="text-sm font-semibold text-foreground leading-none">£{order.total_amount.toLocaleString()}</span>
-                    </TableCell>
-                    <TableCell className="py-2 align-middle hidden xl:table-cell">
-                      <span className="text-xs text-muted-foreground whitespace-nowrap leading-none">
-                        {format(new Date(order.created_at), 'd MMM yyyy')}
-                      </span>
-                    </TableCell>
-                     <TableCell className="py-2 align-middle">
-                       <div className="flex items-center justify-end gap-1">
-                         <Button
-                           variant="outline"
-                           size="sm"
-                           className="h-8 px-2 text-xs font-medium"
-                           onClick={() => navigate(`/admin/orders/${order.id}`)}
-                         >
-                           <Eye className="h-4 w-4" />
-                           <span className="ml-1 hidden sm:inline">View</span>
-                         </Button>
-                         <Button
-                           variant="destructive"
-                           size="sm"
-                           className="h-8 px-2 text-xs font-medium"
-                           onClick={() => handleDeleteOrder(order.id)}
-                           disabled={deleteMutation.isPending}
-                         >
-                           <Trash2 className="h-4 w-4" />
-                           <span className="ml-1 hidden sm:inline">Delete</span>
-                         </Button>
-                       </div>
+                     <TableCell className="py-4 align-middle hidden xl:table-cell">
+                       <span className="text-xs text-muted-foreground whitespace-nowrap">
+                         {format(new Date(order.created_at), 'd MMM yyyy')}
+                       </span>
                      </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
+                      <TableCell className="py-4 align-middle">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 px-3 text-xs font-medium"
+                            onClick={() => navigate(`/admin/orders/${order.id}`)}
+                          >
+                            <Eye className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            className="h-8 px-3 text-xs font-medium"
+                            onClick={() => handleDeleteOrder(order.id)}
+                            disabled={deleteMutation.isPending}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                   </TableRow>
+                 ))}
+               </TableBody>
             </Table>
           </div>
         </CardContent>

@@ -277,136 +277,149 @@ export default function AdminQuotes() {
             ))}
           </div>
 
-          {/* Filters */}
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search quotes or clients..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full sm:w-48">
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="sent">Pending</SelectItem>
-                <SelectItem value="accepted">Accepted</SelectItem>
-                <SelectItem value="declined">Rejected</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          {/* Unified Filter Bar */}
+          <Card className="border border-border shadow-sm rounded-lg">
+            <CardContent className="px-6 py-4">
+              <div className="flex flex-col md:flex-row gap-4">
+                {/* Left: Search Bar */}
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search quotes or clients..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10 h-10 text-sm"
+                  />
+                </div>
+                
+                {/* Right: Filters */}
+                <div className="flex gap-3">
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-48 h-10 text-sm">
+                      <SelectValue placeholder="Filter by status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Statuses</SelectItem>
+                      <SelectItem value="sent">Pending</SelectItem>
+                      <SelectItem value="accepted">Accepted</SelectItem>
+                      <SelectItem value="declined">Rejected</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Quotes Table */}
-          <div className="border rounded-lg overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[160px]">Quote</TableHead>
-                  <TableHead>Client</TableHead>
-                  <TableHead className="hidden sm:table-cell">Email</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                  <TableHead className="hidden md:table-cell">Created</TableHead>
-                  <TableHead className="hidden lg:table-cell">Expires</TableHead>
-                  <TableHead className="w-[100px]">Status</TableHead>
-                  <TableHead className="w-[140px] text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredQuotes.map((quote) => (
-                  <TableRow 
-                    key={quote.id}
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => handleQuoteClick(quote.id)}
-                  >
-                    <TableCell>
-                      <div className="space-y-1">
-                        <div className="text-sm font-medium leading-none truncate">
-                          Quote {quote.quote_number}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <button 
-                        className="text-sm font-medium text-primary hover:text-[hsl(var(--primary-hover))] underline leading-none truncate block max-w-[160px]" 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleClientClick(quote.client.id);
-                        }}
+          <Card className="border border-border shadow-sm rounded-lg">
+            <CardContent className="px-6 py-0">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-b border-border hover:bg-transparent">
+                      <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide py-4 h-auto">Quote</TableHead>
+                      <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide py-4 h-auto">Client</TableHead>
+                      <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide py-4 h-auto hidden sm:table-cell">Email</TableHead>
+                      <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide py-4 h-auto text-right">Amount</TableHead>
+                      <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide py-4 h-auto hidden md:table-cell">Created</TableHead>
+                      <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide py-4 h-auto hidden lg:table-cell">Expires</TableHead>
+                      <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide py-4 h-auto">Status</TableHead>
+                      <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide py-4 h-auto text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredQuotes.map((quote) => (
+                      <TableRow 
+                        key={quote.id}
+                        className="border-b border-border hover:bg-muted/50 transition-colors h-16 cursor-pointer"
+                        onClick={() => handleQuoteClick(quote.id)}
                       >
-                        {quote.client?.full_name}
-                      </button>
-                    </TableCell>
-                    <TableCell className="hidden sm:table-cell">
-                      <div className="text-xs text-muted-foreground truncate max-w-[180px]">
-                        {quote.client?.email}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="text-sm font-semibold">
-                        {formatCurrency(quote.total_cost)}
-                      </div>
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      <div className="text-xs text-muted-foreground">
-                        {format(new Date(quote.created_at), 'dd MMM yyyy')}
-                      </div>
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell">
-                      <div className="text-xs text-muted-foreground">
-                        {quote.expires_at ? format(new Date(quote.expires_at), 'dd MMM yyyy') : '-'}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <BrandBadge 
-                        status={quote.status as 'sent' | 'accepted' | 'declined' | 'pending'}
-                        className="text-[10px] uppercase font-medium px-2 py-1"
-                      >
-                        {quote.status === 'sent' ? 'Pending' : 
-                         quote.status === 'declined' ? 'Rejected' :
-                         quote.status.charAt(0).toUpperCase() + quote.status.slice(1)}
-                      </BrandBadge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1 justify-end">
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="h-8 px-2 text-xs font-medium" 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleQuoteClick(quote.id);
-                          }}
-                        >
-                          <Eye className="h-3 w-3" />
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="h-8 px-2 text-xs font-medium" 
-                          onClick={(e) => handleEditQuote(quote.id, e)}
-                        >
-                          <Edit className="h-3 w-3" />
-                        </Button>
-                        <Button 
-                          variant="destructive" 
-                          size="sm" 
-                          className="h-8 px-2 text-xs font-medium" 
-                          onClick={(e) => handleDeleteQuote(quote.id, e)}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                        <TableCell className="py-4 align-middle">
+                          <div className="text-sm font-medium text-foreground leading-none truncate">
+                            Quote {quote.quote_number}
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-4 align-middle">
+                          <div className="space-y-1">
+                            <button 
+                              className="text-sm font-medium text-primary hover:text-[hsl(var(--primary-hover))] underline leading-none truncate block" 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleClientClick(quote.client.id);
+                              }}
+                            >
+                              {quote.client?.full_name}
+                            </button>
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-4 align-middle hidden sm:table-cell">
+                          <div className="text-xs text-muted-foreground truncate">
+                            {quote.client?.email}
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-4 align-middle text-right">
+                          <div className="text-sm font-semibold text-foreground">
+                            {formatCurrency(quote.total_cost)}
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-4 align-middle hidden md:table-cell">
+                          <div className="text-xs text-muted-foreground">
+                            {format(new Date(quote.created_at), 'dd MMM yyyy')}
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-4 align-middle hidden lg:table-cell">
+                          <div className="text-xs text-muted-foreground">
+                            {quote.expires_at ? format(new Date(quote.expires_at), 'dd MMM yyyy') : '-'}
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-4 align-middle">
+                          <BrandBadge 
+                            status={quote.status as 'sent' | 'accepted' | 'declined' | 'pending'}
+                            className="text-xs uppercase font-semibold px-2 py-1"
+                          >
+                            {quote.status === 'sent' ? 'Pending' : 
+                             quote.status === 'declined' ? 'Rejected' :
+                             quote.status.charAt(0).toUpperCase() + quote.status.slice(1)}
+                          </BrandBadge>
+                        </TableCell>
+                        <TableCell className="py-4 align-middle">
+                          <div className="flex items-center gap-2 justify-end">
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="h-8 px-3 text-xs font-medium" 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleQuoteClick(quote.id);
+                              }}
+                            >
+                              <Eye className="h-3 w-3" />
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="h-8 px-3 text-xs font-medium" 
+                              onClick={(e) => handleEditQuote(quote.id, e)}
+                            >
+                              <Edit className="h-3 w-3" />
+                            </Button>
+                            <Button 
+                              variant="destructive" 
+                              size="sm" 
+                              className="h-8 px-3 text-xs font-medium" 
+                              onClick={(e) => handleDeleteQuote(quote.id, e)}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
 
           {filteredQuotes.length === 0 && (
             <Card>
