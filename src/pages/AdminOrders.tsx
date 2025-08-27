@@ -276,64 +276,64 @@ export default function AdminOrders() {
             <Table>
                <TableHeader>
                  <TableRow className="border-b">
-                   <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wide py-3">Order</TableHead>
-                   <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wide py-3">Client</TableHead>
-                   <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wide py-3">Status</TableHead>
-                   <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wide py-3 hidden lg:table-cell">Engineer</TableHead>
-                   <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wide py-3">Scheduled</TableHead>
-                   <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wide py-3">Amount</TableHead>
-                   <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wide py-3 hidden xl:table-cell">Created</TableHead>
-                   <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wide py-3">Actions</TableHead>
+                   <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wide py-2 h-9">Order</TableHead>
+                   <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wide py-2 h-9">Client</TableHead>
+                   <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wide py-2 h-9">Status</TableHead>
+                   <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wide py-2 h-9 hidden lg:table-cell">Engineer</TableHead>
+                   <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wide py-2 h-9">Scheduled</TableHead>
+                   <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wide py-2 h-9">Amount</TableHead>
+                   <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wide py-2 h-9 hidden xl:table-cell">Created</TableHead>
+                   <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wide py-2 h-9 text-right">Actions</TableHead>
                  </TableRow>
                </TableHeader>
               <TableBody>
                 {orders?.map((order, index) => (
                   <TableRow key={order.id} className={`border-b hover:bg-muted/30 transition-colors ${index % 2 === 0 ? 'bg-background' : 'bg-muted/10'}`}>
-                     <TableCell className="py-2.5 align-middle">
-                       <div className="flex flex-col gap-0.5">
-                         <span className="text-sm font-medium text-foreground leading-tight">{order.order_number}</span>
-                         <div className="flex items-center gap-1.5">
-                           {order.quote?.quote_number && (
-                             <span className="text-xs text-muted-foreground">Q{order.quote.quote_number.replace(/^Q/, '')}</span>
-                           )}
-                           {order.is_partner_job && order.partner && (
-                             <Badge variant="secondary" className="text-[10px] font-medium px-1.5 py-0.5 h-auto bg-blue-50 text-blue-700 border-blue-200">
-                               {order.partner.name}
-                             </Badge>
-                           )}
-                         </div>
+                     <TableCell className="py-2 align-middle">
+                       <div className="flex items-center gap-2">
+                         <span className="text-sm font-medium text-foreground leading-none">{order.order_number}</span>
+                         {order.quote?.quote_number && (
+                           <span className="text-xs text-muted-foreground opacity-75">
+                             Q{order.quote.quote_number.replace(/^Q/, '')}
+                           </span>
+                         )}
+                         {order.is_partner_job && order.partner && (
+                           <Badge variant="secondary" className="text-[10px] font-medium px-1.5 py-0.5 h-4 leading-none bg-blue-50 text-blue-700 border-blue-200">
+                             {order.partner.name}
+                           </Badge>
+                         )}
                        </div>
                      </TableCell>
-                    <TableCell className="py-2.5 align-middle">
+                    <TableCell className="py-2 align-middle">
                       {order.client ? (
-                        <div className="flex flex-col gap-0.5">
-                          <span className="text-sm font-medium text-foreground leading-tight">{order.client.full_name}</span>
-                          <span className="text-xs text-muted-foreground truncate max-w-[180px]">{order.client.email}</span>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-sm font-medium text-foreground leading-none truncate">{order.client.full_name}</span>
+                          <span className="text-xs text-muted-foreground opacity-75 truncate max-w-[120px]">{order.client.email}</span>
                         </div>
                       ) : (
                         <span className="text-xs text-muted-foreground">No client</span>
                       )}
                     </TableCell>
-                     <TableCell className="py-2.5 align-middle">
-                       <Badge className={`text-[10px] font-medium uppercase px-2 py-1 h-auto ${getStatusClassName(order.status_enhanced || 'unknown')}`}>
+                     <TableCell className="py-2 align-middle">
+                       <Badge className={`text-[10px] font-medium uppercase px-2 py-0.5 h-5 leading-none ${getStatusClassName(order.status_enhanced || 'unknown')}`}>
                          {formatStatusText(order.status_enhanced || 'unknown')}
                        </Badge>
                      </TableCell>
-                     <TableCell className="py-2.5 align-middle hidden lg:table-cell">
+                     <TableCell className="py-2 align-middle hidden lg:table-cell">
                        {order.engineer ? (
                          <div className="flex items-center gap-1.5">
-                           <User className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                           <span className="text-xs font-medium text-foreground truncate">{order.engineer.name}</span>
+                           <User className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                           <span className="text-xs font-medium text-foreground truncate leading-none">{order.engineer.name}</span>
                          </div>
                        ) : (
                          <span className="text-xs text-muted-foreground">Unassigned</span>
                        )}
                      </TableCell>
-                     <TableCell className="py-2.5 align-middle">
+                     <TableCell className="py-2 align-middle">
                        {order.scheduled_install_date ? (
                          <div className="flex items-center gap-1.5">
-                           <Calendar className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                           <span className="text-xs font-medium text-foreground whitespace-nowrap">
+                           <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                           <span className="text-xs font-medium text-foreground whitespace-nowrap leading-none">
                              {format(new Date(order.scheduled_install_date), 'd MMM yyyy')}
                            </span>
                          </div>
@@ -341,33 +341,33 @@ export default function AdminOrders() {
                          <span className="text-xs text-muted-foreground">Not scheduled</span>
                        )}
                      </TableCell>
-                    <TableCell className="py-2.5 align-middle">
-                      <span className="text-sm font-semibold text-foreground">£{order.total_amount.toLocaleString()}</span>
+                    <TableCell className="py-2 align-middle">
+                      <span className="text-sm font-semibold text-foreground leading-none">£{order.total_amount.toLocaleString()}</span>
                     </TableCell>
-                    <TableCell className="py-2.5 align-middle hidden xl:table-cell">
-                      <span className="text-xs text-muted-foreground whitespace-nowrap">
+                    <TableCell className="py-2 align-middle hidden xl:table-cell">
+                      <span className="text-xs text-muted-foreground whitespace-nowrap leading-none">
                         {format(new Date(order.created_at), 'd MMM yyyy')}
                       </span>
                     </TableCell>
-                     <TableCell className="py-2.5 align-middle">
-                       <div className="flex items-center gap-1.5">
+                     <TableCell className="py-2 align-middle">
+                       <div className="flex items-center justify-end gap-1">
                          <Button
                            variant="outline"
                            size="sm"
-                           className="h-8 px-2.5 text-xs font-medium"
+                           className="h-8 px-2 text-xs font-medium"
                            onClick={() => navigate(`/admin/orders/${order.id}`)}
                          >
-                           <Eye className="h-3 w-3" />
+                           <Eye className="h-4 w-4" />
                            <span className="ml-1 hidden sm:inline">View</span>
                          </Button>
                          <Button
                            variant="destructive"
                            size="sm"
-                           className="h-8 px-2.5 text-xs font-medium"
+                           className="h-8 px-2 text-xs font-medium"
                            onClick={() => handleDeleteOrder(order.id)}
                            disabled={deleteMutation.isPending}
                          >
-                           <Trash2 className="h-3 w-3" />
+                           <Trash2 className="h-4 w-4" />
                            <span className="ml-1 hidden sm:inline">Delete</span>
                          </Button>
                        </div>
