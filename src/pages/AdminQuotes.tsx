@@ -300,70 +300,67 @@ export default function AdminQuotes() {
           </div>
 
           {/* Quotes List */}
-          <div className="space-y-4">
+          <div className="space-y-3">
             {filteredQuotes.map((quote) => (
               <Card 
                 key={quote.id} 
                 className="brand-card cursor-pointer hover:shadow-md transition-shadow"
                 onClick={() => handleQuoteClick(quote.id)}
               >
-                <CardHeader>
+                <CardHeader className="pb-3">
                   <div className="flex justify-between items-start">
-                    <div>
-                      <CardTitle className="brand-heading-3">Quote {quote.quote_number}</CardTitle>
-                      <CardDescription className="brand-body">
-                        For <button 
-                          className="text-primary hover:text-[hsl(var(--primary-hover))] underline" 
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-3 mb-1">
+                        <h3 className="text-sm font-medium text-foreground leading-none">Quote {quote.quote_number}</h3>
+                        <span className="text-sm font-semibold text-foreground">£{quote.total_cost.toLocaleString()}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <span>For</span>
+                        <button 
+                          className="text-primary hover:text-[hsl(var(--primary-hover))] underline font-medium" 
                           onClick={(e) => {
                             e.stopPropagation();
                             handleClientClick(quote.client.id);
                           }}
                         >
                           {quote.client?.full_name}
-                        </button> • {quote.client?.email}
-                      </CardDescription>
+                        </button>
+                        <span>•</span>
+                        <span className="truncate max-w-[200px]">{quote.client?.email}</span>
+                        <span>•</span>
+                        <span>Created: {new Date(quote.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                        {quote.expires_at && (
+                          <>
+                            <span>•</span>
+                            <span>Expires: {new Date(quote.expires_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                          </>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center gap-2 ml-4">
                       <BrandBadge status={quote.status as 'sent' | 'accepted' | 'declined' | 'pending'}>
                         {quote.status === 'sent' ? 'Pending' : 
                          quote.status === 'declined' ? 'Rejected' :
                          quote.status.charAt(0).toUpperCase() + quote.status.slice(1)}
                       </BrandBadge>
-                      <Button variant="outline" size="sm" onClick={(e) => {
+                      <Button variant="outline" size="sm" className="h-8 px-2 text-xs font-medium" onClick={(e) => {
                         e.stopPropagation();
                         handleQuoteClick(quote.id);
                       }}>
-                        <Eye className="h-4 w-4 mr-2" />
-                        View
+                        <Eye className="h-4 w-4" />
+                        <span className="ml-1 hidden sm:inline">View</span>
                       </Button>
-                      <Button variant="outline" size="sm" onClick={(e) => handleEditQuote(quote.id, e)}>
-                        <Edit className="h-4 w-4 mr-2" />
-                        Edit
+                      <Button variant="outline" size="sm" className="h-8 px-2 text-xs font-medium" onClick={(e) => handleEditQuote(quote.id, e)}>
+                        <Edit className="h-4 w-4" />
+                        <span className="ml-1 hidden sm:inline">Edit</span>
                       </Button>
-                      <Button variant="outline" size="sm" onClick={(e) => handleDeleteQuote(quote.id, e)}>
-                        <Trash2 className="h-4 w-4 mr-2 text-red-600" />
-                        Delete
+                      <Button variant="destructive" size="sm" className="h-8 px-2 text-xs font-medium" onClick={(e) => handleDeleteQuote(quote.id, e)}>
+                        <Trash2 className="h-4 w-4" />
+                        <span className="ml-1 hidden sm:inline">Delete</span>
                       </Button>
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="flex items-center space-x-2">
-                      <span className="brand-body">Total: {formatCurrency(quote.total_cost)}</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <span className="brand-body">Created: {new Date(quote.created_at).toLocaleDateString()}</span>
-                    </div>
-                    {quote.expires_at && (
-                      <div className="flex items-center space-x-2">
-                        <Calendar className="h-4 w-4 text-muted-foreground" />
-                        <span className="brand-body">Expires: {new Date(quote.expires_at).toLocaleDateString()}</span>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
               </Card>
             ))}
           </div>
