@@ -1,13 +1,23 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { corsHeaders } from '../_shared/cors.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.52.1'
 
 const MAPBOX_ACCESS_TOKEN = Deno.env.get('MAPBOX_ACCESS_TOKEN')
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
 // In-function caching and rate limiting
 const geocodeCache = new Map<string, [number, number]>()
 const rateLimitedRequests = new Map<string, number>()
 const RATE_LIMIT_WINDOW = 60000 // 1 minute
 const MAX_REQUESTS_PER_WINDOW = 100
+
+// Usage tracking counters
+let geocodingCalls = 0
+let directionsCalls = 0  
+let matrixCalls = 0
 
 interface DistanceRequest {
   origins: string[]
@@ -24,8 +34,17 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  // Generate session ID for tracking related calls
+  const sessionId = crypto.randomUUID()
+  
+  // Reset usage counters for this request
+  geocodingCalls = 0
+  directionsCalls = 0
+  matrixCalls = 0
+
   try {
     console.log('=== MAPBOX FUNCTION CALLED ===');
+    console.log('Session ID:', sessionId);
     console.log('MAPBOX_ACCESS_TOKEN configured:', !!MAPBOX_ACCESS_TOKEN);
     console.log('Token length:', MAPBOX_ACCESS_TOKEN?.length || 0);
     
@@ -78,22 +97,41 @@ serve(async (req) => {
       const cleanPostcode = postcode.replace(/\s+/g, '').toUpperCase().trim() // Consistent normalization
       console.log(`Geocoding postcode: ${cleanPostcode}`)
       
-      // Check persistent cache first
+      // Check persistent cache first (Supabase)
+      try {
+        const { data: cacheResult } = await supabase
+          .rpc('get_geocode_from_cache', { p_postcode: cleanPostcode })
+        
+        if (cacheResult && cacheResult.length > 0) {
+          const cached: [number, number] = [cacheResult[0].longitude, cacheResult[0].latitude]
+          console.log(`Using Supabase cache for ${cleanPostcode}:`, cached)
+          coordinatesCache.set(cleanPostcode, cached)
+          geocodeCache.set(cleanPostcode, cached) // Also store in local cache
+          return cached
+        }
+      } catch (error) {
+        console.warn('Failed to check Supabase cache:', error)
+      }
+      
+      // Check local in-memory cache
       if (geocodeCache.has(cleanPostcode)) {
         const cached = geocodeCache.get(cleanPostcode)!
-        console.log(`Using persistent cache for ${cleanPostcode}:`, cached)
+        console.log(`Using local cache for ${cleanPostcode}:`, cached)
         coordinatesCache.set(cleanPostcode, cached)
         return cached
       }
       
       if (coordinatesCache.has(cleanPostcode)) {
         const cached = coordinatesCache.get(cleanPostcode)!
-        console.log(`Using local cache for ${cleanPostcode}:`, cached)
+        console.log(`Using coordinatesCache for ${cleanPostcode}:`, cached)
         return cached
       }
       
       const geocodeUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(cleanPostcode)}.json?access_token=${MAPBOX_ACCESS_TOKEN}&country=GB&types=postcode`
       console.log(`Geocoding URL: ${geocodeUrl}`)
+      
+      // Increment geocoding call counter
+      geocodingCalls++
       
       // Test the actual fetch call with detailed logging
       console.log('About to make fetch request...')
@@ -133,7 +171,20 @@ serve(async (req) => {
       const [lng, lat] = data.features[0].center
       const coordinates: [number, number] = [lng, lat]
       coordinatesCache.set(cleanPostcode, coordinates)
-      geocodeCache.set(cleanPostcode, coordinates) // Store in persistent cache
+      geocodeCache.set(cleanPostcode, coordinates) // Store in local cache
+      
+      // Store in Supabase cache
+      try {
+        await supabase.rpc('store_geocode_in_cache', {
+          p_postcode: cleanPostcode,
+          p_longitude: lng,
+          p_latitude: lat
+        })
+        console.log(`Stored ${cleanPostcode} in Supabase cache`)
+      } catch (error) {
+        console.warn('Failed to store in Supabase cache:', error)
+      }
+      
       console.log(`Geocoded ${cleanPostcode} to coordinates:`, coordinates)
       
       return coordinates
@@ -172,6 +223,9 @@ serve(async (req) => {
     // or multiple points (use Matrix API)
     if (normalizedOrigins.length === 1 && normalizedDestinations.length === 1) {
       console.log('=== Using Directions API (single route) ===')
+      
+      // Increment directions call counter
+      directionsCalls++
       
       const startCoord = originCoords[0]
       const endCoord = destinationCoords[0]
@@ -224,12 +278,18 @@ serve(async (req) => {
         durations
       }
 
+      // Log usage tracking before returning
+      await logMapboxUsage(sessionId)
+
       return new Response(JSON.stringify(result), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
       
     } else {
       console.log('=== Using Matrix API (multiple points) ===')
+      
+      // Increment matrix call counter
+      matrixCalls++
       
       // Format coordinates for Mapbox Matrix API
       const allCoords = [...originCoords, ...destinationCoords]
@@ -301,6 +361,9 @@ serve(async (req) => {
         durations
       }
 
+      // Log usage tracking before returning
+      await logMapboxUsage(sessionId)
+
       return new Response(JSON.stringify(result), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
@@ -311,6 +374,13 @@ serve(async (req) => {
     console.error('Error message:', error.message)
     console.error('Error stack:', error.stack)
     console.error('Full error:', JSON.stringify(error, Object.getOwnPropertyNames(error)))
+    
+    // Still log usage tracking even on error
+    try {
+      await logMapboxUsage(sessionId)
+    } catch (loggingError) {
+      console.warn('Failed to log usage tracking:', loggingError)
+    }
     
     return new Response(
       JSON.stringify({ 
@@ -323,5 +393,41 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     )
+  }
+}
+
+// Helper function to log usage tracking
+async function logMapboxUsage(sessionId: string) {
+  try {
+    if (geocodingCalls > 0) {
+      await supabase.rpc('log_mapbox_usage', {
+        p_function_name: 'mapbox-distance',
+        p_api_type: 'geocoding',
+        p_call_count: geocodingCalls,
+        p_session_id: sessionId
+      })
+    }
+    
+    if (directionsCalls > 0) {
+      await supabase.rpc('log_mapbox_usage', {
+        p_function_name: 'mapbox-distance',
+        p_api_type: 'directions',
+        p_call_count: directionsCalls,
+        p_session_id: sessionId
+      })
+    }
+    
+    if (matrixCalls > 0) {
+      await supabase.rpc('log_mapbox_usage', {
+        p_function_name: 'mapbox-distance',
+        p_api_type: 'matrix',
+        p_call_count: matrixCalls,
+        p_session_id: sessionId
+      })
+    }
+    
+    console.log(`✅ Logged usage: ${geocodingCalls} geocoding, ${directionsCalls} directions, ${matrixCalls} matrix calls`)
+  } catch (error) {
+    console.warn('Failed to log usage tracking:', error)
   }
 })

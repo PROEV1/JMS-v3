@@ -12,6 +12,7 @@ import { Order, EngineerSettings, getOrderEstimatedHours, getOrderEstimatedMinut
 import { getSmartEngineerRecommendations, getSchedulingSettings, getAllEngineersForSchedulingFast, getEngineerDailyWorkload, getClientBlockedDatesMap, getWorkloadMap, getEngineerSlotPool } from '@/utils/schedulingUtils';
 import { calculateDayFit, getWorkingDayInfo } from '@/utils/dayFitUtils';
 import { getLocationDisplayText } from '@/utils/postcodeUtils';
+import { MapboxUsageDisplay } from './MapboxUsageDisplay';
 
 interface Engineer {
   id: string;
@@ -93,12 +94,13 @@ export function AutoScheduleReviewModal({
   const [guaranteeSchedule, setGuaranteeSchedule] = useState(true);
   // Auto-fix preflight failures option
   const [autoFixPreflightFailures, setAutoFixPreflightFailures] = useState(true);
-  // Diagnostics
   const [diagnostics, setDiagnostics] = useState<{
     mapbox429Count: number;
     fallbacksUsed: number;
     unboundedMatches: number;
   }>({ mapbox429Count: 0, fallbacksUsed: 0, unboundedMatches: 0 });
+  // Session tracking for Mapbox usage
+  const [sessionId] = useState(() => crypto.randomUUID());
 
   useEffect(() => {
     if (isOpen && orders.length > 0 && !generated && !isGeneratingRef.current) {

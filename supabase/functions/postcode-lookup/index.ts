@@ -1,9 +1,14 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { corsHeaders } from '../_shared/cors.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.52.1'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+
+// Usage tracking counter
+let geocodingCalls = 0
 
 interface AddressResult {
   address: string;
@@ -78,9 +83,13 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Generate session ID for tracking related calls
+  const sessionId = crypto.randomUUID()
+  geocodingCalls = 0 // Reset counter for this request
+
   try {
-    const mapboxToken = Deno.env.get('MAPBOX_ACCESS_TOKEN')
-    if (!mapboxToken) {
+    const MAPBOX_ACCESS_TOKEN = Deno.env.get('MAPBOX_ACCESS_TOKEN')
+    if (!MAPBOX_ACCESS_TOKEN) {
       return new Response(
         JSON.stringify({ error: 'Mapbox access token not configured' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -121,19 +130,44 @@ serve(async (req) => {
     let addresses: AddressResult[] = [];
     let postcodeCoords: { lat: number, lon: number } | null = null;
     
-    // First, get postcode coordinates for proximity biasing
+    // First, get postcode coordinates for proximity biasing (try cache first)
     try {
-      const ukApiUrl = `https://api.postcodes.io/postcodes/${encodeURIComponent(formattedPostcode)}`
-      const ukResponse = await fetch(ukApiUrl)
+      const { data: cacheResult } = await supabase
+        .rpc('get_geocode_from_cache', { p_postcode: formattedPostcode })
       
-      if (ukResponse.ok) {
-        const ukData = await ukResponse.json()
-        if (ukData.status === 200 && ukData.result) {
-          postcodeCoords = {
-            lat: ukData.result.latitude,
-            lon: ukData.result.longitude
-          };
-          console.log('Got postcode coordinates:', postcodeCoords)
+      if (cacheResult && cacheResult.length > 0) {
+        postcodeCoords = {
+          lat: cacheResult[0].latitude,
+          lon: cacheResult[0].longitude
+        };
+        console.log('Using cached coordinates for postcode:', postcodeCoords)
+      } else {
+        // Not in cache, get from UK API and cache it
+        const ukApiUrl = `https://api.postcodes.io/postcodes/${encodeURIComponent(formattedPostcode)}`
+        const ukResponse = await fetch(ukApiUrl)
+        
+        if (ukResponse.ok) {
+          const ukData = await ukResponse.json()
+          if (ukData.status === 200 && ukData.result) {
+            postcodeCoords = {
+              lat: ukData.result.latitude,
+              lon: ukData.result.longitude
+            };
+            
+            // Cache it for future use
+            try {
+              await supabase.rpc('store_geocode_in_cache', {
+                p_postcode: formattedPostcode,
+                p_longitude: postcodeCoords.lon,
+                p_latitude: postcodeCoords.lat
+              })
+              console.log('Cached coordinates for postcode:', formattedPostcode)
+            } catch (error) {
+              console.warn('Failed to cache coordinates:', error)
+            }
+            
+            console.log('Got postcode coordinates from UK API:', postcodeCoords)
+          }
         }
       }
     } catch (error) {
@@ -155,7 +189,7 @@ serve(async (req) => {
       for (const searchQuery of searchQueries) {
         try {
           let mapboxUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchQuery)}.json?` +
-            `access_token=${mapboxToken}&` +
+            `access_token=${MAPBOX_ACCESS_TOKEN}&` +
             'country=GB&' +
             'types=address,poi&' +
             'limit=10'
@@ -167,6 +201,7 @@ serve(async (req) => {
           
           console.log('Mapbox search query:', searchQuery)
           
+          geocodingCalls++ // Track API usage
           const response = await fetch(mapboxUrl)
           if (response.ok) {
             const data = await response.json()
@@ -228,7 +263,7 @@ serve(async (req) => {
       
       try {
         let mapboxUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(formattedPostcode)}.json?` +
-          `access_token=${mapboxToken}&` +
+          `access_token=${MAPBOX_ACCESS_TOKEN}&` +
           'country=GB&' +
           'types=postcode,place&' +
           'limit=10'
@@ -240,6 +275,7 @@ serve(async (req) => {
         
         console.log('Mapbox postcode search for:', formattedPostcode)
         
+        geocodingCalls++ // Track API usage
         const response = await fetch(mapboxUrl)
         if (response.ok) {
           const data = await response.json()
@@ -283,6 +319,9 @@ serve(async (req) => {
 
     console.log('Found', uniqueAddresses.length, 'unique addresses')
 
+    // Log usage tracking before returning
+    await logPostcodeLookupUsage(sessionId)
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -297,6 +336,14 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Function error:', error)
+    
+    // Still log usage tracking even on error
+    try {
+      await logPostcodeLookupUsage(sessionId)
+    } catch (loggingError) {
+      console.warn('Failed to log usage tracking:', loggingError)
+    }
+    
     return new Response(
       JSON.stringify({ 
         error: 'Internal server error',
@@ -309,3 +356,20 @@ serve(async (req) => {
     )
   }
 })
+
+// Helper function to log usage tracking
+async function logPostcodeLookupUsage(sessionId: string) {
+  try {
+    if (geocodingCalls > 0) {
+      await supabase.rpc('log_mapbox_usage', {
+        p_function_name: 'postcode-lookup',
+        p_api_type: 'geocoding',
+        p_call_count: geocodingCalls,
+        p_session_id: sessionId
+      })
+      console.log(`✅ Logged ${geocodingCalls} geocoding calls for postcode-lookup`)
+    }
+  } catch (error) {
+    console.warn('Failed to log usage tracking:', error)
+  }
+}

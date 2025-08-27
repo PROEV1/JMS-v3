@@ -762,6 +762,45 @@ export type Database = {
           },
         ]
       }
+      geocode_cache: {
+        Row: {
+          cached_at: string
+          created_at: string
+          expires_at: string
+          hit_count: number
+          id: string
+          last_accessed: string
+          latitude: number
+          longitude: number
+          postcode: string
+          updated_at: string
+        }
+        Insert: {
+          cached_at?: string
+          created_at?: string
+          expires_at?: string
+          hit_count?: number
+          id?: string
+          last_accessed?: string
+          latitude: number
+          longitude: number
+          postcode: string
+          updated_at?: string
+        }
+        Update: {
+          cached_at?: string
+          created_at?: string
+          expires_at?: string
+          hit_count?: number
+          id?: string
+          last_accessed?: string
+          latitude?: number
+          longitude?: number
+          postcode?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       installers: {
         Row: {
           availability: boolean | null
@@ -1268,6 +1307,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      mapbox_usage_tracking: {
+        Row: {
+          api_type: string
+          call_count: number
+          created_at: string
+          function_name: string
+          id: string
+          metadata: Json | null
+          session_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          api_type: string
+          call_count?: number
+          created_at?: string
+          function_name: string
+          id?: string
+          metadata?: Json | null
+          session_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          api_type?: string
+          call_count?: number
+          created_at?: string
+          function_name?: string
+          id?: string
+          metadata?: Json | null
+          session_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
       }
       messages: {
         Row: {
@@ -3240,6 +3312,10 @@ export type Database = {
         Args: { target_partner_id: string; user_uuid: string }
         Returns: boolean
       }
+      cleanup_expired_geocodes: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
       detect_scheduling_conflicts: {
         Args: { p_order_id: string }
         Returns: Json
@@ -3282,6 +3358,13 @@ export type Database = {
         Args: { p_date: string; p_engineer_id: string }
         Returns: number
       }
+      get_geocode_from_cache: {
+        Args: { p_postcode: string }
+        Returns: {
+          latitude: number
+          longitude: number
+        }[]
+      }
       get_item_location_balances: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -3313,6 +3396,16 @@ export type Database = {
       is_manager: {
         Args: { user_uuid?: string }
         Returns: boolean
+      }
+      log_mapbox_usage: {
+        Args: {
+          p_api_type: string
+          p_call_count?: number
+          p_function_name: string
+          p_metadata?: Json
+          p_session_id?: string
+        }
+        Returns: undefined
       }
       log_order_activity: {
         Args: {
@@ -3365,6 +3458,10 @@ export type Database = {
       revoke_material_usage: {
         Args: { p_restore_stock?: boolean; p_usage_id: string }
         Returns: boolean
+      }
+      store_geocode_in_cache: {
+        Args: { p_latitude: number; p_longitude: number; p_postcode: string }
+        Returns: undefined
       }
       test_partner_import_connectivity: {
         Args: Record<PropertyKey, never>
