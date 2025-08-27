@@ -10,6 +10,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useCreateStockRequest } from '@/hooks/useStockRequests';
 
 interface CreateStockRequestModalProps {
   open: boolean;
@@ -35,6 +36,7 @@ export function CreateStockRequestModal({ open, onOpenChange }: CreateStockReque
   ]);
 
   const { toast } = useToast();
+  const createRequest = useCreateStockRequest();
 
   // Fetch engineers
   const { data: engineers = [] } = useQuery({
@@ -107,23 +109,17 @@ export function CreateStockRequestModal({ open, onOpenChange }: CreateStockReque
 
     try {
       const requestData = {
-        engineer_id: engineerId,
-        requested_by: engineerId, // Same as engineer for admin creation
         destination_location_id: destinationLocationId,
-        order_id: orderId || undefined,
-        needed_by: neededBy || undefined,
+        order_id: orderId || null,
+        needed_by: neededBy || null,
         priority,
-        notes: notes || undefined,
-        lines: lines.map(({ id, ...line }) => line)
+        notes: notes || '',
+        lines: lines.map(({ id, ...line }) => line),
+        engineer_id: engineerId
       };
 
-      // TODO: Use the actual stock request creation hook
       console.log('Creating stock request:', requestData);
-      
-      toast({
-        title: 'Success',
-        description: 'Stock request created successfully',
-      });
+      await createRequest.mutateAsync(requestData);
 
       onOpenChange(false);
       // Reset form
@@ -135,11 +131,7 @@ export function CreateStockRequestModal({ open, onOpenChange }: CreateStockReque
       setNotes('');
       setLines([{ id: '1', item_id: '', qty: 1, notes: '' }]);
     } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to create stock request',
-        variant: 'destructive',
-      });
+      console.error('Failed to create stock request:', error);
     }
   };
 
