@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Plus, Package, Search, Boxes, AlertTriangle, BarChart3, Hash, Trash2, MapPin } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { AddItemModal } from './AddItemModal';
@@ -218,91 +219,97 @@ export const InventoryItemsSimple: React.FC<InventoryItemsSimpleProps> = ({ onSw
         </div>
       )}
 
-      {/* Low Stock Engineer Details */}
+      {/* Low Stock Locations Table */}
       {lowStockDetails && lowStockDetails.length > 0 && (
         <div id="low-stock-section" className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-medium">Low Stock Items</h3>
+            <h3 className="text-lg font-medium">Low Stock Locations</h3>
             <Badge variant="destructive" className="ml-2">
-              {lowStockDetails.length} items need attention
+              {lowStockDetails.reduce((acc: any[], item: any) => {
+                const existingLocation = acc.find(loc => loc.location_id === item.location_id);
+                if (!existingLocation) {
+                  acc.push({ location_id: item.location_id });
+                }
+                return acc;
+              }, []).length} locations need stock
             </Badge>
           </div>
           
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {/* Group by engineer */}
-            {lowStockDetails.reduce((acc: any[], item: any) => {
-              let engineerGroup = acc.find(group => group.engineer_id === item.engineer_id);
-              if (!engineerGroup) {
-                engineerGroup = {
-                  engineer_id: item.engineer_id,
-                  engineer_name: item.engineer_name,
-                  engineer_email: item.engineer_email,
-                  location_name: item.location_name,
-                  items: []
-                };
-                acc.push(engineerGroup);
-              }
-              engineerGroup.items.push(item);
-              return acc;
-            }, []).map((engineerGroup: any) => (
-              <Card key={engineerGroup.engineer_id} className="border-warning/20">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle className="text-sm">{engineerGroup.engineer_name}</CardTitle>
-                      <p className="text-xs text-muted-foreground">{engineerGroup.location_name}</p>
-                    </div>
-                    <Badge variant="outline" className="text-xs">
-                      {engineerGroup.items.length} items
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {engineerGroup.items.map((item: any) => (
-                    <div key={`${item.location_id}-${item.item_id}`} className="flex items-center justify-between p-2 rounded-md bg-muted/50">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-medium truncate">{item.item_name}</p>
-                          <Badge variant="outline" className="text-xs">
-                            {item.item_sku}
-                          </Badge>
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          Stock: {item.current_stock} / Reorder: {item.reorder_point}
-                        </p>
+          <Card>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Engineer / Location</TableHead>
+                  <TableHead>Item</TableHead>
+                  <TableHead>SKU</TableHead>
+                  <TableHead>Current Stock</TableHead>
+                  <TableHead>Reorder Point</TableHead>
+                  <TableHead>Shortage</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {lowStockDetails.map((item: any) => (
+                  <TableRow key={`${item.location_id}-${item.item_id}`} className="hover:bg-muted/50">
+                    <TableCell>
+                      <div>
+                        <div className="font-medium">{item.engineer_name}</div>
+                        <div className="text-sm text-muted-foreground">{item.location_name}</div>
                       </div>
-                      <div className="ml-2">
-                        <StatusChip 
-                          status={item.status === 'out_of_stock' ? 'rejected' : 
-                                 item.status === 'critical_low' ? 'pending' : 'submitted'}
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-medium">{item.item_name}</div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="text-xs">
+                        {item.item_sku}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <span className={item.current_stock === 0 ? "text-destructive font-medium" : 
+                                    item.current_stock < item.reorder_point * 0.5 ? "text-warning font-medium" : ""}>
+                        {item.current_stock}
+                      </span>
+                    </TableCell>
+                    <TableCell>{item.reorder_point}</TableCell>
+                    <TableCell>
+                      <span className="text-destructive font-medium">{item.shortage}</span>
+                    </TableCell>
+                    <TableCell>
+                      <StatusChip 
+                        status={item.status === 'out_of_stock' ? 'rejected' : 
+                               item.status === 'critical_low' ? 'pending' : 'submitted'}
+                      >
+                        {item.status === 'out_of_stock' ? 'Out of Stock' : 
+                         item.status === 'critical_low' ? 'Critical Low' : 'Low Stock'}
+                      </StatusChip>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex gap-1 justify-end">
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          className="text-xs h-7 px-2"
+                          onClick={() => window.open(`/engineer/stock-requests`, '_blank')}
                         >
-                          {item.status === 'out_of_stock' ? 'Out' : 
-                           item.status === 'critical_low' ? 'Critical' : 'Low'}
-                        </StatusChip>
+                          Request Stock
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="ghost"
+                          className="text-xs h-7 px-2"
+                          onClick={() => onSwitchTab?.('locations')}
+                        >
+                          View Location
+                        </Button>
                       </div>
-                    </div>
-                  ))}
-                  <div className="pt-2 space-y-1">
-                    <Button 
-                      size="sm" 
-                      className="w-full text-xs" 
-                      onClick={() => window.open(`/engineer/stock-requests`, '_blank')}
-                    >
-                      Create Stock Request
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="w-full text-xs"
-                      onClick={() => onSwitchTab?.('locations')}
-                    >
-                      View Location Stock
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
         </div>
       )}
 
