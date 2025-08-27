@@ -12,6 +12,7 @@ import { Order, EngineerSettings, getOrderEstimatedHours, getOrderEstimatedMinut
 import { getSmartEngineerRecommendations, getSchedulingSettings, getAllEngineersForSchedulingFast, getEngineerDailyWorkload, getClientBlockedDatesMap, getWorkloadMap, getEngineerSlotPool } from '@/utils/schedulingUtils';
 import { calculateDayFit, getWorkingDayInfo } from '@/utils/dayFitUtils';
 import { getLocationDisplayText } from '@/utils/postcodeUtils';
+import { getMapboxUsageStats, type MapboxUsageSummary } from '@/utils/mapboxUsageTracker';
 import { MapboxUsageDisplay } from './MapboxUsageDisplay';
 
 interface Engineer {
@@ -99,6 +100,10 @@ export function AutoScheduleReviewModal({
     fallbacksUsed: number;
     unboundedMatches: number;
   }>({ mapbox429Count: 0, fallbacksUsed: 0, unboundedMatches: 0 });
+  
+  // Mapbox usage statistics
+  const [mapboxUsage, setMapboxUsage] = useState<MapboxUsageSummary | null>(null);
+  const [loadingMapboxStats, setLoadingMapboxStats] = useState(false);
   // Session tracking for Mapbox usage
   const [sessionId] = useState(() => crypto.randomUUID());
 
@@ -106,7 +111,24 @@ export function AutoScheduleReviewModal({
     if (isOpen && orders.length > 0 && !generated && !isGeneratingRef.current) {
       generateProposals();
     }
+    
+    // Load Mapbox usage stats when modal opens
+    if (isOpen && !loadingMapboxStats && !mapboxUsage) {
+      loadMapboxUsageStats();
+    }
   }, [isOpen, orders, generated]);
+
+  const loadMapboxUsageStats = async () => {
+    setLoadingMapboxStats(true);
+    try {
+      const stats = await getMapboxUsageStats();
+      setMapboxUsage(stats);
+    } catch (error) {
+      console.error('Failed to load Mapbox usage stats:', error);
+    } finally {
+      setLoadingMapboxStats(false);
+    }
+  };
 
   const generateProposals = async () => {
     // Prevent concurrent runs
