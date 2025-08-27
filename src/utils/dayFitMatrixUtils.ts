@@ -83,8 +83,8 @@ export async function calculateDayFitMatrix(
 
     // If only one job (the new one), simple calculation
     if (allJobs.length === 1) {
-      const homeToJob = await getSingleTravelTime(engineer.base_postcode || 'M1 1AA', newJob.postcode);
-      const jobToHome = await getSingleTravelTime(newJob.postcode, engineer.base_postcode || 'M1 1AA');
+      const homeToJob = await getSingleTravelTime(engineer.starting_postcode || 'M1 1AA', newJob.postcode);
+      const jobToHome = await getSingleTravelTime(newJob.postcode, engineer.starting_postcode || 'M1 1AA');
       
       const totalTime = homeToJob + newJob.estimatedMinutes + jobToHome;
       const canFit = totalTime <= availableMinutes;
@@ -94,15 +94,15 @@ export async function calculateDayFitMatrix(
         totalTravelMinutes: homeToJob + jobToHome,
         conflicts: canFit ? [] : [`Total time (${totalTime}min) exceeds available time (${availableMinutes}min)`],
         schedule: [
-          { time: workingHours.start, location: engineer.base_postcode || 'M1 1AA', type: 'travel', duration: homeToJob },
+          { time: workingHours.start, location: engineer.starting_postcode || 'M1 1AA', type: 'travel', duration: homeToJob },
           { time: addMinutesToTime(workingHours.start, homeToJob), location: newJob.postcode, type: 'job', duration: newJob.estimatedMinutes },
-          { time: addMinutesToTime(workingHours.start, homeToJob + newJob.estimatedMinutes), location: engineer.base_postcode || 'M1 1AA', type: 'travel', duration: jobToHome }
+          { time: addMinutesToTime(workingHours.start, homeToJob + newJob.estimatedMinutes), location: engineer.starting_postcode || 'M1 1AA', type: 'travel', duration: jobToHome }
         ]
       };
     }
 
     // Multiple jobs - use Matrix API for all travel legs
-    const locations = [engineer.base_postcode || 'M1 1AA', ...allJobs.map(job => job.postcode)];
+    const locations = [engineer.starting_postcode || 'M1 1AA', ...allJobs.map(job => job.postcode)];
     const uniqueLocations = [...new Set(locations)];
 
     console.log(`Getting matrix for ${uniqueLocations.length} unique locations`);
@@ -114,7 +114,7 @@ export async function calculateDayFitMatrix(
     const schedule: MatrixDayFitResult['schedule'] = [];
     let currentTime = startMinutes;
     let totalTravelMinutes = 0;
-    let currentLocation = engineer.base_postcode || 'M1 1AA';
+    let currentLocation = engineer.starting_postcode || 'M1 1AA';
 
     for (let i = 0; i < allJobs.length; i++) {
       const job = allJobs[i];
@@ -145,14 +145,14 @@ export async function calculateDayFitMatrix(
     }
 
     // Add final travel back home
-    const finalTravelTime = getTravelTimeFromMatrix(travelMatrix, uniqueLocations, currentLocation, engineer.base_postcode || 'M1 1AA');
+    const finalTravelTime = getTravelTimeFromMatrix(travelMatrix, uniqueLocations, currentLocation, engineer.starting_postcode || 'M1 1AA');
     if (finalTravelTime > 0) {
-      schedule.push({
-        time: minutesToTime(currentTime),
-        location: engineer.base_postcode || 'M1 1AA',
-        type: 'travel',
-        duration: finalTravelTime
-      });
+    schedule.push({
+      time: minutesToTime(currentTime),
+      location: engineer.starting_postcode || 'M1 1AA',
+      type: 'travel',
+      duration: finalTravelTime
+    });
       currentTime += finalTravelTime;
       totalTravelMinutes += finalTravelTime;
     }
