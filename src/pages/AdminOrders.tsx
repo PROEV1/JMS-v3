@@ -265,9 +265,9 @@ export default function AdminOrders() {
 
       {/* Orders Table */}
       <Card className="border-0 shadow-sm">
-        <CardHeader className="pb-md">
-          <CardTitle className="text-lg font-semibold">Orders Overview</CardTitle>
-          <CardDescription className="text-sm text-muted-foreground">
+        <CardHeader className="pb-compact">
+          <CardTitle className="brand-heading-3">Orders Overview</CardTitle>
+          <CardDescription className="brand-small text-muted-foreground">
             All orders with their current status and details
           </CardDescription>
         </CardHeader>
@@ -275,101 +275,100 @@ export default function AdminOrders() {
           <div className="overflow-x-auto">
             <Table>
                <TableHeader>
-                 <TableRow>
-                   <TableHead>Order Number</TableHead>
-                   <TableHead>Client</TableHead>
-                   <TableHead>Status</TableHead>
-                   <TableHead>Engineer</TableHead>
-                   <TableHead>Scheduled Date</TableHead>
-                   <TableHead>Amount</TableHead>
-                   <TableHead>Created</TableHead>
-                   <TableHead>Actions</TableHead>
+                 <TableRow className="border-b">
+                   <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wide py-3">Order</TableHead>
+                   <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wide py-3">Client</TableHead>
+                   <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wide py-3">Status</TableHead>
+                   <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wide py-3 hidden lg:table-cell">Engineer</TableHead>
+                   <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wide py-3">Scheduled</TableHead>
+                   <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wide py-3">Amount</TableHead>
+                   <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wide py-3 hidden xl:table-cell">Created</TableHead>
+                   <TableHead className="text-xs font-medium text-muted-foreground uppercase tracking-wide py-3">Actions</TableHead>
                  </TableRow>
                </TableHeader>
               <TableBody>
-                {orders?.map((order) => (
-                  <TableRow key={order.id}>
-                     <TableCell className="font-medium">
-                       <div>
-                         {order.order_number}
-                         {order.quote?.quote_number && (
-                           <p className="text-sm text-muted-foreground">
-                             Quote: {order.quote.quote_number}
-                           </p>
-                         )}
-                         {order.is_partner_job && order.partner && (
-                           <div className="flex items-center gap-1 mt-1">
-                             <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700">
-                               Partner: {order.partner.name}
+                {orders?.map((order, index) => (
+                  <TableRow key={order.id} className={`border-b hover:bg-muted/30 transition-colors ${index % 2 === 0 ? 'bg-background' : 'bg-muted/10'}`}>
+                     <TableCell className="py-2.5 align-middle">
+                       <div className="flex flex-col gap-0.5">
+                         <span className="text-sm font-medium text-foreground leading-tight">{order.order_number}</span>
+                         <div className="flex items-center gap-1.5">
+                           {order.quote?.quote_number && (
+                             <span className="text-xs text-muted-foreground">Q{order.quote.quote_number.replace(/^Q/, '')}</span>
+                           )}
+                           {order.is_partner_job && order.partner && (
+                             <Badge variant="secondary" className="text-[10px] font-medium px-1.5 py-0.5 h-auto bg-blue-50 text-blue-700 border-blue-200">
+                               {order.partner.name}
                              </Badge>
-                             {order.partner_status && (
-                               <Badge variant="outline" className="text-xs">
-                                 {order.partner_status}
-                               </Badge>
-                             )}
-                           </div>
-                         )}
+                           )}
+                         </div>
                        </div>
                      </TableCell>
-                    <TableCell>
+                    <TableCell className="py-2.5 align-middle">
                       {order.client ? (
-                        <div>
-                          <p className="font-medium">{order.client.full_name}</p>
-                          <p className="text-sm text-muted-foreground">{order.client.email}</p>
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-sm font-medium text-foreground leading-tight">{order.client.full_name}</span>
+                          <span className="text-xs text-muted-foreground truncate max-w-[180px]">{order.client.email}</span>
                         </div>
                       ) : (
-                        <span className="text-muted-foreground">No client</span>
+                        <span className="text-xs text-muted-foreground">No client</span>
                       )}
                     </TableCell>
-                     <TableCell>
-                       <span className={`status-base ${getStatusClassName(order.status_enhanced || 'unknown')}`}>
+                     <TableCell className="py-2.5 align-middle">
+                       <Badge className={`text-[10px] font-medium uppercase px-2 py-1 h-auto ${getStatusClassName(order.status_enhanced || 'unknown')}`}>
                          {formatStatusText(order.status_enhanced || 'unknown')}
-                       </span>
+                       </Badge>
                      </TableCell>
-                     <TableCell>
+                     <TableCell className="py-2.5 align-middle hidden lg:table-cell">
                        {order.engineer ? (
-                         <div className="flex items-center gap-sm">
-                           <User className="icon-sm text-muted-foreground" />
-                           <span className="text-sm font-medium">{order.engineer.name}</span>
+                         <div className="flex items-center gap-1.5">
+                           <User className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                           <span className="text-xs font-medium text-foreground truncate">{order.engineer.name}</span>
                          </div>
                        ) : (
-                         <span className="text-sm text-muted-foreground">Unassigned</span>
+                         <span className="text-xs text-muted-foreground">Unassigned</span>
                        )}
                      </TableCell>
-                     <TableCell>
+                     <TableCell className="py-2.5 align-middle">
                        {order.scheduled_install_date ? (
-                         <div className="flex items-center gap-sm">
-                           <Calendar className="icon-sm text-muted-foreground" />
-                           <span className="text-sm font-medium">{format(new Date(order.scheduled_install_date), 'PP')}</span>
+                         <div className="flex items-center gap-1.5">
+                           <Calendar className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                           <span className="text-xs font-medium text-foreground whitespace-nowrap">
+                             {format(new Date(order.scheduled_install_date), 'd MMM yyyy')}
+                           </span>
                          </div>
                        ) : (
-                         <span className="text-sm text-muted-foreground">Not scheduled</span>
+                         <span className="text-xs text-muted-foreground">Not scheduled</span>
                        )}
                      </TableCell>
-                    <TableCell className="font-medium">
-                      £{order.total_amount}
+                    <TableCell className="py-2.5 align-middle">
+                      <span className="text-sm font-semibold text-foreground">£{order.total_amount.toLocaleString()}</span>
                     </TableCell>
-                    <TableCell>
-                      {format(new Date(order.created_at), 'PPP')}
+                    <TableCell className="py-2.5 align-middle hidden xl:table-cell">
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">
+                        {format(new Date(order.created_at), 'd MMM yyyy')}
+                      </span>
                     </TableCell>
-                     <TableCell>
-                       <div className="flex items-center gap-2">
+                     <TableCell className="py-2.5 align-middle">
+                       <div className="flex items-center gap-1.5">
                          <Button
                            variant="outline"
                            size="sm"
+                           className="h-8 px-2.5 text-xs font-medium"
                            onClick={() => navigate(`/admin/orders/${order.id}`)}
                          >
-                           <Eye className="h-4 w-4 mr-2" />
-                           View
+                           <Eye className="h-3 w-3" />
+                           <span className="ml-1 hidden sm:inline">View</span>
                          </Button>
                          <Button
                            variant="destructive"
                            size="sm"
+                           className="h-8 px-2.5 text-xs font-medium"
                            onClick={() => handleDeleteOrder(order.id)}
                            disabled={deleteMutation.isPending}
                          >
-                           <Trash2 className="h-4 w-4 mr-2" />
-                           Delete
+                           <Trash2 className="h-3 w-3" />
+                           <span className="ml-1 hidden sm:inline">Delete</span>
                          </Button>
                        </div>
                      </TableCell>
