@@ -237,7 +237,7 @@ export function InventoryDashboardV2({ onSwitchTab }: InventoryDashboardV2Props)
 
       {/* Priority Tables */}
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Low Stock Items */}
+        {/* Low Stock Items Table */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-lg font-medium">Low Stock Items</CardTitle>
@@ -247,22 +247,61 @@ export function InventoryDashboardV2({ onSwitchTab }: InventoryDashboardV2Props)
           </CardHeader>
           <CardContent>
             {lowStockData?.length ? (
-              <div className="space-y-3">
-                {lowStockData.slice(0, 5).map((item: any) => (
-                  <div key={`${item.location_id}-${item.item_id}`} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
-                    <div className="space-y-1">
-                      <div className="font-medium text-sm">{item.item_name}</div>
-                      <div className="text-xs text-muted-foreground">{item.engineer_name} - {item.location_name}</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-sm font-medium">Stock: {item.current_stock} / {item.reorder_point}</div>
-                      <Button variant="outline" size="sm" className="text-xs h-6 mt-1"
-                              onClick={() => window.open(`/engineer/stock-requests`, '_blank')}>
-                        Request Stock
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-2 px-3 font-medium">Engineer / Location</th>
+                      <th className="text-left py-2 px-3 font-medium">Item</th>
+                      <th className="text-left py-2 px-3 font-medium">SKU</th>
+                      <th className="text-center py-2 px-3 font-medium">Current Stock</th>
+                      <th className="text-center py-2 px-3 font-medium">Reorder Point</th>
+                      <th className="text-center py-2 px-3 font-medium">Shortage</th>
+                      <th className="text-center py-2 px-3 font-medium">Status</th>
+                      <th className="text-right py-2 px-3 font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lowStockData.slice(0, 5).map((item: any) => (
+                      <tr key={`${item.location_id}-${item.item_id}`} className="border-b hover:bg-muted/20">
+                        <td className="py-2 px-3">
+                          <div className="font-medium text-sm">{item.engineer_name}</div>
+                          <div className="text-xs text-muted-foreground">{item.location_name}</div>
+                        </td>
+                        <td className="py-2 px-3 font-medium">{item.item_name}</td>
+                        <td className="py-2 px-3 text-muted-foreground">{item.item_sku}</td>
+                        <td className="py-2 px-3 text-center">{item.current_stock}</td>
+                        <td className="py-2 px-3 text-center">{item.reorder_point}</td>
+                        <td className="py-2 px-3 text-center text-red-600 font-medium">
+                          {item.reorder_point - item.current_stock}
+                        </td>
+                        <td className="py-2 px-3 text-center">
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                            Low Stock
+                          </span>
+                        </td>
+                        <td className="py-2 px-3 text-right">
+                          <div className="flex gap-2 justify-end">
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={() => onSwitchTab('requests')}
+                            >
+                              Request Stock
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => window.location.href = `/admin/engineers/${item.engineer_id}`}
+                            >
+                              View Location
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             ) : (
               <div className="text-center py-6 text-muted-foreground">
@@ -272,7 +311,7 @@ export function InventoryDashboardV2({ onSwitchTab }: InventoryDashboardV2Props)
           </CardContent>
         </Card>
 
-        {/* Open Stock Requests */}
+        {/* Recent Stock Requests */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-lg font-medium">Recent Stock Requests</CardTitle>
