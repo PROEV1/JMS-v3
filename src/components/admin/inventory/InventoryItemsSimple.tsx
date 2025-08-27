@@ -58,7 +58,10 @@ export const InventoryItemsSimple: React.FC<InventoryItemsSimpleProps> = ({ onSw
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [editItem, setEditItem] = useState<InventoryItem | null>(null);
 
-  const { deleteInventoryItem } = useInventoryEnhanced();
+  const { deleteInventoryItem, useLowStockEngineerDetails } = useInventoryEnhanced();
+  
+  // Get low stock engineer details
+  const { data: lowStockDetails } = useLowStockEngineerDetails();
 
   const { data: items, isLoading } = useQuery({
     queryKey: ['inventory-items'],
@@ -75,13 +78,14 @@ export const InventoryItemsSimple: React.FC<InventoryItemsSimpleProps> = ({ onSw
 
   // Header metrics
   const { data: metrics } = useQuery({
-    queryKey: ['inventory-items-metrics'],
+    queryKey: ['inventory-items-metrics', lowStockDetails?.length],
     queryFn: async () => {
       if (!items) return null;
       
       const totalSKUs = items.length;
       const activeItems = items.filter(item => item.is_active).length;
-      const lowStockItems = items.filter(item => item.reorder_point > 0).length; // Simplified
+      // Use actual low stock count from engineer details
+      const lowStockItems = lowStockDetails?.length || 0;
       const serializedItems = items.filter(item => item.is_serialized).length;
       
       return { totalSKUs, activeItems, lowStockItems, serializedItems };
@@ -198,8 +202,11 @@ export const InventoryItemsSimple: React.FC<InventoryItemsSimpleProps> = ({ onSw
             value={metrics.lowStockItems}
             icon={AlertTriangle}
             variant={metrics.lowStockItems > 0 ? "warning" : "success"}
-            subtitle="Need reordering"
-            onClick={() => onSwitchTab?.('locations')}
+            subtitle={metrics.lowStockItems > 0 ? "Engineers need stock" : "All stocked"}
+            onClick={() => {
+              // Scroll to low stock section instead of switching tabs
+              document.getElementById('low-stock-section')?.scrollIntoView({ behavior: 'smooth' });
+            }}
           />
           <InventoryKpiTile
             title="Serialized"
@@ -208,6 +215,94 @@ export const InventoryItemsSimple: React.FC<InventoryItemsSimpleProps> = ({ onSw
             variant="neutral"
             subtitle="Track by serial"
           />
+        </div>
+      )}
+
+      {/* Low Stock Engineer Details */}
+      {lowStockDetails && lowStockDetails.length > 0 && (
+        <div id="low-stock-section" className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-medium">Low Stock Items</h3>
+            <Badge variant="destructive" className="ml-2">
+              {lowStockDetails.length} items need attention
+            </Badge>
+          </div>
+          
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {/* Group by engineer */}
+            {lowStockDetails.reduce((acc: any[], item: any) => {
+              let engineerGroup = acc.find(group => group.engineer_id === item.engineer_id);
+              if (!engineerGroup) {
+                engineerGroup = {
+                  engineer_id: item.engineer_id,
+                  engineer_name: item.engineer_name,
+                  engineer_email: item.engineer_email,
+                  location_name: item.location_name,
+                  items: []
+                };
+                acc.push(engineerGroup);
+              }
+              engineerGroup.items.push(item);
+              return acc;
+            }, []).map((engineerGroup: any) => (
+              <Card key={engineerGroup.engineer_id} className="border-warning/20">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-sm">{engineerGroup.engineer_name}</CardTitle>
+                      <p className="text-xs text-muted-foreground">{engineerGroup.location_name}</p>
+                    </div>
+                    <Badge variant="outline" className="text-xs">
+                      {engineerGroup.items.length} items
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {engineerGroup.items.map((item: any) => (
+                    <div key={`${item.location_id}-${item.item_id}`} className="flex items-center justify-between p-2 rounded-md bg-muted/50">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium truncate">{item.item_name}</p>
+                          <Badge variant="outline" className="text-xs">
+                            {item.item_sku}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Stock: {item.current_stock} / Reorder: {item.reorder_point}
+                        </p>
+                      </div>
+                      <div className="ml-2">
+                        <StatusChip 
+                          status={item.status === 'out_of_stock' ? 'rejected' : 
+                                 item.status === 'critical_low' ? 'pending' : 'submitted'}
+                        >
+                          {item.status === 'out_of_stock' ? 'Out' : 
+                           item.status === 'critical_low' ? 'Critical' : 'Low'}
+                        </StatusChip>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="pt-2 space-y-1">
+                    <Button 
+                      size="sm" 
+                      className="w-full text-xs" 
+                      onClick={() => window.open(`/engineer/stock-requests`, '_blank')}
+                    >
+                      Create Stock Request
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="w-full text-xs"
+                      onClick={() => onSwitchTab?.('locations')}
+                    >
+                      View Location Stock
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </div>
       )}
 
