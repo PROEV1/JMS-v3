@@ -125,9 +125,8 @@ export function InventoryDashboardV2({ onSwitchTab }: InventoryDashboardV2Props)
     {
       label: "Create Purchase Order",
       icon: FileText,
-      onClick: () => {/* TODO: PO creation */},
-      variant: 'secondary' as const,
-      disabled: true
+      onClick: () => onSwitchTab('purchase-orders'),
+      variant: 'secondary' as const
     }
   ];
 

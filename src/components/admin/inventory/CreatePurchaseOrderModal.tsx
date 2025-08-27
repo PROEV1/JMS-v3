@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Plus, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -33,6 +33,7 @@ export function CreatePurchaseOrderModal({ open, onOpenChange }: CreatePurchaseO
   ]);
 
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   // Fetch suppliers
   const { data: suppliers = [] } = useQuery({
@@ -97,13 +98,49 @@ export function CreatePurchaseOrderModal({ open, onOpenChange }: CreatePurchaseO
     }
 
     try {
-      // TODO: Implement actual API call to create purchase order
-      console.log("Creating PO:", { supplierId, expectedDelivery, notes, poItems, totalAmount });
+      // Create the purchase order with auto-generated PO number (handled by database trigger)
+      const { data: poData, error: poError } = await supabase
+        .from('purchase_orders')
+        .insert({
+          po_number: '', // Will be replaced by database trigger
+          supplier_id: supplierId,
+          expected_delivery_date: expectedDelivery || null,
+          notes,
+          total_amount: totalAmount,
+          status: 'pending' as const
+        })
+        .select()
+        .single();
+
+      if (poError) throw poError;
+
+      // Create purchase order lines
+      const poLines = poItems
+        .filter(item => item.item_id && item.quantity > 0)
+        .map(item => ({
+          purchase_order_id: poData.id,
+          item_id: item.item_id,
+          quantity: item.quantity,
+          unit_cost: item.unit_cost,
+          total_cost: item.quantity * item.unit_cost
+        }));
+
+      if (poLines.length > 0) {
+        const { error: linesError } = await supabase
+          .from('purchase_order_lines')
+          .insert(poLines);
+
+        if (linesError) throw linesError;
+      }
       
       toast({
         title: "Success",
-        description: "Purchase order created successfully",
+        description: `Purchase order ${poData.po_number} created successfully`,
       });
+
+      // Refresh the purchase orders list
+      queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['po-metrics'] });
 
       onOpenChange(false);
       // Reset form
@@ -111,10 +148,11 @@ export function CreatePurchaseOrderModal({ open, onOpenChange }: CreatePurchaseO
       setExpectedDelivery("");
       setNotes("");
       setPoItems([{ id: "1", item_id: "", item_name: "", quantity: 1, unit_cost: 0 }]);
-    } catch (error) {
+    } catch (error: any) {
+      console.error("Error creating purchase order:", error);
       toast({
         title: "Error",
-        description: "Failed to create purchase order",
+        description: error.message || "Failed to create purchase order",
         variant: "destructive",
       });
     }

@@ -152,7 +152,7 @@ export function PurchaseOrdersList() {
           </div>
         </div>
         
-        <Button>
+        <Button onClick={() => setShowCreateModal(true)}>
           <Plus className="h-4 w-4 mr-2" />
           Create Purchase Order
         </Button>
