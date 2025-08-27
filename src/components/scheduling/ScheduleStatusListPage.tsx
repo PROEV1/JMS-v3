@@ -1323,6 +1323,17 @@ export function ScheduleStatusListPage({
         )}
       </div>
 
+      {/* Pagination */}
+      {pagination && totalCount && onPageChange && onPageSizeChange && (
+        <Paginator
+          currentPage={pagination.page}
+          pageSize={pagination.pageSize}
+          totalItems={totalCount}
+          onPageChange={onPageChange}
+          onPageSizeChange={onPageSizeChange}
+        />
+      )}
+
       {/* Modals */}
       {selectedOrder && (
         <>
@@ -1382,17 +1393,6 @@ export function ScheduleStatusListPage({
             Orders: {orders?.length || 0}, Engineers: {engineers?.length || 0}
           </p>
       </div>
-
-      {/* Pagination */}
-      {pagination && totalCount && onPageChange && onPageSizeChange && (
-        <Paginator
-          currentPage={pagination.page}
-          pageSize={pagination.pageSize}
-          totalItems={totalCount}
-          onPageChange={onPageChange}
-          onPageSizeChange={onPageSizeChange}
-        />
-      )}
     </div>
   );
   }
