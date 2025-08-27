@@ -53,14 +53,36 @@ export function CreatePurchaseOrderModal({ open, onOpenChange, stockRequest }: C
     }
   });
 
-  // Generate PO number when modal opens
+  // Generate unique PO number when modal opens
   React.useEffect(() => {
-    if (open && !poNumber) {
-      const year = new Date().getFullYear();
-      const randomNum = Math.floor(Math.random() * 9999) + 1;
-      const generatedPO = `PO${year}-${randomNum.toString().padStart(4, '0')}`;
-      setPoNumber(generatedPO);
-    }
+    const generateUniquePONumber = async () => {
+      if (open && !poNumber) {
+        const year = new Date().getFullYear();
+        let attempts = 0;
+        let generatedPO = '';
+        
+        while (attempts < 10) { // Max 10 attempts to find unique number
+          const randomNum = Math.floor(Math.random() * 9999) + 1;
+          generatedPO = `PO${year}-${randomNum.toString().padStart(4, '0')}`;
+          
+          // Check if PO number already exists
+          const { data: existing } = await supabase
+            .from('purchase_orders')
+            .select('id')
+            .eq('po_number', generatedPO)
+            .single();
+          
+          if (!existing) {
+            break; // Found unique number
+          }
+          attempts++;
+        }
+        
+        setPoNumber(generatedPO);
+      }
+    };
+    
+    generateUniquePONumber();
   }, [open, poNumber]);
 
   // Pre-populate with stock request data when provided
