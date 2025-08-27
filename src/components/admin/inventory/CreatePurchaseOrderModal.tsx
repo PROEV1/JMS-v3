@@ -30,6 +30,7 @@ export function CreatePurchaseOrderModal({ open, onOpenChange, stockRequest }: C
   const [supplierId, setSupplierId] = useState("");
   const [expectedDelivery, setExpectedDelivery] = useState("");
   const [notes, setNotes] = useState("");
+  const [poNumber, setPoNumber] = useState("");
   const [poItems, setPoItems] = useState<POItem[]>([
     { id: "1", item_id: "", item_name: "", quantity: 1, unit_cost: 0 }
   ]);
@@ -51,6 +52,16 @@ export function CreatePurchaseOrderModal({ open, onOpenChange, stockRequest }: C
       return data;
     }
   });
+
+  // Generate PO number when modal opens
+  React.useEffect(() => {
+    if (open && !poNumber) {
+      const year = new Date().getFullYear();
+      const randomNum = Math.floor(Math.random() * 9999) + 1;
+      const generatedPO = `PO${year}-${randomNum.toString().padStart(4, '0')}`;
+      setPoNumber(generatedPO);
+    }
+  }, [open, poNumber]);
 
   // Pre-populate with stock request data when provided
   React.useEffect(() => {
@@ -107,7 +118,7 @@ export function CreatePurchaseOrderModal({ open, onOpenChange, stockRequest }: C
     
     if (isSubmitting) return; // Prevent double submission
     
-    if (!supplierId || poItems.some(item => !item.item_id || !item.quantity)) {
+    if (!supplierId || !poNumber || poItems.some(item => !item.item_id || !item.quantity)) {
       toast({
         title: "Error",
         description: "Please fill in all required fields",
@@ -119,11 +130,11 @@ export function CreatePurchaseOrderModal({ open, onOpenChange, stockRequest }: C
     setIsSubmitting(true);
 
     try {
-      // Create the purchase order with auto-generated PO number (handled by database trigger)
+      // Create the purchase order with custom PO number
       const { data: poData, error: poError } = await supabase
         .from('purchase_orders')
         .insert({
-          po_number: '', // Will be replaced by database trigger
+          po_number: poNumber,
           supplier_id: supplierId,
           expected_delivery_date: expectedDelivery || null,
           notes,
@@ -183,6 +194,7 @@ export function CreatePurchaseOrderModal({ open, onOpenChange, stockRequest }: C
       setSupplierId("");
       setExpectedDelivery("");
       setNotes("");
+      setPoNumber("");
       setPoItems([{ id: "1", item_id: "", item_name: "", quantity: 1, unit_cost: 0 }]);
     } catch (error: any) {
       console.error("Error creating purchase order:", error);
@@ -206,7 +218,17 @@ export function CreatePurchaseOrderModal({ open, onOpenChange, stockRequest }: C
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="po-number">PO Number *</Label>
+              <Input
+                id="po-number"
+                value={poNumber}
+                onChange={(e) => setPoNumber(e.target.value)}
+                placeholder="Auto-generated"
+              />
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="supplier">Supplier *</Label>
               <Select value={supplierId} onValueChange={setSupplierId}>
