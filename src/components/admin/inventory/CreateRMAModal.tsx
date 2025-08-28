@@ -187,10 +187,10 @@ export function CreateRMAModal({ open, onOpenChange }: CreateRMAModalProps) {
             <div className="space-y-2">
               <Label htmlFor="supplier">Supplier *</Label>
               <Select value={supplierId} onValueChange={setSupplierId}>
-                <SelectTrigger>
+                <SelectTrigger className="bg-background">
                   <SelectValue placeholder="Select supplier" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="z-[60] bg-background border shadow-lg">
                   {suppliers.map(supplier => (
                     <SelectItem key={supplier.id} value={supplier.id}>
                       {supplier.name}
@@ -203,10 +203,10 @@ export function CreateRMAModal({ open, onOpenChange }: CreateRMAModalProps) {
             <div className="space-y-2">
               <Label htmlFor="type">RMA Type *</Label>
               <Select value={rmaType} onValueChange={(value: 'return' | 'warranty' | 'exchange') => setRmaType(value)}>
-                <SelectTrigger>
+                <SelectTrigger className="bg-background">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="z-[60] bg-background border shadow-lg">
                   <SelectItem value="return">Return</SelectItem>
                   <SelectItem value="warranty">Warranty</SelectItem>
                   <SelectItem value="exchange">Exchange</SelectItem>
@@ -247,10 +247,10 @@ export function CreateRMAModal({ open, onOpenChange }: CreateRMAModalProps) {
                           updateLine(line.id, 'item_id', ''); // Reset item selection
                         }}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="bg-background">
                           <SelectValue />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="z-[60] bg-background border shadow-lg">
                           <SelectItem value="inventory">Inventory</SelectItem>
                           <SelectItem value="charger">Charger</SelectItem>
                         </SelectContent>
@@ -263,10 +263,10 @@ export function CreateRMAModal({ open, onOpenChange }: CreateRMAModalProps) {
                         value={line.item_id} 
                         onValueChange={(value) => updateLine(line.id, 'item_id', value)}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="bg-background">
                           <SelectValue placeholder="Select item" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="z-[60] bg-background border shadow-lg max-h-[200px]">
                           {line.item_type === 'inventory' 
                             ? inventoryItems.map(item => (
                                 <SelectItem key={item.id} value={item.id}>
@@ -299,10 +299,10 @@ export function CreateRMAModal({ open, onOpenChange }: CreateRMAModalProps) {
                         value={line.condition} 
                         onValueChange={(value) => updateLine(line.id, 'condition', value)}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="bg-background">
                           <SelectValue />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="z-[60] bg-background border shadow-lg">
                           <SelectItem value="damaged">Damaged</SelectItem>
                           <SelectItem value="defective">Defective</SelectItem>
                           <SelectItem value="wrong_item">Wrong Item</SelectItem>
