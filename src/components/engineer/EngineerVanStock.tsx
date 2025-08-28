@@ -84,38 +84,83 @@ export function EngineerVanStock() {
     enabled: !!vanLocation?.id
   });
 
-  // Get van stock items
+  // Get van stock items (including assigned chargers)
   const { data: stockItems, isLoading } = useQuery({
-    queryKey: ['van-stock-items', vanLocation?.id, searchQuery],
+    queryKey: ['van-stock-items', vanLocation?.id, engineer?.id, searchQuery],
     queryFn: async () => {
       if (!vanLocation?.id) return [];
 
-      // Get stock balances
+      const allItems = [];
+
+      // Get regular inventory stock balances
       const { data: balances } = await supabase.rpc('get_item_location_balances');
       const vanBalances = balances?.filter(b => b.location_id === vanLocation.id && b.on_hand > 0) || [];
 
-      if (vanBalances.length === 0) return [];
+      if (vanBalances.length > 0) {
+        // Get regular item details
+        const itemIds = vanBalances.map(b => b.item_id);
+        let query = supabase
+          .from('inventory_items')
+          .select('id, name, sku, unit')
+          .in('id', itemIds);
 
-      // Get item details
-      const itemIds = vanBalances.map(b => b.item_id);
-      let query = supabase
-        .from('inventory_items')
-        .select('id, name, sku, unit')
-        .in('id', itemIds);
+        if (searchQuery) {
+          query = query.or(`name.ilike.%${searchQuery}%,sku.ilike.%${searchQuery}%`);
+        }
 
-      if (searchQuery) {
-        query = query.or(`name.ilike.%${searchQuery}%,sku.ilike.%${searchQuery}%`);
+        const { data: items } = await query;
+
+        // Combine regular items with balances
+        const regularItems = items?.map(item => ({
+          ...item,
+          on_hand: vanBalances.find(b => b.item_id === item.id)?.on_hand || 0,
+          type: 'regular'
+        })) || [];
+
+        allItems.push(...regularItems);
       }
 
-      const { data: items } = await query;
+      // Get assigned chargers for this engineer
+      if (engineer?.id) {
+        let chargerQuery = supabase
+          .from('charger_inventory')
+          .select(`
+            id,
+            serial_number,
+            status,
+            inventory_items!charger_item_id(name, sku)
+          `)
+          .eq('engineer_id', engineer.id)
+          .in('status', ['dispatched', 'delivered']);
 
-      // Combine items with balances
-      return items?.map(item => ({
-        ...item,
-        on_hand: vanBalances.find(b => b.item_id === item.id)?.on_hand || 0
-      })) || [];
+        const { data: assignedChargers } = await chargerQuery;
+
+        if (assignedChargers?.length > 0) {
+          const chargerItems = assignedChargers.map(charger => ({
+            id: charger.id,
+            name: charger.inventory_items?.name || 'Unknown Charger',
+            sku: charger.serial_number,
+            unit: 'unit',
+            on_hand: 1,
+            type: 'charger',
+            status: charger.status
+          }));
+
+          // Apply search filter to chargers if provided
+          const filteredChargers = searchQuery 
+            ? chargerItems.filter(item => 
+                item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                item.sku.toLowerCase().includes(searchQuery.toLowerCase())
+              )
+            : chargerItems;
+
+          allItems.push(...filteredChargers);
+        }
+      }
+
+      return allItems;
     },
-    enabled: !!vanLocation?.id
+    enabled: !!vanLocation?.id && !!engineer?.id
   });
 
   // Get recent transactions
@@ -250,20 +295,36 @@ export function EngineerVanStock() {
               </div>
             ) : stockItems?.length > 0 ? (
               <div className="space-y-3">
-                {stockItems.map((item) => (
-                  <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="space-y-1">
-                      <div className="font-medium text-sm">{item.name}</div>
-                      <div className="text-xs text-muted-foreground">{item.sku}</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-sm font-medium">{item.on_hand} {item.unit}</div>
-                      <Badge variant="outline" className="text-xs">
-                        In Stock
-                      </Badge>
-                    </div>
-                  </div>
-                ))}
+                 {stockItems.map((item) => (
+                   <div key={`${item.type}-${item.id}`} className="flex items-center justify-between p-3 border rounded-lg">
+                     <div className="space-y-1">
+                       <div className="font-medium text-sm">
+                         {item.name}
+                         {item.type === 'charger' && (
+                           <Badge variant="secondary" className="ml-2 text-xs">Charger</Badge>
+                         )}
+                       </div>
+                       <div className="text-xs text-muted-foreground">
+                         {item.type === 'charger' ? `Serial: ${item.sku}` : item.sku}
+                       </div>
+                     </div>
+                     <div className="text-right">
+                       <div className="text-sm font-medium">{item.on_hand} {item.unit}</div>
+                       <Badge 
+                         variant={item.type === 'charger' ? 
+                           (item.status === 'delivered' ? 'default' : 'secondary') : 
+                           'outline'
+                         } 
+                         className="text-xs"
+                       >
+                         {item.type === 'charger' ? 
+                           (item.status === 'delivered' ? 'Delivered' : 'Dispatched') : 
+                           'In Stock'
+                         }
+                       </Badge>
+                     </div>
+                   </div>
+                 ))}
               </div>
             ) : (
               <div className="text-center py-6 text-muted-foreground">

@@ -84,7 +84,7 @@ export function AddChargerModal({ open, onOpenChange }: AddChargerModalProps) {
 
       const payload = {
         name: chargerData.name.trim(),
-        sku: chargerData.sku.trim(),
+        sku: chargerData.sku.trim() || null,
         description: description || null,
         unit: 'each',
         default_cost: Number(chargerData.default_cost) || 0,
@@ -147,11 +147,11 @@ export function AddChargerModal({ open, onOpenChange }: AddChargerModalProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.name.trim() || !formData.sku.trim()) {
+    if (!formData.name.trim()) {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Name and SKU are required",
+        description: "Charger name is required",
       });
       return;
     }
@@ -192,13 +192,12 @@ export function AddChargerModal({ open, onOpenChange }: AddChargerModalProps) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="sku">SKU/Part Number *</Label>
+            <Label htmlFor="sku">SKU/Part Number</Label>
             <Input
               id="sku"
               value={formData.sku}
               onChange={(e) => setFormData(prev => ({ ...prev, sku: e.target.value }))}
-              placeholder="e.g., TWC-GEN3-01"
-              required
+              placeholder="e.g., TWC-GEN3-01 (optional)"
             />
           </div>
 
