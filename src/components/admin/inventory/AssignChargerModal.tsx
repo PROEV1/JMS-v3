@@ -170,7 +170,7 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
                   <SelectValue placeholder="Select engineer..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Unassigned</SelectItem>
+                  <SelectItem value="unassigned">Unassigned</SelectItem>
                   {engineers.map((engineer) => (
                     <SelectItem key={engineer.id} value={engineer.id}>
                       <div className="flex items-center gap-2">
@@ -194,7 +194,7 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
                   <SelectValue placeholder="Select location..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">No specific location</SelectItem>
+                  <SelectItem value="none">No specific location</SelectItem>
                   {locations.map((location) => (
                     <SelectItem key={location.id} value={location.id}>
                       <div className="flex items-center gap-2">

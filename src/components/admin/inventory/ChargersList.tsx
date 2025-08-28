@@ -257,156 +257,133 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
         </div>
       )}
 
-      {/* Individual Charger Units */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {(chargerItems || []).flatMap(charger => 
-          (charger.individual_units || []).map(unit => (
-            <Card key={unit.id} className="hover:shadow-md transition-shadow">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <div className="p-2 bg-primary/10 rounded-lg">
-                      <Zap className="w-4 h-4 text-primary" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-sm">{charger.name}</h3>
-                      <p className="text-xs text-muted-foreground">SN: {unit.serial_number}</p>
-                    </div>
-                  </div>
-                  <Badge 
-                    variant={
-                      unit.status === 'available' ? 'secondary' :
-                      unit.status === 'dispatched' ? 'default' :
-                      unit.status === 'delivered' ? 'default' :
-                      'outline'
-                    }
-                  >
-                    {unit.status || (unit.engineer_id ? 'Assigned' : 'Available')}
-                  </Badge>
-                </div>
-              </CardHeader>
-              
-              <CardContent className="pt-0 space-y-3">
-                {/* Current Assignment */}
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <User className="w-3 h-3 text-muted-foreground" />
-                    <span className="text-xs text-muted-foreground">Engineer:</span>
-                    <span className="text-sm font-medium">
-                      {unit.engineer_name || 'Unassigned'}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <MapPin className="w-3 h-3 text-muted-foreground" />
-                    <span className="text-xs text-muted-foreground">Location:</span>
-                    <span className="text-sm font-medium">
-                      {unit.location_name || 'Warehouse'}
-                    </span>
-                  </div>
-                </div>
-                
-                {/* Location Assignment */}
-                <div className="pt-2 border-t space-y-2">
-                  <label className="text-xs font-medium text-muted-foreground">
-                    Quick Location Update:
-                  </label>
-                  <Select
-                    value={unit.location_id || ''}
-                    onValueChange={(value) => {
-                      // This would trigger a real-time update in a full implementation
-                      toast({
-                        title: "Location Updated",
-                        description: `Charger ${unit.serial_number} location updated`,
-                      });
-                      queryClient.invalidateQueries({ queryKey: ["charger-items"] });
-                    }}
-                  >
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue placeholder="Select location..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">Warehouse</SelectItem>
-                      <SelectItem value="van-1">John Smith's Van</SelectItem>
-                      <SelectItem value="van-2">Sarah Connor's Van</SelectItem>
-                      <SelectItem value="van-3">Mike Johnson's Van</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                {/* Action Buttons */}
-                <div className="flex gap-1 pt-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="flex-1"
-                    onClick={() => {
-                      setSelectedCharger(unit);
-                      setSelectedChargerModel(charger.name);
-                      setShowAssignModal(true);
-                    }}
-                  >
-                    <UserCheck className="w-3 h-3 mr-1" />
-                    Assign
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="flex-1"
-                    onClick={() => {
-                      setSelectedCharger(unit);
-                      setSelectedChargerModel(charger.name);
-                      setShowEditModal(true);
-                    }}
-                  >
-                    <Settings className="w-3 h-3 mr-1" />
-                    Edit
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="flex-1"
-                    onClick={() => {
-                      // Navigate to engineer location card or dispatch panel
-                      if (unit.engineer_name) {
-                        onSwitchTab('locations');
-                      } else {
-                        setShowDispatchPanel(true);
-                      }
-                    }}
-                  >
-                    <Truck className="w-3 h-3 mr-1" />
-                    {unit.engineer_name ? 'View' : 'Dispatch'}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
-      </div>
+      {/* Chargers Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Zap className="w-5 h-5" />
+            Individual Charger Units
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Charger Model</TableHead>
+                <TableHead>Serial Number</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Assigned To</TableHead>
+                <TableHead>Location</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {(chargerItems || []).flatMap(charger => 
+                (charger.individual_units || []).map(unit => (
+                  <TableRow key={unit.id} className="hover:bg-muted/50">
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <div className="p-1.5 bg-primary/10 rounded">
+                          <Zap className="w-3 h-3 text-primary" />
+                        </div>
+                        <span className="font-medium">{charger.name}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <code className="text-sm bg-muted px-2 py-1 rounded">
+                        {unit.serial_number}
+                      </code>
+                    </TableCell>
+                    <TableCell>
+                      <Badge 
+                        variant={
+                          unit.status === 'available' ? 'secondary' :
+                          unit.status === 'dispatched' ? 'default' :
+                          unit.status === 'delivered' ? 'default' :
+                          'outline'
+                        }
+                      >
+                        {unit.status || (unit.engineer_id ? 'Assigned' : 'Available')}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <User className="w-3 h-3 text-muted-foreground" />
+                        <span className="text-sm">
+                          {unit.engineer_name || 'Unassigned'}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <MapPin className="w-3 h-3 text-muted-foreground" />
+                        <span className="text-sm">
+                          {unit.location_name || 'Warehouse'}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex gap-1 justify-end">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => {
+                            setSelectedCharger(unit);
+                            setSelectedChargerModel(charger.name);
+                            setShowAssignModal(true);
+                          }}
+                        >
+                          <UserCheck className="w-3 h-3 mr-1" />
+                          Assign
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => {
+                            setSelectedCharger(unit);
+                            setSelectedChargerModel(charger.name);
+                            setShowEditModal(true);
+                          }}
+                        >
+                          <Settings className="w-3 h-3 mr-1" />
+                          Edit
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => {
+                            if (unit.engineer_name) {
+                              onSwitchTab('locations');
+                            } else {
+                              setShowDispatchPanel(true);
+                            }
+                          }}
+                        >
+                          {unit.engineer_name ? <Eye className="w-3 h-3" /> : <Truck className="w-3 h-3" />}
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
       
-      {/* Empty State for Individual Units */}
-      {(chargerItems || []).every(charger => !charger.individual_units?.length) && (
-        <div className="text-center py-8 text-muted-foreground">
-          <Package className="w-12 h-12 mx-auto mb-4 opacity-50" />
-          <h3 className="text-lg font-medium mb-2">No Individual Chargers Found</h3>
-          <p className="mb-4">No individual charger units are currently tracked.</p>
-          <Button onClick={() => setShowAddChargerModal(true)}>
-            <Plus className="w-4 h-4 mr-2" />
-            Add Your First Charger
-          </Button>
-        </div>
-      )}
-
-      {!isLoading && (!chargerItems || chargerItems.length === 0) && (
-        <div className="text-center py-8 text-muted-foreground">
-          <Zap className="w-12 h-12 mx-auto mb-4 opacity-50" />
-          <h3 className="text-lg font-medium mb-2">No Chargers Found</h3>
-          <p className="mb-4">No charger items are currently configured in the inventory.</p>
-          <Button onClick={() => setShowAddChargerModal(true)}>
-            <Plus className="w-4 h-4 mr-2" />
-            Add Your First Charger
-          </Button>
-        </div>
+      {/* Empty State */}
+      {!isLoading && (!chargerItems || chargerItems.length === 0 || chargerItems.every(charger => !charger.individual_units?.length)) && (
+        <Card>
+          <CardContent className="text-center py-8">
+            <Zap className="w-12 h-12 mx-auto mb-4 opacity-50 text-muted-foreground" />
+            <h3 className="text-lg font-medium mb-2">No Chargers Found</h3>
+            <p className="text-muted-foreground mb-4">No charger units are currently tracked in the system.</p>
+            <Button onClick={() => setShowAddChargerModal(true)}>
+              <Plus className="w-4 h-4 mr-2" />
+              Add Your First Charger
+            </Button>
+          </CardContent>
+        </Card>
       )}
 
       <AddChargerModal 
