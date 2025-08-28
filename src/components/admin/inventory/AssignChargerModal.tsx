@@ -258,7 +258,10 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
               </Label>
               <Input
                 value={locationAddress}
-                onChange={(e) => setLocationAddress(e.target.value)}
+                onChange={(e) => {
+                  console.log('Location address changing to:', e.target.value);
+                  setLocationAddress(e.target.value);
+                }}
                 placeholder="Enter location address..."
                 className="w-full"
               />
