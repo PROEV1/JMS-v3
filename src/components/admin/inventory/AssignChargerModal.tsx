@@ -90,14 +90,35 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
     mutationFn: async ({ engineerId, locationId }: { engineerId: string; locationId: string }) => {
       if (!charger) throw new Error('No charger selected');
 
-      // For now, we'll simulate the assignment by updating a demo record
-      // In a real system, you'd have a proper charger assignments table
-      return {
-        charger_id: charger.id,
-        engineer_id: engineerId,
-        location_id: locationId,
-        assigned_at: new Date().toISOString()
-      };
+      // Handle special values
+      const finalEngineerId = engineerId === 'unassigned' ? null : engineerId;
+      const finalLocationId = locationId === 'none' ? null : locationId;
+      
+      // Determine status based on assignment
+      let status = 'available';
+      if (finalEngineerId) {
+        status = 'dispatched'; // Assigned to engineer
+      }
+
+      // Update the charger_inventory record with the engineer and location assignment
+      const { data, error } = await supabase
+        .from('charger_inventory')
+        .update({
+          engineer_id: finalEngineerId,
+          location_id: finalLocationId,
+          status: status,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', charger.id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Database error:', error);
+        throw new Error(error.message || 'Failed to assign charger');
+      }
+
+      return data;
     },
     onSuccess: () => {
       toast({
@@ -120,6 +141,17 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Allow "unassigned" and "none" as valid selections
+    if (!selectedEngineerId || selectedEngineerId === '' || !selectedLocationId || selectedLocationId === '') {
+      toast({
+        variant: "destructive",
+        title: "Error", 
+        description: "Please select both an engineer and location",
+      });
+      return;
+    }
+    
     assignChargerMutation.mutate({
       engineerId: selectedEngineerId,
       locationId: selectedLocationId
