@@ -52,44 +52,75 @@ export function EditChargerModal({ open, onOpenChange, charger, chargerModel }: 
     mutationFn: async () => {
       if (!charger) throw new Error('No charger selected');
 
-      console.log('Attempting to delete charger:', charger);
+      console.log('=== DELETE OPERATION START ===');
+      console.log('Charger to delete:', {
+        id: charger.id,
+        serial_number: charger.serial_number,
+        charger_item_id: charger.charger_item_id,
+        isPlaceholder: charger.id.startsWith('placeholder-')
+      });
 
       if (charger.id.startsWith('placeholder-')) {
-        // For placeholder units, we don't need to delete from database
-        console.log('Deleting placeholder charger');
-        return { success: true };
+        console.log('Deleting placeholder charger - no DB operation needed');
+        return { success: true, type: 'placeholder' };
       } else {
-        // Delete from charger_inventory table
-        console.log('Deleting from charger_inventory table, ID:', charger.id);
-        const { error } = await supabase
+        console.log('Deleting real charger from charger_inventory table');
+        
+        // First, check if the record exists
+        const { data: existingRecord } = await supabase
+          .from('charger_inventory')
+          .select('*')
+          .eq('id', charger.id)
+          .single();
+        
+        console.log('Existing record check:', existingRecord);
+        
+        // Now delete it
+        const { data, error } = await supabase
           .from('charger_inventory')
           .delete()
-          .eq('id', charger.id);
-
+          .eq('id', charger.id)
+          .select(); // This will return the deleted rows
+        
+        console.log('Delete result:', { data, error });
+        
         if (error) {
-          console.error('Delete error:', error);
+          console.error('Delete error details:', error);
           throw error;
         }
-        console.log('Delete successful');
-        return { success: true };
+        
+        console.log('Delete successful, deleted rows:', data);
+        return { success: true, type: 'database', deletedRows: data };
       }
     },
-    onSuccess: () => {
-      console.log('Delete mutation successful, invalidating queries');
+    onSuccess: (result) => {
+      console.log('=== DELETE MUTATION SUCCESS ===');
+      console.log('Delete result:', result);
+      
       toast({
         title: "Success",
         description: `Charger ${charger?.serial_number} deleted successfully`,
       });
-      // Invalidate all related queries to refresh the UI
+      
+      console.log('Invalidating queries...');
+      // Force refresh all related queries
       queryClient.invalidateQueries({ queryKey: ['charger-items'] });
       queryClient.invalidateQueries({ queryKey: ['charger-metrics'] });
       queryClient.invalidateQueries({ queryKey: ['inventory-items'] });
       queryClient.invalidateQueries({ queryKey: ['inventory-stats'] });
+      
+      console.log('Closing modals...');
       onOpenChange(false);
       setShowDeleteConfirm(false);
+      
+      console.log('=== DELETE OPERATION COMPLETE ===');
     },
     onError: (error: any) => {
-      console.error('Error deleting charger:', error);
+      console.error('=== DELETE MUTATION ERROR ===');
+      console.error('Full error:', error);
+      console.error('Error message:', error.message);
+      console.error('Error code:', error.code);
+      
       toast({
         variant: "destructive",
         title: "Error",

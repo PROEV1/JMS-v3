@@ -376,6 +376,13 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
                           variant="outline" 
                           size="sm"
                           onClick={() => {
+                            console.log('Edit button clicked for charger:', unit);
+                            console.log('Charger data:', { 
+                              id: unit.id, 
+                              serial_number: unit.serial_number,
+                              status: unit.status,
+                              charger_item_id: unit.charger_item_id
+                            });
                             setSelectedCharger(unit);
                             setSelectedChargerModel(charger.name);
                             setShowEditModal(true);
