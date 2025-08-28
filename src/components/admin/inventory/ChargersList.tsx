@@ -91,7 +91,7 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
               )
             `)
             .eq('charger_item_id', item.id)
-            .order('serial_number');
+            .order('created_at', { ascending: false });
 
           // Create individual units data
           const individualUnits: ChargerUnit[] = (inventory || []).map(unit => ({
