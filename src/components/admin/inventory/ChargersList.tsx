@@ -340,17 +340,9 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <MapPin className="w-3 h-3 text-muted-foreground" />
-                        <button 
-                          className="text-sm hover:underline cursor-pointer text-left"
-                          onClick={() => {
-                            if (unit.engineer_name) {
-                              // Navigate to engineer's van stock view
-                              onSwitchTab('locations');
-                            }
-                          }}
-                        >
+                        <span className="text-sm">
                           {unit.location_name || 'Warehouse'}
-                        </button>
+                        </span>
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
@@ -365,7 +357,7 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
                           }}
                         >
                           <UserCheck className="w-3 h-3 mr-1" />
-                          Engineer's Van Stock
+                          Assign
                         </Button>
                         <Button 
                           variant="outline" 

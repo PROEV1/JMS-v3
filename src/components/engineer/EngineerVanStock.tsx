@@ -130,7 +130,8 @@ export function EngineerVanStock() {
             status,
             inventory_items!charger_item_id(name, sku)
           `)
-          .eq('engineer_id', engineer.id);
+          .eq('engineer_id', engineer.id)
+          .in('status', ['dispatched', 'delivered']);
 
         const { data: assignedChargers } = await chargerQuery;
 
