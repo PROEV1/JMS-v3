@@ -58,6 +58,7 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
   const [selectedCharger, setSelectedCharger] = useState<ChargerUnit | null>(null);
   const [selectedChargerModel, setSelectedChargerModel] = useState('');
   const [chargerTypeFilter, setChargerTypeFilter] = useState('all-types');
+  const [statusFilter, setStatusFilter] = useState('all-statuses');
   const [serialNumberSearch, setSerialNumberSearch] = useState('');
   
   const { data: chargerItems = [], isLoading } = useQuery({
@@ -283,6 +284,23 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
                 </SelectContent>
               </Select>
             </div>
+            <div className="min-w-[180px]">
+              <label className="text-sm font-medium mb-2 block">Status</label>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="bg-background">
+                  <SelectValue placeholder="All statuses" />
+                </SelectTrigger>
+                <SelectContent className="bg-background border border-border shadow-lg z-50">
+                  <SelectItem value="all-statuses">All Statuses</SelectItem>
+                  <SelectItem value="available">Available</SelectItem>
+                  <SelectItem value="assigned">Assigned</SelectItem>
+                  <SelectItem value="dispatched">Dispatched</SelectItem>
+                  <SelectItem value="delivered">Delivered</SelectItem>
+                  <SelectItem value="maintenance">Maintenance</SelectItem>
+                  <SelectItem value="retired">Retired</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -313,6 +331,11 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
                 .flatMap(charger => 
                   (charger.individual_units || [])
                     .filter(unit => !serialNumberSearch || unit.serial_number.toLowerCase().includes(serialNumberSearch.toLowerCase()))
+                    .filter(unit => {
+                      if (statusFilter === 'all-statuses') return true;
+                      if (statusFilter === 'assigned') return unit.engineer_id && unit.status !== 'available';
+                      return unit.status === statusFilter || (statusFilter === 'available' && !unit.status && !unit.engineer_id);
+                    })
                     .map(unit => ({ ...unit, charger_name: charger.name }))
                 )
                 .sort((a, b) => {
