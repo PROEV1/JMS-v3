@@ -268,10 +268,10 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
             <div className="min-w-[200px]">
               <label className="text-sm font-medium mb-2 block">Charger Type</label>
               <Select value={chargerTypeFilter} onValueChange={setChargerTypeFilter}>
-                <SelectTrigger>
+                <SelectTrigger className="bg-background">
                   <SelectValue placeholder="All charger types" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-background border border-border shadow-lg z-50">
                   <SelectItem value="all-types">All Charger Types</SelectItem>
                   {chargerItems.map(charger => (
                     <SelectItem key={charger.id} value={charger.id}>
