@@ -108,22 +108,8 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
             delivered_at: null
           }));
 
-          // If no dispatches exist, create a placeholder unit for the charger model
-          if (individualUnits.length === 0) {
-            individualUnits.push({
-              id: `placeholder-${item.id}`,
-              charger_item_id: item.id,
-              serial_number: 'Not Assigned',
-              status: 'in_stock',
-              engineer_id: null,
-              engineer_name: null,
-              location_id: null,
-              location_name: 'Warehouse',
-              order_id: null,
-              dispatched_at: null,
-              delivered_at: null
-            });
-          }
+          // Only include charger models that have actual inventory records
+          // Don't create placeholder units - only show models with real chargers
 
           const totalUnits = individualUnits.length;
           const availableUnits = individualUnits.filter(u => u.status === 'available' || !u.engineer_id).length;
@@ -139,7 +125,8 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
         })
       );
 
-      return chargerData;
+      // Only return charger models that have actual inventory records
+      return chargerData.filter(item => item.individual_units.length > 0);
     }
   });
 
