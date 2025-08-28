@@ -112,8 +112,8 @@ export function AddChargerModal({ open, onOpenChange }: AddChargerModalProps) {
         const chargerUnits = validSerialNumbers.map(serialNumber => ({
           charger_item_id: chargerItem.id,
           serial_number: serialNumber.trim(),
-          status: 'available',
-          order_id: null
+          status: 'available'
+          // Note: order_id is omitted since it's not required for inventory tracking
         }));
 
         const { error: dispatchError } = await supabase

@@ -36,6 +36,8 @@ export function EditChargerModal({ open, onOpenChange, charger, chargerModel }: 
     status: ''
   });
 
+  const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(false);
+
   // Reset form when modal opens
   React.useEffect(() => {
     if (open && charger) {
@@ -46,25 +48,54 @@ export function EditChargerModal({ open, onOpenChange, charger, chargerModel }: 
     }
   }, [open, charger]);
 
+  const deleteChargerMutation = useMutation({
+    mutationFn: async () => {
+      if (!charger) throw new Error('No charger selected');
+
+      if (charger.id.startsWith('placeholder-')) {
+        // For placeholder units, we don't need to delete from database
+        return { success: true };
+      } else {
+        // Delete from charger_dispatches table
+        const { error } = await supabase
+          .from('charger_dispatches')
+          .delete()
+          .eq('id', charger.id);
+
+        if (error) throw error;
+        return { success: true };
+      }
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: `Charger ${charger?.serial_number} deleted successfully`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["charger-items"] });
+      queryClient.invalidateQueries({ queryKey: ["charger-metrics"] });
+      onOpenChange(false);
+      setShowDeleteConfirm(false);
+    },
+    onError: (error: any) => {
+      console.error('Error deleting charger:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to delete charger",
+      });
+      setShowDeleteConfirm(false);
+    },
+  });
+
   const updateChargerMutation = useMutation({
     mutationFn: async (updateData: typeof formData) => {
       if (!charger) throw new Error('No charger selected');
 
       // Handle placeholder units by creating new dispatch records
       if (charger.id.startsWith('placeholder-')) {
-        const { data, error } = await supabase
-          .from('charger_dispatches')
-          .insert({
-            charger_item_id: charger.charger_item_id,
-            serial_number: updateData.serial_number.trim(),
-            status: updateData.status,
-            order_id: null
-          })
-          .select()
-          .single();
-
-        if (error) throw error;
-        return data;
+        // For placeholder units, we need to create a proper charger unit without order_id requirement
+        // Since this is just updating charger inventory, we'll use a different approach
+        throw new Error('Cannot edit placeholder chargers. Please add chargers with serial numbers from the start.');
       } else {
         // Update existing dispatch record
         const { data, error } = await supabase
@@ -174,23 +205,59 @@ export function EditChargerModal({ open, onOpenChange, charger, chargerModel }: 
               </select>
             </div>
 
-            <div className="flex justify-end space-x-2 pt-4">
+            <div className="flex justify-between space-x-2 pt-4">
               <Button 
                 type="button" 
-                variant="outline" 
-                onClick={() => onOpenChange(false)}
+                variant="destructive" 
+                onClick={() => setShowDeleteConfirm(true)}
               >
-                Cancel
+                Delete Charger
               </Button>
-              <Button 
-                type="submit" 
-                disabled={updateChargerMutation.isPending}
-              >
-                {updateChargerMutation.isPending ? "Updating..." : "Update Charger"}
-              </Button>
+              <div className="flex space-x-2">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => onOpenChange(false)}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={updateChargerMutation.isPending}
+                >
+                  {updateChargerMutation.isPending ? "Updating..." : "Update Charger"}
+                </Button>
+              </div>
             </div>
           </form>
         </div>
+
+        {/* Delete Confirmation Dialog */}
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white p-6 rounded-lg max-w-sm w-full mx-4">
+              <h3 className="text-lg font-semibold mb-2">Delete Charger</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Are you sure you want to delete this charger? This action cannot be undone.
+              </p>
+              <div className="flex gap-2 justify-end">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowDeleteConfirm(false)}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  variant="destructive"
+                  onClick={() => deleteChargerMutation.mutate()}
+                  disabled={deleteChargerMutation.isPending}
+                >
+                  {deleteChargerMutation.isPending ? "Deleting..." : "Delete"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
