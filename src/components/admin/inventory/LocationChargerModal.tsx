@@ -147,25 +147,18 @@ export function LocationChargerModal({ open, onOpenChange, location }: LocationC
                             Low Stock
                           </Badge>
                         )}
-                        <Badge className={stock.on_hand >= 0 ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}>
-                          Stock: Contact Admin
-                        </Badge>
                       </div>
                     </div>
                   </CardHeader>
 
                   <CardContent className="space-y-4">
-                    {/* Stock Details */}
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <span className="text-muted-foreground">Stock Level: </span>
-                        <span className="font-medium">Contact Admin</span>
+                    {/* Location Information */}
+                    {location?.address && (
+                      <div className="text-sm">
+                        <span className="text-muted-foreground">Location Address: </span>
+                        <span className="font-medium">{location.address}</span>
                       </div>
-                      <div>
-                        <span className="text-muted-foreground">Reorder Point: </span>
-                        <span className="font-medium">{stock.reorder_point} units</span>
-                      </div>
-                    </div>
+                    )}
 
                     {/* Recent Dispatches */}
                     {stock.recent_dispatches.length > 0 && (
@@ -228,7 +221,7 @@ export function LocationChargerModal({ open, onOpenChange, location }: LocationC
               <Button variant="outline" onClick={() => onOpenChange(false)}>
                 Close
               </Button>
-              <Button>
+              <Button onClick={() => window.open('/admin/inventory', '_blank')}>
                 <Package className="w-4 h-4 mr-1" />
                 Manage Inventory
               </Button>
