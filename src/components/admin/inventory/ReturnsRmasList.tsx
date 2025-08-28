@@ -17,9 +17,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { InventoryKpiTile } from './shared/InventoryKpiTile';
 import { StatusChip } from './shared/StatusChip';
 import { EmptyState } from './shared/EmptyState';
+import { CreateRMAModal } from './CreateRMAModal';
 
 export function ReturnsRmasList() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   // Header metrics
   const { data: metrics } = useQuery({
@@ -133,7 +135,7 @@ export function ReturnsRmasList() {
           </div>
         </div>
         
-        <Button>
+        <Button onClick={() => setShowCreateModal(true)}>
           <Plus className="h-4 w-4 mr-2" />
           Create Return/RMA
         </Button>
@@ -196,11 +198,16 @@ export function ReturnsRmasList() {
               title="No Returns or RMAs"
               description="Track product returns and warranty replacements when they occur"
               actionLabel="Create Return/RMA"
-              onAction={() => {/* TODO: Open create RMA modal */}}
+              onAction={() => setShowCreateModal(true)}
             />
           )}
         </CardContent>
       </Card>
+
+      <CreateRMAModal 
+        open={showCreateModal} 
+        onOpenChange={setShowCreateModal} 
+      />
     </div>
   );
 }

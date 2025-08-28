@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,21 +19,32 @@ interface CreateRMAModalProps {
 interface RMALine {
   id: string;
   item_id: string;
+  item_type: 'inventory' | 'charger';
   qty: number;
   reason: string;
   condition: string;
 }
 
 export function CreateRMAModal({ open, onOpenChange }: CreateRMAModalProps) {
+  const [rmaNumber, setRmaNumber] = useState('');
   const [supplierId, setSupplierId] = useState('');
   const [rmaType, setRmaType] = useState<'return' | 'warranty' | 'exchange'>('return');
   const [originalOrderId, setOriginalOrderId] = useState('');
   const [reason, setReason] = useState('');
   const [lines, setLines] = useState<RMALine[]>([
-    { id: '1', item_id: '', qty: 1, reason: '', condition: 'damaged' }
+    { id: '1', item_id: '', item_type: 'inventory', qty: 1, reason: '', condition: 'damaged' }
   ]);
 
   const { toast } = useToast();
+
+  // Generate RMA number when modal opens
+  useEffect(() => {
+    if (open && !rmaNumber) {
+      const year = new Date().getFullYear();
+      const randomNum = Math.floor(Math.random() * 9000) + 1000;
+      setRmaNumber(`RMA${year}-${randomNum}`);
+    }
+  }, [open, rmaNumber]);
 
   // Fetch suppliers
   const { data: suppliers = [] } = useQuery({
@@ -49,15 +60,35 @@ export function CreateRMAModal({ open, onOpenChange }: CreateRMAModalProps) {
     }
   });
 
-  // Fetch inventory items
-  const { data: items = [] } = useQuery({
-    queryKey: ['inventory-items'],
+  // Fetch inventory items (non-chargers)
+  const { data: inventoryItems = [] } = useQuery({
+    queryKey: ['inventory-items-non-chargers'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('inventory_items')
         .select('id, name, sku')
         .eq('is_active', true)
+        .eq('is_charger', false)
         .order('name');
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  // Fetch chargers
+  const { data: chargers = [] } = useQuery({
+    queryKey: ['charger-inventory'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('charger_inventory')
+        .select(`
+          id,
+          serial_number,
+          charger_item_id,
+          inventory_items(name, sku)
+        `)
+        .eq('status', 'available')
+        .order('serial_number');
       if (error) throw error;
       return data;
     }
@@ -67,6 +98,7 @@ export function CreateRMAModal({ open, onOpenChange }: CreateRMAModalProps) {
     setLines([...lines, { 
       id: Date.now().toString(), 
       item_id: '', 
+      item_type: 'inventory',
       qty: 1, 
       reason: '', 
       condition: 'damaged' 
@@ -88,7 +120,7 @@ export function CreateRMAModal({ open, onOpenChange }: CreateRMAModalProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!supplierId || lines.some(line => !line.item_id || !line.qty || !line.reason)) {
+    if (!rmaNumber || !supplierId || lines.some(line => !line.item_id || !line.qty || !line.reason)) {
       toast({
         title: 'Error',
         description: 'Please fill in all required fields',
@@ -99,6 +131,7 @@ export function CreateRMAModal({ open, onOpenChange }: CreateRMAModalProps) {
 
     try {
       const rmaData = {
+        rma_number: rmaNumber,
         supplier_id: supplierId,
         rma_type: rmaType,
         original_order_id: originalOrderId || undefined,
@@ -116,11 +149,12 @@ export function CreateRMAModal({ open, onOpenChange }: CreateRMAModalProps) {
 
       onOpenChange(false);
       // Reset form
+      setRmaNumber('');
       setSupplierId('');
       setRmaType('return');
       setOriginalOrderId('');
       setReason('');
-      setLines([{ id: '1', item_id: '', qty: 1, reason: '', condition: 'damaged' }]);
+      setLines([{ id: '1', item_id: '', item_type: 'inventory', qty: 1, reason: '', condition: 'damaged' }]);
     } catch (error) {
       toast({
         title: 'Error',
@@ -138,7 +172,18 @@ export function CreateRMAModal({ open, onOpenChange }: CreateRMAModalProps) {
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="rma-number">RMA Number *</Label>
+              <Input
+                id="rma-number"
+                value={rmaNumber}
+                onChange={(e) => setRmaNumber(e.target.value)}
+                placeholder="RMA2024-0001"
+                required
+              />
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="supplier">Supplier *</Label>
               <Select value={supplierId} onValueChange={setSupplierId}>
@@ -193,6 +238,25 @@ export function CreateRMAModal({ open, onOpenChange }: CreateRMAModalProps) {
               <Card key={line.id}>
                 <CardContent className="p-4">
                   <div className="grid grid-cols-12 gap-3 items-end">
+                    <div className="col-span-2">
+                      <Label>Type</Label>
+                      <Select 
+                        value={line.item_type} 
+                        onValueChange={(value: 'inventory' | 'charger') => {
+                          updateLine(line.id, 'item_type', value);
+                          updateLine(line.id, 'item_id', ''); // Reset item selection
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="inventory">Inventory</SelectItem>
+                          <SelectItem value="charger">Charger</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
                     <div className="col-span-3">
                       <Label>Item</Label>
                       <Select 
@@ -203,11 +267,18 @@ export function CreateRMAModal({ open, onOpenChange }: CreateRMAModalProps) {
                           <SelectValue placeholder="Select item" />
                         </SelectTrigger>
                         <SelectContent>
-                          {items.map(item => (
-                            <SelectItem key={item.id} value={item.id}>
-                              {item.name} ({item.sku})
-                            </SelectItem>
-                          ))}
+                          {line.item_type === 'inventory' 
+                            ? inventoryItems.map(item => (
+                                <SelectItem key={item.id} value={item.id}>
+                                  {item.name} ({item.sku})
+                                </SelectItem>
+                              ))
+                            : chargers.map(charger => (
+                                <SelectItem key={charger.id} value={charger.id}>
+                                  {charger.inventory_items?.name} - {charger.serial_number}
+                                </SelectItem>
+                              ))
+                          }
                         </SelectContent>
                       </Select>
                     </div>
@@ -241,7 +312,7 @@ export function CreateRMAModal({ open, onOpenChange }: CreateRMAModalProps) {
                       </Select>
                     </div>
 
-                    <div className="col-span-4">
+                    <div className="col-span-3">
                       <Label>Reason</Label>
                       <Input
                         value={line.reason}
