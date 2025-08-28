@@ -273,11 +273,13 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
                 </SelectTrigger>
                 <SelectContent className="bg-background border border-border shadow-lg z-50">
                   <SelectItem value="all-types">All Charger Types</SelectItem>
-                  {chargerItems.map(charger => (
-                    <SelectItem key={charger.id} value={charger.id}>
-                      {charger.name}
-                    </SelectItem>
-                  ))}
+                  {Array.from(new Set(chargerItems.map(charger => charger.name)))
+                    .sort()
+                    .map(chargerName => (
+                      <SelectItem key={chargerName} value={chargerName}>
+                        {chargerName}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
@@ -307,7 +309,7 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
             </TableHeader>
             <TableBody>
               {(chargerItems || [])
-                .filter(charger => chargerTypeFilter === 'all-types' || charger.id === chargerTypeFilter)
+                .filter(charger => chargerTypeFilter === 'all-types' || charger.name === chargerTypeFilter)
                 .flatMap(charger => 
                   (charger.individual_units || [])
                     .filter(unit => !serialNumberSearch || unit.serial_number.toLowerCase().includes(serialNumberSearch.toLowerCase()))
