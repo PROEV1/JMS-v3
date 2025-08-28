@@ -99,7 +99,7 @@ export function CreatePurchaseOrderModal({ open, onOpenChange, stockRequest }: C
       setPoItems(stockRequestItems);
     }
   }, [stockRequest, open]);
-  // Fetch inventory items
+  // Fetch inventory items (excluding chargers)
   const { data: inventoryItems = [] } = useQuery({
     queryKey: ['inventory-items'],
     queryFn: async () => {
@@ -107,6 +107,7 @@ export function CreatePurchaseOrderModal({ open, onOpenChange, stockRequest }: C
         .from('inventory_items')
         .select('id, name, sku')
         .eq('is_active', true)
+        .eq('is_charger', false)  // Exclude chargers
         .order('name');
       if (error) throw error;
       return data;
