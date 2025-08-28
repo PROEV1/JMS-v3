@@ -141,16 +141,16 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
   const { data: metrics } = useQuery({
     queryKey: ['charger-metrics', chargerItems],
     queryFn: async () => {
-      if (!chargerItems.length) return null;
+      if (!chargerItems?.length) return null;
 
       const totalChargers = chargerItems.length;
-      const totalUnits = chargerItems.reduce((sum, item) => sum + item.total_units, 0);
-      const availableUnits = chargerItems.reduce((sum, item) => sum + item.available_units, 0);
-      const assignedUnits = chargerItems.reduce((sum, item) => sum + item.assigned_units, 0);
+      const totalUnits = chargerItems.reduce((sum, item) => sum + (item.total_units || 0), 0);
+      const availableUnits = chargerItems.reduce((sum, item) => sum + (item.available_units || 0), 0);
+      const assignedUnits = chargerItems.reduce((sum, item) => sum + (item.assigned_units || 0), 0);
       
       const engineersWithChargers = new Set(
         chargerItems.flatMap(item => 
-          item.individual_units.filter(u => u.engineer_id).map(u => u.engineer_id)
+          (item.individual_units || []).filter(u => u.engineer_id).map(u => u.engineer_id)
         )
       ).size;
 
@@ -162,7 +162,7 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
         engineersWithChargers
       };
     },
-    enabled: chargerItems.length > 0
+    enabled: !!chargerItems?.length
   });
 
   if (showDispatchPanel) {
@@ -249,7 +249,7 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
 
       {/* Charger Units Table */}
       <div className="space-y-4">
-        {chargerItems.map((charger) => (
+        {(chargerItems || []).map((charger) => (
           <Card key={charger.id}>
             <CardHeader className="pb-4">
               <div className="flex items-start justify-between">
@@ -274,7 +274,7 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
             </CardHeader>
             
             <CardContent>
-              {charger.individual_units.length > 0 ? (
+              {charger.individual_units?.length > 0 ? (
                 <div className="rounded-md border">
                   <Table>
                     <TableHeader>
@@ -287,7 +287,7 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {charger.individual_units.map((unit) => (
+                      {(charger.individual_units || []).map((unit) => (
                         <TableRow key={unit.id}>
                           <TableCell className="font-medium">
                             {unit.serial_number}
@@ -350,7 +350,7 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
         ))}
       </div>
 
-      {chargerItems.length === 0 && (
+      {!isLoading && (!chargerItems || chargerItems.length === 0) && (
         <div className="text-center py-8 text-muted-foreground">
           <Zap className="w-12 h-12 mx-auto mb-4 opacity-50" />
           <h3 className="text-lg font-medium mb-2">No Chargers Found</h3>
