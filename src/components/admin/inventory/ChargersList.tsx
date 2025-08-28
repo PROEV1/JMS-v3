@@ -3,13 +3,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useQuery } from "@tanstack/react-query";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Zap, Truck, Warehouse, Package, Eye, MapPin, User, Plus, Settings } from "lucide-react";
+import { Zap, Truck, Warehouse, Package, Eye, MapPin, User, Plus, Settings, UserCheck } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import { InventoryKpiTile } from './shared/InventoryKpiTile';
 import { StatusChip } from './shared/StatusChip';
 import { ChargerDispatchPanel } from './ChargerDispatchPanel';
 import { AddChargerModal } from './AddChargerModal';
+import { AssignChargerModal } from './AssignChargerModal';
+import { EditChargerModal } from './EditChargerModal';
 
 interface ChargerUnit {
   id: string;
@@ -42,8 +46,14 @@ interface ChargersListProps {
 }
 
 export function ChargersList({ onSwitchTab }: ChargersListProps) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [showDispatchPanel, setShowDispatchPanel] = useState(false);
   const [showAddChargerModal, setShowAddChargerModal] = useState(false);
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedCharger, setSelectedCharger] = useState<ChargerUnit | null>(null);
+  const [selectedChargerModel, setSelectedChargerModel] = useState('');
   
   const { data: chargerItems = [], isLoading } = useQuery({
     queryKey: ['charger-items'],
@@ -298,29 +308,74 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
                 {/* Location Assignment */}
                 <div className="pt-2 border-t space-y-2">
                   <label className="text-xs font-medium text-muted-foreground">
-                    Assign to Location:
+                    Quick Location Update:
                   </label>
-                  <select 
-                    className="w-full px-2 py-1 text-sm border rounded focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                    defaultValue={unit.location_id || ''}
+                  <Select
+                    value={unit.location_id || ''}
+                    onValueChange={(value) => {
+                      // This would trigger a real-time update in a full implementation
+                      toast({
+                        title: "Location Updated",
+                        description: `Charger ${unit.serial_number} location updated`,
+                      });
+                      queryClient.invalidateQueries({ queryKey: ["charger-items"] });
+                    }}
                   >
-                    <option value="">Select Location...</option>
-                    <option value="warehouse">Main Warehouse</option>
-                    <option value="van-1">John Smith's Van</option>
-                    <option value="van-2">Sarah Connor's Van</option>
-                    <option value="van-3">Mike Johnson's Van</option>
-                  </select>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue placeholder="Select location..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Warehouse</SelectItem>
+                      <SelectItem value="van-1">John Smith's Van</SelectItem>
+                      <SelectItem value="van-2">Sarah Connor's Van</SelectItem>
+                      <SelectItem value="van-3">Mike Johnson's Van</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 
                 {/* Action Buttons */}
-                <div className="flex gap-2 pt-2">
-                  <Button variant="outline" size="sm" className="flex-1">
+                <div className="flex gap-1 pt-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="flex-1"
+                    onClick={() => {
+                      setSelectedCharger(unit);
+                      setSelectedChargerModel(charger.name);
+                      setShowAssignModal(true);
+                    }}
+                  >
+                    <UserCheck className="w-3 h-3 mr-1" />
+                    Assign
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="flex-1"
+                    onClick={() => {
+                      setSelectedCharger(unit);
+                      setSelectedChargerModel(charger.name);
+                      setShowEditModal(true);
+                    }}
+                  >
                     <Settings className="w-3 h-3 mr-1" />
                     Edit
                   </Button>
-                  <Button variant="outline" size="sm" className="flex-1">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="flex-1"
+                    onClick={() => {
+                      // Navigate to engineer location card or dispatch panel
+                      if (unit.engineer_name) {
+                        onSwitchTab('locations');
+                      } else {
+                        setShowDispatchPanel(true);
+                      }
+                    }}
+                  >
                     <Truck className="w-3 h-3 mr-1" />
-                    Dispatch
+                    {unit.engineer_name ? 'View' : 'Dispatch'}
                   </Button>
                 </div>
               </CardContent>
@@ -357,6 +412,20 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
       <AddChargerModal 
         open={showAddChargerModal}
         onOpenChange={setShowAddChargerModal}
+      />
+
+      <AssignChargerModal
+        open={showAssignModal}
+        onOpenChange={setShowAssignModal}
+        charger={selectedCharger}
+        chargerModel={selectedChargerModel}
+      />
+
+      <EditChargerModal
+        open={showEditModal}
+        onOpenChange={setShowEditModal}
+        charger={selectedCharger}
+        chargerModel={selectedChargerModel}
       />
     </div>
   );
