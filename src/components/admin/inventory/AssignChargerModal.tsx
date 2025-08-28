@@ -127,9 +127,13 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
         
         // Update existing location address if provided
         if (address && finalLocationId) {
+          const engineer = engineers.find(e => e.id === finalEngineerId);
           await supabase
             .from('inventory_locations')
-            .update({ address })
+            .update({ 
+              address,
+              name: `Van Stock - ${engineer?.name}${address ? ` - ${address}` : ''}` 
+            })
             .eq('id', finalLocationId);
         }
       }
