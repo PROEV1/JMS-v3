@@ -6,6 +6,7 @@ import {
   Building2,
   HelpCircle,
   Package,
+  Zap,
 } from 'lucide-react'
 
 import { NavLink } from 'react-router-dom'
@@ -32,6 +33,11 @@ export function AdminSidebar() {
       title: 'Inventory',
       url: '/admin/inventory',
       icon: Package,
+    },
+    {
+      title: 'Chargers',
+      url: '/admin/chargers',
+      icon: Zap,
     },
     {
       title: 'Settings',

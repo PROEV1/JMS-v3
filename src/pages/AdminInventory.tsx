@@ -8,7 +8,6 @@ import { TransactionsListV2 } from "@/components/admin/inventory/TransactionsLis
 import { AdminStockRequestsBoard } from "@/components/admin/inventory/AdminStockRequestsBoard";
 import { PurchaseOrdersList } from "@/components/admin/inventory/PurchaseOrdersList";
 import { ReturnsRmasList } from "@/components/admin/inventory/ReturnsRmasList";
-import { ChargersList } from "@/components/admin/inventory/ChargersList";
 import { useState } from "react";
 
 const AdminInventory = () => {
@@ -28,12 +27,11 @@ const AdminInventory = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-9">
+        <TabsList className="grid w-full grid-cols-8">
           <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
           <TabsTrigger value="items">Items</TabsTrigger>
           <TabsTrigger value="locations">Locations</TabsTrigger>
           <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
-          <TabsTrigger value="chargers">Chargers</TabsTrigger>
           <TabsTrigger value="purchase-orders">Purchase Orders</TabsTrigger>
           <TabsTrigger value="transactions">Transactions</TabsTrigger>
           <TabsTrigger value="requests">Stock Requests</TabsTrigger>
@@ -54,10 +52,6 @@ const AdminInventory = () => {
 
         <TabsContent value="suppliers">
           <SuppliersList />
-        </TabsContent>
-
-        <TabsContent value="chargers">
-          <ChargersList onSwitchTab={handleTabSwitch} />
         </TabsContent>
 
         <TabsContent value="purchase-orders">
