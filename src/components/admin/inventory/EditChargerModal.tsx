@@ -80,8 +80,11 @@ export function EditChargerModal({ open, onOpenChange, charger, chargerModel }: 
         title: "Success",
         description: `Charger ${charger?.serial_number} deleted successfully`,
       });
-      queryClient.invalidateQueries({ queryKey: ["charger-items"] });
-      queryClient.invalidateQueries({ queryKey: ["charger-metrics"] });
+      // Invalidate all related queries to refresh the UI
+      queryClient.invalidateQueries({ queryKey: ['charger-items'] });
+      queryClient.invalidateQueries({ queryKey: ['charger-metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory-items'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory-stats'] });
       onOpenChange(false);
       setShowDeleteConfirm(false);
     },
@@ -250,32 +253,38 @@ export function EditChargerModal({ open, onOpenChange, charger, chargerModel }: 
           </form>
         </div>
 
-        {/* Delete Confirmation Dialog */}
-        {showDeleteConfirm && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-white p-6 rounded-lg max-w-sm w-full mx-4">
-              <h3 className="text-lg font-semibold mb-2">Delete Charger</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                Are you sure you want to delete this charger? This action cannot be undone.
-              </p>
-              <div className="flex gap-2 justify-end">
-                <Button 
-                  variant="outline" 
-                  onClick={() => setShowDeleteConfirm(false)}
-                >
-                  Cancel
-                </Button>
-                <Button 
-                  variant="destructive"
-                  onClick={() => deleteChargerMutation.mutate()}
-                  disabled={deleteChargerMutation.isPending}
-                >
-                  {deleteChargerMutation.isPending ? "Deleting..." : "Delete"}
-                </Button>
+          {/* Delete Confirmation Dialog */}
+          {showDeleteConfirm && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+              <div className="bg-background p-6 rounded-lg max-w-sm w-full mx-4 border">
+                <h3 className="text-lg font-semibold mb-2">Delete Charger</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Are you sure you want to delete charger <strong>{charger?.serial_number}</strong>? This action cannot be undone.
+                </p>
+                <div className="flex gap-2 justify-end">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => {
+                      console.log('Delete cancelled');
+                      setShowDeleteConfirm(false);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    variant="destructive"
+                    onClick={() => {
+                      console.log('Delete confirmed, calling mutation');
+                      deleteChargerMutation.mutate();
+                    }}
+                    disabled={deleteChargerMutation.isPending}
+                  >
+                    {deleteChargerMutation.isPending ? "Deleting..." : "Delete"}
+                  </Button>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
       </DialogContent>
     </Dialog>
   );
