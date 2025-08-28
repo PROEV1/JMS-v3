@@ -129,9 +129,14 @@ export function CreatePurchaseOrderModal({ open, onOpenChange, stockRequest }: C
   };
 
   const updateItem = (id: string, field: keyof POItem, value: any) => {
-    setPoItems(poItems.map(item => 
-      item.id === id ? { ...item, [field]: value } : item
-    ));
+    console.log(`Updating PO item ${id}, field ${field}, value:`, value);
+    setPoItems(prevItems => {
+      const newItems = prevItems.map(item => 
+        item.id === id ? { ...item, [field]: value } : item
+      );
+      console.log('New PO items state:', newItems);
+      return newItems;
+    });
   };
 
   const totalAmount = poItems.reduce((sum, item) => sum + (item.quantity * item.unit_cost), 0);
@@ -255,12 +260,12 @@ export function CreatePurchaseOrderModal({ open, onOpenChange, stockRequest }: C
             <div className="space-y-2">
               <Label htmlFor="supplier">Supplier *</Label>
               <Select value={supplierId} onValueChange={setSupplierId}>
-                <SelectTrigger>
+                <SelectTrigger className="bg-background border-input">
                   <SelectValue placeholder="Select supplier" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="z-[100] bg-popover border shadow-lg" position="popper" side="bottom" align="start">
                   {suppliers.map(supplier => (
-                    <SelectItem key={supplier.id} value={supplier.id}>
+                    <SelectItem key={supplier.id} value={supplier.id} className="cursor-pointer hover:bg-accent">
                       {supplier.name}
                     </SelectItem>
                   ))}
@@ -295,8 +300,10 @@ export function CreatePurchaseOrderModal({ open, onOpenChange, stockRequest }: C
                     <div className="col-span-4">
                       <Label>Item</Label>
                       <Select 
-                        value={item.item_id} 
+                        key={`item-${item.id}-${item.item_id}`}
+                        value={item.item_id || ''} 
                         onValueChange={(value) => {
+                          console.log('PO Item changing from', item.item_id, 'to', value, 'for item', item.id);
                           updateItem(item.id, "item_id", value);
                           // Auto-populate name based on selection
                           const selectedItem = inventoryItems.find(i => i.id === value);
@@ -305,12 +312,12 @@ export function CreatePurchaseOrderModal({ open, onOpenChange, stockRequest }: C
                           }
                         }}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="bg-background border-input">
                           <SelectValue placeholder="Select item" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="z-[100] bg-popover border shadow-lg max-h-[200px]" position="popper" side="bottom" align="start">
                           {inventoryItems.map(inventoryItem => (
-                            <SelectItem key={inventoryItem.id} value={inventoryItem.id}>
+                            <SelectItem key={inventoryItem.id} value={inventoryItem.id} className="cursor-pointer hover:bg-accent">
                               {inventoryItem.name} ({inventoryItem.sku})
                             </SelectItem>
                           ))}
