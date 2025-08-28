@@ -221,7 +221,7 @@ export function LocationChargerModal({ open, onOpenChange, location }: LocationC
               <Button variant="outline" onClick={() => onOpenChange(false)}>
                 Close
               </Button>
-              <Button onClick={() => window.open('/admin/inventory', '_blank')}>
+              <Button onClick={() => window.open('/admin/chargers', '_blank')}>
                 <Package className="w-4 h-4 mr-1" />
                 Manage Inventory
               </Button>
