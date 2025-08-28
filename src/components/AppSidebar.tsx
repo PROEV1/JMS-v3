@@ -18,7 +18,8 @@ import {
   FolderOpen,
   UserCog,
   CreditCard,
-  FormInput
+  FormInput,
+  Zap
 } from 'lucide-react';
 import {
   Sidebar,
@@ -52,6 +53,7 @@ export function AppSidebar({ userRole }: AppSidebarProps) {
     { icon: Calendar, label: 'Schedule', href: '/admin/schedule', action: () => navigate('/admin/schedule') },
     { icon: FormInput, label: 'Surveys', href: '/admin/survey-forms', action: () => navigate('/admin/survey-forms') },
     { icon: Package, label: 'Inventory', href: '/admin/inventory', action: () => navigate('/admin/inventory') },
+    { icon: Zap, label: 'Chargers', href: '/admin/chargers', action: () => navigate('/admin/chargers') },
     { icon: User, label: 'Engineers', href: '/admin/engineers', action: () => navigate('/admin/engineers') },
     { icon: Users, label: 'Clients', href: '/admin/clients', action: () => navigate('/admin/clients') },
     { icon: Users, label: 'Leads', href: '/admin/leads', action: () => navigate('/admin/leads') },
