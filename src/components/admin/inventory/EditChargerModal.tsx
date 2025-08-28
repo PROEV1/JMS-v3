@@ -56,9 +56,9 @@ export function EditChargerModal({ open, onOpenChange, charger, chargerModel }: 
         // For placeholder units, we don't need to delete from database
         return { success: true };
       } else {
-        // Delete from charger_dispatches table
+        // Delete from charger_inventory table
         const { error } = await supabase
-          .from('charger_dispatches')
+          .from('charger_inventory')
           .delete()
           .eq('id', charger.id);
 
@@ -91,15 +91,24 @@ export function EditChargerModal({ open, onOpenChange, charger, chargerModel }: 
     mutationFn: async (updateData: typeof formData) => {
       if (!charger) throw new Error('No charger selected');
 
-      // Handle placeholder units by creating new dispatch records
+      // Handle placeholder units by creating new inventory records
       if (charger.id.startsWith('placeholder-')) {
-        // For placeholder units, we need to create a proper charger unit without order_id requirement
-        // Since this is just updating charger inventory, we'll use a different approach
-        throw new Error('Cannot edit placeholder chargers. Please add chargers with serial numbers from the start.');
-      } else {
-        // Update existing dispatch record
         const { data, error } = await supabase
-          .from('charger_dispatches')
+          .from('charger_inventory')
+          .insert({
+            charger_item_id: charger.charger_item_id,
+            serial_number: updateData.serial_number.trim(),
+            status: updateData.status
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+        return data;
+      } else {
+        // Update existing inventory record
+        const { data, error } = await supabase
+          .from('charger_inventory')
           .update({
             serial_number: updateData.serial_number.trim(),
             status: updateData.status,

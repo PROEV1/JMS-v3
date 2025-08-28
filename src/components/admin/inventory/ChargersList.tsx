@@ -74,43 +74,38 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
       // Get individual charger units with their assignments
       const chargerData = await Promise.all(
         items.map(async (item) => {
-          // Get individual charger units from dispatches table
-          const { data: dispatches } = await supabase
-            .from('charger_dispatches')
+          // Get individual charger units from charger_inventory table
+          const { data: inventory } = await supabase
+            .from('charger_inventory')
             .select(`
               id,
               serial_number,
               status,
-              order_id,
-              dispatched_at,
-              delivered_at,
-              orders (
-                engineer_id,
-                engineers (
-                  name
-                ),
-                client_id,
-                clients (
-                  full_name
-                )
+              engineer_id,
+              location_id,
+              engineers (
+                name
+              ),
+              inventory_locations (
+                name
               )
             `)
             .eq('charger_item_id', item.id)
             .order('serial_number');
 
           // Create individual units data
-          const individualUnits: ChargerUnit[] = (dispatches || []).map(dispatch => ({
-            id: dispatch.id,
+          const individualUnits: ChargerUnit[] = (inventory || []).map(unit => ({
+            id: unit.id,
             charger_item_id: item.id,
-            serial_number: dispatch.serial_number || `SN-${dispatch.id.slice(0, 8)}`,
-            status: dispatch.status,
-            engineer_id: dispatch.orders?.engineer_id || null,
-            engineer_name: dispatch.orders?.engineers?.name || null,
-            location_id: null, // Would need proper location tracking
-            location_name: dispatch.orders?.engineers?.name ? `${dispatch.orders.engineers.name}'s Van` : null,
-            order_id: dispatch.order_id,
-            dispatched_at: dispatch.dispatched_at,
-            delivered_at: dispatch.delivered_at
+            serial_number: unit.serial_number || `SN-${unit.id.slice(0, 8)}`,
+            status: unit.status,
+            engineer_id: unit.engineer_id || null,
+            engineer_name: unit.engineers?.name || null,
+            location_id: unit.location_id || null,
+            location_name: unit.inventory_locations?.name || (unit.engineer_id ? `${unit.engineers?.name}'s Van` : 'Warehouse'),
+            order_id: null,
+            dispatched_at: null,
+            delivered_at: null
           }));
 
           // If no dispatches exist, create a placeholder unit for the charger model

@@ -106,21 +106,20 @@ export function AddChargerModal({ open, onOpenChange }: AddChargerModalProps) {
 
       if (itemError) throw itemError;
 
-      // Then create individual charger units with serial numbers
+      // Then create individual charger units with serial numbers in charger_inventory table
       const validSerialNumbers = chargerData.initial_serial_numbers.filter(sn => sn.trim());
       if (validSerialNumbers.length > 0) {
         const chargerUnits = validSerialNumbers.map(serialNumber => ({
           charger_item_id: chargerItem.id,
           serial_number: serialNumber.trim(),
           status: 'available'
-          // Note: order_id is omitted since it's not required for inventory tracking
         }));
 
-        const { error: dispatchError } = await supabase
-          .from('charger_dispatches')
+        const { error: inventoryError } = await supabase
+          .from('charger_inventory')
           .insert(chargerUnits);
 
-        if (dispatchError) throw dispatchError;
+        if (inventoryError) throw inventoryError;
       }
 
       return chargerItem;

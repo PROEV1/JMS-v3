@@ -95,6 +95,64 @@ export type Database = {
           },
         ]
       }
+      charger_inventory: {
+        Row: {
+          charger_item_id: string
+          created_at: string
+          engineer_id: string | null
+          id: string
+          location_id: string | null
+          notes: string | null
+          serial_number: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          charger_item_id: string
+          created_at?: string
+          engineer_id?: string | null
+          id?: string
+          location_id?: string | null
+          notes?: string | null
+          serial_number: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          charger_item_id?: string
+          created_at?: string
+          engineer_id?: string | null
+          id?: string
+          location_id?: string | null
+          notes?: string | null
+          serial_number?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "charger_inventory_charger_item_id_fkey"
+            columns: ["charger_item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "charger_inventory_engineer_id_fkey"
+            columns: ["engineer_id"]
+            isOneToOne: false
+            referencedRelation: "engineers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "charger_inventory_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_blocked_dates: {
         Row: {
           blocked_date: string
