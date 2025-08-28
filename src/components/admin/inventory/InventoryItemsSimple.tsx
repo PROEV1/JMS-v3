@@ -70,6 +70,7 @@ export const InventoryItemsSimple: React.FC<InventoryItemsSimpleProps> = ({ onSw
       const { data, error } = await supabase
         .from('inventory_items')
         .select('*')
+        .eq('is_charger', false)  // Exclude chargers
         .order('name');
       
       if (error) throw error;
