@@ -96,12 +96,12 @@ export function AdvancedSearchModal({ filters, onFiltersChange, onClear }: Advan
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label>Category</Label>
-              <Select value={localFilters.category || ''} onValueChange={(value) => updateFilter('category', value)}>
+              <Select value={localFilters.category || 'all-categories'} onValueChange={(value) => updateFilter('category', value === 'all-categories' ? '' : value)}>
                 <SelectTrigger>
                   <SelectValue placeholder="All categories" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All categories</SelectItem>
+                  <SelectItem value="all-categories">All categories</SelectItem>
                   <SelectItem value="charger">Chargers</SelectItem>
                   <SelectItem value="cable">Cables</SelectItem>
                   <SelectItem value="mounting">Mounting</SelectItem>
@@ -112,12 +112,12 @@ export function AdvancedSearchModal({ filters, onFiltersChange, onClear }: Advan
             </div>
             <div className="space-y-2">
               <Label>Supplier</Label>
-              <Select value={localFilters.supplier || ''} onValueChange={(value) => updateFilter('supplier', value)}>
+              <Select value={localFilters.supplier || 'all-suppliers'} onValueChange={(value) => updateFilter('supplier', value === 'all-suppliers' ? '' : value)}>
                 <SelectTrigger>
                   <SelectValue placeholder="All suppliers" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All suppliers</SelectItem>
+                  <SelectItem value="all-suppliers">All suppliers</SelectItem>
                   <SelectItem value="supplier1">Supplier 1</SelectItem>
                   <SelectItem value="supplier2">Supplier 2</SelectItem>
                 </SelectContent>

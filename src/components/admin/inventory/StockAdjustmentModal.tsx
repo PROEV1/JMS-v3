@@ -84,7 +84,7 @@ export function StockAdjustmentModal({ open, onOpenChange, itemId, itemName }: S
               </SelectTrigger>
               <SelectContent>
                 {/* TODO: Replace with real locations from inventory_locations table */}
-                <SelectItem value="" disabled>No locations available</SelectItem>
+                <SelectItem value="no-location" disabled>No locations available</SelectItem>
               </SelectContent>
             </Select>
           </div>
