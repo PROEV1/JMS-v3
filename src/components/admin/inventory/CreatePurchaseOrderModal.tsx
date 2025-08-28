@@ -62,30 +62,30 @@ function ItemComboBox({ value, itemId, inventoryItems, onSelect }: ItemComboBoxP
   };
 
   return (
-    <div className="flex">
+    <div className="relative">
       <Input
         value={inputValue}
         onChange={(e) => handleInputChange(e.target.value)}
         placeholder="Type item name or select from list"
-        className="flex-1 rounded-r-none border-r-0"
+        className="pr-10"
       />
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
-            variant="outline"
+            variant="ghost"
             role="combobox"
             aria-expanded={open}
-            className="w-10 rounded-l-none border-l-0 px-2"
+            className="absolute right-0 top-0 h-full w-10 rounded-l-none border-0 hover:bg-accent px-2"
           >
             <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-[400px] p-0" align="start">
           <Command>
-            <CommandInput placeholder="Search items..." />
-            <CommandEmpty>No items found.</CommandEmpty>
+            <CommandInput placeholder="Search inventory items..." />
+            <CommandEmpty>No inventory items found.</CommandEmpty>
             <CommandList>
-              <CommandGroup>
+              <CommandGroup heading="Inventory Items">
                 {inventoryItems.map((item) => (
                   <CommandItem
                     key={item.id}
@@ -99,7 +99,10 @@ function ItemComboBox({ value, itemId, inventoryItems, onSelect }: ItemComboBoxP
                         itemId === item.id ? "opacity-100" : "opacity-0"
                       )}
                     />
-                    {item.name} ({item.sku})
+                    <div className="flex flex-col">
+                      <span className="font-medium">{item.name}</span>
+                      <span className="text-sm text-muted-foreground">SKU: {item.sku}</span>
+                    </div>
                   </CommandItem>
                 ))}
               </CommandGroup>
