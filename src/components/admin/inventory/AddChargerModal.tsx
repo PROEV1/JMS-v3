@@ -26,7 +26,6 @@ export function AddChargerModal({ open, onOpenChange }: AddChargerModalProps) {
 
   const [formData, setFormData] = React.useState({
     name: '',
-    sku: '',
     description: '',
     model: '',
     power_rating: '',
@@ -42,7 +41,6 @@ export function AddChargerModal({ open, onOpenChange }: AddChargerModalProps) {
     if (open) {
       setFormData({
         name: '',
-        sku: '',
         description: '',
         model: '',
         power_rating: '',
@@ -84,7 +82,7 @@ export function AddChargerModal({ open, onOpenChange }: AddChargerModalProps) {
 
       const payload = {
         name: chargerData.name.trim(),
-        sku: chargerData.sku.trim() || null,
+        sku: `CHARGER-${Date.now()}`, // Auto-generate SKU since it's required in DB
         description: description || null,
         unit: 'each',
         default_cost: Number(chargerData.default_cost) || 0,
@@ -192,13 +190,48 @@ export function AddChargerModal({ open, onOpenChange }: AddChargerModalProps) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="sku">SKU/Part Number</Label>
-            <Input
-              id="sku"
-              value={formData.sku}
-              onChange={(e) => setFormData(prev => ({ ...prev, sku: e.target.value }))}
-              placeholder="e.g., TWC-GEN3-01 (optional)"
-            />
+            <Label>Serial Numbers *</Label>
+            <div className="space-y-2">
+              {formData.initial_serial_numbers.map((serialNumber, index) => (
+                <div key={index} className="flex gap-2">
+                  <Input
+                    value={serialNumber}
+                    onChange={(e) => {
+                      const newSerialNumbers = [...formData.initial_serial_numbers];
+                      newSerialNumbers[index] = e.target.value;
+                      setFormData(prev => ({ ...prev, initial_serial_numbers: newSerialNumbers }));
+                    }}
+                    placeholder={`Serial number ${index + 1}`}
+                  />
+                  {formData.initial_serial_numbers.length > 1 && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const newSerialNumbers = formData.initial_serial_numbers.filter((_, i) => i !== index);
+                        setFormData(prev => ({ ...prev, initial_serial_numbers: newSerialNumbers }));
+                      }}
+                    >
+                      Remove
+                    </Button>
+                  )}
+                </div>
+              ))}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setFormData(prev => ({ 
+                    ...prev, 
+                    initial_serial_numbers: [...prev.initial_serial_numbers, ''] 
+                  }));
+                }}
+              >
+                Add Another Serial Number
+              </Button>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -252,51 +285,6 @@ export function AddChargerModal({ open, onOpenChange }: AddChargerModalProps) {
               placeholder="Additional features, installation notes, etc."
               className="min-h-[80px]"
             />
-          </div>
-
-          <div className="space-y-2">
-            <Label>Initial Serial Numbers *</Label>
-            <div className="space-y-2">
-              {formData.initial_serial_numbers.map((serialNumber, index) => (
-                <div key={index} className="flex gap-2">
-                  <Input
-                    value={serialNumber}
-                    onChange={(e) => {
-                      const newSerialNumbers = [...formData.initial_serial_numbers];
-                      newSerialNumbers[index] = e.target.value;
-                      setFormData(prev => ({ ...prev, initial_serial_numbers: newSerialNumbers }));
-                    }}
-                    placeholder={`Serial number ${index + 1}`}
-                  />
-                  {formData.initial_serial_numbers.length > 1 && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        const newSerialNumbers = formData.initial_serial_numbers.filter((_, i) => i !== index);
-                        setFormData(prev => ({ ...prev, initial_serial_numbers: newSerialNumbers }));
-                      }}
-                    >
-                      Remove
-                    </Button>
-                  )}
-                </div>
-              ))}
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setFormData(prev => ({ 
-                    ...prev, 
-                    initial_serial_numbers: [...prev.initial_serial_numbers, ''] 
-                  }));
-                }}
-              >
-                Add Another Serial Number
-              </Button>
-            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
