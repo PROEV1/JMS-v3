@@ -33,7 +33,7 @@ export function AddChargerModal({ open, onOpenChange }: AddChargerModalProps) {
     default_cost: 0,
     reorder_point: 1,
     supplier_id: 'none',
-    initial_serial_numbers: [''] // Add field for initial serial numbers
+    serial_number: '' // Single serial number field
   });
 
   // Reset form when modal opens/closes
@@ -48,7 +48,7 @@ export function AddChargerModal({ open, onOpenChange }: AddChargerModalProps) {
         default_cost: 0,
         reorder_point: 1,
         supplier_id: 'none',
-        initial_serial_numbers: ['']
+        serial_number: ''
       });
     }
   }, [open]);
@@ -104,18 +104,17 @@ export function AddChargerModal({ open, onOpenChange }: AddChargerModalProps) {
 
       if (itemError) throw itemError;
 
-      // Then create individual charger units with serial numbers in charger_inventory table
-      const validSerialNumbers = chargerData.initial_serial_numbers.filter(sn => sn.trim());
-      if (validSerialNumbers.length > 0) {
-        const chargerUnits = validSerialNumbers.map(serialNumber => ({
+      // Then create individual charger unit with serial number in charger_inventory table
+      if (chargerData.serial_number.trim()) {
+        const chargerUnit = {
           charger_item_id: chargerItem.id,
-          serial_number: serialNumber.trim(),
+          serial_number: chargerData.serial_number.trim(),
           status: 'available'
-        }));
+        };
 
         const { error: inventoryError } = await supabase
           .from('charger_inventory')
-          .insert(chargerUnits);
+          .insert([chargerUnit]);
 
         if (inventoryError) throw inventoryError;
       }
@@ -154,13 +153,12 @@ export function AddChargerModal({ open, onOpenChange }: AddChargerModalProps) {
       return;
     }
 
-    // Validate that at least one serial number is provided
-    const validSerialNumbers = formData.initial_serial_numbers.filter(sn => sn.trim());
-    if (validSerialNumbers.length === 0) {
+    // Validate that serial number is provided
+    if (!formData.serial_number.trim()) {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "At least one serial number is required",
+        description: "Serial number is required",
       });
       return;
     }
@@ -190,48 +188,14 @@ export function AddChargerModal({ open, onOpenChange }: AddChargerModalProps) {
           </div>
 
           <div className="space-y-2">
-            <Label>Serial Numbers *</Label>
-            <div className="space-y-2">
-              {formData.initial_serial_numbers.map((serialNumber, index) => (
-                <div key={index} className="flex gap-2">
-                  <Input
-                    value={serialNumber}
-                    onChange={(e) => {
-                      const newSerialNumbers = [...formData.initial_serial_numbers];
-                      newSerialNumbers[index] = e.target.value;
-                      setFormData(prev => ({ ...prev, initial_serial_numbers: newSerialNumbers }));
-                    }}
-                    placeholder={`Serial number ${index + 1}`}
-                  />
-                  {formData.initial_serial_numbers.length > 1 && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        const newSerialNumbers = formData.initial_serial_numbers.filter((_, i) => i !== index);
-                        setFormData(prev => ({ ...prev, initial_serial_numbers: newSerialNumbers }));
-                      }}
-                    >
-                      Remove
-                    </Button>
-                  )}
-                </div>
-              ))}
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setFormData(prev => ({ 
-                    ...prev, 
-                    initial_serial_numbers: [...prev.initial_serial_numbers, ''] 
-                  }));
-                }}
-              >
-                Add Another Serial Number
-              </Button>
-            </div>
+            <Label htmlFor="serial_number">Serial Number *</Label>
+            <Input
+              id="serial_number"
+              value={formData.serial_number}
+              onChange={(e) => setFormData(prev => ({ ...prev, serial_number: e.target.value }))}
+              placeholder="Enter serial number"
+              required
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
