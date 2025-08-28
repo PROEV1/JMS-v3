@@ -17,7 +17,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { CreatePurchaseOrderModal } from './CreatePurchaseOrderModal';
 import { InventoryKpiTile } from './shared/InventoryKpiTile';
-import { StatusChip } from './shared/StatusChip';
+import { EnhancedJobStatusBadge, type OrderStatusEnhanced } from '../EnhancedJobStatusBadge';
 import { EmptyState } from './shared/EmptyState';
 
 export function PurchaseOrdersList() {
@@ -83,13 +83,13 @@ export function PurchaseOrdersList() {
     po.inventory_suppliers?.name?.toLowerCase().includes(searchQuery.toLowerCase())
   ) || [];
 
-  const getStatusVariant = (status: string) => {
+  const getStatusForBadge = (status: string): OrderStatusEnhanced => {
     switch (status) {
-      case 'pending': return 'pending';
-      case 'approved': return 'approved';
-      case 'received': return 'delivered';
-      case 'cancelled': return 'cancelled';
-      default: return 'pending';
+      case 'pending': return 'awaiting_payment';
+      case 'approved': return 'payment_received';
+      case 'received': return 'completed';
+      case 'cancelled': return 'revisit_required';
+      default: return 'awaiting_payment';
     }
   };
 
@@ -171,9 +171,10 @@ export function PurchaseOrdersList() {
                   <div className="flex-1 space-y-1">
                     <div className="flex items-center gap-3">
                       <span className="font-medium">{po.po_number}</span>
-                      <StatusChip status={getStatusVariant(po.status) as any}>
-                        {po.status}
-                      </StatusChip>
+                      <EnhancedJobStatusBadge 
+                        status={getStatusForBadge(po.status)}
+                        className="text-xs"
+                      />
                     </div>
                     <div className="text-sm text-muted-foreground">
                       {po.inventory_suppliers?.name || 'No supplier'} • {po.purchase_order_lines?.length || 0} items • £{po.total_amount?.toFixed(2) || '0.00'}
