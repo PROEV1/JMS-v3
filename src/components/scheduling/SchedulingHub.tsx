@@ -179,9 +179,6 @@ export function SchedulingHub({}: SchedulingHubProps) {
         </CardContent>
       </Card>
 
-      {/* Engineer Low Stock Status */}
-      <EngineerLowStockPanel />
-
       {/* Full Width Capacity View */}
       <WeeklyCapacityView />
 
