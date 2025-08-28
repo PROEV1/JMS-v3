@@ -247,108 +247,100 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
         </div>
       )}
 
-      {/* Charger Units Table */}
-      <div className="space-y-4">
-        {(chargerItems || []).map((charger) => (
-          <Card key={charger.id}>
-            <CardHeader className="pb-4">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="p-2 bg-primary/10 rounded-lg">
-                    <Zap className="w-5 h-5 text-primary" />
+      {/* Individual Charger Units */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {(chargerItems || []).flatMap(charger => 
+          (charger.individual_units || []).map(unit => (
+            <Card key={unit.id} className="hover:shadow-md transition-shadow">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <div className="p-2 bg-primary/10 rounded-lg">
+                      <Zap className="w-4 h-4 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-sm">{charger.name}</h3>
+                      <p className="text-xs text-muted-foreground">SN: {unit.serial_number}</p>
+                    </div>
                   </div>
-                  <div>
-                    <CardTitle className="text-lg">{charger.name}</CardTitle>
-                    <p className="text-sm text-muted-foreground">SKU: {charger.sku}</p>
-                    {charger.description && (
-                      <p className="text-sm text-muted-foreground mt-1">{charger.description}</p>
-                    )}
+                  <Badge 
+                    variant={
+                      unit.status === 'available' ? 'secondary' :
+                      unit.status === 'dispatched' ? 'default' :
+                      unit.status === 'delivered' ? 'default' :
+                      'outline'
+                    }
+                  >
+                    {unit.status || (unit.engineer_id ? 'Assigned' : 'Available')}
+                  </Badge>
+                </div>
+              </CardHeader>
+              
+              <CardContent className="pt-0 space-y-3">
+                {/* Current Assignment */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <User className="w-3 h-3 text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground">Engineer:</span>
+                    <span className="text-sm font-medium">
+                      {unit.engineer_name || 'Unassigned'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <MapPin className="w-3 h-3 text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground">Location:</span>
+                    <span className="text-sm font-medium">
+                      {unit.location_name || 'Warehouse'}
+                    </span>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <StatusChip status="active">
-                    {charger.total_units} total, {charger.available_units} available
-                  </StatusChip>
+                
+                {/* Location Assignment */}
+                <div className="pt-2 border-t space-y-2">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    Assign to Location:
+                  </label>
+                  <select 
+                    className="w-full px-2 py-1 text-sm border rounded focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                    defaultValue={unit.location_id || ''}
+                  >
+                    <option value="">Select Location...</option>
+                    <option value="warehouse">Main Warehouse</option>
+                    <option value="van-1">John Smith's Van</option>
+                    <option value="van-2">Sarah Connor's Van</option>
+                    <option value="van-3">Mike Johnson's Van</option>
+                  </select>
                 </div>
-              </div>
-            </CardHeader>
-            
-            <CardContent>
-              {charger.individual_units?.length > 0 ? (
-                <div className="rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Serial Number</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Engineer</TableHead>
-                        <TableHead>Location</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {(charger.individual_units || []).map((unit) => (
-                        <TableRow key={unit.id}>
-                          <TableCell className="font-medium">
-                            {unit.serial_number}
-                          </TableCell>
-                          <TableCell>
-                            <Badge 
-                              variant={
-                                unit.status === 'available' ? 'secondary' :
-                                unit.status === 'dispatched' ? 'default' :
-                                unit.status === 'delivered' ? 'default' :
-                                'outline'
-                              }
-                            >
-                              {unit.status || (unit.engineer_id ? 'Assigned' : 'Available')}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            {unit.engineer_name ? (
-                              <div className="flex items-center gap-1">
-                                <User className="w-3 h-3 text-muted-foreground" />
-                                <span className="text-sm">{unit.engineer_name}</span>
-                              </div>
-                            ) : (
-                              <span className="text-muted-foreground text-sm">Unassigned</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {unit.location_name ? (
-                              <div className="flex items-center gap-1">
-                                <MapPin className="w-3 h-3 text-muted-foreground" />
-                                <span className="text-sm">{unit.location_name}</span>
-                              </div>
-                            ) : (
-                              <span className="text-muted-foreground text-sm">Warehouse</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex gap-1">
-                              <Button variant="ghost" size="sm">
-                                <Settings className="w-3 h-3" />
-                              </Button>
-                              <Button variant="ghost" size="sm">
-                                <Truck className="w-3 h-3" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                
+                {/* Action Buttons */}
+                <div className="flex gap-2 pt-2">
+                  <Button variant="outline" size="sm" className="flex-1">
+                    <Settings className="w-3 h-3 mr-1" />
+                    Edit
+                  </Button>
+                  <Button variant="outline" size="sm" className="flex-1">
+                    <Truck className="w-3 h-3 mr-1" />
+                    Dispatch
+                  </Button>
                 </div>
-              ) : (
-                <div className="text-center py-6 text-muted-foreground">
-                  <Package className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">No individual units tracked yet</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        ))}
+              </CardContent>
+            </Card>
+          ))
+        )}
       </div>
+      
+      {/* Empty State for Individual Units */}
+      {(chargerItems || []).every(charger => !charger.individual_units?.length) && (
+        <div className="text-center py-8 text-muted-foreground">
+          <Package className="w-12 h-12 mx-auto mb-4 opacity-50" />
+          <h3 className="text-lg font-medium mb-2">No Individual Chargers Found</h3>
+          <p className="mb-4">No individual charger units are currently tracked.</p>
+          <Button onClick={() => setShowAddChargerModal(true)}>
+            <Plus className="w-4 h-4 mr-2" />
+            Add Your First Charger
+          </Button>
+        </div>
+      )}
 
       {!isLoading && (!chargerItems || chargerItems.length === 0) && (
         <div className="text-center py-8 text-muted-foreground">
