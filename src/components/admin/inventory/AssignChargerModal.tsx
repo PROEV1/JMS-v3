@@ -280,7 +280,7 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
                 {locationAddress && (
                   <p className="text-sm">
                     <MapPin className="w-3 h-3 inline mr-1" />
-                    Location: Van Stock - {selectedEngineer?.name} ({locationAddress})
+                    Location: {selectedEngineer ? `Van Stock - ${selectedEngineer.name} (${locationAddress})` : locationAddress}
                   </p>
                 )}
               </div>
