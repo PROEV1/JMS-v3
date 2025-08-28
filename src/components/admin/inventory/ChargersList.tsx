@@ -28,6 +28,8 @@ interface ChargerUnit {
   order_id: string | null;
   dispatched_at: string | null;
   delivered_at: string | null;
+  created_at?: string;
+  charger_name?: string;
 }
 
 interface ChargerItem {
@@ -83,6 +85,7 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
               status,
               engineer_id,
               location_id,
+              created_at,
               engineers (
                 name
               ),
@@ -92,6 +95,11 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
             `)
             .eq('charger_item_id', item.id)
             .order('created_at', { ascending: false });
+
+          console.log('Inventory data for item', item.name, ':', inventory?.map(i => ({ 
+            serial: i.serial_number, 
+            created_at: i.created_at 
+          })));
 
           // Create individual units data
           const individualUnits: ChargerUnit[] = (inventory || []).map(unit => ({
@@ -105,7 +113,8 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
             location_name: unit.inventory_locations?.name || (unit.engineer_id ? `${unit.engineers?.name}'s Van` : 'Warehouse'),
             order_id: null,
             dispatched_at: null,
-            delivered_at: null
+            delivered_at: null,
+            created_at: unit.created_at
           }));
 
           // Only include charger models that have actual inventory records
@@ -302,14 +311,22 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
                 .flatMap(charger => 
                   (charger.individual_units || [])
                     .filter(unit => !serialNumberSearch || unit.serial_number.toLowerCase().includes(serialNumberSearch.toLowerCase()))
-                    .map(unit => (
+                    .map(unit => ({ ...unit, charger_name: charger.name }))
+                )
+                .sort((a, b) => {
+                  // Sort by creation date - newest first
+                  const aDate = new Date(a.created_at || '').getTime();
+                  const bDate = new Date(b.created_at || '').getTime();
+                  return bDate - aDate;
+                })
+                .map(unit => (
                   <TableRow key={unit.id} className="hover:bg-muted/50">
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <div className="p-1.5 bg-primary/10 rounded">
                           <Zap className="w-3 h-3 text-primary" />
                         </div>
-                        <span className="font-medium">{charger.name}</span>
+                        <span className="font-medium">{unit.charger_name}</span>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -350,11 +367,11 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
                         <Button 
                           variant="outline" 
                           size="sm"
-                          onClick={() => {
-                            setSelectedCharger(unit);
-                            setSelectedChargerModel(charger.name);
-                            setShowAssignModal(true);
-                          }}
+                         onClick={() => {
+                           setSelectedCharger(unit);
+                           setSelectedChargerModel(unit.charger_name || '');
+                           setShowAssignModal(true);
+                         }}
                         >
                           <UserCheck className="w-3 h-3 mr-1" />
                           Assign
@@ -371,7 +388,7 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
                               charger_item_id: unit.charger_item_id
                             });
                             setSelectedCharger(unit);
-                            setSelectedChargerModel(charger.name);
+                            setSelectedChargerModel(unit.charger_name || '');
                             setShowEditModal(true);
                           }}
                         >
@@ -393,9 +410,8 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
                         </Button>
                       </div>
                     </TableCell>
-                  </TableRow>
-                    ))
-                )}
+                   </TableRow>
+                ))}
             </TableBody>
           </Table>
         </CardContent>
