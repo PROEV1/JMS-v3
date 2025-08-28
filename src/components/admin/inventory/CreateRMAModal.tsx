@@ -241,18 +241,20 @@ export function CreateRMAModal({ open, onOpenChange }: CreateRMAModalProps) {
                     <div className="col-span-2">
                       <Label>Type</Label>
                       <Select 
+                        key={`type-${line.id}`}
                         value={line.item_type} 
                         onValueChange={(value: 'inventory' | 'charger') => {
+                          console.log('Type changing from', line.item_type, 'to', value);
                           updateLine(line.id, 'item_type', value);
                           updateLine(line.id, 'item_id', ''); // Reset item selection
                         }}
                       >
-                        <SelectTrigger className="bg-background">
-                          <SelectValue />
+                        <SelectTrigger className="bg-background border-input">
+                          <SelectValue placeholder="Select type" />
                         </SelectTrigger>
-                        <SelectContent className="z-[60] bg-background border shadow-lg">
-                          <SelectItem value="inventory">Inventory</SelectItem>
-                          <SelectItem value="charger">Charger</SelectItem>
+                        <SelectContent className="z-[100] bg-popover border shadow-lg" position="popper">
+                          <SelectItem value="inventory" className="cursor-pointer">Inventory</SelectItem>
+                          <SelectItem value="charger" className="cursor-pointer">Charger</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
