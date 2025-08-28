@@ -38,52 +38,57 @@ export function LocationChargerModal({ open, onOpenChange, location }: LocationC
     queryFn: async () => {
       if (!location?.id) return [];
 
-      // Get charger items for this engineer's van
-      const { data: items, error: itemsError } = await supabase
-        .from('inventory_items')
-        .select('id, name, sku, reorder_point')
-        .eq('is_charger', true)
-        .eq('is_active', true);
+      // Get actual charger inventory assigned to this location
+      const { data: chargerInventory, error } = await supabase
+        .from('charger_inventory')
+        .select(`
+          id,
+          serial_number,
+          status,
+          notes,
+          created_at,
+          charger_item_id,
+          inventory_items (
+            id,
+            name,
+            sku
+          )
+        `)
+        .eq('location_id', location.id);
 
-      if (itemsError) throw itemsError;
+      if (error) throw error;
 
-      // For now, we'll show all charger items with basic info
-      // In a real implementation, you'd need to create a proper view or function
-      // to get accurate stock balances per location
-      const chargerStockData = await Promise.all(
-        (items || []).map(async (item) => {
-          // Get recent dispatches for this charger
-          const { data: dispatches } = await supabase
-            .from('charger_dispatches')
-            .select(`
-              id,
-              status,
-              created_at,
-              orders (
-                order_number
-              )
-            `)
-            .eq('charger_item_id', item.id)
-            .order('created_at', { ascending: false })
-            .limit(3);
+      // Group by charger type and return stock info
+      const stockMap = new Map<string, ChargerStock>();
+      
+      (chargerInventory || []).forEach((charger: any) => {
+        const itemId = charger.charger_item_id;
+        const item = charger.inventory_items;
+        
+        if (!stockMap.has(itemId)) {
+          stockMap.set(itemId, {
+            item_id: itemId,
+            item_name: item?.name || 'Unknown Charger',
+            sku: item?.sku || 'N/A',
+            on_hand: 0,
+            reorder_point: 0,
+            recent_dispatches: []
+          });
+        }
+        
+        const stock = stockMap.get(itemId)!;
+        stock.on_hand += 1;
+        
+        // Add charger details as "dispatch" entries for display
+        stock.recent_dispatches.push({
+          id: charger.id,
+          order_number: `SN: ${charger.serial_number}`,
+          status: charger.status || 'available',
+          created_at: charger.created_at
+        });
+      });
 
-          return {
-            item_id: item.id,
-            item_name: item.name,
-            sku: item.sku,
-            on_hand: 0, // Placeholder - would need proper stock calculation
-            reorder_point: item.reorder_point || 0,
-            recent_dispatches: dispatches?.map(d => ({
-              id: d.id,
-              order_number: d.orders?.order_number || 'Unknown',
-              status: d.status,
-              created_at: d.created_at
-            })) || []
-          } as ChargerStock;
-        })
-      );
-
-      return chargerStockData.filter(item => item.recent_dispatches.length > 0);
+      return Array.from(stockMap.values());
     },
     enabled: !!location?.id && open
   });

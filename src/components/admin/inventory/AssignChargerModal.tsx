@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
@@ -46,13 +47,13 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedEngineerId, setSelectedEngineerId] = useState<string>('');
-  const [selectedLocationId, setSelectedLocationId] = useState<string>('');
+  const [locationAddress, setLocationAddress] = useState<string>('');
 
   // Reset form when modal opens
   React.useEffect(() => {
     if (open && charger) {
       setSelectedEngineerId(charger.engineer_id || '');
-      setSelectedLocationId(charger.location_id || '');
+      setLocationAddress(charger.location_name || '');
     }
   }, [open, charger]);
 
@@ -87,12 +88,51 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
   });
 
   const assignChargerMutation = useMutation({
-    mutationFn: async ({ engineerId, locationId }: { engineerId: string; locationId: string }) => {
+    mutationFn: async ({ engineerId, address }: { engineerId: string; address: string }) => {
       if (!charger) throw new Error('No charger selected');
 
       // Handle special values
       const finalEngineerId = engineerId === 'unassigned' ? null : engineerId;
-      const finalLocationId = locationId === 'none' ? null : locationId;
+      
+      // Find or create engineer van location
+      let finalLocationId = null;
+      if (finalEngineerId && finalEngineerId !== 'unassigned') {
+        // Get engineer's van location or create one
+        const { data: existingLocation } = await supabase
+          .from('inventory_locations')
+          .select('id')
+          .eq('engineer_id', finalEngineerId)
+          .eq('type', 'van')
+          .single();
+
+        if (existingLocation) {
+          finalLocationId = existingLocation.id;
+        } else {
+          // Create van location for engineer
+          const engineer = engineers.find(e => e.id === finalEngineerId);
+          const { data: newLocation, error: locationError } = await supabase
+            .from('inventory_locations')
+            .insert({
+              name: `Van Stock - ${engineer?.name}`,
+              type: 'van',
+              engineer_id: finalEngineerId,
+              address: address || null
+            })
+            .select()
+            .single();
+
+          if (locationError) throw locationError;
+          finalLocationId = newLocation.id;
+        }
+        
+        // Update existing location address if provided
+        if (address && finalLocationId) {
+          await supabase
+            .from('inventory_locations')
+            .update({ address })
+            .eq('id', finalLocationId);
+        }
+      }
       
       // Determine status based on assignment
       let status = 'available';
@@ -142,26 +182,24 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Allow "unassigned" and "none" as valid selections
-    if (!selectedEngineerId || selectedEngineerId === '' || !selectedLocationId || selectedLocationId === '') {
+    if (!selectedEngineerId || selectedEngineerId === '') {
       toast({
         variant: "destructive",
         title: "Error", 
-        description: "Please select both an engineer and location",
+        description: "Please select an engineer",
       });
       return;
     }
     
     assignChargerMutation.mutate({
       engineerId: selectedEngineerId,
-      locationId: selectedLocationId
+      address: locationAddress
     });
   };
 
   if (!charger) return null;
 
   const selectedEngineer = engineers.find(e => e.id === selectedEngineerId);
-  const selectedLocation = locations.find(l => l.id === selectedLocationId);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -205,44 +243,29 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
                   <SelectItem value="unassigned">Unassigned</SelectItem>
                   {engineers.map((engineer) => (
                     <SelectItem key={engineer.id} value={engineer.id}>
-                      <div className="flex items-center gap-2">
-                        <span>{engineer.name}</span>
-                        <span className="text-xs text-muted-foreground">({engineer.email})</span>
-                      </div>
+                      Van Stock - {engineer.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Location Selection */}
+            {/* Location Address Input */}
             <div className="space-y-2">
               <Label htmlFor="location">
                 <MapPin className="w-4 h-4 inline mr-2" />
-                Location
+                Location Address (Optional)
               </Label>
-              <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select location..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No specific location</SelectItem>
-                  {locations.map((location) => (
-                    <SelectItem key={location.id} value={location.id}>
-                      <div className="flex items-center gap-2">
-                        <span>{location.name}</span>
-                        <Badge variant="outline" className="text-xs">
-                          {location.type}
-                        </Badge>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Input
+                value={locationAddress}
+                onChange={(e) => setLocationAddress(e.target.value)}
+                placeholder="Enter location address..."
+                className="w-full"
+              />
             </div>
 
             {/* Assignment Preview */}
-            {(selectedEngineer || selectedLocation) && (
+            {(selectedEngineer || locationAddress) && (
               <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg space-y-1">
                 <p className="text-sm font-medium">Assignment Preview:</p>
                 {selectedEngineer && (
@@ -251,10 +274,10 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
                     Engineer: {selectedEngineer.name}
                   </p>
                 )}
-                {selectedLocation && (
+                {locationAddress && (
                   <p className="text-sm">
                     <MapPin className="w-3 h-3 inline mr-1" />
-                    Location: {selectedLocation.name} ({selectedLocation.type})
+                    Location: Van Stock - {selectedEngineer?.name} ({locationAddress})
                   </p>
                 )}
               </div>
