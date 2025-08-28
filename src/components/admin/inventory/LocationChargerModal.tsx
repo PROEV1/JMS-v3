@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Dialog,
   DialogContent,
@@ -33,6 +34,7 @@ interface ChargerStock {
 }
 
 export function LocationChargerModal({ open, onOpenChange, location }: LocationChargerModalProps) {
+  const navigate = useNavigate();
   const { data: chargerStock = [], isLoading } = useQuery({
     queryKey: ['location-charger-stock', location?.id],
     queryFn: async () => {
@@ -221,7 +223,7 @@ export function LocationChargerModal({ open, onOpenChange, location }: LocationC
               <Button variant="outline" onClick={() => onOpenChange(false)}>
                 Close
               </Button>
-              <Button onClick={() => window.open('/admin/chargers', '_blank')}>
+              <Button onClick={() => navigate('/admin/chargers')}>
                 <Package className="w-4 h-4 mr-1" />
                 Manage Inventory
               </Button>
