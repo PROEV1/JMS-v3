@@ -36,11 +36,12 @@ export function InventoryDashboardV2({ onSwitchTab }: InventoryDashboardV2Props)
   const { data: kpiStats, isLoading: kpiLoading } = useQuery({
     queryKey: ['inventory-kpi-stats'],
     queryFn: async () => {
-      // Active Items
+      // Active Items (excluding chargers)
       const { data: itemsData } = await supabase
         .from('inventory_items')
         .select('id, is_active, reorder_point')
-        .eq('is_active', true);
+        .eq('is_active', true)
+        .eq('is_charger', false);  // Exclude chargers
 
       // Stock balances for low stock calculation
       const { data: balances } = await supabase
