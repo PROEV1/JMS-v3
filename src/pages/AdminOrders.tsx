@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { EnhancedJobStatusBadge, type OrderStatusEnhanced as EnhancedOrderStatus } from "@/components/admin/EnhancedJobStatusBadge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -317,11 +318,12 @@ export default function AdminOrders() {
                          <span className="text-xs text-muted-foreground">No client</span>
                        )}
                      </TableCell>
-                      <TableCell className="py-4 align-middle">
-                        <Badge className={`text-xs font-semibold uppercase px-2 py-1 ${getStatusClassName(order.status_enhanced || 'unknown')}`}>
-                          {formatStatusText(order.status_enhanced || 'unknown')}
-                        </Badge>
-                      </TableCell>
+                       <TableCell className="py-4 align-middle">
+                         <EnhancedJobStatusBadge 
+                           status={order.status_enhanced as EnhancedOrderStatus}
+                           className="text-xs"
+                         />
+                       </TableCell>
                       <TableCell className="py-4 align-middle hidden lg:table-cell">
                         {order.engineer ? (
                           <div className="flex items-center gap-1.5">
