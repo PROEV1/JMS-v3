@@ -50,19 +50,37 @@ export function EditChargerModal({ open, onOpenChange, charger, chargerModel }: 
     mutationFn: async (updateData: typeof formData) => {
       if (!charger) throw new Error('No charger selected');
 
-      const { data, error } = await supabase
-        .from('charger_dispatches')
-        .update({
-          serial_number: updateData.serial_number.trim(),
-          status: updateData.status,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', charger.id)
-        .select()
-        .single();
+      // Handle placeholder units by creating new dispatch records
+      if (charger.id.startsWith('placeholder-')) {
+        const { data, error } = await supabase
+          .from('charger_dispatches')
+          .insert({
+            charger_item_id: charger.charger_item_id,
+            serial_number: updateData.serial_number.trim(),
+            status: updateData.status,
+            order_id: null
+          })
+          .select()
+          .single();
 
-      if (error) throw error;
-      return data;
+        if (error) throw error;
+        return data;
+      } else {
+        // Update existing dispatch record
+        const { data, error } = await supabase
+          .from('charger_dispatches')
+          .update({
+            serial_number: updateData.serial_number.trim(),
+            status: updateData.status,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', charger.id)
+          .select()
+          .single();
+
+        if (error) throw error;
+        return data;
+      }
     },
     onSuccess: () => {
       toast({

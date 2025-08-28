@@ -33,7 +33,8 @@ export function AddChargerModal({ open, onOpenChange }: AddChargerModalProps) {
     connector_type: '',
     default_cost: 0,
     reorder_point: 1,
-    supplier_id: 'none'
+    supplier_id: 'none',
+    initial_serial_numbers: [''] // Add field for initial serial numbers
   });
 
   // Reset form when modal opens/closes
@@ -48,7 +49,8 @@ export function AddChargerModal({ open, onOpenChange }: AddChargerModalProps) {
         connector_type: '',
         default_cost: 0,
         reorder_point: 1,
-        supplier_id: 'none'
+        supplier_id: 'none',
+        initial_serial_numbers: ['']
       });
     }
   }, [open]);
@@ -95,14 +97,33 @@ export function AddChargerModal({ open, onOpenChange }: AddChargerModalProps) {
         supplier_id: supplierIdValue
       };
 
-      const { data, error } = await supabase
+      // First, create the charger model in inventory_items
+      const { data: chargerItem, error: itemError } = await supabase
         .from('inventory_items')
         .insert([payload])
         .select()
         .single();
 
-      if (error) throw error;
-      return data;
+      if (itemError) throw itemError;
+
+      // Then create individual charger units with serial numbers
+      const validSerialNumbers = chargerData.initial_serial_numbers.filter(sn => sn.trim());
+      if (validSerialNumbers.length > 0) {
+        const chargerUnits = validSerialNumbers.map(serialNumber => ({
+          charger_item_id: chargerItem.id,
+          serial_number: serialNumber.trim(),
+          status: 'available',
+          order_id: null
+        }));
+
+        const { error: dispatchError } = await supabase
+          .from('charger_dispatches')
+          .insert(chargerUnits);
+
+        if (dispatchError) throw dispatchError;
+      }
+
+      return chargerItem;
     },
     onSuccess: () => {
       toast({
@@ -132,6 +153,17 @@ export function AddChargerModal({ open, onOpenChange }: AddChargerModalProps) {
         variant: "destructive",
         title: "Error",
         description: "Name and SKU are required",
+      });
+      return;
+    }
+
+    // Validate that at least one serial number is provided
+    const validSerialNumbers = formData.initial_serial_numbers.filter(sn => sn.trim());
+    if (validSerialNumbers.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "At least one serial number is required",
       });
       return;
     }
@@ -222,6 +254,51 @@ export function AddChargerModal({ open, onOpenChange }: AddChargerModalProps) {
               placeholder="Additional features, installation notes, etc."
               className="min-h-[80px]"
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Initial Serial Numbers *</Label>
+            <div className="space-y-2">
+              {formData.initial_serial_numbers.map((serialNumber, index) => (
+                <div key={index} className="flex gap-2">
+                  <Input
+                    value={serialNumber}
+                    onChange={(e) => {
+                      const newSerialNumbers = [...formData.initial_serial_numbers];
+                      newSerialNumbers[index] = e.target.value;
+                      setFormData(prev => ({ ...prev, initial_serial_numbers: newSerialNumbers }));
+                    }}
+                    placeholder={`Serial number ${index + 1}`}
+                  />
+                  {formData.initial_serial_numbers.length > 1 && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const newSerialNumbers = formData.initial_serial_numbers.filter((_, i) => i !== index);
+                        setFormData(prev => ({ ...prev, initial_serial_numbers: newSerialNumbers }));
+                      }}
+                    >
+                      Remove
+                    </Button>
+                  )}
+                </div>
+              ))}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setFormData(prev => ({ 
+                    ...prev, 
+                    initial_serial_numbers: [...prev.initial_serial_numbers, ''] 
+                  }));
+                }}
+              >
+                Add Another Serial Number
+              </Button>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
