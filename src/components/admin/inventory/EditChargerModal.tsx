@@ -52,21 +52,30 @@ export function EditChargerModal({ open, onOpenChange, charger, chargerModel }: 
     mutationFn: async () => {
       if (!charger) throw new Error('No charger selected');
 
+      console.log('Attempting to delete charger:', charger);
+
       if (charger.id.startsWith('placeholder-')) {
         // For placeholder units, we don't need to delete from database
+        console.log('Deleting placeholder charger');
         return { success: true };
       } else {
         // Delete from charger_inventory table
+        console.log('Deleting from charger_inventory table, ID:', charger.id);
         const { error } = await supabase
           .from('charger_inventory')
           .delete()
           .eq('id', charger.id);
 
-        if (error) throw error;
+        if (error) {
+          console.error('Delete error:', error);
+          throw error;
+        }
+        console.log('Delete successful');
         return { success: true };
       }
     },
     onSuccess: () => {
+      console.log('Delete mutation successful, invalidating queries');
       toast({
         title: "Success",
         description: `Charger ${charger?.serial_number} deleted successfully`,
