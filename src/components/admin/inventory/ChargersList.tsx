@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Zap, Truck, Warehouse, Package, Eye, MapPin, User, Plus, Settings, UserCheck } from "lucide-react";
+import { Zap, Truck, Warehouse, Package, Eye, MapPin, User, Plus, Settings, UserCheck, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { InventoryKpiTile } from './shared/InventoryKpiTile';
 import { StatusChip } from './shared/StatusChip';
@@ -54,6 +55,8 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedCharger, setSelectedCharger] = useState<ChargerUnit | null>(null);
   const [selectedChargerModel, setSelectedChargerModel] = useState('');
+  const [chargerTypeFilter, setChargerTypeFilter] = useState('all-types');
+  const [serialNumberSearch, setSerialNumberSearch] = useState('');
   
   const { data: chargerItems = [], isLoading } = useQuery({
     queryKey: ['charger-items'],
@@ -110,24 +113,7 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
             delivered_at: dispatch.delivered_at
           }));
 
-          // Add some demo units if no dispatches exist
-          if (individualUnits.length === 0) {
-            for (let i = 1; i <= 3; i++) {
-              individualUnits.push({
-                id: `demo-${item.id}-${i}`,
-                charger_item_id: item.id,
-                serial_number: `${item.sku}-${String(i).padStart(3, '0')}`,
-                status: i === 1 ? 'available' : (i === 2 ? 'assigned' : 'dispatched'),
-                engineer_id: i === 2 ? 'demo-engineer' : null,
-                engineer_name: i === 2 ? 'John Smith' : null,
-                location_id: null,
-                location_name: i === 2 ? "John Smith's Van" : null,
-                order_id: null,
-                dispatched_at: null,
-                delivered_at: null
-              });
-            }
-          }
+          // Only use real data from dispatches
 
           const totalUnits = individualUnits.length;
           const availableUnits = individualUnits.filter(u => u.status === 'available' || !u.engineer_id).length;
@@ -257,6 +243,42 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
         </div>
       )}
 
+      {/* Filters */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex gap-4 items-end">
+            <div className="flex-1">
+              <label className="text-sm font-medium mb-2 block">Search Serial Number</label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Enter serial number..."
+                  value={serialNumberSearch}
+                  onChange={(e) => setSerialNumberSearch(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+            <div className="min-w-[200px]">
+              <label className="text-sm font-medium mb-2 block">Charger Type</label>
+              <Select value={chargerTypeFilter} onValueChange={setChargerTypeFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All charger types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all-types">All Charger Types</SelectItem>
+                  {chargerItems.map(charger => (
+                    <SelectItem key={charger.id} value={charger.id}>
+                      {charger.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Chargers Table */}
       <Card>
         <CardHeader>
@@ -278,8 +300,12 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {(chargerItems || []).flatMap(charger => 
-                (charger.individual_units || []).map(unit => (
+              {(chargerItems || [])
+                .filter(charger => chargerTypeFilter === 'all-types' || charger.id === chargerTypeFilter)
+                .flatMap(charger => 
+                  (charger.individual_units || [])
+                    .filter(unit => !serialNumberSearch || unit.serial_number.toLowerCase().includes(serialNumberSearch.toLowerCase()))
+                    .map(unit => (
                   <TableRow key={unit.id} className="hover:bg-muted/50">
                     <TableCell>
                       <div className="flex items-center gap-2">
@@ -364,8 +390,8 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))
-              )}
+                    ))
+                )}
             </TableBody>
           </Table>
         </CardContent>
