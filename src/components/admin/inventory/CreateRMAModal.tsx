@@ -112,9 +112,14 @@ export function CreateRMAModal({ open, onOpenChange }: CreateRMAModalProps) {
   };
 
   const updateLine = (id: string, field: keyof RMALine, value: any) => {
-    setLines(lines.map(line => 
-      line.id === id ? { ...line, [field]: value } : line
-    ));
+    console.log(`Updating line ${id}, field ${field}, value:`, value);
+    setLines(prevLines => {
+      const newLines = prevLines.map(line => 
+        line.id === id ? { ...line, [field]: value } : line
+      );
+      console.log('New lines state:', newLines);
+      return newLines;
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -241,10 +246,10 @@ export function CreateRMAModal({ open, onOpenChange }: CreateRMAModalProps) {
                     <div className="col-span-2">
                       <Label>Type</Label>
                       <Select 
-                        key={`type-${line.id}`}
-                        value={line.item_type} 
+                        key={`type-${line.id}-${line.item_type}`}
+                        value={line.item_type || 'inventory'} 
                         onValueChange={(value: 'inventory' | 'charger') => {
-                          console.log('Type changing from', line.item_type, 'to', value);
+                          console.log('Type changing from', line.item_type, 'to', value, 'for line', line.id);
                           updateLine(line.id, 'item_type', value);
                           updateLine(line.id, 'item_id', ''); // Reset item selection
                         }}
@@ -252,9 +257,9 @@ export function CreateRMAModal({ open, onOpenChange }: CreateRMAModalProps) {
                         <SelectTrigger className="bg-background border-input">
                           <SelectValue placeholder="Select type" />
                         </SelectTrigger>
-                        <SelectContent className="z-[100] bg-popover border shadow-lg" position="popper">
-                          <SelectItem value="inventory" className="cursor-pointer">Inventory</SelectItem>
-                          <SelectItem value="charger" className="cursor-pointer">Charger</SelectItem>
+                        <SelectContent className="z-[100] bg-popover border shadow-lg" position="popper" side="bottom" align="start">
+                          <SelectItem value="inventory" className="cursor-pointer hover:bg-accent">Inventory</SelectItem>
+                          <SelectItem value="charger" className="cursor-pointer hover:bg-accent">Charger</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
