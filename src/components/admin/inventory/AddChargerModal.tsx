@@ -69,20 +69,7 @@ export function AddChargerModal({ open, onOpenChange }: AddChargerModalProps) {
     }
   });
 
-  // Fetch existing charger names for validation
-  const { data: existingChargers = [] } = useQuery({
-    queryKey: ['existing-charger-names'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('inventory_items')
-        .select('name')
-        .eq('is_charger', true)
-        .eq('is_active', true);
-      
-      if (error) throw error;
-      return data.map(item => item.name.toLowerCase());
-    }
-  });
+  // Remove duplicate charger name validation - allowing duplicate names
 
   const createChargerMutation = useMutation({
     mutationFn: async (chargerData: typeof formData) => {
@@ -169,16 +156,7 @@ export function AddChargerModal({ open, onOpenChange }: AddChargerModalProps) {
       return;
     }
 
-    // Check for duplicate charger names
-    const nameToCheck = formData.name.trim().toLowerCase();
-    if (existingChargers.includes(nameToCheck)) {
-      toast({
-        variant: "destructive",
-        title: "Duplicate Charger Name",
-        description: `A charger with the name "${formData.name.trim()}" already exists. Please choose a different name or add a version/batch identifier.`,
-      });
-      return;
-    }
+    // Duplicate names are now allowed
 
     // Validate that serial number is provided
     if (!formData.serial_number.trim()) {
@@ -193,16 +171,7 @@ export function AddChargerModal({ open, onOpenChange }: AddChargerModalProps) {
     createChargerMutation.mutate(formData);
   };
 
-  // Check if the current name is similar to existing ones
-  const getSimilarNames = (inputName: string) => {
-    if (!inputName.trim()) return [];
-    const input = inputName.toLowerCase();
-    return existingChargers.filter(name => 
-      name.includes(input) || input.includes(name)
-    ).slice(0, 3); // Show max 3 similar names
-  };
-
-  const similarNames = getSimilarNames(formData.name);
+  // Remove similar names check since duplicates are allowed
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -222,25 +191,7 @@ export function AddChargerModal({ open, onOpenChange }: AddChargerModalProps) {
               onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
               placeholder="e.g., Tesla Wall Connector Gen 3"
               required
-              className={existingChargers.includes(formData.name.trim().toLowerCase()) ? "border-destructive" : ""}
             />
-            {similarNames.length > 0 && formData.name.trim() && (
-              <Alert className="border-amber-200 bg-amber-50">
-                <AlertTriangle className="h-4 w-4 text-amber-600" />
-                <AlertDescription className="text-amber-800">
-                  {existingChargers.includes(formData.name.trim().toLowerCase()) ? (
-                    <span className="font-medium">This charger name already exists! Please choose a different name.</span>
-                  ) : (
-                    <>
-                      <span className="font-medium">Similar charger names found:</span>
-                      <div className="mt-1 text-sm">
-                        Consider using a different name or adding version/batch identifiers like "v2", "Gen 2", or "Batch A".
-                      </div>
-                    </>
-                  )}
-                </AlertDescription>
-              </Alert>
-            )}
           </div>
 
           <div className="space-y-2">
