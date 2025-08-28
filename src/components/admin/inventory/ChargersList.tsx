@@ -2,12 +2,28 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Zap, Truck, Warehouse, Package, Eye, MapPin, User } from "lucide-react";
+import { Zap, Truck, Warehouse, Package, Eye, MapPin, User, Plus, Settings } from "lucide-react";
 import { InventoryKpiTile } from './shared/InventoryKpiTile';
 import { StatusChip } from './shared/StatusChip';
 import { ChargerDispatchPanel } from './ChargerDispatchPanel';
+import { AddChargerModal } from './AddChargerModal';
+
+interface ChargerUnit {
+  id: string;
+  charger_item_id: string;
+  serial_number: string;
+  status: string;
+  engineer_id: string | null;
+  engineer_name: string | null;
+  location_id: string | null;
+  location_name: string | null;
+  order_id: string | null;
+  dispatched_at: string | null;
+  delivered_at: string | null;
+}
 
 interface ChargerItem {
   id: string;
@@ -15,19 +31,10 @@ interface ChargerItem {
   sku: string;
   description: string | null;
   is_active: boolean;
-  on_hand?: number;
-  engineer_assignments?: {
-    engineer_id: string;
-    engineer_name: string;
-    location_id: string;
-    location_name: string;
-    stock_count: number;
-  }[];
-  dispatch_status?: {
-    pending: number;
-    sent: number;
-    delivered: number;
-  };
+  total_units: number;
+  available_units: number;
+  assigned_units: number;
+  individual_units: ChargerUnit[];
 }
 
 interface ChargersListProps {
@@ -36,11 +43,12 @@ interface ChargersListProps {
 
 export function ChargersList({ onSwitchTab }: ChargersListProps) {
   const [showDispatchPanel, setShowDispatchPanel] = useState(false);
+  const [showAddChargerModal, setShowAddChargerModal] = useState(false);
   
   const { data: chargerItems = [], isLoading } = useQuery({
     queryKey: ['charger-items'],
     queryFn: async () => {
-      // Fetch charger items
+      // Fetch charger items (models)
       const { data: items, error: itemsError } = await supabase
         .from('inventory_items')
         .select('*')
@@ -50,55 +58,77 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
 
       if (itemsError) throw itemsError;
 
-      // Get stock levels and engineer assignments
+      // Get individual charger units with their assignments
       const chargerData = await Promise.all(
         items.map(async (item) => {
-          // For simplicity, we'll use placeholder stock data
-          // In a real implementation, you'd need proper stock calculation
-          const totalStock = 5; // Placeholder
-
-          // Get engineer assignments (van locations)
-          const { data: vanLocations } = await supabase
-            .from('inventory_locations')
-            .select(`
-              id,
-              name,
-              engineer_id,
-              engineers (
-                name
-              )
-            `)
-            .eq('type', 'van')
-            .eq('is_active', true);
-
-          // Create mock engineer assignments for demo
-          const engineerAssignments = (vanLocations || [])
-            .filter(location => location.engineer_id)
-            .map((location) => ({
-              engineer_id: location.engineer_id,
-              engineer_name: location.engineers?.name || 'Unassigned',
-              location_id: location.id,
-              location_name: location.name,
-              stock_count: Math.floor(Math.random() * 3) // Random stock for demo
-            }));
-
-          // Get dispatch status counts
+          // Get individual charger units from dispatches table
           const { data: dispatches } = await supabase
             .from('charger_dispatches')
-            .select('status')
-            .eq('charger_item_id', item.id);
+            .select(`
+              id,
+              serial_number,
+              status,
+              order_id,
+              dispatched_at,
+              delivered_at,
+              orders (
+                engineer_id,
+                engineers (
+                  name
+                ),
+                client_id,
+                clients (
+                  full_name
+                )
+              )
+            `)
+            .eq('charger_item_id', item.id)
+            .order('serial_number');
 
-          const dispatchStatus = {
-            pending: dispatches?.filter(d => d.status === 'pending_dispatch').length || 0,
-            sent: dispatches?.filter(d => d.status === 'sent').length || 0,
-            delivered: dispatches?.filter(d => d.status === 'delivered').length || 0,
-          };
+          // Create individual units data
+          const individualUnits: ChargerUnit[] = (dispatches || []).map(dispatch => ({
+            id: dispatch.id,
+            charger_item_id: item.id,
+            serial_number: dispatch.serial_number || `SN-${dispatch.id.slice(0, 8)}`,
+            status: dispatch.status,
+            engineer_id: dispatch.orders?.engineer_id || null,
+            engineer_name: dispatch.orders?.engineers?.name || null,
+            location_id: null, // Would need proper location tracking
+            location_name: dispatch.orders?.engineers?.name ? `${dispatch.orders.engineers.name}'s Van` : null,
+            order_id: dispatch.order_id,
+            dispatched_at: dispatch.dispatched_at,
+            delivered_at: dispatch.delivered_at
+          }));
+
+          // Add some demo units if no dispatches exist
+          if (individualUnits.length === 0) {
+            for (let i = 1; i <= 3; i++) {
+              individualUnits.push({
+                id: `demo-${item.id}-${i}`,
+                charger_item_id: item.id,
+                serial_number: `${item.sku}-${String(i).padStart(3, '0')}`,
+                status: i === 1 ? 'available' : (i === 2 ? 'assigned' : 'dispatched'),
+                engineer_id: i === 2 ? 'demo-engineer' : null,
+                engineer_name: i === 2 ? 'John Smith' : null,
+                location_id: null,
+                location_name: i === 2 ? "John Smith's Van" : null,
+                order_id: null,
+                dispatched_at: null,
+                delivered_at: null
+              });
+            }
+          }
+
+          const totalUnits = individualUnits.length;
+          const availableUnits = individualUnits.filter(u => u.status === 'available' || !u.engineer_id).length;
+          const assignedUnits = individualUnits.filter(u => u.engineer_id && u.status !== 'available').length;
 
           return {
             ...item,
-            on_hand: totalStock,
-            engineer_assignments: engineerAssignments,
-            dispatch_status: dispatchStatus
+            total_units: totalUnits,
+            available_units: availableUnits,
+            assigned_units: assignedUnits,
+            individual_units: individualUnits
           } as ChargerItem;
         })
       );
@@ -114,22 +144,22 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
       if (!chargerItems.length) return null;
 
       const totalChargers = chargerItems.length;
-      const totalStock = chargerItems.reduce((sum, item) => sum + (item.on_hand || 0), 0);
+      const totalUnits = chargerItems.reduce((sum, item) => sum + item.total_units, 0);
+      const availableUnits = chargerItems.reduce((sum, item) => sum + item.available_units, 0);
+      const assignedUnits = chargerItems.reduce((sum, item) => sum + item.assigned_units, 0);
+      
       const engineersWithChargers = new Set(
         chargerItems.flatMap(item => 
-          item.engineer_assignments?.filter(a => a.stock_count > 0).map(a => a.engineer_id) || []
+          item.individual_units.filter(u => u.engineer_id).map(u => u.engineer_id)
         )
       ).size;
 
-      const totalDispatchesPending = chargerItems.reduce((sum, item) => 
-        sum + (item.dispatch_status?.pending || 0), 0
-      );
-
       return {
         totalChargers,
-        totalStock,
-        engineersWithChargers,
-        totalDispatchesPending
+        totalUnits,
+        availableUnits,
+        assignedUnits,
+        engineersWithChargers
       };
     },
     enabled: chargerItems.length > 0
@@ -164,10 +194,23 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
             Manage charger inventory, engineer assignments, and dispatches
           </p>
         </div>
-        <Button onClick={() => setShowDispatchPanel(true)} className="flex items-center gap-2">
-          <Package className="w-4 h-4" />
-          View Dispatches
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            onClick={() => setShowAddChargerModal(true)} 
+            className="flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            Add Charger
+          </Button>
+          <Button 
+            variant="outline"
+            onClick={() => setShowDispatchPanel(true)} 
+            className="flex items-center gap-2"
+          >
+            <Package className="w-4 h-4" />
+            View Dispatches
+          </Button>
+        </div>
       </div>
 
       {/* Header Metrics */}
@@ -181,32 +224,33 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
             subtitle="Active charger types"
           />
           <InventoryKpiTile
-            title="Total Stock"
-            value={metrics.totalStock}
+            title="Total Units"
+            value={metrics.totalUnits}
             icon={Package}
             variant="success"
-            subtitle="Units available"
+            subtitle="Individual chargers"
           />
           <InventoryKpiTile
-            title="Engineers with Stock"
-            value={metrics.engineersWithChargers}
-            icon={User}
+            title="Available"
+            value={metrics.availableUnits}
+            icon={Warehouse}
             variant="neutral"
-            subtitle="Van inventories"
+            subtitle="Ready for dispatch"
           />
           <InventoryKpiTile
-            title="Pending Dispatches"
-            value={metrics.totalDispatchesPending}
-            icon={Truck}
+            title="Assigned"
+            value={metrics.assignedUnits}
+            icon={User}
             variant="warning"
-            subtitle="Awaiting dispatch"
+            subtitle="With engineers"
           />
         </div>
       )}
 
-      <div className="grid gap-6">
+      {/* Charger Units Table */}
+      <div className="space-y-4">
         {chargerItems.map((charger) => (
-          <Card key={charger.id} className="relative">
+          <Card key={charger.id}>
             <CardHeader className="pb-4">
               <div className="flex items-start justify-between">
                 <div className="flex items-center space-x-3">
@@ -222,92 +266,85 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                <StatusChip status="active">
-                  {charger.on_hand || 0} in stock
-                </StatusChip>
+                  <StatusChip status="active">
+                    {charger.total_units} total, {charger.available_units} available
+                  </StatusChip>
                 </div>
               </div>
             </CardHeader>
             
-            <CardContent className="space-y-4">
-              {/* Engineer Assignments */}
-              {charger.engineer_assignments && charger.engineer_assignments.length > 0 ? (
-                <div>
-                  <h4 className="font-medium mb-2">Engineer Van Stock</h4>
-                  <div className="grid gap-2">
-                    {charger.engineer_assignments.map((assignment) => (
-                      <div 
-                        key={`${assignment.engineer_id}-${assignment.location_id}`}
-                        className="flex items-center justify-between p-2 bg-muted/30 rounded-lg"
-                      >
-                        <div className="flex items-center gap-2">
-                          <User className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-sm font-medium">{assignment.engineer_name}</span>
-                          <span className="text-xs text-muted-foreground">({assignment.location_name})</span>
-                        </div>
-                        <Badge variant={assignment.stock_count > 0 ? "default" : "secondary"}>
-                          {assignment.stock_count} units
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
+            <CardContent>
+              {charger.individual_units.length > 0 ? (
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Serial Number</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Engineer</TableHead>
+                        <TableHead>Location</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {charger.individual_units.map((unit) => (
+                        <TableRow key={unit.id}>
+                          <TableCell className="font-medium">
+                            {unit.serial_number}
+                          </TableCell>
+                          <TableCell>
+                            <Badge 
+                              variant={
+                                unit.status === 'available' ? 'secondary' :
+                                unit.status === 'dispatched' ? 'default' :
+                                unit.status === 'delivered' ? 'default' :
+                                'outline'
+                              }
+                            >
+                              {unit.status || (unit.engineer_id ? 'Assigned' : 'Available')}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {unit.engineer_name ? (
+                              <div className="flex items-center gap-1">
+                                <User className="w-3 h-3 text-muted-foreground" />
+                                <span className="text-sm">{unit.engineer_name}</span>
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground text-sm">Unassigned</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {unit.location_name ? (
+                              <div className="flex items-center gap-1">
+                                <MapPin className="w-3 h-3 text-muted-foreground" />
+                                <span className="text-sm">{unit.location_name}</span>
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground text-sm">Warehouse</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex gap-1">
+                              <Button variant="ghost" size="sm">
+                                <Settings className="w-3 h-3" />
+                              </Button>
+                              <Button variant="ghost" size="sm">
+                                <Truck className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </div>
               ) : (
-                <div className="text-center py-4 text-muted-foreground">
+                <div className="text-center py-6 text-muted-foreground">
                   <Package className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">No engineer assignments</p>
+                  <p className="text-sm">No individual units tracked yet</p>
                 </div>
               )}
-
-              {/* Dispatch Status */}
-              {charger.dispatch_status && (
-                <div>
-                  <h4 className="font-medium mb-2">Dispatch Status</h4>
-                  <div className="flex gap-4 text-sm">
-                    <div className="flex items-center gap-1">
-                      <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                      <span>{charger.dispatch_status.pending} Pending</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                      <span>{charger.dispatch_status.sent} Sent</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                      <span>{charger.dispatch_status.delivered} Delivered</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div className="flex justify-between items-center pt-2 border-t">
-                <div className="flex gap-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => onSwitchTab('items')}
-                  >
-                    <Eye className="w-4 h-4 mr-1" />
-                    View Details
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => onSwitchTab('locations')}
-                  >
-                    <MapPin className="w-4 h-4 mr-1" />
-                    View Locations
-                  </Button>
-                </div>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => setShowDispatchPanel(true)}
-                >
-                  <Truck className="w-4 h-4 mr-1" />
-                  Manage Dispatches
-                </Button>
-              </div>
             </CardContent>
           </Card>
         ))}
@@ -318,11 +355,17 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
           <Zap className="w-12 h-12 mx-auto mb-4 opacity-50" />
           <h3 className="text-lg font-medium mb-2">No Chargers Found</h3>
           <p className="mb-4">No charger items are currently configured in the inventory.</p>
-          <Button onClick={() => onSwitchTab('items')}>
-            Add Charger Items
+          <Button onClick={() => setShowAddChargerModal(true)}>
+            <Plus className="w-4 h-4 mr-2" />
+            Add Your First Charger
           </Button>
         </div>
       )}
+
+      <AddChargerModal 
+        open={showAddChargerModal}
+        onOpenChange={setShowAddChargerModal}
+      />
     </div>
   );
 }
