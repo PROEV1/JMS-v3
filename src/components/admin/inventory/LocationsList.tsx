@@ -5,10 +5,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { MapPin, Warehouse, Truck, Building, User, DollarSign, Hash, Plus, Edit, Trash2 } from "lucide-react";
+import { MapPin, Warehouse, Truck, Building, User, DollarSign, Hash, Plus, Edit, Trash2, Zap } from "lucide-react";
 import { AddLocationModal } from './AddLocationModal';
 import { EditLocationModal } from './EditLocationModal';
 import { LocationStockModal } from './LocationStockModal';
+import { LocationChargerModal } from './LocationChargerModal';
 import { InventoryKpiTile } from './shared/InventoryKpiTile';
 import { StatusChip } from './shared/StatusChip';
 
@@ -26,6 +27,7 @@ export function LocationsList() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showStockModal, setShowStockModal] = useState(false);
+  const [showChargerModal, setShowChargerModal] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<any>(null);
   const { data: locations = [], isLoading, error } = useQuery({
     queryKey: ['inventory-locations'],
@@ -208,16 +210,30 @@ export function LocationsList() {
                     <Trash2 className="w-4 h-4" />
                   </Button>
                 </div>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => {
-                    setSelectedLocation(location);
-                    setShowStockModal(true);
-                  }}
-                >
-                  View Stock
-                </Button>
+                <div className="flex gap-1">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => {
+                      setSelectedLocation(location);
+                      setShowStockModal(true);
+                    }}
+                  >
+                    View Stock
+                  </Button>
+                  {location.type === 'van' && (
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => {
+                        setSelectedLocation(location);
+                        setShowChargerModal(true);
+                      }}
+                    >
+                      <Zap className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -244,6 +260,12 @@ export function LocationsList() {
       <LocationStockModal
         open={showStockModal}
         onOpenChange={setShowStockModal}
+        location={selectedLocation}
+      />
+      
+      <LocationChargerModal
+        open={showChargerModal}
+        onOpenChange={setShowChargerModal}
         location={selectedLocation}
       />
     </div>
