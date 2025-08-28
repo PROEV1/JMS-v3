@@ -5,12 +5,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Card, CardContent } from "@/components/ui/card";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Check, ChevronsUpDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { StockRequestWithDetails } from '@/types/stock-request';
+import { cn } from "@/lib/utils";
 
 interface CreatePurchaseOrderModalProps {
   open: boolean;
@@ -24,6 +27,88 @@ interface POItem {
   item_name: string;
   quantity: number;
   unit_cost: number;
+}
+
+// Custom ComboBox component for item selection
+interface ItemComboBoxProps {
+  value: string;
+  itemId: string;
+  inventoryItems: Array<{ id: string; name: string; sku: string }>;
+  onSelect: (itemName: string, itemId?: string) => void;
+}
+
+function ItemComboBox({ value, itemId, inventoryItems, onSelect }: ItemComboBoxProps) {
+  const [open, setOpen] = useState(false);
+  const [inputValue, setInputValue] = useState(value);
+
+  React.useEffect(() => {
+    setInputValue(value);
+  }, [value]);
+
+  const handleInputChange = (newValue: string) => {
+    setInputValue(newValue);
+    // If the user is typing a custom item name (not from inventory), clear the item_id
+    const existingItem = inventoryItems.find(item => item.name === newValue);
+    onSelect(newValue, existingItem?.id);
+  };
+
+  const handleSelect = (selectedValue: string) => {
+    const selectedItem = inventoryItems.find(item => item.id === selectedValue);
+    if (selectedItem) {
+      setInputValue(selectedItem.name);
+      onSelect(selectedItem.name, selectedItem.id);
+    }
+    setOpen(false);
+  };
+
+  return (
+    <div className="flex">
+      <Input
+        value={inputValue}
+        onChange={(e) => handleInputChange(e.target.value)}
+        placeholder="Type item name or select from list"
+        className="flex-1 rounded-r-none border-r-0"
+      />
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            className="w-10 rounded-l-none border-l-0 px-2"
+          >
+            <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[400px] p-0" align="start">
+          <Command>
+            <CommandInput placeholder="Search items..." />
+            <CommandEmpty>No items found.</CommandEmpty>
+            <CommandList>
+              <CommandGroup>
+                {inventoryItems.map((item) => (
+                  <CommandItem
+                    key={item.id}
+                    value={item.id}
+                    onSelect={handleSelect}
+                    className="cursor-pointer"
+                  >
+                    <Check
+                      className={cn(
+                        "mr-2 h-4 w-4",
+                        itemId === item.id ? "opacity-100" : "opacity-0"
+                      )}
+                    />
+                    {item.name} ({item.sku})
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
 }
 
 export function CreatePurchaseOrderModal({ open, onOpenChange, stockRequest }: CreatePurchaseOrderModalProps) {
@@ -146,10 +231,10 @@ export function CreatePurchaseOrderModal({ open, onOpenChange, stockRequest }: C
     
     if (isSubmitting) return; // Prevent double submission
     
-    if (!supplierId || !poNumber || poItems.some(item => !item.item_id || !item.quantity)) {
+    if (!supplierId || !poNumber || poItems.some(item => (!item.item_name || item.item_name.trim() === '') || !item.quantity)) {
       toast({
         title: "Error",
-        description: "Please fill in all required fields",
+        description: "Please fill in all required fields (item name and quantity)",
         variant: "destructive",
       });
       return;
@@ -177,10 +262,11 @@ export function CreatePurchaseOrderModal({ open, onOpenChange, stockRequest }: C
 
       // Create purchase order lines
       const poLines = poItems
-        .filter(item => item.item_id && item.quantity > 0)
+        .filter(item => item.item_name && item.item_name.trim() !== '' && item.quantity > 0)
         .map(item => ({
           purchase_order_id: poData.id,
-          item_id: item.item_id,
+          item_id: item.item_id || null, // Can be null for custom items
+          item_name: item.item_name, // Store the custom name
           quantity: item.quantity,
           unit_cost: item.unit_cost,
           total_cost: item.quantity * item.unit_cost
@@ -299,30 +385,17 @@ export function CreatePurchaseOrderModal({ open, onOpenChange, stockRequest }: C
                   <div className="grid grid-cols-12 gap-3 items-end">
                     <div className="col-span-4">
                       <Label>Item</Label>
-                      <Select 
+                      <ItemComboBox
                         key={`item-${item.id}-${item.item_id}`}
-                        value={item.item_id || ''} 
-                        onValueChange={(value) => {
-                          console.log('PO Item changing from', item.item_id, 'to', value, 'for item', item.id);
-                          updateItem(item.id, "item_id", value);
-                          // Auto-populate name based on selection
-                          const selectedItem = inventoryItems.find(i => i.id === value);
-                          if (selectedItem) {
-                            updateItem(item.id, "item_name", selectedItem.name);
-                          }
+                        value={item.item_name}
+                        itemId={item.item_id}
+                        inventoryItems={inventoryItems}
+                        onSelect={(itemName, itemId) => {
+                          console.log('PO Item changing to:', itemName, 'ID:', itemId);
+                          updateItem(item.id, "item_name", itemName);
+                          updateItem(item.id, "item_id", itemId || '');
                         }}
-                      >
-                        <SelectTrigger className="bg-background border-input">
-                          <SelectValue placeholder="Select item" />
-                        </SelectTrigger>
-                        <SelectContent className="z-[100] bg-popover border shadow-lg max-h-[200px]" position="popper" side="bottom" align="start">
-                          {inventoryItems.map(inventoryItem => (
-                            <SelectItem key={inventoryItem.id} value={inventoryItem.id} className="cursor-pointer hover:bg-accent">
-                              {inventoryItem.name} ({inventoryItem.sku})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      />
                     </div>
 
                     <div className="col-span-2">
