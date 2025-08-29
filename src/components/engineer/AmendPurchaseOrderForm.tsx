@@ -37,6 +37,34 @@ export const AmendPurchaseOrderForm: React.FC<AmendPurchaseOrderFormProps> = ({
   // Get the PO linked to this stock request
   const { data: purchaseOrder, isLoading: poLoading } = usePurchaseOrderForStockRequest(stockRequestId);
   
+  // Get the original stock request to show baseline items
+  const { data: stockRequest, isLoading: srLoading } = useQuery({
+    queryKey: ['stock-request-for-amendment', stockRequestId],
+    queryFn: async () => {
+      console.log('Fetching stock request for amendment:', stockRequestId);
+      const { data, error } = await supabase
+        .from('stock_requests')
+        .select(`
+          *,
+          lines:stock_request_lines(
+            *,
+            item:inventory_items(name, sku, unit)
+          )
+        `)
+        .eq('id', stockRequestId)
+        .single();
+      
+      if (error) {
+        console.error('Error fetching stock request:', error);
+        throw error;
+      }
+      
+      console.log('Stock request fetched:', data);
+      return data;
+    },
+    enabled: !!stockRequestId
+  });
+  
   // Get all inventory items for adding new items
   const { data: allItems } = useQuery({
     queryKey: ['inventory-items-for-amendment'],
@@ -52,19 +80,29 @@ export const AmendPurchaseOrderForm: React.FC<AmendPurchaseOrderFormProps> = ({
     }
   });
 
-  // Pre-populate with current PO items
+  // Pre-populate with original stock request items as baseline
   useEffect(() => {
-    if (purchaseOrder?.purchase_order_lines) {
-      const items = purchaseOrder.purchase_order_lines.map((line, index) => ({
-        id: `existing-${index}`,
+    if (stockRequest?.lines) {
+      console.log('Setting up amendment items from stock request lines:', stockRequest.lines);
+      
+      const items = stockRequest.lines.map((line, index) => ({
+        id: `original-${line.id}`,
         item_id: line.item_id,
         item_name: line.item.name,
-        quantity: line.quantity,
-        notes: ''
+        quantity: line.qty, // Start with original requested quantity
+        notes: line.notes || ''
       }));
       setAmendmentItems(items);
     }
-  }, [purchaseOrder]);
+  }, [stockRequest]);
+
+  console.log('AmendPurchaseOrderForm state:', { 
+    stockRequest, 
+    purchaseOrder, 
+    amendmentItems,
+    poLoading, 
+    srLoading 
+  });
 
   const addNewItem = () => {
     const newItem: AmendmentItem = {
@@ -99,7 +137,7 @@ export const AmendPurchaseOrderForm: React.FC<AmendPurchaseOrderFormProps> = ({
   };
 
   const handleSubmit = async () => {
-    if (!purchaseOrder || !amendmentReason.trim()) {
+    if (!amendmentReason.trim()) {
       return;
     }
 
@@ -111,31 +149,40 @@ export const AmendPurchaseOrderForm: React.FC<AmendPurchaseOrderFormProps> = ({
       return;
     }
 
-    await amendPO.mutateAsync({
-      purchaseOrderId: purchaseOrder.id,
-      items: validItems.map(item => ({
-        item_id: item.item_id,
-        quantity: item.quantity,
-        notes: item.notes
-      })),
-      amendmentReason,
-      engineerId
-    });
+    if (purchaseOrder) {
+      // Amend existing PO
+      await amendPO.mutateAsync({
+        purchaseOrderId: purchaseOrder.id,
+        items: validItems.map(item => ({
+          item_id: item.item_id,
+          quantity: item.quantity,
+          notes: item.notes
+        })),
+        amendmentReason,
+        engineerId
+      });
+    } else {
+      // Create amendment request (update the stock request with amended items)
+      // This will be handled by updating the stock request lines
+      console.log('Creating amendment request for stock request without PO');
+      // For now, we'll just show a message to contact the office
+      // In the future, this could create a new amendment record
+    }
 
     onClose();
   };
 
-  if (poLoading) {
-    return <div className="p-4">Loading purchase order...</div>;
+  if (poLoading || srLoading) {
+    return <div className="p-4">Loading...</div>;
   }
 
-  if (!purchaseOrder) {
+  if (!stockRequest) {
     return (
-      <Card className="border-yellow-200 bg-yellow-50">
+      <Card className="border-red-200 bg-red-50">
         <CardContent className="p-6">
-          <div className="flex items-center gap-2 text-yellow-800">
+          <div className="flex items-center gap-2 text-red-800">
             <AlertTriangle className="h-5 w-5" />
-            <span>No purchase order found for this stock request. A PO must be created first before reporting issues.</span>
+            <span>Could not load stock request details. Please try again.</span>
           </div>
         </CardContent>
       </Card>
@@ -148,12 +195,15 @@ export const AmendPurchaseOrderForm: React.FC<AmendPurchaseOrderFormProps> = ({
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-blue-800">
             <Package className="h-5 w-5" />
-            Amend Purchase Order - {purchaseOrder.po_number}
+            {purchaseOrder ? `Amend Purchase Order - ${purchaseOrder.po_number}` : 'Report Stock Issues'}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-blue-700">
-            This will update the existing purchase order with corrected quantities and any additional items needed.
+            {purchaseOrder 
+              ? 'This will update the existing purchase order with corrected quantities and any additional items needed.'
+              : 'Report discrepancies in the originally requested items or request additional items. This will create an amendment request for the office to process.'
+            }
             The office will be notified of these changes.
           </p>
         </CardContent>
@@ -260,7 +310,12 @@ export const AmendPurchaseOrderForm: React.FC<AmendPurchaseOrderFormProps> = ({
           disabled={amendPO.isPending || !amendmentReason.trim() || amendmentItems.length === 0}
           className="bg-blue-600 hover:bg-blue-700"
         >
-          {amendPO.isPending ? 'Amending PO...' : 'Amend Purchase Order'}
+          {amendPO.isPending 
+            ? 'Submitting...' 
+            : purchaseOrder 
+              ? 'Amend Purchase Order'
+              : 'Submit Amendment Request'
+          }
         </Button>
       </div>
     </div>

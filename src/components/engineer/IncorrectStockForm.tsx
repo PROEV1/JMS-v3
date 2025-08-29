@@ -40,37 +40,12 @@ export const IncorrectStockForm: React.FC<IncorrectStockFormProps> = ({
     );
   }
 
-  // If there's a purchase order, show the amendment form
-  if (purchaseOrder) {
-    return (
-      <AmendPurchaseOrderForm
-        engineerId={engineerId}
-        stockRequestId={stockRequestId}
-        onClose={onClose}
-      />
-    );
-  }
-
-  // If no purchase order exists, show message that PO must be created first
+  // Always show the amendment form - it handles both PO and non-PO cases
   return (
-    <Card className="border-yellow-200 bg-yellow-50">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-yellow-800">
-          <AlertTriangle className="h-5 w-5" />
-          Purchase Order Required
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <p className="text-sm text-yellow-700">
-          To report stock issues, a purchase order must be created first for this stock request.
-          Please contact the office to create a purchase order before reporting discrepancies.
-        </p>
-        <div className="flex justify-end">
-          <Button variant="outline" onClick={onClose}>
-            Close
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+    <AmendPurchaseOrderForm
+      engineerId={engineerId}
+      stockRequestId={stockRequestId}
+      onClose={onClose}
+    />
   );
 };
