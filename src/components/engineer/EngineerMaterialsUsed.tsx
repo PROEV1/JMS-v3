@@ -17,6 +17,8 @@ interface EngineerMaterialsUsedProps {
 }
 
 export function EngineerMaterialsUsed({ orderId, engineerId }: EngineerMaterialsUsedProps) {
+  console.log('EngineerMaterialsUsed: Component mounted with orderId:', orderId, 'engineerId:', engineerId);
+  
   const [itemName, setItemName] = useState("");
   const [selectedItemId, setSelectedItemId] = useState<string>("");
   const [selectedChargerId, setSelectedChargerId] = useState<string>("");
