@@ -432,11 +432,11 @@ export function useInventoryEnhanced() {
 
         if (locationsError) throw locationsError;
 
-        // Get stock balances using direct query
+        // Get stock balances using direct query (include pending and approved)
         const { data: txnsData, error: balancesError } = await supabase
           .from('inventory_txns')
           .select('item_id, location_id, direction, qty, status')
-          .eq('status', 'approved');
+          .in('status', ['pending', 'approved']);
         if (balancesError) throw balancesError;
         
         // Calculate balances manually
