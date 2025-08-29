@@ -40,11 +40,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signOut = async () => {
+    console.log('signOut function called');
     try {
       // Clear any local state first
+      console.log('Setting loading to true');
       setLoading(true);
       
       // Sign out from Supabase
+      console.log('Calling supabase.auth.signOut()');
       const { error } = await supabase.auth.signOut();
       
       if (error) {
@@ -52,13 +55,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Even if there's an error, clear local state
         setSession(null);
         setUser(null);
+      } else {
+        console.log('Supabase sign out successful');
       }
       
       // Clear session storage
+      console.log('Clearing session storage');
       sessionStorage.removeItem('authRedirectPath');
       sessionStorage.removeItem('lastAuthenticatedPath');
       
       // Force reload to clear any cached state
+      console.log('Redirecting to /auth');
       window.location.href = '/auth';
     } catch (err) {
       console.error('Sign out error:', err);
