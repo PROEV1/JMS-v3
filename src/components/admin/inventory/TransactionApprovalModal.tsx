@@ -12,12 +12,14 @@ interface TransactionApprovalModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   transaction: any;
+  onSuccess?: () => void;
 }
 
 export const TransactionApprovalModal: React.FC<TransactionApprovalModalProps> = ({
   open,
   onOpenChange,
-  transaction
+  transaction,
+  onSuccess
 }) => {
   const [reason, setReason] = React.useState('');
   const queryClient = useQueryClient();
@@ -37,7 +39,7 @@ export const TransactionApprovalModal: React.FC<TransactionApprovalModalProps> =
       queryClient.invalidateQueries({ queryKey: ['inventory-transactions'] });
       queryClient.invalidateQueries({ queryKey: ['inventory-audit'] });
       showSuccessToast('Transaction status updated successfully');
-      onOpenChange(false);
+      onSuccess?.();
       setReason('');
     },
     onError: (error) => {

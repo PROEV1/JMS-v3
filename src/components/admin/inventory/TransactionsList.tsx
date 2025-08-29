@@ -23,6 +23,7 @@ interface Transaction {
   approved_at: string | null;
   rejection_reason: string | null;
   created_at: string;
+  updated_at?: string;
   inventory_items: {
     name: string;
     sku: string;
@@ -31,6 +32,12 @@ interface Transaction {
     name: string;
     code: string | null;
   };
+  created_by_profile?: {
+    full_name: string;
+  } | null;
+  approved_by_profile?: {
+    full_name: string;
+  } | null;
 }
 
 export function TransactionsList() {
@@ -41,7 +48,7 @@ export function TransactionsList() {
   const [showAuditModal, setShowAuditModal] = useState(false);
   const [auditTransactionId, setAuditTransactionId] = useState<string | null>(null);
 
-  const { data: transactions, isLoading } = useQuery({
+  const { data: transactions, isLoading, refetch } = useQuery({
     queryKey: ["inventory-transactions", searchTerm],
     queryFn: async () => {
       let query = supabase
@@ -172,6 +179,7 @@ export function TransactionsList() {
                     <TableHead>Direction</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Reference</TableHead>
+                    <TableHead>Created By</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
@@ -224,6 +232,9 @@ export function TransactionsList() {
                         {transaction.reference || '-'}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
+                        {transaction.created_by_profile?.full_name || 'System'}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
                         {format(new Date(transaction.created_at), 'MMM d, HH:mm')}
                       </TableCell>
                       <TableCell>
@@ -265,6 +276,10 @@ export function TransactionsList() {
         open={showApprovalModal}
         onOpenChange={setShowApprovalModal}
         transaction={selectedTransaction}
+        onSuccess={() => {
+          refetch();
+          setShowApprovalModal(false);
+        }}
       />
 
       <TransactionAuditModal
