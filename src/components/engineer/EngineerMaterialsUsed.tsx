@@ -34,6 +34,8 @@ export function EngineerMaterialsUsed({ orderId, engineerId }: EngineerMaterials
   const { data: engineerLocation } = useQuery({
     queryKey: ['engineer-location', engineerId],
     queryFn: async () => {
+      console.log('EngineerMaterialsUsed: Fetching location for engineer:', engineerId);
+      
       const { data, error } = await supabase
         .from('inventory_locations')
         .select('id, name, code')
@@ -41,7 +43,12 @@ export function EngineerMaterialsUsed({ orderId, engineerId }: EngineerMaterials
         .eq('is_active', true)
         .maybeSingle();
       
-      if (error) throw error;
+      if (error) {
+        console.error('EngineerMaterialsUsed: Error fetching engineer location:', error);
+        throw error;
+      }
+      
+      console.log('EngineerMaterialsUsed: Engineer location result:', data);
       return data;
     }
   });
