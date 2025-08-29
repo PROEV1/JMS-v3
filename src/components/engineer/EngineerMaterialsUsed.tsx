@@ -52,19 +52,45 @@ export function EngineerMaterialsUsed({ orderId, engineerId }: EngineerMaterials
     queryFn: async () => {
       if (!engineerLocation?.id) return [];
       
-      // Get items with current stock in engineer's van
-      const { data, error } = await supabase.rpc('get_item_location_balances');
+      console.log('EngineerMaterialsUsed: Fetching van stock for location:', engineerLocation.id);
       
-      if (error) throw error;
+      // Get inventory transactions for this location using direct query
+      const { data: txnData, error } = await supabase
+        .from('inventory_txns')
+        .select('item_id, location_id, direction, qty, status')
+        .eq('location_id', engineerLocation.id)
+        .eq('status', 'approved');
       
-      const vanItems = data?.filter(balance => 
-        balance.location_id === engineerLocation.id && balance.on_hand > 0
-      ) || [];
+      if (error) {
+        console.error('EngineerMaterialsUsed: Error fetching transactions:', error);
+        throw error;
+      }
+      
+      console.log('EngineerMaterialsUsed: Found transactions:', txnData?.length || 0);
+      
+      // Calculate balances manually
+      const balances = new Map<string, number>();
+      
+      txnData?.forEach(txn => {
+        const current = balances.get(txn.item_id) || 0;
+        if (txn.direction === 'in' || txn.direction === 'adjust') {
+          balances.set(txn.item_id, current + txn.qty);
+        } else {
+          balances.set(txn.item_id, current - txn.qty);
+        }
+      });
+      
+      // Filter items with positive stock
+      const itemsWithStock = Array.from(balances.entries())
+        .filter(([_, qty]) => qty > 0)
+        .map(([itemId, qty]) => ({ item_id: itemId, on_hand: qty }));
+      
+      console.log('EngineerMaterialsUsed: Items with stock:', itemsWithStock);
       
       // Get item details
-      if (vanItems.length === 0) return [];
+      if (itemsWithStock.length === 0) return [];
       
-      const itemIds = vanItems.map(item => item.item_id);
+      const itemIds = itemsWithStock.map(item => item.item_id);
       const { data: itemDetails, error: itemError } = await supabase
         .from('inventory_items')
         .select('id, name, sku, is_serialized')
@@ -72,12 +98,18 @@ export function EngineerMaterialsUsed({ orderId, engineerId }: EngineerMaterials
         .eq('is_active', true)
         .order('name');
       
-      if (itemError) throw itemError;
+      if (itemError) {
+        console.error('EngineerMaterialsUsed: Error fetching item details:', itemError);
+        throw itemError;
+      }
       
-      return itemDetails?.map(item => ({
+      const result = itemDetails?.map(item => ({
         ...item,
-        on_hand: vanItems.find(v => v.item_id === item.id)?.on_hand || 0
+        on_hand: itemsWithStock.find(v => v.item_id === item.id)?.on_hand || 0
       })) || [];
+      
+      console.log('EngineerMaterialsUsed: Final result:', result);
+      return result;
     },
     enabled: !!engineerLocation?.id
   });
