@@ -16,6 +16,9 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { CreatePurchaseOrderModal } from './CreatePurchaseOrderModal';
+import { ViewPurchaseOrderModal } from './ViewPurchaseOrderModal';
+import { EditPurchaseOrderModal } from './EditPurchaseOrderModal';
+import { ReceivePurchaseOrderModal } from './ReceivePurchaseOrderModal';
 import { InventoryKpiTile } from './shared/InventoryKpiTile';
 import { EnhancedJobStatusBadge, type OrderStatusEnhanced } from '../EnhancedJobStatusBadge';
 import { EmptyState } from './shared/EmptyState';
@@ -23,6 +26,10 @@ import { EmptyState } from './shared/EmptyState';
 export function PurchaseOrdersList() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showReceiveModal, setShowReceiveModal] = useState(false);
+  const [selectedPOId, setSelectedPOId] = useState<string | null>(null);
 
   // Header metrics
   const { data: metrics } = useQuery({
@@ -185,16 +192,37 @@ export function PurchaseOrdersList() {
                   </div>
                   
                   <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => {
+                        setSelectedPOId(po.id);
+                        setShowViewModal(true);
+                      }}
+                    >
                       <Eye className="h-4 w-4 mr-1" />
                       View
                     </Button>
-                    <Button variant="outline" size="sm">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => {
+                        setSelectedPOId(po.id);
+                        setShowEditModal(true);
+                      }}
+                    >
                       <Edit className="h-4 w-4 mr-1" />
                       Edit
                     </Button>
-                    {po.status === 'pending' && (
-                      <Button variant="outline" size="sm">
+                    {(po.status === 'pending' || po.status === 'approved') && (
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => {
+                          setSelectedPOId(po.id);
+                          setShowReceiveModal(true);
+                        }}
+                      >
                         <Package className="h-4 w-4 mr-1" />
                         Receive
                       </Button>
@@ -218,6 +246,24 @@ export function PurchaseOrdersList() {
       <CreatePurchaseOrderModal
         open={showCreateModal}
         onOpenChange={setShowCreateModal}
+      />
+      
+      <ViewPurchaseOrderModal
+        open={showViewModal}
+        onOpenChange={setShowViewModal}
+        purchaseOrderId={selectedPOId}
+      />
+      
+      <EditPurchaseOrderModal
+        open={showEditModal}
+        onOpenChange={setShowEditModal}
+        purchaseOrderId={selectedPOId}
+      />
+      
+      <ReceivePurchaseOrderModal
+        open={showReceiveModal}
+        onOpenChange={setShowReceiveModal}
+        purchaseOrderId={selectedPOId}
       />
     </div>
   );
