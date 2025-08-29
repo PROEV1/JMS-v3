@@ -36,7 +36,7 @@ export function EngineerMaterialsUsed({ orderId, engineerId }: EngineerMaterials
   const { data: engineerLocation } = useQuery({
     queryKey: ['engineer-location', engineerId],
     queryFn: async () => {
-      console.log('EngineerMaterialsUsed: Fetching location for engineer:', engineerId);
+      console.log('🔍 ENGINEER LOCATION QUERY: Starting for engineer:', engineerId);
       
       const { data, error } = await supabase
         .from('inventory_locations')
@@ -46,22 +46,27 @@ export function EngineerMaterialsUsed({ orderId, engineerId }: EngineerMaterials
         .maybeSingle();
       
       if (error) {
-        console.error('EngineerMaterialsUsed: Error fetching engineer location:', error);
+        console.error('❌ ENGINEER LOCATION ERROR:', error);
         throw error;
       }
       
-      console.log('EngineerMaterialsUsed: Engineer location result:', data);
+      console.log('✅ ENGINEER LOCATION RESULT:', data);
+      console.log('🎯 Location ID found:', data?.id);
       return data;
-    }
+    },
+    enabled: !!engineerId
   });
 
   // Fetch inventory items available in engineer's van
   const { data: inventoryItems = [] } = useQuery({
     queryKey: ['engineer-inventory-items', engineerLocation?.id],
     queryFn: async () => {
-      if (!engineerLocation?.id) return [];
+      if (!engineerLocation?.id) {
+        console.log('🚫 NO LOCATION: Skipping inventory fetch - no location found');
+        return [];
+      }
       
-      console.log('EngineerMaterialsUsed: Fetching van stock for location:', engineerLocation.id);
+      console.log('📦 INVENTORY QUERY: Starting for location:', engineerLocation.id, engineerLocation.name);
       
       // Get inventory transactions for this location using direct query
       const { data: txnData, error } = await supabase
@@ -71,11 +76,12 @@ export function EngineerMaterialsUsed({ orderId, engineerId }: EngineerMaterials
         .in('status', ['approved', 'pending']); // Include pending for now
       
       if (error) {
-        console.error('EngineerMaterialsUsed: Error fetching transactions:', error);
+        console.error('❌ INVENTORY TXN ERROR:', error);
         throw error;
       }
       
-      console.log('EngineerMaterialsUsed: Found transactions:', txnData?.length || 0);
+      console.log('📋 TRANSACTIONS FOUND:', txnData?.length || 0, 'transactions');
+      console.log('📊 Transaction details:', txnData);
       
       // Calculate balances manually
       const balances = new Map<string, number>();
@@ -89,17 +95,24 @@ export function EngineerMaterialsUsed({ orderId, engineerId }: EngineerMaterials
         }
       });
       
+      console.log('🧮 CALCULATED BALANCES:', Object.fromEntries(balances));
+      
       // Filter items with positive stock
       const itemsWithStock = Array.from(balances.entries())
         .filter(([_, qty]) => qty > 0)
         .map(([itemId, qty]) => ({ item_id: itemId, on_hand: qty }));
       
-      console.log('EngineerMaterialsUsed: Items with stock:', itemsWithStock);
+      console.log('✅ ITEMS WITH STOCK:', itemsWithStock);
       
       // Get item details
-      if (itemsWithStock.length === 0) return [];
+      if (itemsWithStock.length === 0) {
+        console.log('📦 NO STOCK: No items with positive stock found');
+        return [];
+      }
       
       const itemIds = itemsWithStock.map(item => item.item_id);
+      console.log('🔎 FETCHING ITEM DETAILS for IDs:', itemIds);
+      
       const { data: itemDetails, error: itemError } = await supabase
         .from('inventory_items')
         .select('id, name, sku, is_serialized')
@@ -108,16 +121,18 @@ export function EngineerMaterialsUsed({ orderId, engineerId }: EngineerMaterials
         .order('name');
       
       if (itemError) {
-        console.error('EngineerMaterialsUsed: Error fetching item details:', itemError);
+        console.error('❌ ITEM DETAILS ERROR:', itemError);
         throw itemError;
       }
+      
+      console.log('📝 ITEM DETAILS:', itemDetails);
       
       const result = itemDetails?.map(item => ({
         ...item,
         on_hand: itemsWithStock.find(v => v.item_id === item.id)?.on_hand || 0
       })) || [];
       
-      console.log('EngineerMaterialsUsed: Final result:', result);
+      console.log('🎯 FINAL INVENTORY RESULT:', result);
       return result;
     },
     enabled: !!engineerLocation?.id
