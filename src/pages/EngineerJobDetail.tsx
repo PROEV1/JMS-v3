@@ -36,6 +36,7 @@ import { EngineerMaterialsUsed } from '@/components/engineer/EngineerMaterialsUs
 interface JobDetails {
   id: string;
   order_number: string;
+  engineer_id: string;
   client: {
     full_name: string;
     phone: string;
@@ -211,6 +212,7 @@ export default function EngineerJobDetail() {
       const formattedJob = {
         id: orderData.id,
         order_number: orderData.order_number,
+        engineer_id: orderData.engineer_id,
         client: {
           full_name: clientData?.full_name || 'Unknown Client',
           phone: clientData?.phone || 'Not provided',
@@ -691,7 +693,7 @@ export default function EngineerJobDetail() {
           {!job.engineer_signed_off_at && (
             <EngineerMaterialsUsed 
               orderId={job.id} 
-              engineerId={engineerInfo?.id || ""} 
+              engineerId={job.engineer_id || ""} 
             />
           )}
 
