@@ -140,7 +140,8 @@ export const useUpdateStockRequestStatus = () => {
             notes: `Voided due to cancelled stock request #${id.slice(0, 8)}`,
             updated_at: new Date().toISOString()
           })
-          .eq('id', data.purchase_order_id);
+          .eq('id', data.purchase_order_id)
+          .eq('status', 'pending'); // Only update if still pending to avoid conflicts
 
         if (poError) {
           console.error('Failed to cancel purchase order:', poError);
