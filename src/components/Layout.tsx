@@ -179,7 +179,10 @@ export default function Layout({ children }: LayoutProps) {
               <Button 
                 variant="outline" 
                 size="sm" 
-                onClick={signOut}
+                onClick={() => {
+                  console.log('Sign out button clicked');
+                  signOut();
+                }}
                 className="border-border text-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary"
               >
                 <LogOut className="h-4 w-4 mr-2" />
