@@ -110,6 +110,8 @@ export const useUpdateStockRequestStatus = () => {
 
   return useMutation({
     mutationFn: async ({ id, status, notes }: { id: string; status: string; notes?: string }) => {
+      console.log('Attempting to update stock request status:', { id, status, notes });
+      
       const { data, error } = await (supabase as any)
         .from('stock_requests')
         .update({ 
@@ -121,7 +123,12 @@ export const useUpdateStockRequestStatus = () => {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Database error when updating status:', error);
+        throw error;
+      }
+      
+      console.log('Status update successful:', data);
       return data;
     },
     onSuccess: () => {
