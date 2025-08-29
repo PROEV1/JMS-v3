@@ -19,6 +19,7 @@ interface EngineerMaterialsUsedProps {
 export function EngineerMaterialsUsed({ orderId, engineerId }: EngineerMaterialsUsedProps) {
   const [itemName, setItemName] = useState("");
   const [selectedItemId, setSelectedItemId] = useState<string>("");
+  const [selectedChargerId, setSelectedChargerId] = useState<string>("");
   const [quantity, setQuantity] = useState(1);
   const [serialNumber, setSerialNumber] = useState("");
   const [locationId, setLocationId] = useState<string>("");
@@ -29,15 +30,78 @@ export function EngineerMaterialsUsed({ orderId, engineerId }: EngineerMaterials
   const recordMaterialMutation = useRecordMaterialUsage();
   const revokeMaterialMutation = useRevokeMaterialUsage();
 
-  // Fetch inventory items for autocomplete
-  const { data: inventoryItems = [] } = useQuery({
-    queryKey: ['inventory-items-active'],
+  // Fetch engineer's van location to get available inventory
+  const { data: engineerLocation } = useQuery({
+    queryKey: ['engineer-location', engineerId],
     queryFn: async () => {
       const { data, error } = await supabase
+        .from('inventory_locations')
+        .select('id, name, code')
+        .eq('engineer_id', engineerId)
+        .eq('is_active', true)
+        .maybeSingle();
+      
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  // Fetch inventory items available in engineer's van
+  const { data: inventoryItems = [] } = useQuery({
+    queryKey: ['engineer-inventory-items', engineerLocation?.id],
+    queryFn: async () => {
+      if (!engineerLocation?.id) return [];
+      
+      // Get items with current stock in engineer's van
+      const { data, error } = await supabase.rpc('get_item_location_balances');
+      
+      if (error) throw error;
+      
+      const vanItems = data?.filter(balance => 
+        balance.location_id === engineerLocation.id && balance.on_hand > 0
+      ) || [];
+      
+      // Get item details
+      if (vanItems.length === 0) return [];
+      
+      const itemIds = vanItems.map(item => item.item_id);
+      const { data: itemDetails, error: itemError } = await supabase
         .from('inventory_items')
         .select('id, name, sku, is_serialized')
+        .in('id', itemIds)
         .eq('is_active', true)
         .order('name');
+      
+      if (itemError) throw itemError;
+      
+      return itemDetails?.map(item => ({
+        ...item,
+        on_hand: vanItems.find(v => v.item_id === item.id)?.on_hand || 0
+      })) || [];
+    },
+    enabled: !!engineerLocation?.id
+  });
+
+  // Fetch assigned chargers for this engineer
+  const { data: assignedChargers = [] } = useQuery({
+    queryKey: ['assigned-chargers', engineerId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('charger_inventory')
+        .select(`
+          id,
+          serial_number,
+          status,
+          notes,
+          charger_item_id,
+          inventory_items:charger_item_id (
+            name,
+            sku
+          )
+        `)
+        .eq('engineer_id', engineerId)
+        .eq('status', 'assigned')
+        .order('serial_number');
       
       if (error) throw error;
       return data;
@@ -61,9 +125,22 @@ export function EngineerMaterialsUsed({ orderId, engineerId }: EngineerMaterials
 
   const handleItemSelect = (itemId: string) => {
     setSelectedItemId(itemId);
+    setSelectedChargerId(""); // Clear charger selection
     const selectedItem = inventoryItems.find(item => item.id === itemId);
     if (selectedItem) {
       setItemName(selectedItem.name);
+      setLocationId(engineerLocation?.id || "");
+    }
+  };
+
+  const handleChargerSelect = (chargerId: string) => {
+    setSelectedChargerId(chargerId);
+    setSelectedItemId(""); // Clear item selection
+    const selectedCharger = assignedChargers.find(charger => charger.id === chargerId);
+    if (selectedCharger) {
+      setItemName(selectedCharger.inventory_items?.name || "EV Charger");
+      setSerialNumber(selectedCharger.serial_number || "");
+      setLocationId(engineerLocation?.id || "");
     }
   };
 
@@ -85,6 +162,7 @@ export function EngineerMaterialsUsed({ orderId, engineerId }: EngineerMaterials
     // Reset form
     setItemName("");
     setSelectedItemId("");
+    setSelectedChargerId("");
     setQuantity(1);
     setSerialNumber("");
     setLocationId("");
@@ -131,22 +209,53 @@ export function EngineerMaterialsUsed({ orderId, engineerId }: EngineerMaterials
         <div className="border rounded-lg p-4 space-y-4 bg-background/50">
           <h4 className="font-medium text-sm">Add Material</h4>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="material-select">Select Item</Label>
+              <Label htmlFor="material-select">Van Inventory</Label>
               <Select value={selectedItemId} onValueChange={handleItemSelect}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Choose from inventory..." />
+                  <SelectValue placeholder="Choose from van stock..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectGroup>
-                    <SelectLabel>Inventory Items</SelectLabel>
-                    {inventoryItems.map((item) => (
-                      <SelectItem key={item.id} value={item.id}>
-                        {item.name} ({item.sku})
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
+                  {inventoryItems.length > 0 ? (
+                    <SelectGroup>
+                      <SelectLabel>Available Stock</SelectLabel>
+                      {inventoryItems.map((item) => (
+                        <SelectItem key={item.id} value={item.id}>
+                          {item.name} ({item.sku}) - {item.on_hand} available
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  ) : (
+                    <SelectItem value="none" disabled>
+                      No items in van stock
+                    </SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="charger-select">Assigned Chargers</Label>
+              <Select value={selectedChargerId} onValueChange={handleChargerSelect}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose assigned charger..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {assignedChargers.length > 0 ? (
+                    <SelectGroup>
+                      <SelectLabel>Your Chargers</SelectLabel>
+                      {assignedChargers.map((charger) => (
+                        <SelectItem key={charger.id} value={charger.id}>
+                          {charger.inventory_items?.name || "EV Charger"} - {charger.serial_number}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  ) : (
+                    <SelectItem value="none" disabled>
+                      No chargers assigned
+                    </SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -157,7 +266,7 @@ export function EngineerMaterialsUsed({ orderId, engineerId }: EngineerMaterials
                 id="material-name"
                 value={itemName}
                 onChange={(e) => setItemName(e.target.value)}
-                placeholder="e.g., EV Charger, Cable (5m)"
+                placeholder="e.g., Cable (5m), Mounting Kit"
                 className="text-sm"
               />
             </div>
@@ -323,9 +432,14 @@ export function EngineerMaterialsUsed({ orderId, engineerId }: EngineerMaterials
             <div className="text-sm">
               <p className="text-primary font-medium mb-1">Material Tracking</p>
               <p className="text-muted-foreground">
-                Select items from inventory to automatically track usage and optionally deduct stock. 
-                Custom items can be added for materials not in the inventory system.
+                Select items from your van stock, assigned chargers, or add custom materials. 
+                Items from van stock can be automatically deducted when used.
               </p>
+              {!engineerLocation && (
+                <p className="text-amber-600 mt-1 font-medium">
+                  ⚠️ No van location found - contact admin to set up your van stock location.
+                </p>
+              )}
             </div>
           </div>
         </div>
