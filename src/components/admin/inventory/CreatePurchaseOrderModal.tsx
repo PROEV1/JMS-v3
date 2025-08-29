@@ -158,7 +158,7 @@ export function CreatePurchaseOrderModal({ open, onOpenChange, stockRequest }: C
             .from('purchase_orders')
             .select('id')
             .eq('po_number', generatedPO)
-            .single();
+            .maybeSingle();
           
           if (!existing) {
             break; // Found unique number
