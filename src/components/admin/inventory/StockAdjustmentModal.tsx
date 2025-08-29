@@ -7,6 +7,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useInventoryEnhanced } from "@/hooks/useInventoryEnhanced";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 interface StockAdjustmentModalProps {
   open: boolean;
@@ -24,6 +26,21 @@ export function StockAdjustmentModal({ open, onOpenChange, itemId, itemName }: S
 
   const { createStockAdjustment } = useInventoryEnhanced();
   const { toast } = useToast();
+
+  // Fetch inventory locations
+  const { data: locations = [] } = useQuery({
+    queryKey: ['inventory-locations'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('inventory_locations')
+        .select('id, name, code')
+        .eq('is_active', true)
+        .order('name');
+      
+      if (error) throw error;
+      return data;
+    }
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -83,8 +100,15 @@ export function StockAdjustmentModal({ open, onOpenChange, itemId, itemName }: S
                 <SelectValue placeholder="Select location" />
               </SelectTrigger>
               <SelectContent>
-                {/* TODO: Replace with real locations from inventory_locations table */}
-                <SelectItem value="no-location" disabled>No locations available</SelectItem>
+                {locations.length > 0 ? (
+                  locations.map((location) => (
+                    <SelectItem key={location.id} value={location.id}>
+                      {location.name} {location.code && `(${location.code})`}
+                    </SelectItem>
+                  ))
+                ) : (
+                  <SelectItem value="no-location" disabled>No locations available</SelectItem>
+                )}
               </SelectContent>
             </Select>
           </div>
