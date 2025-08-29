@@ -272,7 +272,7 @@ export function CreatePurchaseOrderModal({ open, onOpenChange, stockRequest }: C
           item_name: item.item_name, // Store the custom name
           quantity: item.quantity,
           unit_cost: item.unit_cost,
-          total_cost: item.quantity * item.unit_cost
+          line_total: item.quantity * item.unit_cost
         }));
 
       if (poLines.length > 0) {
