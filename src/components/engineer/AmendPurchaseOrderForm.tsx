@@ -8,6 +8,7 @@ import { AlertTriangle, Package, Plus, Trash2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import { usePurchaseOrderForStockRequest, useAmendPurchaseOrder } from '@/hooks/usePurchaseOrderAmendment';
 
 interface AmendPurchaseOrderFormProps {
@@ -32,6 +33,7 @@ export const AmendPurchaseOrderForm: React.FC<AmendPurchaseOrderFormProps> = ({
   const [amendmentItems, setAmendmentItems] = useState<AmendmentItem[]>([]);
   const [amendmentReason, setAmendmentReason] = useState<string>('');
   
+  const { user } = useAuth();
   const amendPO = useAmendPurchaseOrder();
   
   // Get the PO linked to this stock request
@@ -223,14 +225,31 @@ export const AmendPurchaseOrderForm: React.FC<AmendPurchaseOrderFormProps> = ({
               item_id: item.item_id,
               quantity: item.quantity,
               item_name: item.item_name,
-              unit_cost: 0,
-              line_total: 0,
+              unit_cost: 2.00, // Default unit cost - should be retrieved from item or set properly
+              line_total: item.quantity * 2.00, // Calculate line total
               received_quantity: 0
             })));
 
           if (insertPoError) {
             console.error('Error inserting PO lines:', insertPoError);
             throw insertPoError;
+          }
+          
+          // Update the total amount on the purchase order
+          const newTotalAmount = validItems.reduce((sum, item) => sum + (item.quantity * 2.00), 0);
+          const { error: updatePoError } = await supabase
+            .from('purchase_orders')
+            .update({ 
+              total_amount: newTotalAmount,
+              updated_at: new Date().toISOString(),
+              amended_at: new Date().toISOString(),
+              amended_by: user?.id
+            })
+            .eq('id', stockRequest.purchase_order_id);
+
+          if (updatePoError) {
+            console.error('Error updating PO total:', updatePoError);
+            throw updatePoError;
           }
           
           console.log('Successfully updated PO lines');
