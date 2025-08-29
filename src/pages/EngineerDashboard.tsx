@@ -2,7 +2,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Calendar, Clock, MapPin, Package, User, Plus, Eye, Play, ArrowRight, FileText } from 'lucide-react';
+import { Calendar, Clock, MapPin, Package, User, Plus, Eye, Play, ArrowRight, FileText, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -174,6 +174,28 @@ export default function EngineerDashboard() {
     enabled: !!engineer?.id,
   });
 
+  // Get assigned chargers
+  const { data: assignedChargers } = useQuery({
+    queryKey: ['assigned-chargers', engineer?.id],
+    queryFn: async () => {
+      if (!engineer?.id) return [];
+
+      const { data, error } = await supabase
+        .from('charger_inventory')
+        .select(`
+          *,
+          charger_item:inventory_items(name, sku)
+        `)
+        .eq('engineer_id', engineer.id)
+        .eq('status', 'assigned')
+        .limit(5);
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!engineer?.id,
+  });
+
   if (!engineer) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -197,7 +219,7 @@ export default function EngineerDashboard() {
       </div>
 
       {/* Large Info Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {/* Today's Jobs Card */}
         <Card className="relative overflow-hidden bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
           <CardHeader className="pb-3">
@@ -251,6 +273,36 @@ export default function EngineerDashboard() {
                 variant="outline"
                 onClick={() => navigate('/engineer/jobs')}
                 className="border-orange-300 text-orange-600 hover:bg-orange-50"
+              >
+                View All
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Assigned Chargers Card */}
+        <Card className="relative overflow-hidden bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-purple-500 rounded-lg text-white">
+                  <Zap className="h-5 w-5" />
+                </div>
+                <CardTitle className="text-lg">Assigned Chargers</CardTitle>
+              </div>
+              <div className="text-3xl font-bold text-purple-600">
+                {assignedChargers?.length || 0}
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-purple-700">Ready for installation</p>
+              <Button 
+                size="sm" 
+                variant="outline"
+                onClick={() => navigate('/engineer/chargers')}
+                className="border-purple-300 text-purple-600 hover:bg-purple-50"
               >
                 View All
               </Button>
@@ -475,6 +527,56 @@ export default function EngineerDashboard() {
                       {request.priority === 'medium' && '🟡'} 
                       {request.priority === 'low' && '🟢'}
                     </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Assigned Chargers Section */}
+      {assignedChargers && assignedChargers.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
+              <Zap className="h-5 w-5 text-purple-500" />
+              Assigned Chargers
+            </h2>
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={() => navigate('/engineer/chargers')}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              View All <ArrowRight className="h-4 w-4 ml-1" />
+            </Button>
+          </div>
+          <div className="grid gap-3">
+            {assignedChargers.slice(0, 3).map((charger) => (
+              <Card key={charger.id} className="hover:shadow-sm transition-all duration-200">
+                <CardContent className="p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="font-medium">{charger.charger_item?.name || 'Unknown Charger'}</h4>
+                        <Badge className="bg-purple-100 text-purple-700 border-purple-200">
+                          {charger.status}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                        <span>Serial: {charger.serial_number}</span>
+                        <span>SKU: {charger.charger_item?.sku}</span>
+                      </div>
+                    </div>
+                    <Button 
+                      size="sm" 
+                      variant="ghost"
+                      onClick={() => navigate('/engineer/chargers')}
+                      className="shrink-0"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
                   </div>
                 </CardContent>
               </Card>

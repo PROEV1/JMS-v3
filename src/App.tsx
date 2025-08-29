@@ -59,6 +59,7 @@ import EngineerJobs from "./pages/EngineerJobs";
 import EngineerJobDetail from "./pages/EngineerJobDetail";
 import EngineerProfile from "./pages/EngineerProfile";
 import EngineerStockRequests from "./pages/EngineerStockRequests";
+import EngineerChargers from "./pages/EngineerChargers";
 import OrderDetail from "./pages/OrderDetail";
 import PublicQuoteView from "./pages/PublicQuoteView";
 import NotFound from "./pages/NotFound";
@@ -146,6 +147,7 @@ function App() {
                     <Route path="/engineer/jobs/:id" element={<EngineerJobDetail />} />
                     <Route path="/engineer/profile" element={<EngineerProfile />} />
                     <Route path="/engineer/stock-requests" element={<EngineerStockRequests />} />
+                    <Route path="/engineer/chargers" element={<EngineerChargers />} />
                     
                     {/* Other authenticated routes */}
                     <Route path="/orders/:id" element={<OrderDetail />} />
