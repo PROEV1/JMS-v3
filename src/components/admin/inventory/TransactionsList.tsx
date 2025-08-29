@@ -6,9 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, FileText, AlertCircle, TrendingUp, TrendingDown, Settings } from "lucide-react";
+import { Plus, Search, FileText, AlertCircle, TrendingUp, TrendingDown, Settings, CheckCircle, XCircle, History, Clock, Eye } from "lucide-react";
 import { format } from "date-fns";
 import { QuickAdjustModal } from "./QuickAdjustModal";
+import { TransactionApprovalModal } from "./TransactionApprovalModal";
+import { TransactionAuditModal } from "./TransactionAuditModal";
 
 interface Transaction {
   id: string;
@@ -16,6 +18,10 @@ interface Transaction {
   direction: string;
   reference: string | null;
   notes: string | null;
+  status: string | null;
+  approved_by: string | null;
+  approved_at: string | null;
+  rejection_reason: string | null;
   created_at: string;
   inventory_items: {
     name: string;
@@ -30,6 +36,10 @@ interface Transaction {
 export function TransactionsList() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showQuickAdjust, setShowQuickAdjust] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+  const [showApprovalModal, setShowApprovalModal] = useState(false);
+  const [showAuditModal, setShowAuditModal] = useState(false);
+  const [auditTransactionId, setAuditTransactionId] = useState<string | null>(null);
 
   const { data: transactions, isLoading } = useQuery({
     queryKey: ["inventory-transactions", searchTerm],
@@ -53,6 +63,34 @@ export function TransactionsList() {
       return data as Transaction[];
     },
   });
+
+  const getStatusColor = (status: string | null) => {
+    switch (status) {
+      case 'approved': return 'bg-green-100 text-green-800';
+      case 'rejected': return 'bg-red-100 text-red-800';
+      case 'pending': return 'bg-yellow-100 text-yellow-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getStatusIcon = (status: string | null) => {
+    switch (status) {
+      case 'approved': return <CheckCircle className="h-4 w-4" />;
+      case 'rejected': return <XCircle className="h-4 w-4" />;
+      case 'pending': return <Clock className="h-4 w-4" />;
+      default: return <Clock className="h-4 w-4" />;
+    }
+  };
+
+  const handleApprovalClick = (transaction: Transaction) => {
+    setSelectedTransaction(transaction);
+    setShowApprovalModal(true);
+  };
+
+  const handleAuditClick = (transactionId: string) => {
+    setAuditTransactionId(transactionId);
+    setShowAuditModal(true);
+  };
 
   if (isLoading) {
     return (
@@ -129,61 +167,86 @@ export function TransactionsList() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Date</TableHead>
                     <TableHead>Item</TableHead>
                     <TableHead>Location</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Quantity</TableHead>
+                    <TableHead>Direction</TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead>Reference</TableHead>
-                    <TableHead>Notes</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {transactions.map((txn) => (
-                    <TableRow key={txn.id}>
-                      <TableCell className="text-sm">
-                        {format(new Date(txn.created_at), 'MMM dd, HH:mm')}
-                      </TableCell>
+                  {transactions.map((transaction) => (
+                    <TableRow key={transaction.id}>
                       <TableCell>
                         <div>
-                          <div className="font-medium">{txn.inventory_items.name}</div>
+                          <div className="font-medium">{transaction.inventory_items.name}</div>
                           <div className="text-sm text-muted-foreground font-mono">
-                            {txn.inventory_items.sku}
+                            {transaction.inventory_items.sku}
                           </div>
                         </div>
                       </TableCell>
                       <TableCell>
                         <div>
-                          <div className="font-medium">{txn.inventory_locations.name}</div>
-                          {txn.inventory_locations.code && (
+                          <div className="font-medium">{transaction.inventory_locations.name}</div>
+                          {transaction.inventory_locations.code && (
                             <div className="text-sm text-muted-foreground font-mono">
-                              {txn.inventory_locations.code}
+                              {transaction.inventory_locations.code}
                             </div>
                           )}
                         </div>
                       </TableCell>
                       <TableCell>
                         <Badge 
-                          variant={txn.direction === 'in' ? 'default' : txn.direction === 'out' ? 'destructive' : 'secondary'}
+                          variant={transaction.direction === 'in' ? 'default' : transaction.direction === 'out' ? 'destructive' : 'secondary'}
                           className="flex items-center gap-1 w-fit"
                         >
-                          {txn.direction === 'in' ? (
+                          {transaction.direction === 'in' ? (
                             <TrendingUp className="h-3 w-3" />
-                          ) : txn.direction === 'out' ? (
+                          ) : transaction.direction === 'out' ? (
                             <TrendingDown className="h-3 w-3" />
                           ) : (
                             <Settings className="h-3 w-3" />
                           )}
-                          {txn.direction === 'in' ? 'Stock In' : txn.direction === 'out' ? 'Stock Out' : 'Adjustment'}
+                          {transaction.direction === 'in' ? 'In' : transaction.direction === 'out' ? 'Out' : 'Adjust'} ({Math.abs(transaction.qty)})
                         </Badge>
                       </TableCell>
-                      <TableCell className="font-mono">
-                        <span className={txn.direction === 'out' ? 'text-red-600' : 'text-green-600'}>
-                          {txn.direction === 'out' ? '-' : '+'}{Math.abs(txn.qty)}
-                        </span>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          {getStatusIcon(transaction.status)}
+                          <Badge className={getStatusColor(transaction.status)}>
+                            {(transaction.status || 'pending').charAt(0).toUpperCase() + (transaction.status || 'pending').slice(1)}
+                          </Badge>
+                        </div>
                       </TableCell>
-                      <TableCell className="font-mono text-sm">{txn.reference || "N/A"}</TableCell>
-                      <TableCell className="max-w-xs truncate text-sm">{txn.notes || "N/A"}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {transaction.reference || '-'}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {format(new Date(transaction.created_at), 'MMM d, HH:mm')}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleApprovalClick(transaction)}
+                            className="h-6 px-2 text-xs"
+                          >
+                            <Eye className="h-3 w-3 mr-1" />
+                            Manage
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleAuditClick(transaction.id)}
+                            className="h-6 px-2 text-xs"
+                          >
+                            <History className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -193,9 +256,21 @@ export function TransactionsList() {
         </Card>
       </div>
 
-      <QuickAdjustModal 
-        open={showQuickAdjust} 
-        onOpenChange={setShowQuickAdjust} 
+      <QuickAdjustModal
+        open={showQuickAdjust}
+        onOpenChange={setShowQuickAdjust}
+      />
+
+      <TransactionApprovalModal
+        open={showApprovalModal}
+        onOpenChange={setShowApprovalModal}
+        transaction={selectedTransaction}
+      />
+
+      <TransactionAuditModal
+        open={showAuditModal}
+        onOpenChange={setShowAuditModal}
+        transactionId={auditTransactionId}
       />
     </>
   );

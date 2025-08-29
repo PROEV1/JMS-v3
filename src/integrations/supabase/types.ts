@@ -1041,8 +1041,54 @@ export type Database = {
         }
         Relationships: []
       }
+      inventory_txn_audit: {
+        Row: {
+          action: Database["public"]["Enums"]["txn_audit_action"]
+          created_at: string | null
+          id: string
+          new_data: Json | null
+          old_data: Json | null
+          performed_at: string | null
+          performed_by: string | null
+          reason: string | null
+          txn_id: string | null
+        }
+        Insert: {
+          action: Database["public"]["Enums"]["txn_audit_action"]
+          created_at?: string | null
+          id?: string
+          new_data?: Json | null
+          old_data?: Json | null
+          performed_at?: string | null
+          performed_by?: string | null
+          reason?: string | null
+          txn_id?: string | null
+        }
+        Update: {
+          action?: Database["public"]["Enums"]["txn_audit_action"]
+          created_at?: string | null
+          id?: string
+          new_data?: Json | null
+          old_data?: Json | null
+          performed_at?: string | null
+          performed_by?: string | null
+          reason?: string | null
+          txn_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_txn_audit_txn_id_fkey"
+            columns: ["txn_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_txns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inventory_txns: {
         Row: {
+          approved_at: string | null
+          approved_by: string | null
           created_at: string
           created_by: string | null
           direction: string
@@ -1052,8 +1098,12 @@ export type Database = {
           notes: string | null
           qty: number
           reference: string | null
+          rejection_reason: string | null
+          status: string | null
         }
         Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
           created_at?: string
           created_by?: string | null
           direction?: string
@@ -1063,8 +1113,12 @@ export type Database = {
           notes?: string | null
           qty: number
           reference?: string | null
+          rejection_reason?: string | null
+          status?: string | null
         }
         Update: {
+          approved_at?: string | null
+          approved_by?: string | null
           created_at?: string
           created_by?: string | null
           direction?: string
@@ -1074,6 +1128,8 @@ export type Database = {
           notes?: string | null
           qty?: number
           reference?: string | null
+          rejection_reason?: string | null
+          status?: string | null
         }
         Relationships: [
           {
@@ -3353,6 +3409,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      approve_inventory_transaction: {
+        Args: { p_action: string; p_reason?: string; p_txn_id: string }
+        Returns: boolean
+      }
       archive_engineer_work: {
         Args: {
           p_order_id: string
@@ -3629,6 +3689,12 @@ export type Database = {
         | "rework_requested"
         | "resubmitted"
         | "approved"
+      txn_audit_action:
+        | "created"
+        | "approved"
+        | "rejected"
+        | "modified"
+        | "deleted"
       user_role:
         | "admin"
         | "client"
@@ -3820,6 +3886,13 @@ export const Constants = {
         "rework_requested",
         "resubmitted",
         "approved",
+      ],
+      txn_audit_action: [
+        "created",
+        "approved",
+        "rejected",
+        "modified",
+        "deleted",
       ],
       user_role: [
         "admin",
