@@ -16,10 +16,7 @@ export function useInventoryEnhanced() {
         
         let query = supabase
           .from('inventory_items')
-          .select(`
-            *,
-            inventory_suppliers(name)
-          `)
+          .select('*')
           .eq('is_active', true);
 
         // Apply basic filters only
@@ -37,10 +34,7 @@ export function useInventoryEnhanced() {
 
         console.log('useInventoryItems: Fetched items:', data?.length || 0);
         
-        return data?.map((item: any) => ({
-          ...item,
-          supplier_name: item.inventory_suppliers?.name
-        })) || [];
+        return data || [];
       },
       staleTime: 30 * 1000, // 30 seconds
       gcTime: 5 * 60 * 1000, // 5 minutes
