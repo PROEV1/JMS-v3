@@ -1,5 +1,5 @@
 
-export type StockRequestStatus = 'submitted' | 'approved' | 'rejected' | 'in_pick' | 'in_transit' | 'delivered' | 'cancelled';
+export type StockRequestStatus = 'submitted' | 'approved' | 'rejected' | 'in_pick' | 'in_transit' | 'delivered' | 'cancelled' | 'amend';
 export type StockRequestPriority = 'low' | 'medium' | 'high';
 
 export interface StockRequest {

@@ -1,7 +1,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { StockRequest, StockRequestWithDetails, CreateStockRequestData } from '@/types/stock-request';
+import { StockRequest, StockRequestWithDetails, CreateStockRequestData, StockRequestStatus } from '@/types/stock-request';
 import { safeApiCall, showErrorToast, showSuccessToast } from '@/utils/apiErrorHandler';
 //import { toast } from 'sonner'; // Removed - use showErrorToast/showSuccessToast from apiErrorHandler
 
@@ -131,6 +131,66 @@ export const useUpdateStockRequestStatus = () => {
     onError: (error) => {
       console.error('Failed to update request status:', error);
       showErrorToast('Failed to update request status');
+    }
+  });
+};
+
+export const useUpdateStockRequestLines = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ 
+      requestId, 
+      lines, 
+      status = 'submitted' 
+    }: { 
+      requestId: string; 
+      lines: Array<{ item_id: string; qty: number; notes?: string }>; 
+      status?: StockRequestStatus;
+    }) => {
+      // Delete existing lines
+      const { error: deleteError } = await supabase
+        .from('stock_request_lines')
+        .delete()
+        .eq('request_id', requestId);
+
+      if (deleteError) throw deleteError;
+
+      // Insert new lines if any
+      if (lines.length > 0) {
+        const { error: insertError } = await supabase
+          .from('stock_request_lines')
+          .insert(
+            lines.map(line => ({
+              ...line,
+              request_id: requestId
+            }))
+          );
+
+        if (insertError) throw insertError;
+      }
+
+      // Update request status
+      const { data, error } = await supabase
+        .from('stock_requests')
+        .update({ 
+          status: status,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', requestId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['stock-requests'] });
+      showSuccessToast('Stock request updated successfully');
+    },
+    onError: (error) => {
+      console.error('Failed to update stock request:', error);
+      showErrorToast('Failed to update stock request');
     }
   });
 };

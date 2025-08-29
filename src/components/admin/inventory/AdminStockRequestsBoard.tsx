@@ -15,6 +15,7 @@ import { QuickActionsBlock } from './shared/QuickActionsBlock';
 import { CreateStockRequestModal } from './CreateStockRequestModal';
 import { CreateRMAModal } from './CreateRMAModal';
 import { CreatePurchaseOrderModal } from './CreatePurchaseOrderModal';
+import { AmendStockRequestModal } from './AmendStockRequestModal';
 
 const statusIcons = {
   submitted: Clock,
@@ -23,7 +24,8 @@ const statusIcons = {
   in_pick: Package,
   in_transit: Truck,
   delivered: CheckCircle,
-  cancelled: XCircle
+  cancelled: XCircle,
+  amend: Package
 };
 
 import { StatusChip } from './shared/StatusChip';
@@ -36,9 +38,10 @@ interface RequestCardProps {
   request: StockRequestWithDetails;
   onStatusChange: (id: string, status: StockRequestStatus, notes?: string) => void;
   onCreatePurchaseOrder?: (request: StockRequestWithDetails) => void;
+  onAmendRequest?: (request: StockRequestWithDetails) => void;
 }
 
-const RequestCard: React.FC<RequestCardProps> = ({ request, onStatusChange, onCreatePurchaseOrder }) => {
+const RequestCard: React.FC<RequestCardProps> = ({ request, onStatusChange, onCreatePurchaseOrder, onAmendRequest }) => {
   const [showDetails, setShowDetails] = useState(false);
   const [showStatusChange, setShowStatusChange] = useState(false);
   const [newStatus, setNewStatus] = useState<StockRequestStatus | ''>('');
@@ -50,18 +53,25 @@ const RequestCard: React.FC<RequestCardProps> = ({ request, onStatusChange, onCr
 
   const handleStatusChange = () => {
     if (newStatus) {
-      onStatusChange(request.id, newStatus as StockRequestStatus, statusNotes || undefined);
-      setShowStatusChange(false);
-      setNewStatus('');
-      setStatusNotes('');
+      if (newStatus === 'amend') {
+        onAmendRequest?.(request);
+        setShowStatusChange(false);
+        setNewStatus('');
+        setStatusNotes('');
+      } else {
+        onStatusChange(request.id, newStatus as StockRequestStatus, statusNotes || undefined);
+        setShowStatusChange(false);
+        setNewStatus('');
+        setStatusNotes('');
+      }
     }
   };
 
   const getAvailableStatusTransitions = (currentStatus: StockRequestStatus): StockRequestStatus[] => {
     switch (currentStatus) {
-      case 'submitted': return ['approved', 'rejected'];
-      case 'approved': return ['in_pick', 'cancelled'];
-      case 'in_pick': return ['in_transit', 'cancelled'];
+      case 'submitted': return ['approved', 'rejected', 'amend'];
+      case 'approved': return ['in_pick', 'cancelled', 'amend'];
+      case 'in_pick': return ['in_transit', 'cancelled', 'amend'];
       case 'in_transit': return ['delivered'];
       default: return [];
     }
@@ -290,6 +300,7 @@ export const AdminStockRequestsBoard = () => {
   const [showCreateRequest, setShowCreateRequest] = useState(false);
   const [showCreateRMA, setShowCreateRMA] = useState(false);
   const [showCreatePO, setShowCreatePO] = useState(false);
+  const [showAmendRequest, setShowAmendRequest] = useState(false);
   const [selectedStockRequest, setSelectedStockRequest] = useState<StockRequestWithDetails | null>(null);
   
   const { data: requests, isLoading } = useStockRequests();
@@ -302,6 +313,11 @@ export const AdminStockRequestsBoard = () => {
   const handleCreatePurchaseOrder = (request: StockRequestWithDetails) => {
     setSelectedStockRequest(request);
     setShowCreatePO(true);
+  };
+
+  const handleAmendRequest = (request: StockRequestWithDetails) => {
+    setSelectedStockRequest(request);
+    setShowAmendRequest(true);
   };
 
   // Calculate metrics
@@ -455,6 +471,7 @@ export const AdminStockRequestsBoard = () => {
               <SelectItem value="in_transit">In Transit</SelectItem>
               <SelectItem value="delivered">Delivered</SelectItem>
               <SelectItem value="rejected">Rejected</SelectItem>
+              <SelectItem value="amend">Amend</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -493,6 +510,7 @@ export const AdminStockRequestsBoard = () => {
                     request={request}
                     onStatusChange={handleStatusChange}
                     onCreatePurchaseOrder={handleCreatePurchaseOrder}
+                    onAmendRequest={handleAmendRequest}
                   />
                 ))}
               </div>
@@ -525,6 +543,7 @@ export const AdminStockRequestsBoard = () => {
                       request={request}
                       onStatusChange={handleStatusChange}
                       onCreatePurchaseOrder={handleCreatePurchaseOrder}
+                      onAmendRequest={handleAmendRequest}
                     />
                   ))}
                   {requestsForStatus.length === 0 && (
@@ -557,6 +576,15 @@ export const AdminStockRequestsBoard = () => {
           if (!open) setSelectedStockRequest(null);
         }}
         stockRequest={selectedStockRequest}
+      />
+      
+      <AmendStockRequestModal
+        open={showAmendRequest}
+        onOpenChange={(open) => {
+          setShowAmendRequest(open);
+          if (!open) setSelectedStockRequest(null);
+        }}
+        request={selectedStockRequest}
       />
     </div>
   );
