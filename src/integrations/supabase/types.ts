@@ -2653,6 +2653,7 @@ export type Database = {
           created_at: string
           id: string
           item_id: string
+          item_name: string | null
           line_total: number | null
           purchase_order_id: string
           quantity: number
@@ -2663,6 +2664,7 @@ export type Database = {
           created_at?: string
           id?: string
           item_id: string
+          item_name?: string | null
           line_total?: number | null
           purchase_order_id: string
           quantity: number
@@ -2673,6 +2675,7 @@ export type Database = {
           created_at?: string
           id?: string
           item_id?: string
+          item_name?: string | null
           line_total?: number | null
           purchase_order_id?: string
           quantity?: number
