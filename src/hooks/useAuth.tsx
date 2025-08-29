@@ -41,31 +41,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     console.log('signOut function called');
+    console.log('Current user before signout:', user);
+    console.log('Current session before signout:', session);
+    
     try {
       setLoading(true);
       
       // Sign out from Supabase - ignore errors for expired sessions
       console.log('Calling supabase.auth.signOut()');
-      await supabase.auth.signOut();
+      const { error } = await supabase.auth.signOut();
       
-      console.log('Supabase sign out completed');
+      if (error) {
+        console.log('Supabase sign out error (expected for expired sessions):', error);
+      } else {
+        console.log('Supabase sign out completed successfully');
+      }
     } catch (error) {
       console.error('Error during sign out (ignoring):', error);
       // Ignore errors - the session might already be expired
-    } finally {
-      // Always clear local state and redirect regardless of Supabase response
-      console.log('Clearing local state and redirecting');
-      setSession(null);
-      setUser(null);
-      setLoading(false);
-      
-      // Clear session storage
-      sessionStorage.removeItem('authRedirectPath');
-      sessionStorage.removeItem('lastAuthenticatedPath');
-      
-      // Redirect to auth page
-      window.location.href = '/auth';
     }
+    
+    // Always clear local state and redirect regardless of Supabase response
+    console.log('Clearing local state and redirecting');
+    setSession(null);
+    setUser(null);
+    setLoading(false);
+    
+    // Clear session storage
+    sessionStorage.removeItem('authRedirectPath');
+    sessionStorage.removeItem('lastAuthenticatedPath');
+    
+    // Force redirect to auth page
+    console.log('Forcing redirect to /auth');
+    window.location.replace('/auth');
   };
 
   return (
