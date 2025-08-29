@@ -156,7 +156,7 @@ const RequestCard: React.FC<RequestCardProps> = ({ request, onStatusChange, onCr
                 Update
               </Button>
             )}
-            {request.status === 'in_transit' && !request.purchase_order_id && (
+            {request.status === 'approved' && !request.purchase_order_id && (
               <Button
                 variant="secondary"
                 size="sm"
