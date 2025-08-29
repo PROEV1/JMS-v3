@@ -85,7 +85,7 @@ export function LocationStockModal({ open, onOpenChange, location }: LocationSto
       adjustment: number;
       reason: string;
     }) => {
-      console.log('Adjusting stock:', { itemId, locationId: location?.id, adjustment, reason });
+      console.log('🚀 Starting stock adjustment:', { itemId, locationId: location?.id, adjustment, reason });
       
       const { data, error } = await supabase
         .from('inventory_txns')
@@ -96,25 +96,27 @@ export function LocationStockModal({ open, onOpenChange, location }: LocationSto
           qty: adjustment,
           reference: `Stock adjustment: ${reason}`,
           notes: `${reason} via location stock modal`,
-          status: 'approved' // Auto-approve for engineers
+          status: 'pending' // Change to pending instead of approved
         })
         .select()
         .single();
 
       if (error) {
-        console.error('Stock adjustment error:', error);
+        console.error('❌ Stock adjustment error:', error);
         throw error;
       }
       
+      console.log('✅ Stock adjustment success:', data);
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log('🔄 Refreshing stock data after successful adjustment');
       // Only refresh this modal's data
       refetchStock();
       queryClient.invalidateQueries({ queryKey: ['item-location-balances'] });
     },
     onError: (error: any) => {
-      console.error('Stock adjustment failed:', error);
+      console.error('💥 Stock adjustment failed:', error);
       toast({
         title: "Stock Update Failed",
         description: error.message || "Failed to update stock. Please try again.",
@@ -145,15 +147,18 @@ export function LocationStockModal({ open, onOpenChange, location }: LocationSto
 
   // Button handlers
   const handleIncrease = useCallback((itemId: string) => {
+    console.log('🔽 + button clicked for item:', itemId);
     debouncedAdjustStock(itemId, 1, 'Quick add');
   }, [debouncedAdjustStock]);
 
   const handleDecrease = useCallback((itemId: string, currentStock: number) => {
+    console.log('🔽 - button clicked for item:', itemId, 'current stock:', currentStock);
     if (currentStock <= 0) return;
     debouncedAdjustStock(itemId, -1, 'Quick remove');
   }, [debouncedAdjustStock]);
 
   const handleDelete = useCallback((itemId: string, itemName: string, currentStock: number) => {
+    console.log('🔽 🗑 button clicked for item:', itemId, itemName, 'current stock:', currentStock);
     if (currentStock <= 0) return;
     
     if (window.confirm(`Remove all ${itemName} from ${location?.name}? This will set stock to 0.`)) {
@@ -162,6 +167,7 @@ export function LocationStockModal({ open, onOpenChange, location }: LocationSto
   }, [debouncedAdjustStock, location?.name]);
 
   const handleItemAdded = useCallback(() => {
+    console.log('🔄 Item added, refreshing stock');
     setShowItemPicker(false);
     refetchStock();
   }, [refetchStock]);
