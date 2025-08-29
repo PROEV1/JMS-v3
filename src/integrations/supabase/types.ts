@@ -3083,6 +3083,42 @@ export type Database = {
           },
         ]
       }
+      stock_request_audit: {
+        Row: {
+          action: string
+          created_at: string | null
+          id: string
+          new_data: Json | null
+          old_data: Json | null
+          performed_at: string | null
+          performed_by: string | null
+          reason: string | null
+          request_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          id?: string
+          new_data?: Json | null
+          old_data?: Json | null
+          performed_at?: string | null
+          performed_by?: string | null
+          reason?: string | null
+          request_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          id?: string
+          new_data?: Json | null
+          old_data?: Json | null
+          performed_at?: string | null
+          performed_by?: string | null
+          reason?: string | null
+          request_id?: string | null
+        }
+        Relationships: []
+      }
       stock_request_lines: {
         Row: {
           created_at: string
@@ -3124,6 +3160,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      stock_request_lines_audit: {
+        Row: {
+          action: string
+          created_at: string | null
+          id: string
+          line_id: string | null
+          new_data: Json | null
+          old_data: Json | null
+          performed_at: string | null
+          performed_by: string | null
+          request_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          id?: string
+          line_id?: string | null
+          new_data?: Json | null
+          old_data?: Json | null
+          performed_at?: string | null
+          performed_by?: string | null
+          request_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          id?: string
+          line_id?: string | null
+          new_data?: Json | null
+          old_data?: Json | null
+          performed_at?: string | null
+          performed_by?: string | null
+          request_id?: string | null
+        }
+        Relationships: []
       }
       stock_requests: {
         Row: {
@@ -3695,6 +3767,7 @@ export type Database = {
         | "rejected"
         | "modified"
         | "deleted"
+        | "related_request_deleted"
       user_role:
         | "admin"
         | "client"
@@ -3893,6 +3966,7 @@ export const Constants = {
         "rejected",
         "modified",
         "deleted",
+        "related_request_deleted",
       ],
       user_role: [
         "admin",
