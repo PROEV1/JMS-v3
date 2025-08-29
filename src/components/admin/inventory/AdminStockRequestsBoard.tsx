@@ -24,6 +24,7 @@ const statusIcons = {
   in_pick: Package,
   in_transit: Truck,
   cancelled: XCircle,
+  received: CheckCircle,
   amend: Package
 };
 
@@ -345,9 +346,10 @@ export const AdminStockRequestsBoard = () => {
     const inTransit = requests.filter(r => r.status === 'in_transit').length;
     const rejected = requests.filter(r => r.status === 'rejected').length;
     const cancelled = requests.filter(r => r.status === 'cancelled').length;
+    const received = requests.filter(r => r.status === 'received').length;
     const total = requests.length;
     
-    return { submitted, approved, inPick, inTransit, rejected, cancelled, total };
+    return { submitted, approved, inPick, inTransit, rejected, cancelled, received, total };
   }, [requests]);
 
   // Filter requests
@@ -407,7 +409,7 @@ export const AdminStockRequestsBoard = () => {
     return acc;
   }, {} as Record<StockRequestStatus, StockRequestWithDetails[]>) || {};
 
-  const statusOrder: StockRequestStatus[] = ['submitted', 'approved', 'in_pick', 'in_transit', 'rejected', 'cancelled'];
+  const statusOrder: StockRequestStatus[] = ['submitted', 'approved', 'in_pick', 'in_transit', 'received', 'cancelled'];
 
   return (
     <div className="space-y-6">
@@ -449,12 +451,12 @@ export const AdminStockRequestsBoard = () => {
         />
 
         <InventoryKpiTile
-          title="Cancelled"
-          value={metrics.cancelled || 0}
-          icon={XCircle}
-          variant="danger"
-          onClick={() => setStatusFilter('cancelled')}
-          subtitle="Cancelled/Received"
+          title="Received"
+          value={metrics.received || 0}
+          icon={CheckCircle}
+          variant="success"
+          onClick={() => setStatusFilter('received')}
+          subtitle="Successfully delivered"
         />
       </div>
 
@@ -485,7 +487,7 @@ export const AdminStockRequestsBoard = () => {
               <SelectItem value="in_pick">In Pick</SelectItem>
               <SelectItem value="in_transit">In Transit</SelectItem>
               <SelectItem value="rejected">Rejected</SelectItem>
-              <SelectItem value="cancelled">Cancelled/Received</SelectItem>
+              <SelectItem value="received">Received</SelectItem>
               <SelectItem value="amend">Amend</SelectItem>
             </SelectContent>
           </Select>
