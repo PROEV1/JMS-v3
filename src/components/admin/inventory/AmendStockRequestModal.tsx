@@ -52,11 +52,13 @@ export const AmendStockRequestModal: React.FC<AmendStockRequestModalProps> = ({
     try {
       const { data, error } = await supabase
         .from('inventory_items')
-        .select('id, name, sku, unit')
+        .select('id, name, sku, unit, is_charger')
         .eq('is_active', true)
+        .eq('is_charger', false) // Exclude charger items from stock requests
         .order('name');
 
       if (error) throw error;
+      console.log('Loaded inventory items for amend modal:', data?.length, 'items');
       setItems(data || []);
     } catch (error) {
       console.error('Error loading inventory items:', error);

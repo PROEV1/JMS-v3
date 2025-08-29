@@ -112,11 +112,12 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({
           throw locationError;
         }
         
-        // Fetch ALL active inventory items
+        // Fetch active inventory items (excluding chargers for stock requests)
         const { data: itemData, error: itemError } = await supabase
           .from('inventory_items')
-          .select('id, name, sku, unit, min_level, max_level, reorder_point')
+          .select('id, name, sku, unit, min_level, max_level, reorder_point, is_charger')
           .eq('is_active', true)
+          .eq('is_charger', false) // Exclude charger items from stock requests
           .order('name');
 
         if (itemError) {
@@ -125,7 +126,7 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({
         }
 
         console.log('Fetched locations:', locationData);
-        console.log('Fetched items:', itemData);
+        console.log('Loaded inventory items for engineer stock request:', itemData?.length, 'items');
 
         setLocations(locationData || []);
         setItems(itemData || []);

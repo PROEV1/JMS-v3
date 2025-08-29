@@ -67,14 +67,16 @@ export function CreateStockRequestModal({ open, onOpenChange }: CreateStockReque
 
   // Fetch inventory items
   const { data: items = [] } = useQuery({
-    queryKey: ['inventory-items'],
+    queryKey: ['inventory-items-stock-request'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('inventory_items')
-        .select('id, name, sku')
+        .select('id, name, sku, is_charger')
         .eq('is_active', true)
+        .eq('is_charger', false) // Exclude charger items from stock requests
         .order('name');
       if (error) throw error;
+      console.log('Loaded inventory items for stock request:', data?.length, 'items');
       return data;
     }
   });
