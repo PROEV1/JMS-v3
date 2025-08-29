@@ -40,7 +40,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signOut = async () => {
-    console.log('signOut function called');
+    console.log('🔴 signOut function called');
     console.log('Current user before signout:', user);
     console.log('Current session before signout:', session);
     
@@ -72,7 +72,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     sessionStorage.removeItem('lastAuthenticatedPath');
     
     // Force redirect to auth page
-    console.log('Forcing redirect to /auth');
+    console.log('🔴 Forcing redirect to /auth');
     window.location.replace('/auth');
   };
 

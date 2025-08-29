@@ -179,18 +179,8 @@ export default function Layout({ children }: LayoutProps) {
               <Button 
                 variant="outline" 
                 size="sm" 
-                onClick={(e) => {
-                  console.log('Sign out button clicked - event details:', e);
-                  console.log('Current user:', user);
-                  console.log('Button element:', e.currentTarget);
-                  e.preventDefault();
-                  e.stopPropagation();
-                  signOut();
-                }}
-                onMouseDown={() => console.log('Sign out button mouse down')}
-                onMouseUp={() => console.log('Sign out button mouse up')}
+                onClick={signOut}
                 className="border-border text-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary"
-                style={{ pointerEvents: 'auto', zIndex: 1000 }}
               >
                 <LogOut className="h-4 w-4 mr-2" />
                 Sign Out
