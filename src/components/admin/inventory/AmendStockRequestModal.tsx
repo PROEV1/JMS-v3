@@ -177,7 +177,7 @@ export const AmendStockRequestModal: React.FC<AmendStockRequestModalProps> = ({
                           <SelectTrigger>
                             <SelectValue placeholder="Select item" />
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent className="bg-background border border-border shadow-lg z-50 max-h-48 overflow-y-auto">
                             {items.map((item) => (
                               <SelectItem key={item.id} value={item.id}>
                                 {item.name} ({item.sku})

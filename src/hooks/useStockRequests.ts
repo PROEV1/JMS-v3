@@ -194,3 +194,37 @@ export const useUpdateStockRequestLines = () => {
     }
   });
 };
+
+export const useDeleteStockRequest = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (requestId: string) => {
+      // First delete all related lines
+      const { error: linesError } = await supabase
+        .from('stock_request_lines')
+        .delete()
+        .eq('request_id', requestId);
+
+      if (linesError) throw linesError;
+
+      // Then delete the request
+      const { error: requestError } = await supabase
+        .from('stock_requests')
+        .delete()
+        .eq('id', requestId);
+
+      if (requestError) throw requestError;
+
+      return requestId;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['stock-requests'] });
+      showSuccessToast('Stock request deleted successfully');
+    },
+    onError: (error) => {
+      console.error('Failed to delete stock request:', error);
+      showErrorToast('Failed to delete stock request');
+    }
+  });
+};

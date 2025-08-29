@@ -6,8 +6,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { CheckCircle, XCircle, Clock, Package, Truck, Calendar, MapPin, User, Search, Plus, Filter } from 'lucide-react';
-import { useStockRequests, useUpdateStockRequestStatus } from '@/hooks/useStockRequests';
+import { CheckCircle, XCircle, Clock, Package, Truck, Calendar, MapPin, User, Search, Plus, Filter, Trash2, Edit } from 'lucide-react';
+import { useStockRequests, useUpdateStockRequestStatus, useDeleteStockRequest } from '@/hooks/useStockRequests';
 import { StockRequestWithDetails, StockRequestStatus } from '@/types/stock-request';
 import { format } from 'date-fns';
 import { InventoryKpiTile } from './shared/InventoryKpiTile';
@@ -39,9 +39,10 @@ interface RequestCardProps {
   onStatusChange: (id: string, status: StockRequestStatus, notes?: string) => void;
   onCreatePurchaseOrder?: (request: StockRequestWithDetails) => void;
   onAmendRequest?: (request: StockRequestWithDetails) => void;
+  onDeleteRequest?: (requestId: string) => void;
 }
 
-const RequestCard: React.FC<RequestCardProps> = ({ request, onStatusChange, onCreatePurchaseOrder, onAmendRequest }) => {
+const RequestCard: React.FC<RequestCardProps> = ({ request, onStatusChange, onCreatePurchaseOrder, onAmendRequest, onDeleteRequest }) => {
   const [showDetails, setShowDetails] = useState(false);
   const [showStatusChange, setShowStatusChange] = useState(false);
   const [newStatus, setNewStatus] = useState<StockRequestStatus | ''>('');
@@ -166,6 +167,14 @@ const RequestCard: React.FC<RequestCardProps> = ({ request, onStatusChange, onCr
                 Create PO
               </Button>
             )}
+            <Button
+              variant="destructive"
+              size="sm"
+              className="text-xs h-6 px-2"
+              onClick={() => onDeleteRequest?.(request.id)}
+            >
+              <Trash2 className="h-3 w-3" />
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -258,13 +267,13 @@ const RequestCard: React.FC<RequestCardProps> = ({ request, onStatusChange, onCr
                 <SelectTrigger>
                   <SelectValue placeholder="Select new status" />
                 </SelectTrigger>
-                <SelectContent>
-                  {availableTransitions.map((status) => (
-                    <SelectItem key={status} value={status}>
-                      {formatStatus(status)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
+                 <SelectContent className="bg-background border border-border shadow-lg z-50">
+                   {availableTransitions.map((status) => (
+                     <SelectItem key={status} value={status}>
+                       {formatStatus(status)}
+                     </SelectItem>
+                   ))}
+                 </SelectContent>
               </Select>
             </div>
 
@@ -305,6 +314,7 @@ export const AdminStockRequestsBoard = () => {
   
   const { data: requests, isLoading } = useStockRequests();
   const updateStatus = useUpdateStockRequestStatus();
+  const deleteRequest = useDeleteStockRequest();
 
   const handleStatusChange = (id: string, status: StockRequestStatus, notes?: string) => {
     updateStatus.mutate({ id, status, notes });
@@ -318,6 +328,12 @@ export const AdminStockRequestsBoard = () => {
   const handleAmendRequest = (request: StockRequestWithDetails) => {
     setSelectedStockRequest(request);
     setShowAmendRequest(true);
+  };
+
+  const handleDeleteRequest = (requestId: string) => {
+    if (confirm('Are you sure you want to delete this stock request? This action cannot be undone.')) {
+      deleteRequest.mutate(requestId);
+    }
   };
 
   // Calculate metrics
@@ -463,7 +479,7 @@ export const AdminStockRequestsBoard = () => {
             <SelectTrigger className="w-48">
               <SelectValue placeholder="All statuses" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="bg-background border border-border shadow-lg z-50">
               <SelectItem value="all">All Statuses</SelectItem>
               <SelectItem value="submitted">Submitted</SelectItem>
               <SelectItem value="approved">Approved</SelectItem>
@@ -511,6 +527,7 @@ export const AdminStockRequestsBoard = () => {
                     onStatusChange={handleStatusChange}
                     onCreatePurchaseOrder={handleCreatePurchaseOrder}
                     onAmendRequest={handleAmendRequest}
+                    onDeleteRequest={handleDeleteRequest}
                   />
                 ))}
               </div>
@@ -544,6 +561,7 @@ export const AdminStockRequestsBoard = () => {
                       onStatusChange={handleStatusChange}
                       onCreatePurchaseOrder={handleCreatePurchaseOrder}
                       onAmendRequest={handleAmendRequest}
+                      onDeleteRequest={handleDeleteRequest}
                     />
                   ))}
                   {requestsForStatus.length === 0 && (
