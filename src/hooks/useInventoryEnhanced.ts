@@ -12,12 +12,13 @@ export function useInventoryEnhanced() {
     return useQuery({
       queryKey: ['inventory-items', filters],
       queryFn: async () => {
+        console.log('useInventoryItems: Fetching inventory items...');
+        
         let query = supabase
           .from('inventory_items')
           .select(`
             *,
-            inventory_suppliers(name),
-            stock_balances:inventory_txns(item_id, location_id, qty, direction)
+            inventory_suppliers(name)
           `)
           .eq('is_active', true);
 
@@ -28,12 +29,16 @@ export function useInventoryEnhanced() {
         query = query.order('name');
 
         const { data, error } = await query;
-        if (error) throw error;
+        
+        if (error) {
+          console.error('useInventoryItems: Error fetching items:', error);
+          throw error;
+        }
 
-        // Calculate current stock levels for each item
+        console.log('useInventoryItems: Fetched items:', data?.length || 0);
+        
         return data?.map((item: any) => ({
           ...item,
-          current_stock: calculateCurrentStock(item.stock_balances || []),
           supplier_name: item.inventory_suppliers?.name
         })) || [];
       },
