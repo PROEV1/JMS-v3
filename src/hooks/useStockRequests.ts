@@ -112,6 +112,7 @@ export const useUpdateStockRequestStatus = () => {
     mutationFn: async ({ id, status, notes }: { id: string; status: string; notes?: string }) => {
       console.log('Attempting to update stock request status:', { id, status, notes });
       
+      // Update the stock request status
       const { data, error } = await (supabase as any)
         .from('stock_requests')
         .update({ 
@@ -127,13 +128,41 @@ export const useUpdateStockRequestStatus = () => {
         console.error('Database error when updating status:', error);
         throw error;
       }
+
+      // If the status is being changed to 'cancelled', also void any associated purchase order
+      if (status === 'cancelled' && data.purchase_order_id) {
+        console.log('Cancelling associated purchase order:', data.purchase_order_id);
+        
+        const { error: poError } = await supabase
+          .from('purchase_orders')
+          .update({ 
+            status: 'cancelled',
+            notes: `Voided due to cancelled stock request #${id.slice(0, 8)}`,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', data.purchase_order_id);
+
+        if (poError) {
+          console.error('Failed to cancel purchase order:', poError);
+          // Don't throw here - stock request was updated successfully
+          // Just log the PO cancellation failure
+        } else {
+          console.log('Successfully cancelled purchase order:', data.purchase_order_id);
+        }
+      }
       
       console.log('Status update successful:', data);
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['stock-requests'] });
-      showSuccessToast('Request status updated');
+      queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
+      
+      if (variables.status === 'cancelled' && data?.purchase_order_id) {
+        showSuccessToast('Stock request cancelled and associated purchase order voided');
+      } else {
+        showSuccessToast('Request status updated');
+      }
     },
     onError: (error) => {
       console.error('Failed to update request status:', error);

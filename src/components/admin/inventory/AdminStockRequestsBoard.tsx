@@ -59,6 +59,14 @@ const RequestCard: React.FC<RequestCardProps> = ({ request, onStatusChange, onCr
         setShowStatusChange(false);
         setNewStatus('');
         setStatusNotes('');
+      } else if (newStatus === 'cancelled' && request.purchase_order_id) {
+        // Show confirmation for cancelling with linked PO
+        if (confirm(`This will cancel the stock request and void the associated purchase order. Are you sure you want to continue?`)) {
+          onStatusChange(request.id, newStatus as StockRequestStatus, statusNotes || undefined);
+          setShowStatusChange(false);
+          setNewStatus('');
+          setStatusNotes('');
+        }
       } else {
         onStatusChange(request.id, newStatus as StockRequestStatus, statusNotes || undefined);
         setShowStatusChange(false);
@@ -200,11 +208,24 @@ const RequestCard: React.FC<RequestCardProps> = ({ request, onStatusChange, onCr
                 <span className="font-medium">Destination:</span> {request.destination_location.name}
               </div>
               <div>
-                <span className="font-medium">Status:</span>
-                <StatusChip status={request.status as any}>
+                <span className="font-medium">Status:</span> 
+                <Badge className="ml-2">
                   {formatStatus(request.status)}
-                </StatusChip>
+                </Badge>
               </div>
+              {request.purchase_order_id && (
+                <div className="col-span-2">
+                  <span className="font-medium">Purchase Order:</span> 
+                  <Badge variant="outline" className="ml-2">
+                    Linked to PO
+                  </Badge>
+                </div>
+              )}
+              {request.needed_by && (
+                <div>
+                  <span className="font-medium">Needed By:</span> {format(new Date(request.needed_by), 'MMM d, yyyy')}
+                </div>
+              )}
             </div>
 
             {request.order && (
@@ -488,7 +509,7 @@ export const AdminStockRequestsBoard = () => {
               <SelectItem value="in_transit">In Transit</SelectItem>
               <SelectItem value="rejected">Rejected</SelectItem>
               <SelectItem value="received">Received</SelectItem>
-              <SelectItem value="amend">Amend</SelectItem>
+              <SelectItem value="cancelled">Cancelled</SelectItem>
             </SelectContent>
           </Select>
         </div>
