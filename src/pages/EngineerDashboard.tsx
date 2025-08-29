@@ -2,12 +2,13 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Calendar, Clock, MapPin, Package, User, Plus, Eye, Play, ArrowRight, FileText, Zap } from 'lucide-react';
+import { Calendar, Clock, MapPin, Package, User, Plus, Eye, Play, ArrowRight, FileText, Zap, AlertTriangle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';  
 import { StockRequestButton } from '@/components/engineer/StockRequestButton';
+import { IncorrectStockButton } from '@/components/engineer/IncorrectStockButton';
 import { useStockRequests } from '@/hooks/useStockRequests';
 import { useToast } from '@/hooks/use-toast';
 
@@ -41,8 +42,7 @@ const getStockRequestStatusColor = (status: string) => {
   switch (status) {
     case 'submitted': 
     case 'pending': return 'status-pending';
-    case 'approved': 
-    case 'delivered': return 'status-accepted';
+    case 'approved': return 'status-accepted';
     case 'rejected': 
     case 'cancelled': return 'status-rejected';
     case 'in_pick':
@@ -326,16 +326,26 @@ export default function EngineerDashboard() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-2">
               <p className="text-sm text-green-700">Recent requests</p>
-              <StockRequestButton 
-                engineerId={engineer.id}
-                size="sm"
-                variant="outline"
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                New Request
-              </StockRequestButton>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <StockRequestButton 
+                  engineerId={engineer.id}
+                  size="sm"
+                  variant="outline"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  New Request
+                </StockRequestButton>
+                <IncorrectStockButton 
+                  engineerId={engineer.id}
+                  size="sm"
+                  variant="outline"
+                >
+                  <AlertTriangle className="h-4 w-4 mr-1" />
+                  Report Issue
+                </IncorrectStockButton>
+              </div>
             </div>
           </CardContent>
         </Card>

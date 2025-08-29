@@ -87,8 +87,8 @@ export function InventoryDashboardV2({ onSwitchTab }: InventoryDashboardV2Props)
       const inPickRequests = requests.filter(r => r.status === 'in_pick').length;
       const inTransitRequests = requests.filter(r => r.status === 'in_transit').length;
       
-      // Delivered today (simplified to just delivered count for now)
-      const deliveredToday = requests.filter(r => r.status === 'delivered').length;
+      // Cancelled/Received today (updated to reflect new status meaning)
+      const cancelledToday = requests.filter(r => r.status === 'cancelled').length;
 
       // Open POs (placeholder for now)
       const openPOs = 0;
@@ -103,7 +103,7 @@ export function InventoryDashboardV2({ onSwitchTab }: InventoryDashboardV2Props)
         submittedRequests,
         inPickRequests,
         inTransitRequests,
-        deliveredToday,
+        deliveredToday: cancelledToday,
         shrinkage
       };
     }

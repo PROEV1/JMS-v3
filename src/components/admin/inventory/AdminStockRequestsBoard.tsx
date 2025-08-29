@@ -23,7 +23,6 @@ const statusIcons = {
   rejected: XCircle,
   in_pick: Package,
   in_transit: Truck,
-  delivered: CheckCircle,
   cancelled: XCircle,
   amend: Package
 };
@@ -73,7 +72,7 @@ const RequestCard: React.FC<RequestCardProps> = ({ request, onStatusChange, onCr
       case 'submitted': return ['approved', 'rejected', 'amend'];
       case 'approved': return ['in_pick', 'cancelled', 'amend'];
       case 'in_pick': return ['in_transit', 'cancelled', 'amend'];
-      case 'in_transit': return ['delivered'];
+      case 'in_transit': return ['cancelled']; // Removed 'delivered', now engineers mark as received
       default: return [];
     }
   };
@@ -344,11 +343,11 @@ export const AdminStockRequestsBoard = () => {
     const approved = requests.filter(r => r.status === 'approved').length;
     const inPick = requests.filter(r => r.status === 'in_pick').length;
     const inTransit = requests.filter(r => r.status === 'in_transit').length;
-    const delivered = requests.filter(r => r.status === 'delivered').length;
     const rejected = requests.filter(r => r.status === 'rejected').length;
+    const cancelled = requests.filter(r => r.status === 'cancelled').length;
     const total = requests.length;
     
-    return { submitted, approved, inPick, inTransit, delivered, rejected, total };
+    return { submitted, approved, inPick, inTransit, rejected, cancelled, total };
   }, [requests]);
 
   // Filter requests
@@ -408,7 +407,7 @@ export const AdminStockRequestsBoard = () => {
     return acc;
   }, {} as Record<StockRequestStatus, StockRequestWithDetails[]>) || {};
 
-  const statusOrder: StockRequestStatus[] = ['submitted', 'approved', 'in_pick', 'in_transit', 'delivered', 'rejected', 'cancelled'];
+  const statusOrder: StockRequestStatus[] = ['submitted', 'approved', 'in_pick', 'in_transit', 'rejected', 'cancelled'];
 
   return (
     <div className="space-y-6">
@@ -450,12 +449,12 @@ export const AdminStockRequestsBoard = () => {
         />
 
         <InventoryKpiTile
-          title="Delivered"
-          value={metrics.delivered || 0}
-          icon={CheckCircle}
-          variant="success"
-          onClick={() => setStatusFilter('delivered')}
-          subtitle="Completed"
+          title="Cancelled"
+          value={metrics.cancelled || 0}
+          icon={XCircle}
+          variant="danger"
+          onClick={() => setStatusFilter('cancelled')}
+          subtitle="Cancelled/Received"
         />
       </div>
 
@@ -485,8 +484,8 @@ export const AdminStockRequestsBoard = () => {
               <SelectItem value="approved">Approved</SelectItem>
               <SelectItem value="in_pick">In Pick</SelectItem>
               <SelectItem value="in_transit">In Transit</SelectItem>
-              <SelectItem value="delivered">Delivered</SelectItem>
               <SelectItem value="rejected">Rejected</SelectItem>
+              <SelectItem value="cancelled">Cancelled/Received</SelectItem>
               <SelectItem value="amend">Amend</SelectItem>
             </SelectContent>
           </Select>
