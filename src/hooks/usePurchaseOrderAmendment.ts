@@ -50,7 +50,6 @@ export const usePurchaseOrderForStockRequest = (stockRequestId?: string) => {
           )
         `)
         .eq('stock_request_id', stockRequestId)
-        .eq('status', 'pending')
         .maybeSingle();
 
       if (error) throw error;
