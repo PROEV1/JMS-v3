@@ -536,22 +536,23 @@ export default function EngineerDashboard() {
       )}
 
       {/* Assigned Chargers Section */}
-      {assignedChargers && assignedChargers.length > 0 && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
-              <Zap className="h-5 w-5 text-purple-500" />
-              Assigned Chargers
-            </h2>
-            <Button 
-              variant="ghost" 
-              size="sm"
-              onClick={() => navigate('/engineer/chargers')}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              View All <ArrowRight className="h-4 w-4 ml-1" />
-            </Button>
-          </div>
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
+            <Zap className="h-5 w-5 text-purple-500" />
+            Assigned Chargers
+          </h2>
+          <Button 
+            variant="ghost" 
+            size="sm"
+            onClick={() => navigate('/engineer/chargers')}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            View All <ArrowRight className="h-4 w-4 ml-1" />
+          </Button>
+        </div>
+        
+        {assignedChargers && assignedChargers.length > 0 ? (
           <div className="grid gap-3">
             {assignedChargers.slice(0, 3).map((charger) => (
               <Card key={charger.id} className="hover:shadow-sm transition-all duration-200">
@@ -582,8 +583,24 @@ export default function EngineerDashboard() {
               </Card>
             ))}
           </div>
-        </div>
-      )}
+        ) : (
+          <Card className="text-center py-8 bg-gradient-to-br from-purple-50 to-indigo-50">
+            <CardContent>
+              <Zap className="h-12 w-12 mx-auto text-purple-300 mb-3" />
+              <h3 className="text-sm font-medium text-purple-900 mb-1">No chargers assigned</h3>
+              <p className="text-xs text-purple-600 mb-3">You don't have any chargers assigned at the moment.</p>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => navigate('/engineer/chargers')}
+                className="border-purple-300 text-purple-600 hover:bg-purple-50"
+              >
+                View Chargers Page
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </div>
   );
 }
