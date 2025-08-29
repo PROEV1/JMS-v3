@@ -271,8 +271,8 @@ export function CreatePurchaseOrderModal({ open, onOpenChange, stockRequest }: C
           item_id: item.item_id || null, // Can be null for custom items
           item_name: item.item_name, // Store the custom name
           quantity: item.quantity,
-          unit_cost: item.unit_cost,
-          line_total: item.quantity * item.unit_cost
+          unit_cost: item.unit_cost
+          // Removed line_total as it's a generated column
         }));
 
       if (poLines.length > 0) {
@@ -405,8 +405,8 @@ export function CreatePurchaseOrderModal({ open, onOpenChange, stockRequest }: C
                       <Label>Quantity</Label>
                       <Input
                         type="number"
-                        value={item.quantity}
-                        onChange={(e) => updateItem(item.id, "quantity", parseInt(e.target.value))}
+                        value={item.quantity || 1}
+                        onChange={(e) => updateItem(item.id, "quantity", parseInt(e.target.value) || 1)}
                         min="1"
                       />
                     </div>
@@ -416,8 +416,8 @@ export function CreatePurchaseOrderModal({ open, onOpenChange, stockRequest }: C
                       <Input
                         type="number"
                         step="0.01"
-                        value={item.unit_cost}
-                        onChange={(e) => updateItem(item.id, "unit_cost", parseFloat(e.target.value))}
+                        value={item.unit_cost || 0}
+                        onChange={(e) => updateItem(item.id, "unit_cost", parseFloat(e.target.value) || 0)}
                         min="0"
                       />
                     </div>
