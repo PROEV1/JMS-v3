@@ -187,7 +187,7 @@ export default function EngineerDashboard() {
           charger_item:inventory_items(name, sku)
         `)
         .eq('engineer_id', engineer.id)
-        .eq('status', 'assigned')
+        .in('status', ['assigned', 'dispatched', 'delivered', 'in_transit'])
         .limit(5);
 
       if (error) throw error;
