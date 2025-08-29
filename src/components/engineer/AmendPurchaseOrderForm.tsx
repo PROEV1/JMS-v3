@@ -203,6 +203,8 @@ export const AmendPurchaseOrderForm: React.FC<AmendPurchaseOrderFormProps> = ({
 
         // If there's a purchase order, update it too
         if (stockRequest?.purchase_order_id) {
+          console.log('Updating purchase order lines for PO:', stockRequest.purchase_order_id);
+          
           const { error: deletePoError } = await supabase
             .from('purchase_order_lines')
             .delete()
@@ -213,19 +215,27 @@ export const AmendPurchaseOrderForm: React.FC<AmendPurchaseOrderFormProps> = ({
             throw deletePoError;
           }
 
+          console.log('Inserting new PO lines:', validItems);
           const { error: insertPoError } = await supabase
             .from('purchase_order_lines')
             .insert(validItems.map(item => ({
               purchase_order_id: stockRequest.purchase_order_id,
               item_id: item.item_id,
               quantity: item.quantity,
-              notes: item.notes
+              item_name: item.item_name,
+              unit_cost: 0,
+              line_total: 0,
+              received_quantity: 0
             })));
 
           if (insertPoError) {
             console.error('Error inserting PO lines:', insertPoError);
             throw insertPoError;
           }
+          
+          console.log('Successfully updated PO lines');
+        } else {
+          console.log('No purchase order linked to this stock request');
         }
 
         console.log('Amendment request created successfully');
