@@ -42,36 +42,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     console.log('signOut function called');
     try {
-      // Clear any local state first
-      console.log('Setting loading to true');
       setLoading(true);
       
-      // Sign out from Supabase
+      // Sign out from Supabase - ignore errors for expired sessions
       console.log('Calling supabase.auth.signOut()');
-      const { error } = await supabase.auth.signOut();
+      await supabase.auth.signOut();
       
-      if (error) {
-        console.error('Error signing out:', error);
-        // Even if there's an error, clear local state
-        setSession(null);
-        setUser(null);
-      } else {
-        console.log('Supabase sign out successful');
-      }
+      console.log('Supabase sign out completed');
+    } catch (error) {
+      console.error('Error during sign out (ignoring):', error);
+      // Ignore errors - the session might already be expired
+    } finally {
+      // Always clear local state and redirect regardless of Supabase response
+      console.log('Clearing local state and redirecting');
+      setSession(null);
+      setUser(null);
+      setLoading(false);
       
       // Clear session storage
-      console.log('Clearing session storage');
       sessionStorage.removeItem('authRedirectPath');
       sessionStorage.removeItem('lastAuthenticatedPath');
       
-      // Force reload to clear any cached state
-      console.log('Redirecting to /auth');
-      window.location.href = '/auth';
-    } catch (err) {
-      console.error('Sign out error:', err);
-      // Fallback: clear everything and redirect
-      setSession(null);
-      setUser(null);
+      // Redirect to auth page
       window.location.href = '/auth';
     }
   };
