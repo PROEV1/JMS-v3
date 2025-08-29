@@ -86,6 +86,8 @@ export const useAmendPurchaseOrder = () => {
         .update({
           notes: (currentPO.notes || '') + amendmentNote,
           status: 'pending', // Keep as pending but add amendment notes
+          amended_at: new Date().toISOString(),
+          amended_by: engineerId,
           updated_at: new Date().toISOString()
         })
         .eq('id', purchaseOrderId);

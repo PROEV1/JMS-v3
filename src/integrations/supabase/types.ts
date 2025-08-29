@@ -2702,6 +2702,8 @@ export type Database = {
       purchase_orders: {
         Row: {
           actual_delivery_date: string | null
+          amended_at: string | null
+          amended_by: string | null
           created_at: string
           created_by: string | null
           expected_delivery_date: string | null
@@ -2717,6 +2719,8 @@ export type Database = {
         }
         Insert: {
           actual_delivery_date?: string | null
+          amended_at?: string | null
+          amended_by?: string | null
           created_at?: string
           created_by?: string | null
           expected_delivery_date?: string | null
@@ -2732,6 +2736,8 @@ export type Database = {
         }
         Update: {
           actual_delivery_date?: string | null
+          amended_at?: string | null
+          amended_by?: string | null
           created_at?: string
           created_by?: string | null
           expected_delivery_date?: string | null
