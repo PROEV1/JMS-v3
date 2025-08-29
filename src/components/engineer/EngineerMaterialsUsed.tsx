@@ -68,7 +68,7 @@ export function EngineerMaterialsUsed({ orderId, engineerId }: EngineerMaterials
         .from('inventory_txns')
         .select('item_id, location_id, direction, qty, status')
         .eq('location_id', engineerLocation.id)
-        .eq('status', 'approved');
+        .in('status', ['approved', 'pending']); // Include pending for now
       
       if (error) {
         console.error('EngineerMaterialsUsed: Error fetching transactions:', error);
