@@ -21,7 +21,7 @@ export const MarkReceivedButton: React.FC<MarkReceivedButtonProps> = ({
     try {
       await updateStatus.mutateAsync({
         id: request.id,
-        status: 'cancelled',
+        status: 'delivered',
         notes: `Marked as received by engineer on ${new Date().toLocaleString()}`
       });
       
