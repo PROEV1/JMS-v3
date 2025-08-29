@@ -151,6 +151,8 @@ export function useInventoryEnhanced() {
       reason: string;
       notes?: string;
     }) => {
+      console.log('Creating stock adjustment:', { itemId, locationId, quantity, reason, notes });
+      
       const { data, error } = await supabase
         .from('inventory_txns')
         .insert({
@@ -164,16 +166,23 @@ export function useInventoryEnhanced() {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Stock adjustment error:', error);
+        throw error;
+      }
+      
+      console.log('Stock adjustment success:', data);
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['inventory-items'] });
       queryClient.invalidateQueries({ queryKey: ['inventory-kpis'] });
       queryClient.invalidateQueries({ queryKey: ['low-stock-items'] });
+      queryClient.invalidateQueries({ queryKey: ['item-location-balances'] });
       showSuccessToast('Stock adjustment completed');
     },
     onError: (error) => {
+      console.error('Stock adjustment mutation error:', error);
       showErrorToast('Failed to adjust stock: ' + error.message);
     }
   });

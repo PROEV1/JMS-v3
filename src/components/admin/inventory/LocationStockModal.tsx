@@ -95,6 +95,8 @@ export function LocationStockModal({ open, onOpenChange, location }: LocationSto
   };
 
   const handleAdjustStock = async (itemId: string, adjustment: number, adjustmentReason: string) => {
+    console.log('handleAdjustStock called:', { itemId, adjustment, adjustmentReason, locationId: location.id });
+    
     try {
       await createStockAdjustment.mutateAsync({
         itemId,
@@ -115,6 +117,7 @@ export function LocationStockModal({ open, onOpenChange, location }: LocationSto
       await refetchBalances();
       await refetchItems();
     } catch (error: any) {
+      console.error('handleAdjustStock error:', error);
       toast({
         title: "Stock Update Failed",
         description: error.message || "Failed to update stock. Please try again.",
