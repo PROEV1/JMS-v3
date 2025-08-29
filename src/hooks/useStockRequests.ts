@@ -207,6 +207,18 @@ export const useDeleteStockRequest = () => {
 
   return useMutation({
     mutationFn: async (requestId: string) => {
+      // Check if the stock request is linked to any purchase orders
+      const { data: linkedPOs, error: poCheckError } = await supabase
+        .from('purchase_orders')
+        .select('id, po_number')
+        .eq('stock_request_id', requestId);
+
+      if (poCheckError) throw poCheckError;
+
+      if (linkedPOs && linkedPOs.length > 0) {
+        throw new Error(`Cannot delete stock request - it is linked to purchase order(s): ${linkedPOs.map(po => po.po_number).join(', ')}`);
+      }
+
       // First delete all related lines
       const { error: linesError } = await supabase
         .from('stock_request_lines')
@@ -231,7 +243,11 @@ export const useDeleteStockRequest = () => {
     },
     onError: (error) => {
       console.error('Failed to delete stock request:', error);
-      showErrorToast('Failed to delete stock request');
+      if (error.message.includes('linked to purchase order')) {
+        showErrorToast(error.message);
+      } else {
+        showErrorToast('Failed to delete stock request');
+      }
     }
   });
 };
