@@ -37,7 +37,7 @@ const directionIcons = {
 };
 
 const directionColors = {
-  in: 'delivered' as const,
+  in: 'approved' as const,
   out: 'cancelled' as const,
   adjust: 'submitted' as const
 };
