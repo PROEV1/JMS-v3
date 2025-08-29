@@ -163,12 +163,11 @@ export const AmendPurchaseOrderForm: React.FC<AmendPurchaseOrderFormProps> = ({
           engineerId
         });
       } else {
-        // Create amendment request by updating the stock request
+        // Create amendment request by updating the stock request notes only
         const { error: updateError } = await supabase
           .from('stock_requests')
           .update({
-            notes: `AMENDMENT REQUEST: ${amendmentReason}\n\nRequested items:\n${validItems.map(item => `- ${item.item_name}: ${item.quantity}${item.notes ? ` (${item.notes})` : ''}`).join('\n')}\n\nOriginal notes: ${stockRequest?.notes || 'None'}`,
-            status: 'pending'
+            notes: `AMENDMENT REQUEST: ${amendmentReason}\n\nRequested items:\n${validItems.map(item => `- ${item.item_name}: ${item.quantity}${item.notes ? ` (${item.notes})` : ''}`).join('\n')}\n\nOriginal notes: ${stockRequest?.notes || 'None'}`
           })
           .eq('id', stockRequestId);
 
