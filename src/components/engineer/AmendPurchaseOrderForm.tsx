@@ -149,27 +149,66 @@ export const AmendPurchaseOrderForm: React.FC<AmendPurchaseOrderFormProps> = ({
       return;
     }
 
-    if (purchaseOrder) {
-      // Amend existing PO
-      await amendPO.mutateAsync({
-        purchaseOrderId: purchaseOrder.id,
-        items: validItems.map(item => ({
-          item_id: item.item_id,
-          quantity: item.quantity,
-          notes: item.notes
-        })),
-        amendmentReason,
-        engineerId
-      });
-    } else {
-      // Create amendment request (update the stock request with amended items)
-      // This will be handled by updating the stock request lines
-      console.log('Creating amendment request for stock request without PO');
-      // For now, we'll just show a message to contact the office
-      // In the future, this could create a new amendment record
-    }
+    try {
+      if (purchaseOrder) {
+        // Amend existing PO
+        await amendPO.mutateAsync({
+          purchaseOrderId: purchaseOrder.id,
+          items: validItems.map(item => ({
+            item_id: item.item_id,
+            quantity: item.quantity,
+            notes: item.notes
+          })),
+          amendmentReason,
+          engineerId
+        });
+      } else {
+        // Create amendment request by updating the stock request
+        const { error: updateError } = await supabase
+          .from('stock_requests')
+          .update({
+            notes: `AMENDMENT REQUEST: ${amendmentReason}\n\nRequested items:\n${validItems.map(item => `- ${item.item_name}: ${item.quantity}${item.notes ? ` (${item.notes})` : ''}`).join('\n')}\n\nOriginal notes: ${stockRequest?.notes || 'None'}`,
+            status: 'pending_amendment'
+          })
+          .eq('id', stockRequestId);
 
-    onClose();
+        if (updateError) {
+          console.error('Error creating amendment request:', updateError);
+          throw updateError;
+        }
+
+        // Delete existing lines and create new ones
+        const { error: deleteError } = await supabase
+          .from('stock_request_lines')
+          .delete()
+          .eq('request_id', stockRequestId);
+
+        if (deleteError) {
+          console.error('Error deleting old lines:', deleteError);
+          throw deleteError;
+        }
+
+        const { error: insertError } = await supabase
+          .from('stock_request_lines')
+          .insert(validItems.map(item => ({
+            request_id: stockRequestId,
+            item_id: item.item_id,
+            qty: item.quantity,
+            notes: item.notes
+          })));
+
+        if (insertError) {
+          console.error('Error inserting new lines:', insertError);
+          throw insertError;
+        }
+
+        console.log('Amendment request created successfully');
+      }
+
+      onClose();
+    } catch (error) {
+      console.error('Error submitting amendment:', error);
+    }
   };
 
   if (poLoading || srLoading) {
