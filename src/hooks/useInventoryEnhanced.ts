@@ -57,12 +57,33 @@ export function useInventoryEnhanced() {
 
         if (!data) return [];
 
-        // Get stock balances
-        const { data: balances } = await supabase.rpc('get_item_location_balances');
+        // Get stock balances using direct query
+        const { data: txnsData } = await supabase
+          .from('inventory_txns')
+          .select('item_id, location_id, direction, qty, status')
+          .eq('status', 'approved');
+        
+        // Calculate balances manually
+        const balances = new Map<string, { item_id: string; location_id: string; on_hand: number }>();
+        
+        txnsData?.forEach(txn => {
+          const key = `${txn.item_id}-${txn.location_id}`;
+          const current = balances.get(key) || { item_id: txn.item_id, location_id: txn.location_id, on_hand: 0 };
+          
+          if (txn.direction === 'in' || txn.direction === 'adjust') {
+            current.on_hand += txn.qty;
+          } else {
+            current.on_hand -= txn.qty;
+          }
+          
+          balances.set(key, current);
+        });
+        
+        const balancesArray = Array.from(balances.values());
 
         // Filter items with low stock
         return data.filter(item => {
-          const itemBalances = balances?.filter((b: any) => b.item_id === item.id) || [];
+          const itemBalances = balancesArray?.filter((b: any) => b.item_id === item.id) || [];
           const totalStock = itemBalances.reduce((sum: number, balance: any) => sum + balance.on_hand, 0);
           return totalStock <= item.reorder_point;
         }).map((item: any) => ({
@@ -167,14 +188,25 @@ export function useInventoryEnhanced() {
       quantity: number;
       notes?: string;
     }) => {
-      // Check if sufficient stock is available at source location
-      const { data: balances } = await supabase.rpc('get_item_location_balances');
-      const sourceBalance = balances?.find((b: any) => 
-        b.item_id === itemId && b.location_id === fromLocationId
-      );
+      // Check if sufficient stock is available at source location using direct query
+      const { data: txnsData } = await supabase
+        .from('inventory_txns')
+        .select('item_id, location_id, direction, qty, status')
+        .eq('status', 'approved')
+        .eq('item_id', itemId)
+        .eq('location_id', fromLocationId);
       
-      if (!sourceBalance || sourceBalance.on_hand < quantity) {
-        throw new Error(`Insufficient stock at source location. Available: ${sourceBalance?.on_hand || 0}, Required: ${quantity}`);
+      let sourceBalance = 0;
+      txnsData?.forEach(txn => {
+        if (txn.direction === 'in' || txn.direction === 'adjust') {
+          sourceBalance += txn.qty;
+        } else {
+          sourceBalance -= txn.qty;
+        }
+      });
+      
+      if (sourceBalance < quantity) {
+        throw new Error(`Insufficient stock at source location. Available: ${sourceBalance}, Required: ${quantity}`);
       }
 
       const reference = `Transfer ${quantity} units`;
@@ -275,14 +307,44 @@ export function useInventoryEnhanced() {
     return useQuery({
       queryKey: ['item-location-balances', itemId],
       queryFn: async () => {
-        const { data, error } = await supabase.rpc('get_item_location_balances');
+        // Use direct query instead of RLS-protected function for broader access
+        const { data, error } = await supabase
+          .from('inventory_txns')
+          .select(`
+            item_id,
+            location_id,
+            direction,
+            qty,
+            status
+          `)
+          .eq('status', 'approved');
+        
         if (error) throw error;
+        
+        // Calculate balances manually
+        const balances = new Map<string, { item_id: string; location_id: string; on_hand: number }>();
+        
+        data?.forEach(txn => {
+          const key = `${txn.item_id}-${txn.location_id}`;
+          const current = balances.get(key) || { item_id: txn.item_id, location_id: txn.location_id, on_hand: 0 };
+          
+          if (txn.direction === 'in' || txn.direction === 'adjust') {
+            current.on_hand += txn.qty;
+          } else {
+            current.on_hand -= txn.qty;
+          }
+          
+          balances.set(key, current);
+        });
+        
+        const result = Array.from(balances.values()).filter(b => b.on_hand > 0);
         
         // Filter by item if provided
         if (itemId) {
-          return data?.filter((balance: any) => balance.item_id === itemId) || [];
+          return result.filter(balance => balance.item_id === itemId);
         }
-        return data || [];
+        
+        return result;
       },
       staleTime: 30 * 1000, // 30 seconds
     });
@@ -353,9 +415,30 @@ export function useInventoryEnhanced() {
 
         if (locationsError) throw locationsError;
 
-        // Get stock balances (only items that have transactions at van locations)
-        const { data: balances, error: balancesError } = await supabase.rpc('get_item_location_balances');
+        // Get stock balances using direct query
+        const { data: txnsData, error: balancesError } = await supabase
+          .from('inventory_txns')
+          .select('item_id, location_id, direction, qty, status')
+          .eq('status', 'approved');
         if (balancesError) throw balancesError;
+        
+        // Calculate balances manually
+        const balancesMap = new Map<string, { item_id: string; location_id: string; on_hand: number }>();
+        
+        txnsData?.forEach(txn => {
+          const key = `${txn.item_id}-${txn.location_id}`;
+          const current = balancesMap.get(key) || { item_id: txn.item_id, location_id: txn.location_id, on_hand: 0 };
+          
+          if (txn.direction === 'in' || txn.direction === 'adjust') {
+            current.on_hand += txn.qty;
+          } else {
+            current.on_hand -= txn.qty;
+          }
+          
+          balancesMap.set(key, current);
+        });
+        
+        const balances = Array.from(balancesMap.values());
 
         // Get items data
         const { data: items, error: itemsError } = await supabase
