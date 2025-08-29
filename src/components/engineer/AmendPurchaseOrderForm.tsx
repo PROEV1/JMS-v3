@@ -168,7 +168,7 @@ export const AmendPurchaseOrderForm: React.FC<AmendPurchaseOrderFormProps> = ({
           .from('stock_requests')
           .update({
             notes: `AMENDMENT REQUEST: ${amendmentReason}\n\nRequested items:\n${validItems.map(item => `- ${item.item_name}: ${item.quantity}${item.notes ? ` (${item.notes})` : ''}`).join('\n')}\n\nOriginal notes: ${stockRequest?.notes || 'None'}`,
-            status: 'pending_amendment'
+            status: 'pending'
           })
           .eq('id', stockRequestId);
 
