@@ -44,19 +44,56 @@ export const IncorrectStockForm: React.FC<IncorrectStockFormProps> = ({
   const [location, setLocation] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
 
-  // Get inventory items
+  // Get items from the specific stock request
   const { data: items } = useQuery<InventoryItem[]>({
-    queryKey: ['inventory-items-for-incorrect-stock'],
+    queryKey: ['stock-request-items', stockRequestId],
     queryFn: async () => {
+      if (!stockRequestId) {
+        // If no specific stock request, show all active inventory items
+        const { data, error } = await supabase
+          .from('inventory_items')
+          .select('id, name, sku, unit')
+          .eq('is_active', true)
+          .order('name');
+        
+        if (error) throw error;
+        return data;
+      }
+
+      // Get items from the specific stock request
       const { data, error } = await supabase
-        .from('inventory_items')
-        .select('id, name, sku, unit')
-        .eq('is_active', true)
-        .order('name');
+        .from('stock_request_lines')
+        .select(`
+          item_id,
+          qty,
+          item:inventory_items!inner(
+            id,
+            name,
+            sku,
+            unit
+          )
+        `)
+        .eq('request_id', stockRequestId);
       
       if (error) throw error;
-      return data;
-    }
+      
+      // Transform to match InventoryItem interface and remove duplicates
+      const uniqueItems = data?.reduce((acc, line) => {
+        const item = line.item;
+        if (item && !acc.find(existing => existing.id === item.id)) {
+          acc.push({
+            id: item.id,
+            name: item.name,
+            sku: item.sku,
+            unit: item.unit
+          });
+        }
+        return acc;
+      }, [] as InventoryItem[]) || [];
+      
+      return uniqueItems;
+    },
+    enabled: true
   });
 
   // Get engineer's van location
@@ -68,7 +105,7 @@ export const IncorrectStockForm: React.FC<IncorrectStockFormProps> = ({
         .select('id, name, type')
         .eq('engineer_id', engineerId)
         .eq('type', 'van')
-        .single();
+        .maybeSingle();
       
       if (error) throw error;
       return data;
