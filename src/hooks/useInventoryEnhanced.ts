@@ -307,6 +307,7 @@ export function useInventoryEnhanced() {
     return useQuery({
       queryKey: ['item-location-balances', itemId],
       queryFn: async () => {
+        console.log('useItemLocationBalances: Fetching inventory transactions...');
         // Use direct query instead of RLS-protected function for broader access
         const { data, error } = await supabase
           .from('inventory_txns')
@@ -319,7 +320,12 @@ export function useInventoryEnhanced() {
           `)
           .eq('status', 'approved');
         
-        if (error) throw error;
+        if (error) {
+          console.error('useItemLocationBalances: Error fetching transactions:', error);
+          throw error;
+        }
+        
+        console.log('useItemLocationBalances: Raw transactions:', data?.length || 0);
         
         // Calculate balances manually
         const balances = new Map<string, { item_id: string; location_id: string; on_hand: number }>();
@@ -338,10 +344,13 @@ export function useInventoryEnhanced() {
         });
         
         const result = Array.from(balances.values()).filter(b => b.on_hand > 0);
+        console.log('useItemLocationBalances: Calculated balances:', result);
         
         // Filter by item if provided
         if (itemId) {
-          return result.filter(balance => balance.item_id === itemId);
+          const filtered = result.filter(balance => balance.item_id === itemId);
+          console.log('useItemLocationBalances: Filtered by item:', filtered);
+          return filtered;
         }
         
         return result;

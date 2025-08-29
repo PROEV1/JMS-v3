@@ -27,6 +27,10 @@ export function LocationStockModal({ open, onOpenChange, location }: LocationSto
 
   const { data: allItems = [], refetch: refetchItems } = useInventoryItems();
   const { data: locationBalances = [], refetch: refetchBalances } = useItemLocationBalances();
+  
+  console.log('LocationStockModal: Location:', location);
+  console.log('LocationStockModal: All location balances:', locationBalances);
+  console.log('LocationStockModal: All items:', allItems.length);
 
   if (!location) return null;
 
