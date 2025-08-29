@@ -6,6 +6,7 @@ import { IncorrectStockForm } from './IncorrectStockForm';
 
 interface IncorrectStockButtonProps {
   engineerId: string;
+  stockRequestId?: string;
   size?: 'default' | 'sm' | 'lg';
   variant?: 'default' | 'outline' | 'secondary';
   children?: React.ReactNode;
@@ -13,6 +14,7 @@ interface IncorrectStockButtonProps {
 
 export const IncorrectStockButton: React.FC<IncorrectStockButtonProps> = ({
   engineerId,
+  stockRequestId,
   size = 'default',
   variant = 'outline',
   children
@@ -37,6 +39,7 @@ export const IncorrectStockButton: React.FC<IncorrectStockButtonProps> = ({
         </DialogHeader>
         <IncorrectStockForm
           engineerId={engineerId}
+          stockRequestId={stockRequestId}
           onClose={() => setOpen(false)}
         />
       </DialogContent>

@@ -2,12 +2,11 @@ import React from 'react';
 import { BrandPage, BrandContainer, BrandHeading1, BrandLoading } from '@/components/brand';
 import { StockRequestButton } from '@/components/engineer/StockRequestButton';
 import { StockRequestHistory } from '@/components/engineer/StockRequestHistory';
-import { IncorrectStockButton } from '@/components/engineer/IncorrectStockButton';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useAuth } from '@/hooks/useAuth';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, Package, ShieldAlert, AlertTriangle } from 'lucide-react';
+import { Plus, Package, ShieldAlert } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 
 export default function EngineerStockRequests() {
@@ -104,13 +103,6 @@ export default function EngineerStockRequests() {
                 <Plus className="h-4 w-4 mr-2" />
                 New Stock Request
               </StockRequestButton>
-              <IncorrectStockButton 
-                engineerId={engineer.id}
-                variant="outline"
-              >
-                <AlertTriangle className="h-4 w-4 mr-2" />
-                Report Issue
-              </IncorrectStockButton>
             </div>
           </div>
 

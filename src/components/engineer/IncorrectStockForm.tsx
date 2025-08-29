@@ -13,6 +13,7 @@ import { useCreateStockRequest } from '@/hooks/useStockRequests';
 
 interface IncorrectStockFormProps {
   engineerId: string;
+  stockRequestId?: string;
   onClose: () => void;
 }
 
@@ -31,6 +32,7 @@ interface Location {
 
 export const IncorrectStockForm: React.FC<IncorrectStockFormProps> = ({
   engineerId,
+  stockRequestId,
   onClose
 }) => {
   const { toast } = useToast();
@@ -104,6 +106,7 @@ export const IncorrectStockForm: React.FC<IncorrectStockFormProps> = ({
     if (!selectedItemData) return;
 
     const discrepancyNotes = `STOCK DISCREPANCY REPORT:
+${stockRequestId ? `Related to Stock Request: ${stockRequestId.slice(0, 8)}` : ''}
 Item: ${selectedItemData.name} (${selectedItemData.sku})
 Expected Quantity: ${expectedQuantity || 'Unknown'}
 Actual Quantity Found: ${actualQuantity}

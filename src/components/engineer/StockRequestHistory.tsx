@@ -9,6 +9,7 @@ import { useStockRequests } from '@/hooks/useStockRequests';
 import { StockRequestStatus, StockRequestPriority } from '@/types/stock-request';
 import { format } from 'date-fns';
 import { MarkReceivedButton } from './MarkReceivedButton';
+import { IncorrectStockButton } from './IncorrectStockButton';
 
 interface StockRequestHistoryProps {
   engineerId: string;
@@ -21,7 +22,7 @@ const getStatusColor = (status: StockRequestStatus) => {
     case 'rejected': return 'bg-red-100 text-red-800 border-red-200';
     case 'in_pick': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
     case 'in_transit': return 'bg-purple-100 text-purple-800 border-purple-200';
-    
+    case 'received': return 'bg-emerald-100 text-emerald-800 border-emerald-200';
     case 'cancelled': return 'bg-gray-100 text-gray-800 border-gray-200';
     default: return 'bg-gray-100 text-gray-800 border-gray-200';
   }
@@ -119,6 +120,14 @@ export const StockRequestHistory: React.FC<StockRequestHistoryProps> = ({ engine
                       {request.lines.length} item{request.lines.length !== 1 ? 's' : ''}
                     </span>
                     <MarkReceivedButton request={request} />
+                    <IncorrectStockButton 
+                      engineerId={engineerId} 
+                      stockRequestId={request.id}
+                      size="sm"
+                      variant="outline"
+                    >
+                      Report Issue
+                    </IncorrectStockButton>
                   </div>
                 </div>
               </CardHeader>
