@@ -80,6 +80,87 @@ export default function AdminOrders() {
   const { data: ordersResponse, isLoading, error } = useQuery({
     queryKey: ['admin-orders', pagination.page, pagination.pageSize, searchTerm, statusFilter, engineerFilter],
     queryFn: async () => {
+      let orderIds: string[] = [];
+
+      // If there's a search term, find matching order IDs from multiple sources
+      if (searchTerm) {
+        const searchPattern = `%${searchTerm}%`;
+        
+        // Search in orders table
+        const { data: orderMatches } = await supabase
+          .from('orders')
+          .select('id')
+          .or(`order_number.ilike.${searchPattern},partner_external_id.ilike.${searchPattern},job_address.ilike.${searchPattern},postcode.ilike.${searchPattern}`);
+        
+        if (orderMatches) {
+          orderIds.push(...orderMatches.map(o => o.id));
+        }
+
+        // Search in clients table and get their order IDs
+        const { data: clientMatches } = await supabase
+          .from('clients')
+          .select('id')
+          .or(`full_name.ilike.${searchPattern},email.ilike.${searchPattern},phone.ilike.${searchPattern}`);
+        
+        if (clientMatches) {
+          const clientIds = clientMatches.map(c => c.id);
+          if (clientIds.length > 0) {
+            const { data: clientOrders } = await supabase
+              .from('orders')
+              .select('id')
+              .in('client_id', clientIds);
+            
+            if (clientOrders) {
+              orderIds.push(...clientOrders.map(o => o.id));
+            }
+          }
+        }
+
+        // Search in quotes table and get their order IDs
+        const { data: quoteMatches } = await supabase
+          .from('quotes')
+          .select('id')
+          .ilike('quote_number', searchPattern);
+        
+        if (quoteMatches) {
+          const quoteIds = quoteMatches.map(q => q.id);
+          if (quoteIds.length > 0) {
+            const { data: quoteOrders } = await supabase
+              .from('orders')
+              .select('id')
+              .in('quote_id', quoteIds);
+            
+            if (quoteOrders) {
+              orderIds.push(...quoteOrders.map(o => o.id));
+            }
+          }
+        }
+
+        // Search in partners table and get their order IDs
+        const { data: partnerMatches } = await supabase
+          .from('partners')
+          .select('id')
+          .ilike('name', searchPattern);
+        
+        if (partnerMatches) {
+          const partnerIds = partnerMatches.map(p => p.id);
+          if (partnerIds.length > 0) {
+            const { data: partnerOrders } = await supabase
+              .from('orders')
+              .select('id')
+              .in('partner_id', partnerIds);
+            
+            if (partnerOrders) {
+              orderIds.push(...partnerOrders.map(o => o.id));
+            }
+          }
+        }
+
+        // Remove duplicates
+        orderIds = [...new Set(orderIds)];
+      }
+
+      // Build the main query
       let query = supabase
         .from('orders')
         .select(`
@@ -104,7 +185,16 @@ export default function AdminOrders() {
         `, { count: 'exact' })
         .order('created_at', { ascending: false });
 
-      // Apply server-side filters
+      // Apply search filter if we have matching order IDs
+      if (searchTerm) {
+        if (orderIds.length === 0) {
+          // No matches found, return empty result
+          return { data: [], count: 0 };
+        }
+        query = query.in('id', orderIds);
+      }
+
+      // Apply other filters
       if (statusFilter !== 'all') {
         query = query.eq('status_enhanced', statusFilter as OrderStatusEnhanced);
       }
@@ -113,58 +203,20 @@ export default function AdminOrders() {
         query = query.eq('engineer_id', engineerFilter);
       }
 
-      // For search, we'll need to fetch more data and filter client-side
-      // since Supabase can't handle OR queries across joined tables
-      let shouldPaginate = true;
-      if (searchTerm) {
-        // Fetch more records when searching to ensure we capture all matches
-        shouldPaginate = false;
-        query = query.limit(2000);
-      }
-
-      if (shouldPaginate) {
-        query = query.range(pagination.offset, pagination.offset + pagination.pageSize - 1);
-      }
+      // Apply pagination
+      query = query.range(pagination.offset, pagination.offset + pagination.pageSize - 1);
 
       const { data, error, count } = await query;
       if (error) throw error;
 
       // Transform data
-      let transformedData = data?.map(order => ({
+      const transformedData = data?.map(order => ({
         ...order,
         client: order.clients || null,
         quote: order.quotes || null,
         engineer: order.engineers || null,
         partner: order.partners || null
       })) || [];
-
-      // Apply client-side search filtering
-      if (searchTerm) {
-        const searchLower = searchTerm.toLowerCase();
-        transformedData = transformedData.filter(order => {
-          return (
-            order.order_number?.toLowerCase().includes(searchLower) ||
-            order.partner_external_id?.toLowerCase().includes(searchLower) ||
-            order.job_address?.toLowerCase().includes(searchLower) ||
-            order.postcode?.toLowerCase().includes(searchLower) ||
-            order.client?.full_name?.toLowerCase().includes(searchLower) ||
-            order.client?.email?.toLowerCase().includes(searchLower) ||
-            order.client?.phone?.toLowerCase().includes(searchLower) ||
-            order.quote?.quote_number?.toLowerCase().includes(searchLower) ||
-            order.partner?.name?.toLowerCase().includes(searchLower)
-          );
-        });
-
-        // Apply pagination to filtered results
-        const startIndex = pagination.offset;
-        const endIndex = startIndex + pagination.pageSize;
-        const paginatedData = transformedData.slice(startIndex, endIndex);
-        
-        return { 
-          data: paginatedData, 
-          count: transformedData.length // Use filtered count for search results
-        };
-      }
 
       return { data: transformedData, count: count || 0 };
     },
