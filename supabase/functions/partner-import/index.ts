@@ -1048,35 +1048,86 @@ serve(async (req: Request): Promise<Response> => {
             }
           }
 
-          // Batch 5: Bulk update existing orders (done individually due to different data per order)
-          for (const updateItem of ordersToUpdate) {
-            try {
-              const { error: updateError } = await supabase
-                .from('orders')
-                .update(updateItem.data)
-                .eq('id', updateItem.id);
+          // Batch 5: Optimized bulk update for existing orders
+          if (ordersToUpdate.length > 0) {
+            // Process updates in chunks of 50 to avoid query complexity limits
+            const updateChunkSize = 50;
+            for (let i = 0; i < ordersToUpdate.length; i += updateChunkSize) {
+              const updateChunk = ordersToUpdate.slice(i, i + updateChunkSize);
+              
+              try {
+                // For small batches, use individual updates for safety
+                if (updateChunk.length <= 5) {
+                  for (const updateItem of updateChunk) {
+                    const { error: updateError } = await supabase
+                      .from('orders')
+                      .update(updateItem.data)
+                      .eq('id', updateItem.id);
 
-              if (updateError) {
-                results.errors.push({
-                  row: updateItem.rowIndex + 1,
-                  message: `Failed to update order: ${updateError.message}`,
-                  data: updateItem.data
-                });
-              } else {
-                results.updated.push({
-                  type: 'update',
-                  data: { ...updateItem.data, id: updateItem.id }
-                });
-                if (verbose) {
-                  console.log(`Updated order: ${updateItem.id}`);
+                    if (updateError) {
+                      results.errors.push({
+                        row: updateItem.rowIndex + 1,
+                        message: `Failed to update order: ${updateError.message}`,
+                        data: updateItem.data
+                      });
+                    } else {
+                      results.updated.push({
+                        type: 'update',
+                        data: { ...updateItem.data, id: updateItem.id }
+                      });
+                      if (verbose) {
+                        console.log(`Updated order: ${updateItem.id}`);
+                      }
+                    }
+                  }
+                } else {
+                  // For larger batches, use upsert operation
+                  const upsertData = updateChunk.map(item => ({
+                    id: item.id,
+                    ...item.data,
+                    updated_at: new Date().toISOString()
+                  }));
+
+                  const { data: upsertedOrders, error: upsertError } = await supabase
+                    .from('orders')
+                    .upsert(upsertData, { 
+                      onConflict: 'id',
+                      ignoreDuplicates: false
+                    })
+                    .select('id');
+
+                  if (upsertError) {
+                    console.error('Batch order upsert error:', upsertError);
+                    updateChunk.forEach(item => {
+                      results.errors.push({
+                        row: item.rowIndex + 1,
+                        message: `Failed to update order: ${upsertError.message}`,
+                        data: item.data
+                      });
+                    });
+                  } else if (upsertedOrders) {
+                    updateChunk.forEach((item, index) => {
+                      if (upsertedOrders[index]) {
+                        results.updated.push({
+                          type: 'update',
+                          data: { ...item.data, id: item.id }
+                        });
+                        if (verbose) {
+                          console.log(`Updated order: ${item.id}`);
+                        }
+                      }
+                    });
+                  }
                 }
+              } catch (error: any) {
+                updateChunk.forEach(item => {
+                  results.errors.push({
+                    row: item.rowIndex + 1,
+                    message: `Update batch error: ${error.message}`,
+                    data: item.data
+                  });
+                });
               }
-            } catch (error: any) {
-              results.errors.push({
-                row: updateItem.rowIndex + 1,
-                message: `Update error: ${error.message}`,
-                data: updateItem.data
-              });
             }
           }
 
