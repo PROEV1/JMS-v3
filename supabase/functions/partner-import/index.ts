@@ -939,10 +939,13 @@ serve(async (req: Request): Promise<Response> => {
 
         } catch (error: any) {
           console.error(`Error processing row ${rowIndex + 1}:`, error);
+          console.error(`Row data:`, JSON.stringify(row, null, 2));
+          console.error(`Mapped data:`, JSON.stringify(mappedData, null, 2));
+          console.error(`Error stack:`, error.stack);
           results.errors.push({
             row: rowIndex + 1,
-            message: `Processing error: ${error.message}`,
-            data: row
+            message: `Processing error: ${error.message} | Stack: ${error.stack?.substring(0, 200)}`,
+            data: { row, mappedData, error: error.toString() }
           });
         }
       }
