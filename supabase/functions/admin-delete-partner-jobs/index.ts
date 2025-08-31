@@ -313,21 +313,33 @@ serve(async (req) => {
       }
     }
 
-    // After all order-related deletions, delete standalone partner clients
+    // After all order-related deletions, delete standalone partner clients in batches
     if (standaloneClientIds.length > 0) {
       console.log(`Deleting ${standaloneClientIds.length} standalone partner clients...`);
       
-      const { error: standaloneClientsError } = await supabase
-        .from('clients')
-        .delete()
-        .in('id', standaloneClientIds);
+      // Delete clients in batches to avoid URL length limits
+      const clientBatchSize = 100; // Smaller batch size for safety
+      let deletedClientCount = 0;
       
-      if (standaloneClientsError) {
-        console.error('Standalone clients deletion error:', standaloneClientsError);
-      } else {
-        totalStats.clients += standaloneClientIds.length;
-        console.log(`Deleted ${standaloneClientIds.length} standalone partner clients`);
+      for (let i = 0; i < standaloneClientIds.length; i += clientBatchSize) {
+        const clientBatch = standaloneClientIds.slice(i, i + clientBatchSize);
+        console.log(`Deleting client batch ${Math.floor(i/clientBatchSize) + 1}: ${clientBatch.length} clients`);
+        
+        const { error: standaloneClientsError } = await supabase
+          .from('clients')
+          .delete()
+          .in('id', clientBatch);
+        
+        if (standaloneClientsError) {
+          console.error(`Standalone clients batch ${Math.floor(i/clientBatchSize) + 1} deletion error:`, standaloneClientsError);
+        } else {
+          deletedClientCount += clientBatch.length;
+          console.log(`Successfully deleted client batch ${Math.floor(i/clientBatchSize) + 1}: ${clientBatch.length} clients`);
+        }
       }
+      
+      totalStats.clients += deletedClientCount;
+      console.log(`Deleted ${deletedClientCount} standalone partner clients total`);
     }
 
     const totalTime = performance.now() - startTime
