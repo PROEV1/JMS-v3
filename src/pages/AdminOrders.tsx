@@ -113,18 +113,23 @@ export default function AdminOrders() {
         query = query.eq('engineer_id', engineerFilter);
       }
 
-      // Apply server-side search - only on orders table columns for now
+      // For search, we'll need to fetch more data and filter client-side
+      // since Supabase can't handle OR queries across joined tables
+      let shouldPaginate = true;
       if (searchTerm) {
-        query = query.or(`order_number.ilike.%${searchTerm}%,partner_external_id.ilike.%${searchTerm}%,job_address.ilike.%${searchTerm}%,postcode.ilike.%${searchTerm}%`);
+        // Fetch more records when searching to ensure we capture all matches
+        shouldPaginate = false;
+        query = query.limit(2000);
       }
 
-      // Apply pagination
-      query = query.range(pagination.offset, pagination.offset + pagination.pageSize - 1);
+      if (shouldPaginate) {
+        query = query.range(pagination.offset, pagination.offset + pagination.pageSize - 1);
+      }
 
       const { data, error, count } = await query;
       if (error) throw error;
 
-      // Transform data and apply client-side filtering for related table searches
+      // Transform data
       let transformedData = data?.map(order => ({
         ...order,
         client: order.clients || null,
@@ -133,17 +138,15 @@ export default function AdminOrders() {
         partner: order.partners || null
       })) || [];
 
-      // Apply additional client-side filtering for related table searches
+      // Apply client-side search filtering
       if (searchTerm) {
         const searchLower = searchTerm.toLowerCase();
         transformedData = transformedData.filter(order => {
           return (
-            // Already handled by server-side search
             order.order_number?.toLowerCase().includes(searchLower) ||
             order.partner_external_id?.toLowerCase().includes(searchLower) ||
             order.job_address?.toLowerCase().includes(searchLower) ||
             order.postcode?.toLowerCase().includes(searchLower) ||
-            // Client-side filtering for related tables
             order.client?.full_name?.toLowerCase().includes(searchLower) ||
             order.client?.email?.toLowerCase().includes(searchLower) ||
             order.client?.phone?.toLowerCase().includes(searchLower) ||
@@ -151,6 +154,16 @@ export default function AdminOrders() {
             order.partner?.name?.toLowerCase().includes(searchLower)
           );
         });
+
+        // Apply pagination to filtered results
+        const startIndex = pagination.offset;
+        const endIndex = startIndex + pagination.pageSize;
+        const paginatedData = transformedData.slice(startIndex, endIndex);
+        
+        return { 
+          data: paginatedData, 
+          count: transformedData.length // Use filtered count for search results
+        };
       }
 
       return { data: transformedData, count: count || 0 };
