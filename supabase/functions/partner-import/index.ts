@@ -1323,7 +1323,8 @@ serve(async (req: Request): Promise<Response> => {
             data: { error: batchError }
           });
         }
-      } else {
+      } 
+      else {
         // For dry run, simulate all orders as inserts
         ordersToProcess.forEach(orderData => {
           const processedRow: ProcessedRow = {
