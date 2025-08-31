@@ -1005,38 +1005,60 @@ serve(async (req: Request): Promise<Response> => {
         
         try {
           console.log('=== STEP 1: Finding existing clients ===');
-          // Batch 1: Find existing clients
+          // Batch 1: Find existing clients using email_normalized
+          
+          // Deduplicate clients within this chunk by email_normalized
+          const uniqueClientsMap = new Map();
+          clientsToCreate.forEach(client => {
+            const normalizedEmail = client.email?.toLowerCase()?.trim();
+            if (normalizedEmail && !uniqueClientsMap.has(normalizedEmail)) {
+              uniqueClientsMap.set(normalizedEmail, client);
+            }
+          });
+          const deduplicatedClientsToCreate = Array.from(uniqueClientsMap.values());
+          
           const existingClientEmails = [...new Set(clientsToFind)].filter(Boolean);
+          const normalizedEmailsToFind = existingClientEmails.map(email => email.toLowerCase().trim());
           const existingClientsMap = new Map();
           
-          if (existingClientEmails.length > 0) {
-            console.log(`Searching for ${existingClientEmails.length} existing client emails`);
+          if (normalizedEmailsToFind.length > 0) {
+            console.log(`Searching for ${normalizedEmailsToFind.length} existing client emails`);
             const { data: existingClients } = await supabase
               .from('clients')
-              .select('id, email, full_name')
-              .in('email', existingClientEmails);
+              .select('id, email, email_normalized, full_name')
+              .in('email_normalized', normalizedEmailsToFind);
             
             if (existingClients) {
               console.log(`Found ${existingClients.length} existing clients`);
               existingClients.forEach(client => {
-                existingClientsMap.set(client.email, client);
+                existingClientsMap.set(client.email_normalized || client.email.toLowerCase().trim(), client);
               });
             }
           }
 
           console.log('=== STEP 2: Creating missing clients ===');
-          // Batch 2: Create missing clients first
-          if (clientsToCreate.length > 0) {
-            console.log(`Creating ${clientsToCreate.length} new clients`);
-            const sanitizedClients = clientsToCreate.map(sanitizeForDatabase);
+          // Batch 2: Create missing clients with upsert for concurrency safety
+          const existingEmailsSet = new Set(Array.from(existingClientsMap.keys()));
+          const newClientsToInsert = deduplicatedClientsToCreate.filter(c => 
+            !existingEmailsSet.has(c.email.toLowerCase().trim())
+          );
+          
+          if (newClientsToInsert.length > 0) {
+            console.log(`Creating ${newClientsToInsert.length} new clients (deduplicated from ${clientsToCreate.length})`);
+            const sanitizedClients = newClientsToInsert.map(sanitizeForDatabase);
+            
+            // Use upsert to handle concurrent imports safely
             const { data: createdClients, error: clientError } = await supabase
               .from('clients')
-              .insert(sanitizedClients)
-              .select('id, email, full_name');
+              .upsert(sanitizedClients, { 
+                onConflict: 'email_normalized',
+                ignoreDuplicates: false 
+              })
+              .select('id, email, email_normalized, full_name');
 
             if (clientError) {
               console.error('Client creation error:', clientError);
-              clientsToCreate.forEach((clientData, index) => {
+              newClientsToInsert.forEach((clientData, index) => {
                 results.errors.push({
                   row: 0, // Will be updated when processing orders
                   message: `Failed to create client: ${clientError.message}`,
@@ -1046,7 +1068,8 @@ serve(async (req: Request): Promise<Response> => {
             } else if (createdClients) {
               console.log(`Successfully created ${createdClients.length} clients`);
               createdClients.forEach(client => {
-                existingClientsMap.set(client.email, client);
+                const normalizedEmail = client.email_normalized || client.email.toLowerCase().trim();
+                existingClientsMap.set(normalizedEmail, client);
               });
             }
           }
@@ -1054,10 +1077,13 @@ serve(async (req: Request): Promise<Response> => {
           console.log('=== STEP 3: Updating order client IDs ===');
           // Batch 3: Update order client IDs with resolved clients
           ordersToProcess.forEach(orderData => {
-            if (orderData._clientEmail && existingClientsMap.has(orderData._clientEmail)) {
-              orderData.client_id = existingClientsMap.get(orderData._clientEmail).id;
-              if (verbose) {
-                console.log(`Linked order to client: ${orderData._clientEmail} -> ${orderData.client_id}`);
+            if (orderData._clientEmail) {
+              const normalizedEmail = orderData._clientEmail.toLowerCase().trim();
+              if (existingClientsMap.has(normalizedEmail)) {
+                orderData.client_id = existingClientsMap.get(normalizedEmail).id;
+                if (verbose) {
+                  console.log(`Linked order to client: ${orderData._clientEmail} -> ${orderData.client_id}`);
+                }
               }
             }
           });

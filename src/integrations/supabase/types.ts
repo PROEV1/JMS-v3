@@ -339,6 +339,7 @@ export type Database = {
           address: string | null
           created_at: string
           email: string
+          email_normalized: string | null
           full_name: string
           id: string
           is_partner_client: boolean | null
@@ -352,6 +353,7 @@ export type Database = {
           address?: string | null
           created_at?: string
           email: string
+          email_normalized?: string | null
           full_name: string
           id?: string
           is_partner_client?: boolean | null
@@ -365,6 +367,7 @@ export type Database = {
           address?: string | null
           created_at?: string
           email?: string
+          email_normalized?: string | null
           full_name?: string
           id?: string
           is_partner_client?: boolean | null
@@ -3604,6 +3607,26 @@ export type Database = {
         Args: { user_id: string }
         Returns: Database["public"]["Enums"]["user_role"]
       }
+      gtrgm_compress: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      gtrgm_decompress: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      gtrgm_in: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      gtrgm_options: {
+        Args: { "": unknown }
+        Returns: undefined
+      }
+      gtrgm_out: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
       is_admin: {
         Args: { user_uuid?: string }
         Returns: boolean
@@ -3677,6 +3700,18 @@ export type Database = {
       revoke_material_usage: {
         Args: { p_restore_stock?: boolean; p_usage_id: string }
         Returns: boolean
+      }
+      set_limit: {
+        Args: { "": number }
+        Returns: number
+      }
+      show_limit: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      show_trgm: {
+        Args: { "": string }
+        Returns: string[]
       }
       store_geocode_in_cache: {
         Args: { p_latitude: number; p_longitude: number; p_postcode: string }

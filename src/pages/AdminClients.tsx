@@ -66,9 +66,10 @@ export default function AdminClients() {
         .select('*', { count: 'exact' })
         .order('created_at', { ascending: false });
 
-      // Apply search filter if present
+      // Apply comprehensive search filter if present
       if (searchTerm.trim()) {
-        query = query.or(`full_name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`);
+        const searchPattern = `%${searchTerm}%`;
+        query = query.or(`full_name.ilike.${searchPattern},email.ilike.${searchPattern},phone.ilike.${searchPattern},address.ilike.${searchPattern}`);
       }
 
       // Apply pagination
@@ -80,18 +81,23 @@ export default function AdminClients() {
       setClients(data || []);
       setTotalCount(count || 0);
 
-      // Fetch this month's count separately
-      const startOfMonth = new Date();
-      startOfMonth.setDate(1);
-      startOfMonth.setHours(0, 0, 0, 0);
+      // Fetch this month's count separately (but only if not searching)
+      if (!searchTerm.trim()) {
+        const startOfMonth = new Date();
+        startOfMonth.setDate(1);
+        startOfMonth.setHours(0, 0, 0, 0);
 
-      const { count: monthCount, error: monthError } = await supabase
-        .from('clients')
-        .select('*', { count: 'exact', head: true })
-        .gte('created_at', startOfMonth.toISOString());
+        const { count: monthCount, error: monthError } = await supabase
+          .from('clients')
+          .select('*', { count: 'exact', head: true })
+          .gte('created_at', startOfMonth.toISOString());
 
-      if (monthError) throw monthError;
-      setThisMonthCount(monthCount || 0);
+        if (monthError) throw monthError;
+        setThisMonthCount(monthCount || 0);
+      } else {
+        // When searching, show the current result count as "this month"
+        setThisMonthCount(count || 0);
+      }
 
     } catch (error) {
       console.error('Error fetching clients:', error);
@@ -160,7 +166,7 @@ export default function AdminClients() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search clients..."
+              placeholder="Search clients by name, email, phone, or address..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
@@ -186,7 +192,9 @@ export default function AdminClients() {
                 <div className="flex items-center space-x-2">
                   <Calendar className="h-4 w-4 text-brand-green" />
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">This Month</p>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      {searchTerm ? 'Search Results' : 'This Month'}
+                    </p>
                     <p className="text-2xl font-bold text-primary">{thisMonthCount}</p>
                   </div>
                 </div>
