@@ -104,6 +104,7 @@ export default function AdminOrders() {
         `, { count: 'exact' })
         .order('created_at', { ascending: false });
 
+      // Apply server-side filters
       if (statusFilter !== 'all') {
         query = query.eq('status_enhanced', statusFilter as OrderStatusEnhanced);
       }
@@ -112,26 +113,27 @@ export default function AdminOrders() {
         query = query.eq('engineer_id', engineerFilter);
       }
 
-      // For search functionality, we need to handle this differently
-      // If there's a search term, fetch more data and filter client-side
-      let shouldPaginate = true;
+      // Apply server-side search with OR filters
       if (searchTerm) {
-        // When searching, fetch a larger chunk to ensure we capture results
-        // that might not be in the first page when filtered
-        shouldPaginate = false;
-        query = query.limit(1000); // Fetch up to 1000 orders for search
+        const searchPattern = `%${searchTerm}%`;
+        query = query.or(`
+          order_number.ilike.${searchPattern},
+          clients.full_name.ilike.${searchPattern},
+          clients.email.ilike.${searchPattern},
+          clients.phone.ilike.${searchPattern},
+          quotes.quote_number.ilike.${searchPattern},
+          partners.name.ilike.${searchPattern}
+        `);
       }
 
-      if (shouldPaginate) {
-        // Apply pagination only when not searching
-        query = query.range(pagination.offset, pagination.offset + pagination.pageSize - 1);
-      }
+      // Apply pagination
+      query = query.range(pagination.offset, pagination.offset + pagination.pageSize - 1);
 
       const { data, error, count } = await query;
       if (error) throw error;
 
       // Transform data
-      const allData = data?.map(order => ({
+      const transformedData = data?.map(order => ({
         ...order,
         client: order.clients || null,
         quote: order.quotes || null,
@@ -139,34 +141,7 @@ export default function AdminOrders() {
         partner: order.partners || null
       })) || [];
 
-      // Apply client-side search filtering
-      let filteredData = allData;
-      if (searchTerm) {
-        const searchLower = searchTerm.toLowerCase();
-        filteredData = allData.filter(order => {
-          return (
-            order.order_number?.toLowerCase().includes(searchLower) ||
-            order.client?.full_name?.toLowerCase().includes(searchLower) ||
-            order.client?.email?.toLowerCase().includes(searchLower) ||
-            order.quote?.quote_number?.toLowerCase().includes(searchLower) ||
-            order.partner?.name?.toLowerCase().includes(searchLower)
-          );
-        });
-      }
-
-      // Apply client-side pagination when searching
-      if (searchTerm) {
-        const startIndex = pagination.offset;
-        const endIndex = startIndex + pagination.pageSize;
-        const paginatedData = filteredData.slice(startIndex, endIndex);
-        
-        return { 
-          data: paginatedData, 
-          count: filteredData.length // Use filtered count for search results
-        };
-      }
-
-      return { data: filteredData, count: count || 0 };
+      return { data: transformedData, count: count || 0 };
     },
     placeholderData: keepPreviousData,
   });
