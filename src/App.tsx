@@ -16,6 +16,8 @@ import AdminLeads from '@/pages/AdminLeads';
 import AdminProducts from '@/pages/AdminProducts';
 import AdminInventory from '@/pages/AdminInventory';
 import AdminSurveyForms from '@/pages/AdminSurveyForms';
+import AdminChargers from '@/pages/AdminChargers';
+import AdminPartners from '@/pages/AdminPartners';
 import PublicQuoteView from '@/pages/PublicQuoteView';
 import AdminSchedule from '@/pages/AdminSchedule';
 import AdminScheduleStatus from '@/pages/AdminScheduleStatus';
@@ -46,6 +48,8 @@ function App() {
         <Route path="/admin/products" element={<ProtectedRoute><Layout><AdminProducts /></Layout></ProtectedRoute>} />
         <Route path="/admin/inventory" element={<ProtectedRoute><Layout><AdminInventory /></Layout></ProtectedRoute>} />
         <Route path="/admin/survey-forms" element={<ProtectedRoute><Layout><AdminSurveyForms /></Layout></ProtectedRoute>} />
+        <Route path="/admin/chargers" element={<ProtectedRoute><Layout><AdminChargers /></Layout></ProtectedRoute>} />
+        <Route path="/admin/partners" element={<ProtectedRoute><Layout><AdminPartners /></Layout></ProtectedRoute>} />
         <Route path="/admin/engineers" element={<ProtectedRoute><Layout><AdminEngineers /></Layout></ProtectedRoute>} />
         <Route path="/admin/engineers/:id" element={<ProtectedRoute><Layout><EngineerProfile /></Layout></ProtectedRoute>} />
         <Route path="/admin/users" element={<ProtectedRoute><Layout><AdminUsers /></Layout></ProtectedRoute>} />
