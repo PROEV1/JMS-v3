@@ -74,7 +74,7 @@ const sidebarItems = [
   {
     title: "Operations",
     items: [
-      { name: "Partner Quotes", href: "/admin/ops/quotes", icon: Quote, permission: "quotes.manage" },
+      { name: "Partner Quotes", href: "/ops/quotes", icon: Quote, permission: "quotes.manage" },
       { name: "Schedule", href: "/admin/schedule", icon: Calendar, permission: null },
     ]
   },

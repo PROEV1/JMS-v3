@@ -70,7 +70,7 @@ export function AddQuoteModal({ job, open, onOpenChange, onQuoteAdded, partnerNa
         storagePath = `partner-quotes/${fileName}`;
 
         const { error: uploadError } = await supabase.storage
-          .from('documents')
+          .from('partner-quotes')
           .upload(storagePath, formData.file);
 
         if (uploadError) {
@@ -78,7 +78,7 @@ export function AddQuoteModal({ job, open, onOpenChange, onQuoteAdded, partnerNa
         }
 
         const { data: { publicUrl } } = supabase.storage
-          .from('documents')
+          .from('partner-quotes')
           .getPublicUrl(storagePath);
 
         fileUrl = publicUrl;
@@ -95,7 +95,7 @@ export function AddQuoteModal({ job, open, onOpenChange, onQuoteAdded, partnerNa
           notes: formData.notes,
           file_url: fileUrl,
           storage_path: storagePath,
-          storage_bucket: 'documents',
+          storage_bucket: 'partner-quotes',
           status: 'submitted'
         });
 

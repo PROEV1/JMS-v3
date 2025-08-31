@@ -14,7 +14,8 @@ import { PartnerQuoteKPIs } from '@/components/partner-quotes/PartnerQuoteKPIs';
 import { PartnerQuoteJobCard } from '@/components/partner-quotes/PartnerQuoteJobCard';
 import { PartnerQuoteDrawer } from '@/components/partner-quotes/PartnerQuoteDrawer';
 import { AddQuoteModal } from '@/components/partner-quotes/AddQuoteModal';
-import { AlertCircle, ExternalLink, Plus, Shield } from 'lucide-react';
+import { AlertCircle, ExternalLink, Plus, Shield, Loader2 } from 'lucide-react';
+import { useDebounce } from '@/hooks/useDebounce';
 
 interface Partner {
   id: string;
@@ -71,6 +72,9 @@ export default function AdminPartnerQuotes() {
     quote_value_max: ''
   });
 
+  // Debounce filters to avoid excessive API calls
+  const debouncedFilters = useDebounce(filters, 500);
+
   useEffect(() => {
     fetchPartners();
   }, []);
@@ -80,7 +84,7 @@ export default function AdminPartnerQuotes() {
       fetchJobs();
       fetchPartnerSettings();
     }
-  }, [selectedPartner, filters]);
+  }, [selectedPartner, debouncedFilters]);
 
   const fetchPartners = async () => {
     try {
@@ -157,7 +161,7 @@ export default function AdminPartnerQuotes() {
           created_at,
           partner_id,
           client:clients(full_name, address),
-          partner_quotes_latest:partner_quotes_latest(
+          partner_quotes_latest(
             id,
             amount,
             currency,
@@ -384,7 +388,15 @@ export default function AdminPartnerQuotes() {
               />
 
               {/* Quote Buckets */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-6">
+              {loading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Loading jobs...</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-6">
                 {/* Needs Quotation */}
                 <Card>
                   <CardHeader className="pb-3">
@@ -506,6 +518,7 @@ export default function AdminPartnerQuotes() {
                   </CardContent>
                 </Card>
               </div>
+              )}
             </>
           )}
         </div>
