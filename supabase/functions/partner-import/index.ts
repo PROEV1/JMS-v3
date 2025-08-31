@@ -64,6 +64,20 @@ interface Results {
   errors: Array<{ row: number; message: string; data?: any }>;
 }
 
+// Helper function to sanitize objects before database operations
+function sanitizeForDatabase(obj: any): any {
+  const sanitized = { ...obj };
+  
+  // Remove all fields starting with underscore (meta fields)
+  Object.keys(sanitized).forEach(key => {
+    if (key.startsWith('_')) {
+      delete sanitized[key];
+    }
+  });
+  
+  return sanitized;
+}
+
 // Helper functions for email and phone handling
 function generatePlaceholderEmail(partnerId: string, clientName: string | null, rowIndex: number): string {
   const cleanName = (clientName || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
@@ -859,7 +873,8 @@ serve(async (req: Request): Promise<Response> => {
                 address: consolidatedCustomerAddress || null,
                 postcode: mappedData.customer_address_post_code || mappedData.postcode || null,
                 is_partner_client: true,
-                partner_id: partner.id
+                partner_id: partner.id,
+                _clientKey: clientKey // Keep for linking after creation
               };
               
               clientsToCreate.push(clientData);
@@ -911,6 +926,7 @@ serve(async (req: Request): Promise<Response> => {
             deposit_amount: 0,
             amount_paid: 0,
             _needsClientCreation: needsClientCreation,
+            _clientEmail: mappedData.client_email, // For linking after client creation
             _clientKey: needsClientCreation ? `${mappedData.client_email || 'no-email'}_${mappedData.client_name || 'no-name'}` : null,
             _rowIndex: rowIndex
           };
@@ -1012,9 +1028,10 @@ serve(async (req: Request): Promise<Response> => {
           // Batch 2: Create missing clients first
           if (clientsToCreate.length > 0) {
             console.log(`Creating ${clientsToCreate.length} new clients`);
+            const sanitizedClients = clientsToCreate.map(sanitizeForDatabase);
             const { data: createdClients, error: clientError } = await supabase
               .from('clients')
-              .insert(clientsToCreate)
+              .insert(sanitizedClients)
               .select('id, email, full_name');
 
             if (clientError) {
@@ -1037,8 +1054,11 @@ serve(async (req: Request): Promise<Response> => {
           console.log('=== STEP 3: Updating order client IDs ===');
           // Batch 3: Update order client IDs with resolved clients
           ordersToProcess.forEach(orderData => {
-            if (orderData.client_email && existingClientsMap.has(orderData.client_email)) {
-              orderData.client_id = existingClientsMap.get(orderData.client_email).id;
+            if (orderData._clientEmail && existingClientsMap.has(orderData._clientEmail)) {
+              orderData.client_id = existingClientsMap.get(orderData._clientEmail).id;
+              if (verbose) {
+                console.log(`Linked order to client: ${orderData._clientEmail} -> ${orderData.client_id}`);
+              }
             }
           });
 
@@ -1089,7 +1109,11 @@ serve(async (req: Request): Promise<Response> => {
           // Batch 4: Enhanced bulk insert for new orders with optimistic insert strategy
           if (ordersToInsert.length > 0) {
             console.log(`Attempting bulk insert of ${ordersToInsert.length} orders...`);
-            const insertData = ordersToInsert.map(item => item.data);
+            const insertData = ordersToInsert.map(item => sanitizeForDatabase(item.data));
+            
+            if (verbose) {
+              console.log('Sample sanitized order data:', JSON.stringify(insertData[0], null, 2));
+            }
             
             const { data: insertedOrders, error: insertError } = await supabase
               .from('orders')
@@ -1104,9 +1128,10 @@ serve(async (req: Request): Promise<Response> => {
               
               for (const item of ordersToInsert) {
                 try {
+                  const sanitizedData = sanitizeForDatabase(item.data);
                   const { data: singleInsert, error: singleError } = await supabase
                     .from('orders')
-                    .insert([item.data])
+                    .insert([sanitizedData])
                     .select('id');
                   
                   if (singleError) {
@@ -1126,9 +1151,10 @@ serve(async (req: Request): Promise<Response> => {
                         console.log(`Found existing order to update: ${existingOrder.order_number} (ID: ${existingOrder.id})`);
                         
                         // Update the existing order instead
+                        const sanitizedUpdateData = sanitizeForDatabase(item.data);
                         const { error: updateError } = await supabase
                           .from('orders')
-                          .update(item.data)
+                          .update(sanitizedUpdateData)
                           .eq('id', existingOrder.id);
                         
                         if (updateError) {
@@ -1152,11 +1178,15 @@ serve(async (req: Request): Promise<Response> => {
                         });
                       }
                     } else {
-                      results.errors.push({
-                        row: item.rowIndex + 1,
-                        message: `Failed to insert order: ${singleError.message}`,
-                        data: item.data
-                      });
+                        results.errors.push({
+                          row: item.rowIndex + 1,
+                          message: `Failed to insert order: ${singleError.message}`,
+                          data: { 
+                            original: item.data, 
+                            sanitized: sanitizedData,
+                            error_details: singleError
+                          }
+                        });
                     }
                   } else if (singleInsert?.[0]) {
                     results.inserted.push({
@@ -1168,7 +1198,11 @@ serve(async (req: Request): Promise<Response> => {
                   results.errors.push({
                     row: item.rowIndex + 1,
                     message: `Individual insert failed: ${individualError.message}`,
-                    data: item.data
+                    data: {
+                      original: item.data,
+                      sanitized: sanitizeForDatabase(item.data),
+                      error_details: individualError
+                    }
                   });
                 }
               }
@@ -1193,9 +1227,10 @@ serve(async (req: Request): Promise<Response> => {
                 // For small batches, use individual updates for safety
                 if (updateChunk.length <= 5) {
                   for (const updateItem of updateChunk) {
+                    const sanitizedUpdateData = sanitizeForDatabase(updateItem.data);
                     const { error: updateError } = await supabase
                       .from('orders')
-                      .update(updateItem.data)
+                      .update(sanitizedUpdateData)
                       .eq('id', updateItem.id);
 
                     if (updateError) {
