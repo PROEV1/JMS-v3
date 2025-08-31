@@ -1229,17 +1229,6 @@ serve(async (req: Request): Promise<Response> => {
                  });
                });
              }
-           }
-                if (insertedOrders[index]) {
-                  results.inserted.push({
-                    type: 'insert',
-                    data: { ...item.data, id: insertedOrders[index].id }
-                  });
-                  if (verbose) {
-                    console.log(`Inserted order: ${insertedOrders[index].id}`);
-                  }
-                }
-              });
             }
           }
 
