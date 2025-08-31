@@ -247,7 +247,7 @@ async function fetchPartner(supabase: any, partnerId: string) {
   return data;
 }
 
-async function fetchGoogleSheetData(sheetId: string, sheetName: string) {
+async function getGoogleSheetsAuth() {
   const serviceAccountKey = Deno.env.get('GOOGLE_SERVICE_ACCOUNT_KEY');
   if (!serviceAccountKey) {
     throw new Error('Google Service Account Key not configured');
@@ -278,45 +278,98 @@ async function fetchGoogleSheetData(sheetId: string, sheetName: string) {
     throw new Error('No access token received');
   }
   console.log('Access token obtained successfully');
+  
+  return tokenData.access_token;
+}
 
-  // Fetch sheet data with proper range
-  const range = `${sheetName}!A1:ZZ1000`;
+async function getTotalRowCount(sheetId: string, sheetName: string, accessToken: string): Promise<number> {
+  // Get all values in column A to count non-empty rows
+  const range = `${sheetName}!A:A`;
   const sheetResponse = await fetch(
     `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(range)}`,
     {
-      headers: { 'Authorization': `Bearer ${tokenData.access_token}` }
+      headers: { 'Authorization': `Bearer ${accessToken}` }
     }
   );
 
   if (!sheetResponse.ok) {
     const errorText = await sheetResponse.text();
-    console.error('Sheets API error:', errorText);
-    if (sheetResponse.status === 403) {
-      throw new Error('Permission denied accessing Google Sheet. Check service account permissions.');
-    } else if (sheetResponse.status === 404) {
-      throw new Error(`Sheet not found: ${sheetId}/${sheetName}`);
-    } else {
-      throw new Error(`Failed to fetch sheet data: ${errorText}`);
-    }
+    console.error('Sheets API error getting row count:', errorText);
+    throw new Error(`Failed to get row count: ${errorText}`);
   }
 
   const sheetData = await sheetResponse.json();
-  console.log('Google Sheets: Raw response:', { 
-    range: sheetData.range, 
-    majorDimension: sheetData.majorDimension,
-    rowCount: sheetData.values?.length || 0
-  });
-
   const rows = sheetData.values || [];
-  if (rows.length === 0) {
-    throw new Error('No data found in the sheet');
+  
+  // Count non-empty rows, subtract 1 for header
+  const totalRows = Math.max(0, rows.filter(row => row && row[0] && row[0].toString().trim()).length - 1);
+  console.log(`Total data rows found: ${totalRows}`);
+  
+  return totalRows;
+}
+
+async function fetchGoogleSheetData(sheetId: string, sheetName: string, startRow: number = 0, maxRows: number = 1000) {
+  const accessToken = await getGoogleSheetsAuth();
+  
+  // Always fetch headers first
+  const headersRange = `${sheetName}!A1:ZZ1`;
+  const headersResponse = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(headersRange)}`,
+    {
+      headers: { 'Authorization': `Bearer ${accessToken}` }
+    }
+  );
+
+  if (!headersResponse.ok) {
+    const errorText = await headersResponse.text();
+    console.error('Sheets API error getting headers:', errorText);
+    throw new Error(`Failed to fetch headers: ${errorText}`);
   }
 
-  console.log('Sheet data fetched successfully, rows:', rows.length);
+  const headersData = await headersResponse.json();
+  const headers = headersData.values?.[0] || [];
+  
+  if (headers.length === 0) {
+    throw new Error('No headers found in the sheet');
+  }
+
+  // Get total row count
+  const totalRows = await getTotalRowCount(sheetId, sheetName, accessToken);
+  
+  // If startRow is 0 and maxRows >= totalRows, this is likely a count check
+  if (startRow === 0 && maxRows >= totalRows) {
+    console.log('Returning total row count without fetching data');
+    return { headers, dataRows: [], totalRows };
+  }
+
+  // Calculate actual data range (add 2 to account for 1-based indexing and header row)
+  const dataStartRow = startRow + 2;
+  const dataEndRow = Math.min(startRow + maxRows + 1, totalRows + 1);
+  
+  // Fetch the actual data chunk
+  const dataRange = `${sheetName}!A${dataStartRow}:ZZ${dataEndRow}`;
+  console.log(`Fetching data range: ${dataRange} (rows ${startRow + 1}-${Math.min(startRow + maxRows, totalRows)} of ${totalRows})`);
+  
+  const dataResponse = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(dataRange)}`,
+    {
+      headers: { 'Authorization': `Bearer ${accessToken}` }
+    }
+  );
+
+  if (!dataResponse.ok) {
+    const errorText = await dataResponse.text();
+    console.error('Sheets API error getting data:', errorText);
+    throw new Error(`Failed to fetch data: ${errorText}`);
+  }
+
+  const sheetData = await dataResponse.json();
+  const rows = sheetData.values || [];
+  
+  console.log(`Google Sheets: Fetched ${rows.length} data rows for range ${dataRange}`);
 
   // Convert to objects
-  const headers = rows[0];
-  const dataRows = rows.slice(1).map((row: any[]) => {
+  const dataRows = rows.map((row: any[]) => {
     const obj: Record<string, string> = {};
     headers.forEach((header: string, index: number) => {
       obj[header] = row[index] || '';
@@ -324,7 +377,7 @@ async function fetchGoogleSheetData(sheetId: string, sheetName: string) {
     return obj;
   });
 
-  return dataRows;
+  return { headers, dataRows, totalRows };
 }
 
 async function createJWT(credentials: any) {
@@ -440,6 +493,7 @@ serve(async (req: Request): Promise<Response> => {
     });
 
     let parsedData: any[] = [];
+    let totalRows = 0;
 
     // Fetch data based on source type
     if (importProfile.source_type === 'gsheet' && !csvData) {
@@ -450,12 +504,29 @@ serve(async (req: Request): Promise<Response> => {
         });
       }
       console.log('Fetching Google Sheet data...');
-      parsedData = await fetchGoogleSheetData(importProfile.gsheet_id, importProfile.gsheet_sheet_name || 'Sheet1');
+      const sheetResult = await fetchGoogleSheetData(
+        importProfile.gsheet_id, 
+        importProfile.gsheet_sheet_name || 'Sheet1',
+        startRow,
+        maxRows
+      );
+      parsedData = sheetResult.dataRows;
+      totalRows = sheetResult.totalRows;
     } else if (csvData) {
-      parsedData = parse(csvData, {
+      const allCsvData = parse(csvData, {
         skipFirstRow: true,
         columns: undefined
       }) as any[];
+      
+      totalRows = allCsvData.length;
+      const endRow = Math.min(startRow + maxRows, totalRows);
+      
+      if (startRow > 0 || maxRows < totalRows) {
+        console.log(`Processing CSV chunk: rows ${startRow + 1}-${endRow} of ${totalRows}`);
+        parsedData = allCsvData.slice(startRow, endRow);
+      } else {
+        parsedData = allCsvData;
+      }
     } else {
       return new Response(JSON.stringify({ error: 'No data source provided' }), {
         status: 400,
@@ -463,14 +534,7 @@ serve(async (req: Request): Promise<Response> => {
       });
     }
 
-    // Apply chunking if specified
-    const totalRows = parsedData.length;
-    const endRow = Math.min(startRow + maxRows, totalRows);
-    
-    if (startRow > 0 || maxRows < totalRows) {
-      console.log(`Processing chunk: rows ${startRow + 1}-${endRow} of ${totalRows}`);
-      parsedData = parsedData.slice(startRow, endRow);
-    }
+    const endRow = Math.min(startRow + parsedData.length, totalRows);
 
     console.log(`Processing ${parsedData.length} rows in chunk (${startRow + 1}-${endRow} of ${totalRows})...`);
     

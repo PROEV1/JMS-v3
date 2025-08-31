@@ -101,7 +101,7 @@ export default function ImportRunModal({
     cancelledRef.current = false;
     
     try {
-      // First, get total row count
+      // First, get total row count with minimal data fetch
       const previewResult = await onImport(sourceType === 'csv' ? csvData : undefined, true, createMissingOrders, 0, 1) as ImportResult;
       
       if (!previewResult?.chunk_info) {
@@ -109,6 +109,11 @@ export default function ImportRunModal({
       }
 
       const totalRows = previewResult.chunk_info.total_rows;
+      
+      if (totalRows === 0) {
+        throw new Error('No data rows found to import');
+      }
+
       const totalChunks = Math.ceil(totalRows / chunkSize);
 
       console.log(`Starting chunked import: ${totalRows} rows, ${totalChunks} chunks of ${chunkSize}`);
