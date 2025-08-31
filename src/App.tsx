@@ -4,6 +4,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
 import { DesignVersionProvider } from '@/contexts/DesignVersionContext';
+import { AuthProvider } from '@/hooks/useAuth';
 import Dashboard from '@/pages/Dashboard';
 import AdminQuotes from '@/pages/AdminQuotes';
 import AdminQuoteDetail from '@/pages/AdminQuoteDetail';
@@ -20,33 +21,39 @@ import EngineerAvailability from '@/pages/EngineerAvailability';
 import EngineerProfile from '@/pages/EngineerProfile';
 import AdminMessages from '@/pages/AdminMessages';
 import AdminPartnerQuotes from '@/pages/AdminPartnerQuotes';
+import Auth from '@/pages/Auth';
+import { ProtectedRoute } from '@/components/ProtectedRoute';
 
 function App() {
   return (
     <Router>
       <QueryClientProvider client={new QueryClient()}>
-        <DesignVersionProvider>
-          <Toaster />
-          <Routes>
+        <AuthProvider>
+          <DesignVersionProvider>
+            <Toaster />
+           <Routes>
+             <Route path="/login" element={<Auth />} />
+             <Route path="/auth" element={<Auth />} />
             <Route path="/" element={<PublicQuoteView />} />
-            <Route path="/quote/:token" element={<PublicQuoteView />} />
-            <Route path="/admin" element={<Dashboard />} />
-            <Route path="/admin/quotes" element={<AdminQuotes />} />
-            <Route path="/admin/quotes/:id" element={<AdminQuoteDetail />} />
-            <Route path="/admin/orders" element={<AdminOrders />} />
-            <Route path="/admin/orders/:id" element={<OrderDetail />} />
-            <Route path="/admin/clients" element={<AdminClients />} />
-            <Route path="/admin/engineers" element={<AdminEngineers />} />
-            <Route path="/admin/engineers/:id" element={<EngineerProfile />} />
-            <Route path="/admin/users" element={<AdminUsers />} />
-            <Route path="/admin/settings" element={<AdminSettings />} />
-            <Route path="/admin/schedule" element={<AdminSchedule />} />
-            <Route path="/admin/schedule/status/:status" element={<AdminScheduleStatus />} />
-            <Route path="/admin/schedule/engineer/:engineerId" element={<EngineerAvailability />} />
-            <Route path="/admin/messages" element={<AdminMessages />} />
-            <Route path="/ops/quotes" element={<AdminPartnerQuotes />} />
-          </Routes>
-        </DesignVersionProvider>
+             <Route path="/admin" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+             <Route path="/quote/:token" element={<PublicQuoteView />} />
+             <Route path="/admin/quotes" element={<ProtectedRoute><AdminQuotes /></ProtectedRoute>} />
+             <Route path="/admin/quotes/:id" element={<ProtectedRoute><AdminQuoteDetail /></ProtectedRoute>} />
+             <Route path="/admin/orders" element={<ProtectedRoute><AdminOrders /></ProtectedRoute>} />
+             <Route path="/admin/orders/:id" element={<ProtectedRoute><OrderDetail /></ProtectedRoute>} />
+             <Route path="/admin/clients" element={<ProtectedRoute><AdminClients /></ProtectedRoute>} />
+             <Route path="/admin/engineers" element={<ProtectedRoute><AdminEngineers /></ProtectedRoute>} />
+             <Route path="/admin/engineers/:id" element={<ProtectedRoute><EngineerProfile /></ProtectedRoute>} />
+             <Route path="/admin/users" element={<ProtectedRoute><AdminUsers /></ProtectedRoute>} />
+             <Route path="/admin/settings" element={<ProtectedRoute><AdminSettings /></ProtectedRoute>} />
+             <Route path="/admin/schedule" element={<ProtectedRoute><AdminSchedule /></ProtectedRoute>} />
+             <Route path="/admin/schedule/status/:status" element={<ProtectedRoute><AdminScheduleStatus /></ProtectedRoute>} />
+             <Route path="/admin/schedule/engineer/:engineerId" element={<ProtectedRoute><EngineerAvailability /></ProtectedRoute>} />
+             <Route path="/admin/messages" element={<ProtectedRoute><AdminMessages /></ProtectedRoute>} />
+             <Route path="/ops/quotes" element={<ProtectedRoute><AdminPartnerQuotes /></ProtectedRoute>} />
+            </Routes>
+          </DesignVersionProvider>
+        </AuthProvider>
       </QueryClientProvider>
     </Router>
   );
