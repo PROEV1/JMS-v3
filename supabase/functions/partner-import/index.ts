@@ -1023,7 +1023,16 @@ serve(async (req: Request): Promise<Response> => {
             try {
               // Map client ID from batch operations
               if (orderData._needsClientCreation && orderData._clientKey) {
-                orderData.client_id = newClientsMap.get(orderData._clientKey) || existingClientsMap.get(orderData.client_id);
+                const clientId = newClientsMap.get(orderData._clientKey) || existingClientsMap.get(orderData.client_id);
+                if (!clientId) {
+                  throw new Error(`Failed to create or find client for key: ${orderData._clientKey}`);
+                }
+                orderData.client_id = clientId;
+              }
+
+              // Validate required fields
+              if (!orderData.client_id) {
+                throw new Error('Missing client_id for order');
               }
 
               const existingOrder = existingOrdersMap.get(orderData.partner_external_id);
@@ -1051,8 +1060,12 @@ serve(async (req: Request): Promise<Response> => {
                   });
                 }
               } else {
+                // For new orders, ensure no order_number is set (let trigger generate it)
+                const cleanOrderData = { ...orderData };
+                delete cleanOrderData.order_number;
+                
                 ordersToInsert.push({
-                  data: orderData,
+                  data: cleanOrderData,
                   rowIndex
                 });
               }
