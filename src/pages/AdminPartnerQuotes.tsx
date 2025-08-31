@@ -57,7 +57,7 @@ export default function AdminPartnerQuotes() {
   const { toast } = useToast();
   const { role } = useUserRole();
   const { canManageQuotes, canManageOrders, loading: permissionsLoading } = usePermissions();
-  const [selectedPartner, setSelectedPartner] = useState<string>('');
+  const [selectedPartner, setSelectedPartner] = useState<string | null>(null);
   const [partners, setPartners] = useState<Partner[]>([]);
   const [jobs, setJobs] = useState<PartnerQuoteJob[]>([]);
   const [loading, setLoading] = useState(true);
@@ -372,7 +372,7 @@ export default function AdminPartnerQuotes() {
             {/* Partner Selector */}
             <div className="flex items-center gap-4">
               <span className="text-sm font-medium">Partner:</span>
-              <Select value={selectedPartner} onValueChange={setSelectedPartner}>
+              <Select value={selectedPartner || ''} onValueChange={setSelectedPartner}>
                 <SelectTrigger className="w-48">
                   <SelectValue placeholder="Select partner..." />
                 </SelectTrigger>
