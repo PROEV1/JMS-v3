@@ -71,7 +71,7 @@ interface ChunkedImportProgress {
 interface ImportRunModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onImport: (csvData?: string, dryRun?: boolean, createMissingOrders?: boolean, startRow?: number, maxRows?: number) => Promise<ImportResult | void>;
+  onImport: (csvData?: string, dryRun?: boolean, createMissingOrders?: boolean, startRow?: number, maxRows?: number, totalRows?: number, verbose?: boolean) => Promise<ImportResult | void>;
   sourceType: 'csv' | 'gsheet';
   gsheetId?: string;
   gsheetSheetName?: string;
@@ -90,9 +90,11 @@ export default function ImportRunModal({
   const [createMissingOrders, setCreateMissingOrders] = useState(true);
   const [isImporting, setIsImporting] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
-  const [chunkSize, setChunkSize] = useState(150);
+  const [chunkSize, setChunkSize] = useState(200); // Increased default
   const [progress, setProgress] = useState<ChunkedImportProgress | null>(null);
   const cancelledRef = useRef(false);
+  const [parallelChunks, setParallelChunks] = useState(1);
+  const [verboseLogging, setVerboseLogging] = useState(false);
 
   const handleImport = async () => {
     setIsImporting(true);
@@ -102,7 +104,7 @@ export default function ImportRunModal({
     
     try {
       // First, get total row count with minimal data fetch
-      const previewResult = await onImport(sourceType === 'csv' ? csvData : undefined, true, createMissingOrders, 0, 1) as ImportResult;
+      const previewResult = await onImport(sourceType === 'csv' ? csvData : undefined, true, createMissingOrders, 0, 1, undefined, verboseLogging) as ImportResult;
       
       if (!previewResult?.chunk_info) {
         throw new Error('Unable to determine total row count');
@@ -116,7 +118,7 @@ export default function ImportRunModal({
 
       const totalChunks = Math.ceil(totalRows / chunkSize);
 
-      console.log(`Starting chunked import: ${totalRows} rows, ${totalChunks} chunks of ${chunkSize}`);
+      console.log(`Starting ${parallelChunks > 1 ? 'parallel' : 'sequential'} chunked import: ${totalRows} rows, ${totalChunks} chunks of ${chunkSize}`);
 
       // Initialize aggregated result
       const aggregatedResult: ImportResult = {
@@ -137,85 +139,224 @@ export default function ImportRunModal({
         }
       };
 
-      // Process chunks
-      let currentStartRow = 0;
-      let chunkNum = 0;
+      // Process chunks (sequential or parallel)
+      if (parallelChunks === 1) {
+        // Sequential processing (original logic)
+        let currentStartRow = 0;
+        let chunkNum = 0;
 
-      while (currentStartRow < totalRows && !cancelledRef.current) {
-        chunkNum++;
-        console.log(`Processing chunk ${chunkNum}/${totalChunks}: rows ${currentStartRow + 1}-${Math.min(currentStartRow + chunkSize, totalRows)}`);
+        while (currentStartRow < totalRows && !cancelledRef.current) {
+          chunkNum++;
+          console.log(`Processing chunk ${chunkNum}/${totalChunks}: rows ${currentStartRow + 1}-${Math.min(currentStartRow + chunkSize, totalRows)}`);
 
+          setProgress({
+            currentChunk: chunkNum,
+            totalChunks,
+            processedRows: currentStartRow,
+            totalRows,
+            aggregatedResult: { ...aggregatedResult },
+            isRunning: true,
+            canCancel: true
+          });
+
+          try {
+            const chunkResult = await onImport(
+              sourceType === 'csv' ? csvData : undefined, 
+              dryRun, 
+              createMissingOrders, 
+              currentStartRow, 
+              chunkSize,
+              totalRows, // Pass total rows to avoid recounting
+              verboseLogging
+            ) as ImportResult;
+
+            if (!chunkResult?.success) {
+              throw new Error(chunkResult?.summary?.errors?.[0]?.error || 'Chunk processing failed');
+            }
+
+            // Aggregate results
+            aggregatedResult.summary.processed += chunkResult.summary.processed;
+            aggregatedResult.summary.inserted_count += chunkResult.summary.inserted_count;
+            aggregatedResult.summary.updated_count += chunkResult.summary.updated_count;
+            aggregatedResult.summary.skipped_count += chunkResult.summary.skipped_count;
+            aggregatedResult.summary.errors.push(...chunkResult.summary.errors);
+            aggregatedResult.summary.warnings.push(...chunkResult.summary.warnings);
+
+            // Aggregate preview data
+            if (chunkResult.preview) {
+              aggregatedResult.preview!.updates.push(...(chunkResult.preview.updates || []));
+              aggregatedResult.preview!.skips.push(...(chunkResult.preview.skips || []));
+              aggregatedResult.preview!.inserts.push(...(chunkResult.preview.inserts || []));
+            }
+
+            // Move to next chunk
+            currentStartRow = chunkResult.chunk_info?.next_start_row || currentStartRow + chunkSize;
+            
+            if (!chunkResult.chunk_info?.has_more) {
+              break;
+            }
+
+          } catch (chunkError: any) {
+            console.error(`Chunk ${chunkNum} failed:`, chunkError);
+            aggregatedResult.summary.errors.push({
+              row: currentStartRow + 1,
+              error: `Chunk ${chunkNum} failed: ${chunkError.message}`
+            });
+            
+            // Continue with next chunk or stop based on severity
+            if (chunkError.message.includes('CPU') || chunkError.message.includes('timeout')) {
+              throw chunkError; // Fatal error, stop processing
+            }
+            
+            currentStartRow += chunkSize; // Skip this chunk
+          }
+        }
+
+        // Update final progress
         setProgress({
           currentChunk: chunkNum,
           totalChunks,
-          processedRows: currentStartRow,
+          processedRows: totalRows,
           totalRows,
           aggregatedResult: { ...aggregatedResult },
-          isRunning: true,
-          canCancel: true
+          isRunning: false,
+          canCancel: false
         });
-
-        try {
-          const chunkResult = await onImport(
+      } else {
+        // Parallel processing
+        const chunkPromises: Promise<{ result: ImportResult; startRow: number; chunkNum: number }>[] = [];
+        
+        for (let chunkNum = 1; chunkNum <= Math.min(parallelChunks, totalChunks) && !cancelledRef.current; chunkNum++) {
+          const startRow = (chunkNum - 1) * chunkSize;
+          if (startRow >= totalRows) break;
+          
+          const chunkPromise = onImport(
             sourceType === 'csv' ? csvData : undefined, 
             dryRun, 
             createMissingOrders, 
-            currentStartRow, 
-            chunkSize
-          ) as ImportResult;
-
-          if (!chunkResult?.success) {
-            throw new Error(chunkResult?.summary?.errors?.[0]?.error || 'Chunk processing failed');
-          }
-
-          // Aggregate results
-          aggregatedResult.summary.processed += chunkResult.summary.processed;
-          aggregatedResult.summary.inserted_count += chunkResult.summary.inserted_count;
-          aggregatedResult.summary.updated_count += chunkResult.summary.updated_count;
-          aggregatedResult.summary.skipped_count += chunkResult.summary.skipped_count;
-          aggregatedResult.summary.errors.push(...chunkResult.summary.errors);
-          aggregatedResult.summary.warnings.push(...chunkResult.summary.warnings);
-
-          // Aggregate preview data
-          if (chunkResult.preview) {
-            aggregatedResult.preview!.updates.push(...(chunkResult.preview.updates || []));
-            aggregatedResult.preview!.skips.push(...(chunkResult.preview.skips || []));
-            aggregatedResult.preview!.inserts.push(...(chunkResult.preview.inserts || []));
-          }
-
-          // Move to next chunk
-          currentStartRow = chunkResult.chunk_info?.next_start_row || currentStartRow + chunkSize;
+            startRow, 
+            chunkSize,
+            totalRows,
+            verboseLogging
+          ).then(result => ({
+            result: result as ImportResult,
+            startRow,
+            chunkNum
+          }));
           
-          if (!chunkResult.chunk_info?.has_more) {
-            break;
-          }
-
-        } catch (chunkError: any) {
-          console.error(`Chunk ${chunkNum} failed:`, chunkError);
-          aggregatedResult.summary.errors.push({
-            row: currentStartRow + 1,
-            error: `Chunk ${chunkNum} failed: ${chunkError.message}`
-          });
-          
-          // Continue with next chunk or stop based on severity
-          if (chunkError.message.includes('CPU') || chunkError.message.includes('timeout')) {
-            throw chunkError; // Fatal error, stop processing
-          }
-          
-          currentStartRow += chunkSize; // Skip this chunk
+          chunkPromises.push(chunkPromise);
         }
-      }
 
-      // Update final progress
-      setProgress({
-        currentChunk: chunkNum,
-        totalChunks,
-        processedRows: totalRows,
-        totalRows,
-        aggregatedResult: { ...aggregatedResult },
-        isRunning: false,
-        canCancel: false
-      });
+        // Process parallel chunks
+        const chunkResults = await Promise.allSettled(chunkPromises);
+        let processedRows = 0;
+        let completedChunks = 0;
+        
+        chunkResults.forEach((chunkResult, index) => {
+          if (chunkResult.status === 'fulfilled') {
+            const { result } = chunkResult.value;
+            
+            // Aggregate results
+            aggregatedResult.summary.processed += result.summary.processed;
+            aggregatedResult.summary.inserted_count += result.summary.inserted_count;
+            aggregatedResult.summary.updated_count += result.summary.updated_count;
+            aggregatedResult.summary.skipped_count += result.summary.skipped_count;
+            aggregatedResult.summary.errors.push(...result.summary.errors);
+            aggregatedResult.summary.warnings.push(...result.summary.warnings);
+
+            // Aggregate preview data
+            if (result.preview) {
+              aggregatedResult.preview!.updates.push(...(result.preview.updates || []));
+              aggregatedResult.preview!.skips.push(...(result.preview.skips || []));
+              aggregatedResult.preview!.inserts.push(...(result.preview.inserts || []));
+            }
+            
+            processedRows += result.summary.processed;
+            completedChunks++;
+          } else {
+            aggregatedResult.summary.errors.push({
+              row: (index * chunkSize) + 1,
+              error: `Parallel chunk ${index + 1} failed: ${chunkResult.reason}`
+            });
+          }
+        });
+
+        // Continue with remaining chunks if there are more
+        let currentStartRow = parallelChunks * chunkSize;
+        let chunkNum = parallelChunks;
+        
+        while (currentStartRow < totalRows && !cancelledRef.current) {
+          chunkNum++;
+          
+          setProgress({
+            currentChunk: chunkNum,
+            totalChunks,
+            processedRows: currentStartRow,
+            totalRows,
+            aggregatedResult: { ...aggregatedResult },
+            isRunning: true,
+            canCancel: true
+          });
+
+          try {
+            const chunkResult = await onImport(
+              sourceType === 'csv' ? csvData : undefined, 
+              dryRun, 
+              createMissingOrders, 
+              currentStartRow, 
+              chunkSize,
+              totalRows,
+              verboseLogging
+            ) as ImportResult;
+
+            if (!chunkResult?.success) {
+              throw new Error(chunkResult?.summary?.errors?.[0]?.error || 'Chunk processing failed');
+            }
+
+            // Aggregate results
+            aggregatedResult.summary.processed += chunkResult.summary.processed;
+            aggregatedResult.summary.inserted_count += chunkResult.summary.inserted_count;
+            aggregatedResult.summary.updated_count += chunkResult.summary.updated_count;
+            aggregatedResult.summary.skipped_count += chunkResult.summary.skipped_count;
+            aggregatedResult.summary.errors.push(...chunkResult.summary.errors);
+            aggregatedResult.summary.warnings.push(...chunkResult.summary.warnings);
+
+            // Aggregate preview data
+            if (chunkResult.preview) {
+              aggregatedResult.preview!.updates.push(...(chunkResult.preview.updates || []));
+              aggregatedResult.preview!.skips.push(...(chunkResult.preview.skips || []));
+              aggregatedResult.preview!.inserts.push(...(chunkResult.preview.inserts || []));
+            }
+
+            // Move to next chunk
+            currentStartRow = chunkResult.chunk_info?.next_start_row || currentStartRow + chunkSize;
+            
+            if (!chunkResult.chunk_info?.has_more) {
+              break;
+            }
+
+          } catch (chunkError: any) {
+            console.error(`Chunk ${chunkNum} failed:`, chunkError);
+            aggregatedResult.summary.errors.push({
+              row: currentStartRow + 1,
+              error: `Chunk ${chunkNum} failed: ${chunkError.message}`
+            });
+            
+            currentStartRow += chunkSize; // Skip this chunk
+          }
+        }
+
+        // Update final progress for parallel processing
+        setProgress({
+          currentChunk: Math.max(completedChunks, totalChunks),
+          totalChunks,
+          processedRows: totalRows,
+          totalRows,
+          aggregatedResult: { ...aggregatedResult },
+          isRunning: false,
+          canCancel: false
+        });
+      }
 
       if (cancelledRef.current) {
         aggregatedResult.summary.errors.push({
@@ -355,27 +496,66 @@ export default function ImportRunModal({
               </Label>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="chunk_size">Rows per Batch</Label>
-              <div className="flex items-center space-x-2">
-                <input
-                  type="range"
-                  id="chunk_size"
-                  min="50"
-                  max="300"
-                  step="25"
-                  value={chunkSize}
-                  onChange={(e) => setChunkSize(Number(e.target.value))}
-                  className="flex-1"
-                  disabled={isImporting}
-                />
-                <Badge variant="outline" className="min-w-[60px] text-center">
-                  {chunkSize}
-                </Badge>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="chunk_size">Rows per Batch</Label>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="range"
+                    id="chunk_size"
+                    min="100"
+                    max="500"
+                    step="50"
+                    value={chunkSize}
+                    onChange={(e) => setChunkSize(Number(e.target.value))}
+                    className="flex-1"
+                    disabled={isImporting}
+                  />
+                  <Badge variant="outline" className="min-w-[60px] text-center">
+                    {chunkSize}
+                  </Badge>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Larger batches are faster but may timeout on slow networks.
+                </p>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Smaller batches reduce CPU timeout risk but take longer overall.
-              </p>
+
+              <div className="space-y-2">
+                <Label htmlFor="parallel_chunks">Parallel Chunks</Label>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="range"
+                    id="parallel_chunks"
+                    min="1"
+                    max="4"
+                    step="1"
+                    value={parallelChunks}
+                    onChange={(e) => setParallelChunks(Number(e.target.value))}
+                    className="flex-1"
+                    disabled={isImporting}
+                  />
+                  <Badge variant="outline" className="min-w-[40px] text-center">
+                    {parallelChunks}
+                  </Badge>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Process multiple chunks simultaneously for speed.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="verbose_logging"
+                checked={verboseLogging}
+                onCheckedChange={setVerboseLogging}
+              />
+              <Label htmlFor="verbose_logging" className="flex items-center gap-2">
+                Verbose Logging
+                <Badge variant={verboseLogging ? 'default' : 'secondary'}>
+                  {verboseLogging ? 'Detailed' : 'Summary Only'}
+                </Badge>
+              </Label>
             </div>
 
             {createMissingOrders && (

@@ -308,7 +308,7 @@ async function getTotalRowCount(sheetId: string, sheetName: string, accessToken:
   return totalRows;
 }
 
-async function fetchGoogleSheetData(sheetId: string, sheetName: string, startRow: number = 0, maxRows: number = 1000) {
+async function fetchGoogleSheetData(sheetId: string, sheetName: string, startRow: number = 0, maxRows: number = 1000, totalRows?: number) {
   const accessToken = await getGoogleSheetsAuth();
   
   // Always fetch headers first
@@ -333,8 +333,10 @@ async function fetchGoogleSheetData(sheetId: string, sheetName: string, startRow
     throw new Error('No headers found in the sheet');
   }
 
-  // Get total row count
-  const totalRows = await getTotalRowCount(sheetId, sheetName, accessToken);
+  // Get total row count only if not provided
+  if (totalRows === undefined) {
+    totalRows = await getTotalRowCount(sheetId, sheetName, accessToken);
+  }
   
   // If startRow is 0 and maxRows >= totalRows, this is likely a count check
   if (startRow === 0 && maxRows >= totalRows) {
@@ -443,8 +445,10 @@ serve(async (req: Request): Promise<Response> => {
     
     // Chunking parameters
     const startRow = requestBody.start_row ?? 0;
-    const maxRows = requestBody.max_rows ?? 150;  // Default chunk size
+    const maxRows = requestBody.max_rows ?? 200;  // Increased default chunk size
     const chunkInfo = requestBody.chunk_info || null;
+    const totalRowsFromPrevious = requestBody.total_rows || null;
+    const verbose = requestBody.verbose ?? false;
 
     if (!profileId) {
       return new Response(JSON.stringify({ error: 'Missing profile_id or partnerImportProfileId' }), {
@@ -508,7 +512,8 @@ serve(async (req: Request): Promise<Response> => {
         importProfile.gsheet_id, 
         importProfile.gsheet_sheet_name || 'Sheet1',
         startRow,
-        maxRows
+        maxRows,
+        totalRowsFromPrevious // Pass total rows to avoid re-counting
       );
       parsedData = sheetResult.dataRows;
       totalRows = sheetResult.totalRows;
@@ -536,18 +541,20 @@ serve(async (req: Request): Promise<Response> => {
 
     const endRow = Math.min(startRow + parsedData.length, totalRows);
 
-    console.log(`Processing ${parsedData.length} rows in chunk (${startRow + 1}-${endRow} of ${totalRows})...`);
-    
-    // Log first and last few Job IDs for reconciliation
-    if (parsedData.length > 0) {
-      const firstFewIds = parsedData.slice(0, 3).map((row, idx) => 
-        `Row ${startRow + idx + 1}: ${row['Job ID'] || 'N/A'}`
-      ).join(', ');
-      const lastFewIds = parsedData.slice(-3).map((row, idx) => 
-        `Row ${startRow + parsedData.length - 3 + idx + 1}: ${row['Job ID'] || 'N/A'}`
-      ).join(', ');
-      console.log(`Sheet reconciliation - Chunk first rows: ${firstFewIds}`);
-      console.log(`Sheet reconciliation - Chunk last rows: ${lastFewIds}`);
+    if (verbose) {
+      console.log(`Processing ${parsedData.length} rows in chunk (${startRow + 1}-${endRow} of ${totalRows})...`);
+      
+      // Log first and last few Job IDs for reconciliation
+      if (parsedData.length > 0) {
+        const firstFewIds = parsedData.slice(0, 3).map((row, idx) => 
+          `Row ${startRow + idx + 1}: ${row['Job ID'] || 'N/A'}`
+        ).join(', ');
+        const lastFewIds = parsedData.slice(-3).map((row, idx) => 
+          `Row ${startRow + parsedData.length - 3 + idx + 1}: ${row['Job ID'] || 'N/A'}`
+        ).join(', ');
+        console.log(`Sheet reconciliation - Chunk first rows: ${firstFewIds}`);
+        console.log(`Sheet reconciliation - Chunk last rows: ${lastFewIds}`);
+      }
     }
 
     const results: Results = {
@@ -573,27 +580,35 @@ serve(async (req: Request): Promise<Response> => {
     }
 
     // Log first few headers and first mapped row for debugging
-    if (parsedData.length > 0) {
+    if (verbose && parsedData.length > 0) {
       const firstRow = parsedData[0];
       console.log('Available columns:', Object.keys(firstRow));
       console.log('Column mappings:', columnMappings);
     }
 
-    // Process data directly (already chunked)
+    // Prepare batch collections for bulk operations
+    const clientsToCreate: any[] = [];
+    const clientsToFind: string[] = [];
+    const ordersToProcess: any[] = [];
+    const processedRows: ProcessedRow[] = [];
+
+    // STEP 1: Map and validate all rows first
     for (const [index, row] of parsedData.entries()) {
       const rowIndex = startRow + index;  // Adjust for chunk offset
         
-        try {
-          // Map columns based on configuration
-          const mappedData: MappedData = {};
-          
-          for (const [dbField, csvColumn] of Object.entries(columnMappings)) {
-            if (csvColumn && row[csvColumn] !== undefined) {
-              (mappedData as any)[dbField] = row[csvColumn];
-            }
+      try {
+        // Map columns based on configuration
+        const mappedData: MappedData = {};
+        
+        for (const [dbField, csvColumn] of Object.entries(columnMappings)) {
+          if (csvColumn && row[csvColumn] !== undefined) {
+            (mappedData as any)[dbField] = row[csvColumn];
           }
+        }
 
+        if (verbose) {
           console.log(`Row ${rowIndex + 1} mapped data:`, mappedData);
+        }
 
           // Build consolidated customer address
           const addressParts = [
@@ -650,7 +665,9 @@ serve(async (req: Request): Promise<Response> => {
           const originalPartnerStatus = partnerStatusFromColumn ? String(partnerStatusFromColumn).trim().toUpperCase() : 'UNKNOWN';
           const mappedStatus = statusMappings[originalPartnerStatus] || originalPartnerStatus.toLowerCase();
 
-          console.log(`Processing row ${rowIndex + 1}: Partner Status = '${originalPartnerStatus}'`);
+          if (verbose) {
+            console.log(`Processing row ${rowIndex + 1}: Partner Status = '${originalPartnerStatus}'`);
+          }
 
           // Use status actions as primary mapping
           const actionConfig = statusActions[originalPartnerStatus] || {};
@@ -662,7 +679,9 @@ serve(async (req: Request): Promise<Response> => {
           // Prefer status_actions over old status_mappings
           if (actionConfig.jms_status) {
             jmsStatus = actionConfig.jms_status;
-            console.log(`Using status action mapping: ${originalPartnerStatus} -> ${jmsStatus}`);
+            if (verbose) {
+              console.log(`Using status action mapping: ${originalPartnerStatus} -> ${jmsStatus}`);
+            }
           } else {
             // Default mappings for common partner statuses
             const defaultPartnerMappings: Record<string, string> = {
@@ -680,7 +699,9 @@ serve(async (req: Request): Promise<Response> => {
             
             if (defaultPartnerMappings[originalPartnerStatus]) {
               jmsStatus = defaultPartnerMappings[originalPartnerStatus];
-              console.log(`Using default mapping: ${originalPartnerStatus} -> ${jmsStatus}`);
+              if (verbose) {
+                console.log(`Using default mapping: ${originalPartnerStatus} -> ${jmsStatus}`);
+              }
             }
           }
           
@@ -746,7 +767,9 @@ serve(async (req: Request): Promise<Response> => {
             if (engineerMapping[engineerKey]) {
               engineerId = engineerMapping[engineerKey];
             } else {
-              console.log(`No engineer mapping found for: '${engineerKey}'`);
+              if (verbose) {
+                console.log(`No engineer mapping found for: '${engineerKey}'`);
+              }
               
               results.warnings.push({
                 row: rowIndex + 1,
@@ -757,70 +780,50 @@ serve(async (req: Request): Promise<Response> => {
             }
           }
 
-          // Create or find client if needed
+          // Store client info for batch processing
           let clientId = mappedData.client_id;
+          let needsClientCreation = false;
           
           if (!clientId && createMissingOrders && (mappedData.client_name || mappedData.client_email)) {
+            // For batch processing, we'll create a unique key for client lookup
+            const clientKey = `${mappedData.client_email || 'no-email'}_${mappedData.client_name || 'no-name'}`;
+            
+            if (mappedData.client_email) {
+              clientsToFind.push(mappedData.client_email);
+            }
             
             if (!dryRun) {
-              // Try to find existing client first
-              const { data: existingClient } = await supabase
-                .from('clients')
-                .select('id')
-                .or(`email.eq.${mappedData.client_email || 'no-email'},full_name.ilike.%${mappedData.client_name || 'no-name'}%`)
-                .limit(1)
-                .single();
-
-              if (existingClient) {
-                clientId = existingClient.id;
-              } else {
-                // Create new client
-                const normalizedPhone = normalizePhone(mappedData.client_phone);
-                if (mappedData.client_phone && !normalizedPhone) {
-                  results.warnings.push({
-                    row: rowIndex + 1,
-                    column: 'client_phone',
-                    message: `Invalid phone number format: '${mappedData.client_phone}'. Phone number skipped.`,
-                    data: { original_phone: mappedData.client_phone }
-                  });
-                }
-
-                const clientData = {
-                  full_name: mappedData.client_name || 'Unknown Client',
-                  email: mappedData.client_email || null,
-                  phone: normalizedPhone,
-                  address: consolidatedCustomerAddress || null,
-                  postcode: mappedData.customer_address_post_code || mappedData.postcode || null,
-                  is_partner_client: true,
-                  partner_id: partner.id
-                };
-
-                const { data: newClient, error: clientError } = await supabase
-                  .from('clients')
-                  .insert(clientData)
-                  .select('id')
-                  .single();
-
-                if (clientError) {
-                  console.error('Error creating client:', clientError);
-                  results.errors.push({
-                    row: rowIndex + 1,
-                    message: `Failed to create client: ${clientError.message}`,
-                    data: clientData
-                  });
-                  continue;
-                } else {
-                  clientId = newClient.id;
-                  console.log(`Created client: ${clientId}`);
-                }
+              needsClientCreation = true;
+              
+              const normalizedPhone = normalizePhone(mappedData.client_phone);
+              if (mappedData.client_phone && !normalizedPhone) {
+                results.warnings.push({
+                  row: rowIndex + 1,
+                  column: 'client_phone',
+                  message: `Invalid phone number format: '${mappedData.client_phone}'. Phone number skipped.`,
+                  data: { original_phone: mappedData.client_phone }
+                });
               }
+
+              const clientData = {
+                full_name: mappedData.client_name || 'Unknown Client',
+                email: mappedData.client_email || null,
+                phone: normalizedPhone,
+                address: consolidatedCustomerAddress || null,
+                postcode: mappedData.customer_address_post_code || mappedData.postcode || null,
+                is_partner_client: true,
+                partner_id: partner.id,
+                _clientKey: clientKey // Add for matching later
+              };
+              
+              clientsToCreate.push(clientData);
             } else {
               // For dry run, simulate client creation
               clientId = 'placeholder-client-id';
             }
           }
 
-          // Build order data
+          // Build order data with fingerprint for change detection
           const orderData: any = {
             partner_id: partner.id,
             client_id: clientId,
@@ -835,13 +838,16 @@ serve(async (req: Request): Promise<Response> => {
             job_type: (mappedData.job_type || mappedData.type || 'installation').toLowerCase(),
             installation_notes: mappedData.job_notes || null,
             sub_partner: mappedData.sub_partner || null,
-             total_amount: sanitizedQuoteAmount,
-             scheduling_suppressed: suppressScheduling,
-             scheduling_suppressed_reason: suppressionReason,
-             // order_number will be auto-generated by trigger
+            total_amount: sanitizedQuoteAmount,
+            scheduling_suppressed: suppressScheduling,
+            scheduling_suppressed_reason: suppressionReason,
+            // order_number will be auto-generated by trigger
             status: 'awaiting_payment',
             deposit_amount: 0,
-            amount_paid: 0
+            amount_paid: 0,
+            _needsClientCreation: needsClientCreation,
+            _clientKey: needsClientCreation ? `${mappedData.client_email || 'no-email'}_${mappedData.client_name || 'no-name'}` : null,
+            _rowIndex: rowIndex
           };
 
           // Handle scheduled date
@@ -852,7 +858,9 @@ serve(async (req: Request): Promise<Response> => {
               
               // If both engineer and date are assigned, force status to 'scheduled'
               if (engineerId && !suppressScheduling) {
-                console.log(`Row ${rowIndex + 1}: Both engineer and date assigned, forcing status to 'scheduled'`);
+                if (verbose) {
+                  console.log(`Row ${rowIndex + 1}: Both engineer and date assigned, forcing status to 'scheduled'`);
+                }
                 orderData.status_enhanced = 'scheduled';
                 orderData.scheduling_suppressed = false;
                 orderData.scheduling_suppressed_reason = null;
@@ -867,78 +875,21 @@ serve(async (req: Request): Promise<Response> => {
             }
           }
 
-          const processedRow: ProcessedRow = {
-            type: 'insert',
-            data: orderData
-          };
+          // Create fingerprint for change detection
+          const fingerprint = JSON.stringify({
+            status: orderData.status_enhanced,
+            partner_status: orderData.partner_status,
+            engineer_id: orderData.engineer_id,
+            scheduled_date: orderData.scheduled_install_date,
+            job_address: orderData.job_address,
+            total_amount: orderData.total_amount,
+            suppressed: orderData.scheduling_suppressed
+          });
           
-          if (!dryRun) {
-            try {
-              // Check for existing order with same partner_external_id
-              const { data: existingOrder } = await supabase
-                .from('orders')
-                .select('id, partner_external_id')
-                .eq('partner_external_id', processedRow.data.partner_external_id)
-                .eq('partner_id', partner.id)
-                .single();
+          orderData.partner_metadata = orderData.partner_metadata || {};
+          orderData.partner_metadata.import_fingerprint = fingerprint;
 
-              if (existingOrder) {
-                // Update existing order
-                const { error: updateError } = await supabase
-                  .from('orders')
-                  .update(processedRow.data)
-                  .eq('id', existingOrder.id);
-
-                if (updateError) {
-                  console.error('Error updating order:', updateError);
-                  results.errors.push({
-                    row: rowIndex + 1,
-                    message: `Failed to update order: ${updateError.message}`,
-                    data: processedRow.data
-                  });
-                } else {
-                  results.updated.push({
-                    ...processedRow,
-                    type: 'update',
-                    data: { ...processedRow.data, id: existingOrder.id }
-                  });
-                  console.log(`Updated order: ${existingOrder.id}`);
-                }
-              } else {
-                // Insert new order
-                const { data: newOrder, error: insertError } = await supabase
-                  .from('orders')
-                  .insert(processedRow.data)
-                  .select('id')
-                  .single();
-
-                if (insertError) {
-                  console.error('Error inserting order:', insertError);
-                  results.errors.push({
-                    row: rowIndex + 1,
-                    message: `Failed to insert order: ${insertError.message}`,
-                    data: processedRow.data
-                  });
-                } else {
-                  results.inserted.push({
-                    ...processedRow,
-                    data: { ...processedRow.data, id: newOrder.id }
-                  });
-                  console.log(`Inserted order: ${newOrder.id}`);
-                }
-              }
-            } catch (dbError: any) {
-              console.error('Database error:', dbError);
-              results.errors.push({
-                row: rowIndex + 1,
-                message: `Database error: ${dbError.message}`,
-                data: processedRow.data
-              });
-            }
-          } else {
-            // For dry run, just add to results
-            results.inserted.push(processedRow);
-          }
+          ordersToProcess.push(orderData);
 
         } catch (error: any) {
           console.error(`Error processing row ${rowIndex + 1}:`, error);
@@ -948,6 +899,204 @@ serve(async (req: Request): Promise<Response> => {
             data: row
           });
         }
+      }
+
+      // STEP 2: Batch database operations for performance
+      if (!dryRun) {
+        try {
+          // Batch 1: Find existing clients
+          const existingClientEmails = [...new Set(clientsToFind)].filter(Boolean);
+          const existingClientsMap = new Map();
+          
+          if (existingClientEmails.length > 0) {
+            const { data: existingClients } = await supabase
+              .from('clients')
+              .select('id, email, full_name')
+              .in('email', existingClientEmails);
+              
+            existingClients?.forEach(client => {
+              existingClientsMap.set(client.email, client.id);
+            });
+          }
+
+          // Batch 2: Create unique clients only
+          const uniqueClientsToCreate = new Map();
+          clientsToCreate.forEach(client => {
+            if (!existingClientsMap.has(client.email) && !uniqueClientsToCreate.has(client._clientKey)) {
+              uniqueClientsToCreate.set(client._clientKey, client);
+            }
+          });
+
+          const newClientsMap = new Map();
+          if (uniqueClientsToCreate.size > 0) {
+            const clientsArray = Array.from(uniqueClientsToCreate.values());
+            const { data: newClients, error: clientError } = await supabase
+              .from('clients')
+              .insert(clientsArray.map(({_clientKey, ...client}) => client))
+              .select('id, email, full_name');
+
+            if (clientError) {
+              console.error('Batch client creation error:', clientError);
+              // Individual error handling would need to be more sophisticated
+            } else if (newClients) {
+              clientsArray.forEach((client, index) => {
+                if (newClients[index]) {
+                  newClientsMap.set(client._clientKey, newClients[index].id);
+                  existingClientsMap.set(client.email, newClients[index].id);
+                }
+              });
+            }
+          }
+
+          // Batch 3: Get existing orders for fingerprint comparison
+          const externalIds = ordersToProcess.map(order => order.partner_external_id).filter(Boolean);
+          const existingOrdersMap = new Map();
+          
+          if (externalIds.length > 0) {
+            const { data: existingOrders } = await supabase
+              .from('orders')
+              .select('id, partner_external_id, partner_metadata')
+              .in('partner_external_id', externalIds)
+              .eq('partner_id', partner.id);
+              
+            existingOrders?.forEach(order => {
+              existingOrdersMap.set(order.partner_external_id, {
+                id: order.id,
+                fingerprint: order.partner_metadata?.import_fingerprint
+              });
+            });
+          }
+
+          // STEP 3: Process orders with fingerprint checking
+          const ordersToInsert: any[] = [];
+          const ordersToUpdate: any[] = [];
+          
+          for (const orderData of ordersToProcess) {
+            try {
+              // Map client ID from batch operations
+              if (orderData._needsClientCreation && orderData._clientKey) {
+                orderData.client_id = newClientsMap.get(orderData._clientKey) || existingClientsMap.get(orderData.client_id);
+              }
+
+              const existingOrder = existingOrdersMap.get(orderData.partner_external_id);
+              const currentFingerprint = orderData.partner_metadata.import_fingerprint;
+              
+              // Clean up temp fields
+              delete orderData._needsClientCreation;
+              delete orderData._clientKey;
+              const rowIndex = orderData._rowIndex;
+              delete orderData._rowIndex;
+              
+              if (existingOrder) {
+                // Check fingerprint to avoid unnecessary updates
+                if (existingOrder.fingerprint !== currentFingerprint) {
+                  ordersToUpdate.push({
+                    id: existingOrder.id,
+                    data: orderData,
+                    rowIndex
+                  });
+                } else {
+                  results.skipped.push({
+                    type: 'skip',
+                    data: { ...orderData, id: existingOrder.id },
+                    reason: 'No changes detected'
+                  });
+                }
+              } else {
+                ordersToInsert.push({
+                  data: orderData,
+                  rowIndex
+                });
+              }
+            } catch (error: any) {
+              results.errors.push({
+                row: orderData._rowIndex + 1,
+                message: `Order processing error: ${error.message}`,
+                data: orderData
+              });
+            }
+          }
+
+          // Batch 4: Bulk insert new orders
+          if (ordersToInsert.length > 0) {
+            const { data: insertedOrders, error: insertError } = await supabase
+              .from('orders')
+              .insert(ordersToInsert.map(item => item.data))
+              .select('id');
+
+            if (insertError) {
+              console.error('Batch order insert error:', insertError);
+              ordersToInsert.forEach(item => {
+                results.errors.push({
+                  row: item.rowIndex + 1,
+                  message: `Failed to insert order: ${insertError.message}`,
+                  data: item.data
+                });
+              });
+            } else if (insertedOrders) {
+              ordersToInsert.forEach((item, index) => {
+                if (insertedOrders[index]) {
+                  results.inserted.push({
+                    type: 'insert',
+                    data: { ...item.data, id: insertedOrders[index].id }
+                  });
+                  if (verbose) {
+                    console.log(`Inserted order: ${insertedOrders[index].id}`);
+                  }
+                }
+              });
+            }
+          }
+
+          // Batch 5: Bulk update existing orders (done individually due to different data per order)
+          for (const updateItem of ordersToUpdate) {
+            try {
+              const { error: updateError } = await supabase
+                .from('orders')
+                .update(updateItem.data)
+                .eq('id', updateItem.id);
+
+              if (updateError) {
+                results.errors.push({
+                  row: updateItem.rowIndex + 1,
+                  message: `Failed to update order: ${updateError.message}`,
+                  data: updateItem.data
+                });
+              } else {
+                results.updated.push({
+                  type: 'update',
+                  data: { ...updateItem.data, id: updateItem.id }
+                });
+                if (verbose) {
+                  console.log(`Updated order: ${updateItem.id}`);
+                }
+              }
+            } catch (error: any) {
+              results.errors.push({
+                row: updateItem.rowIndex + 1,
+                message: `Update error: ${error.message}`,
+                data: updateItem.data
+              });
+            }
+          }
+
+        } catch (batchError: any) {
+          console.error('Batch processing error:', batchError);
+          results.errors.push({
+            row: 0,
+            message: `Batch processing failed: ${batchError.message}`,
+            data: { error: batchError }
+          });
+        }
+      } else {
+        // For dry run, simulate all orders as inserts
+        ordersToProcess.forEach(orderData => {
+          const processedRow: ProcessedRow = {
+            type: 'insert',
+            data: orderData
+          };
+          results.inserted.push(processedRow);
+        });
       }
 
     // Log results summary
