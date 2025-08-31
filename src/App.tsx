@@ -20,6 +20,7 @@ import EngineerProfile from '@/pages/EngineerProfile';
 import AdminMessages from '@/pages/AdminMessages';
 import AdminPartnerQuotes from '@/pages/AdminPartnerQuotes';
 import Auth from '@/pages/Auth';
+import Layout from '@/components/Layout';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 
 function App() {
@@ -31,21 +32,21 @@ function App() {
         <Route path="/login" element={<Auth />} />
         <Route path="/auth" element={<Auth />} />
         <Route path="/quote/:token" element={<PublicQuoteView />} />
-        <Route path="/admin" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-        <Route path="/admin/quotes" element={<ProtectedRoute><AdminQuotes /></ProtectedRoute>} />
-        <Route path="/admin/quotes/:id" element={<ProtectedRoute><AdminQuoteDetail /></ProtectedRoute>} />
-        <Route path="/admin/orders" element={<ProtectedRoute><AdminOrders /></ProtectedRoute>} />
-        <Route path="/admin/orders/:id" element={<ProtectedRoute><OrderDetail /></ProtectedRoute>} />
-        <Route path="/admin/clients" element={<ProtectedRoute><AdminClients /></ProtectedRoute>} />
-        <Route path="/admin/engineers" element={<ProtectedRoute><AdminEngineers /></ProtectedRoute>} />
-        <Route path="/admin/engineers/:id" element={<ProtectedRoute><EngineerProfile /></ProtectedRoute>} />
-        <Route path="/admin/users" element={<ProtectedRoute><AdminUsers /></ProtectedRoute>} />
-        <Route path="/admin/settings" element={<ProtectedRoute><AdminSettings /></ProtectedRoute>} />
-        <Route path="/admin/schedule" element={<ProtectedRoute><AdminSchedule /></ProtectedRoute>} />
-        <Route path="/admin/schedule/status/:status" element={<ProtectedRoute><AdminScheduleStatus /></ProtectedRoute>} />
-        <Route path="/admin/schedule/engineer/:engineerId" element={<ProtectedRoute><EngineerAvailability /></ProtectedRoute>} />
-        <Route path="/admin/messages" element={<ProtectedRoute><AdminMessages /></ProtectedRoute>} />
-        <Route path="/ops/quotes" element={<ProtectedRoute><AdminPartnerQuotes /></ProtectedRoute>} />
+        <Route path="/admin" element={<ProtectedRoute><Layout><Dashboard /></Layout></ProtectedRoute>} />
+        <Route path="/admin/quotes" element={<ProtectedRoute><Layout><AdminQuotes /></Layout></ProtectedRoute>} />
+        <Route path="/admin/quotes/:id" element={<ProtectedRoute><Layout><AdminQuoteDetail /></Layout></ProtectedRoute>} />
+        <Route path="/admin/orders" element={<ProtectedRoute><Layout><AdminOrders /></Layout></ProtectedRoute>} />
+        <Route path="/admin/orders/:id" element={<ProtectedRoute><Layout><OrderDetail /></Layout></ProtectedRoute>} />
+        <Route path="/admin/clients" element={<ProtectedRoute><Layout><AdminClients /></Layout></ProtectedRoute>} />
+        <Route path="/admin/engineers" element={<ProtectedRoute><Layout><AdminEngineers /></Layout></ProtectedRoute>} />
+        <Route path="/admin/engineers/:id" element={<ProtectedRoute><Layout><EngineerProfile /></Layout></ProtectedRoute>} />
+        <Route path="/admin/users" element={<ProtectedRoute><Layout><AdminUsers /></Layout></ProtectedRoute>} />
+        <Route path="/admin/settings" element={<ProtectedRoute><Layout><AdminSettings /></Layout></ProtectedRoute>} />
+        <Route path="/admin/schedule" element={<ProtectedRoute><Layout><AdminSchedule /></Layout></ProtectedRoute>} />
+        <Route path="/admin/schedule/status/:status" element={<ProtectedRoute><Layout><AdminScheduleStatus /></Layout></ProtectedRoute>} />
+        <Route path="/admin/schedule/engineer/:engineerId" element={<ProtectedRoute><Layout><EngineerAvailability /></Layout></ProtectedRoute>} />
+        <Route path="/admin/messages" element={<ProtectedRoute><Layout><AdminMessages /></Layout></ProtectedRoute>} />
+        <Route path="/ops/quotes" element={<ProtectedRoute><Layout><AdminPartnerQuotes /></Layout></ProtectedRoute>} />
       </Routes>
     </Router>
   );
