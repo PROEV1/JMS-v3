@@ -387,6 +387,11 @@ serve(async (req: Request): Promise<Response> => {
     const csvData = requestBody.csv_data || requestBody.csvData;
     const dryRun = requestBody.dry_run ?? requestBody.dryRun ?? true;
     const createMissingOrders = requestBody.create_missing_orders ?? requestBody.createMissingOrders ?? true;
+    
+    // Chunking parameters
+    const startRow = requestBody.start_row ?? 0;
+    const maxRows = requestBody.max_rows ?? 150;  // Default chunk size
+    const chunkInfo = requestBody.chunk_info || null;
 
     if (!profileId) {
       return new Response(JSON.stringify({ error: 'Missing profile_id or partnerImportProfileId' }), {
@@ -458,18 +463,27 @@ serve(async (req: Request): Promise<Response> => {
       });
     }
 
-    console.log(`Processing ${parsedData.length} rows...`);
+    // Apply chunking if specified
+    const totalRows = parsedData.length;
+    const endRow = Math.min(startRow + maxRows, totalRows);
+    
+    if (startRow > 0 || maxRows < totalRows) {
+      console.log(`Processing chunk: rows ${startRow + 1}-${endRow} of ${totalRows}`);
+      parsedData = parsedData.slice(startRow, endRow);
+    }
+
+    console.log(`Processing ${parsedData.length} rows in chunk (${startRow + 1}-${endRow} of ${totalRows})...`);
     
     // Log first and last few Job IDs for reconciliation
     if (parsedData.length > 0) {
       const firstFewIds = parsedData.slice(0, 3).map((row, idx) => 
-        `Row ${idx + 1}: ${row['Job ID'] || 'N/A'}`
+        `Row ${startRow + idx + 1}: ${row['Job ID'] || 'N/A'}`
       ).join(', ');
       const lastFewIds = parsedData.slice(-3).map((row, idx) => 
-        `Row ${parsedData.length - 3 + idx + 1}: ${row['Job ID'] || 'N/A'}`
+        `Row ${startRow + parsedData.length - 3 + idx + 1}: ${row['Job ID'] || 'N/A'}`
       ).join(', ');
-      console.log(`Sheet reconciliation - First rows: ${firstFewIds}`);
-      console.log(`Sheet reconciliation - Last rows: ${lastFewIds}`);
+      console.log(`Sheet reconciliation - Chunk first rows: ${firstFewIds}`);
+      console.log(`Sheet reconciliation - Chunk last rows: ${lastFewIds}`);
     }
 
     const results: Results = {
@@ -501,13 +515,9 @@ serve(async (req: Request): Promise<Response> => {
       console.log('Column mappings:', columnMappings);
     }
 
-    // Process data in batches
-    const batchSize = 100;
-    for (let batchStart = 0; batchStart < parsedData.length; batchStart += batchSize) {
-      const batch = parsedData.slice(batchStart, batchStart + batchSize);
-      
-      for (const [index, row] of batch.entries()) {
-        const rowIndex = batchStart + index;
+    // Process data directly (already chunked)
+    for (const [index, row] of parsedData.entries()) {
+      const rowIndex = startRow + index;  // Adjust for chunk offset
         
         try {
           // Map columns based on configuration
@@ -875,11 +885,12 @@ serve(async (req: Request): Promise<Response> => {
           });
         }
       }
-    }
 
     // Log results summary
-    console.log('Import completed:', {
-      total_rows: parsedData.length,
+    console.log('Import chunk completed:', {
+      chunk_rows: parsedData.length,
+      chunk_range: `${startRow + 1}-${endRow}`,
+      total_available: totalRows,
       inserted: results.inserted.length,
       updated: results.updated.length,
       skipped: results.skipped.length,
@@ -911,7 +922,14 @@ serve(async (req: Request): Promise<Response> => {
     return new Response(JSON.stringify({
       success: true,
       dry_run: dryRun,
-      total_rows: parsedData.length,
+      chunk_info: {
+        start_row: startRow,
+        end_row: endRow,
+        processed_count: parsedData.length,
+        total_rows: totalRows,
+        has_more: endRow < totalRows,
+        next_start_row: endRow < totalRows ? endRow : null
+      },
       results: {
         inserted: results.inserted.length,
         updated: results.updated.length,

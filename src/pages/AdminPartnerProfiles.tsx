@@ -370,7 +370,7 @@ export default function AdminPartnerProfiles() {
     }
   };
 
-  const triggerImport = async (profileId: string, csvData?: string, dryRun: boolean = true, createMissingOrders: boolean = true) => {
+  const triggerImport = async (profileId: string, csvData?: string, dryRun: boolean = true, createMissingOrders: boolean = true, startRow?: number, maxRows?: number) => {
     try {
       const body: any = {
         profile_id: profileId,
@@ -382,10 +382,19 @@ export default function AdminPartnerProfiles() {
         body.csv_data = csvData;
       }
 
+      // Add chunking parameters
+      if (startRow !== undefined) {
+        body.start_row = startRow;
+      }
+      if (maxRows !== undefined) {
+        body.max_rows = maxRows;
+      }
+
       console.log('=== FRONTEND DEBUG ===');
       console.log('Calling partner-import with body:', body);
       console.log('ProfileId:', profileId);
       console.log('DryRun:', dryRun);
+      console.log('Chunk:', startRow !== undefined ? `${startRow}-${(startRow || 0) + (maxRows || 150)}` : 'full');
 
       const { data, error } = await supabase.functions.invoke('partner-import', {
         body
@@ -400,12 +409,13 @@ export default function AdminPartnerProfiles() {
         throw error;
       }
 
-      if (data.success) {
+      // Only show toast for single imports (not chunks)
+      if (startRow === undefined && data.success) {
         toast({ 
           title: dryRun ? 'Dry run completed' : 'Import completed',
           description: `Processed ${data.summary.processed} rows. ${data.summary.inserted_count} inserted, ${data.summary.updated_count} updated, ${data.summary.skipped_count} skipped. ${data.summary.errors.length} errors.`
         });
-      } else {
+      } else if (startRow === undefined && !data.success) {
         toast({
           title: 'Import failed',
           description: data.unmapped_engineers ? `${data.unmapped_engineers.length} engineers need to be mapped` : 'Unknown error',
@@ -415,11 +425,14 @@ export default function AdminPartnerProfiles() {
 
       return data; // Return the result for the modal to display
     } catch (error: any) {
-      toast({ 
-        title: 'Import failed', 
-        description: error.message, 
-        variant: 'destructive' 
-      });
+      // Only show error toast for single imports (not chunks)
+      if (startRow === undefined) {
+        toast({ 
+          title: 'Import failed', 
+          description: error.message, 
+          variant: 'destructive' 
+        });
+      }
       throw error; // Re-throw so the modal can handle it
     }
   };
@@ -622,7 +635,7 @@ export default function AdminPartnerProfiles() {
         <ImportRunModal
           isOpen={!!showImportDialog}
           onClose={() => setShowImportDialog(null)}
-          onImport={(csvData, dryRun, createMissingOrders) => triggerImport(showImportDialog, csvData, dryRun, createMissingOrders)}
+          onImport={(csvData, dryRun, createMissingOrders, startRow, maxRows) => triggerImport(showImportDialog, csvData, dryRun, createMissingOrders, startRow, maxRows)}
           sourceType={profiles?.find(p => p.id === showImportDialog)?.source_type || 'csv'}
           gsheetId={profiles?.find(p => p.id === showImportDialog)?.gsheet_id || undefined}
           gsheetSheetName={profiles?.find(p => p.id === showImportDialog)?.gsheet_sheet_name || undefined}

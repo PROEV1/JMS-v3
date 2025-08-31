@@ -1,18 +1,27 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, XCircle, Clock, Pause, Play, Square } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
 
 interface ImportResult {
   success: boolean;
   unmapped_engineers?: Array<string>; // Add this to handle blocking
+  chunk_info?: {
+    start_row: number;
+    end_row: number;
+    processed_count: number;
+    total_rows: number;
+    has_more: boolean;
+    next_start_row: number | null;
+  };
   summary: {
     processed: number;
     inserted_count: number;
@@ -49,10 +58,20 @@ interface ImportResult {
   };
 }
 
+interface ChunkedImportProgress {
+  currentChunk: number;
+  totalChunks: number;
+  processedRows: number;
+  totalRows: number;
+  aggregatedResult: ImportResult;
+  isRunning: boolean;
+  canCancel: boolean;
+}
+
 interface ImportRunModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onImport: (csvData?: string, dryRun?: boolean, createMissingOrders?: boolean) => Promise<ImportResult | void>;
+  onImport: (csvData?: string, dryRun?: boolean, createMissingOrders?: boolean, startRow?: number, maxRows?: number) => Promise<ImportResult | void>;
   sourceType: 'csv' | 'gsheet';
   gsheetId?: string;
   gsheetSheetName?: string;
@@ -71,30 +90,144 @@ export default function ImportRunModal({
   const [createMissingOrders, setCreateMissingOrders] = useState(true);
   const [isImporting, setIsImporting] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [chunkSize, setChunkSize] = useState(150);
+  const [progress, setProgress] = useState<ChunkedImportProgress | null>(null);
+  const cancelledRef = useRef(false);
 
   const handleImport = async () => {
     setIsImporting(true);
     setImportResult(null);
-    
-    // Add timeout to prevent stuck imports
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Import timed out after 120 seconds')), 120000)
-    );
+    setProgress(null);
+    cancelledRef.current = false;
     
     try {
-      const result = await Promise.race([
-        onImport(sourceType === 'csv' ? csvData : undefined, dryRun, createMissingOrders),
-        timeoutPromise
-      ]) as ImportResult;
+      // First, get total row count
+      const previewResult = await onImport(sourceType === 'csv' ? csvData : undefined, true, createMissingOrders, 0, 1) as ImportResult;
       
-      if (result) {
-        setImportResult(result);
+      if (!previewResult?.chunk_info) {
+        throw new Error('Unable to determine total row count');
       }
-      if (!dryRun && result?.success) {
-        onClose();
+
+      const totalRows = previewResult.chunk_info.total_rows;
+      const totalChunks = Math.ceil(totalRows / chunkSize);
+
+      console.log(`Starting chunked import: ${totalRows} rows, ${totalChunks} chunks of ${chunkSize}`);
+
+      // Initialize aggregated result
+      const aggregatedResult: ImportResult = {
+        success: true,
+        summary: {
+          processed: 0,
+          inserted_count: 0,
+          updated_count: 0,
+          skipped_count: 0,
+          errors: [],
+          warnings: [],
+          dry_run: dryRun
+        },
+        preview: {
+          updates: [],
+          skips: [],
+          inserts: []
+        }
+      };
+
+      // Process chunks
+      let currentStartRow = 0;
+      let chunkNum = 0;
+
+      while (currentStartRow < totalRows && !cancelledRef.current) {
+        chunkNum++;
+        console.log(`Processing chunk ${chunkNum}/${totalChunks}: rows ${currentStartRow + 1}-${Math.min(currentStartRow + chunkSize, totalRows)}`);
+
+        setProgress({
+          currentChunk: chunkNum,
+          totalChunks,
+          processedRows: currentStartRow,
+          totalRows,
+          aggregatedResult: { ...aggregatedResult },
+          isRunning: true,
+          canCancel: true
+        });
+
+        try {
+          const chunkResult = await onImport(
+            sourceType === 'csv' ? csvData : undefined, 
+            dryRun, 
+            createMissingOrders, 
+            currentStartRow, 
+            chunkSize
+          ) as ImportResult;
+
+          if (!chunkResult?.success) {
+            throw new Error(chunkResult?.summary?.errors?.[0]?.error || 'Chunk processing failed');
+          }
+
+          // Aggregate results
+          aggregatedResult.summary.processed += chunkResult.summary.processed;
+          aggregatedResult.summary.inserted_count += chunkResult.summary.inserted_count;
+          aggregatedResult.summary.updated_count += chunkResult.summary.updated_count;
+          aggregatedResult.summary.skipped_count += chunkResult.summary.skipped_count;
+          aggregatedResult.summary.errors.push(...chunkResult.summary.errors);
+          aggregatedResult.summary.warnings.push(...chunkResult.summary.warnings);
+
+          // Aggregate preview data
+          if (chunkResult.preview) {
+            aggregatedResult.preview!.updates.push(...(chunkResult.preview.updates || []));
+            aggregatedResult.preview!.skips.push(...(chunkResult.preview.skips || []));
+            aggregatedResult.preview!.inserts.push(...(chunkResult.preview.inserts || []));
+          }
+
+          // Move to next chunk
+          currentStartRow = chunkResult.chunk_info?.next_start_row || currentStartRow + chunkSize;
+          
+          if (!chunkResult.chunk_info?.has_more) {
+            break;
+          }
+
+        } catch (chunkError: any) {
+          console.error(`Chunk ${chunkNum} failed:`, chunkError);
+          aggregatedResult.summary.errors.push({
+            row: currentStartRow + 1,
+            error: `Chunk ${chunkNum} failed: ${chunkError.message}`
+          });
+          
+          // Continue with next chunk or stop based on severity
+          if (chunkError.message.includes('CPU') || chunkError.message.includes('timeout')) {
+            throw chunkError; // Fatal error, stop processing
+          }
+          
+          currentStartRow += chunkSize; // Skip this chunk
+        }
       }
+
+      // Update final progress
+      setProgress({
+        currentChunk: chunkNum,
+        totalChunks,
+        processedRows: totalRows,
+        totalRows,
+        aggregatedResult: { ...aggregatedResult },
+        isRunning: false,
+        canCancel: false
+      });
+
+      if (cancelledRef.current) {
+        aggregatedResult.summary.errors.push({
+          row: 0,
+          error: 'Import was cancelled by user'
+        });
+        aggregatedResult.success = false;
+      }
+
+      setImportResult(aggregatedResult);
+      
+      if (!dryRun && aggregatedResult.success && !cancelledRef.current) {
+        setTimeout(() => onClose(), 2000); // Auto-close after 2 seconds on successful live import
+      }
+
     } catch (error: any) {
-      console.error('Import failed:', error);
+      console.error('Chunked import failed:', error);
       setImportResult({
         success: false,
         summary: {
@@ -106,13 +239,23 @@ export default function ImportRunModal({
           warnings: []
         }
       });
+      setProgress(null);
     } finally {
       setIsImporting(false);
     }
   };
 
+  const handleCancel = () => {
+    cancelledRef.current = true;
+    setIsImporting(false);
+  };
+
   const handleClose = () => {
+    if (isImporting) {
+      handleCancel();
+    }
     setImportResult(null); // Clear results when closing
+    setProgress(null);
     onClose();
   };
 
@@ -207,6 +350,29 @@ export default function ImportRunModal({
               </Label>
             </div>
 
+            <div className="space-y-2">
+              <Label htmlFor="chunk_size">Rows per Batch</Label>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="range"
+                  id="chunk_size"
+                  min="50"
+                  max="300"
+                  step="25"
+                  value={chunkSize}
+                  onChange={(e) => setChunkSize(Number(e.target.value))}
+                  className="flex-1"
+                  disabled={isImporting}
+                />
+                <Badge variant="outline" className="min-w-[60px] text-center">
+                  {chunkSize}
+                </Badge>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Smaller batches reduce CPU timeout risk but take longer overall.
+              </p>
+            </div>
+
             {createMissingOrders && (
               <Alert>
                 <AlertCircle className="h-4 w-4" />
@@ -226,6 +392,59 @@ export default function ImportRunModal({
                 Make sure you've tested with dry run mode first.
               </AlertDescription>
             </Alert>
+          )}
+
+          {/* Progress Display */}
+          {progress && (
+            <Card className="border-blue-200 bg-blue-50">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    {progress.isRunning ? (
+                      <Play className="h-4 w-4 text-blue-600" />
+                    ) : (
+                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                    )}
+                    Processing Import
+                  </div>
+                  <Badge variant="outline">
+                    {progress.currentChunk}/{progress.totalChunks} chunks
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Rows processed:</span>
+                    <span className="font-medium">{progress.processedRows.toLocaleString()} / {progress.totalRows.toLocaleString()}</span>
+                  </div>
+                  <Progress 
+                    value={(progress.processedRows / progress.totalRows) * 100} 
+                    className="h-2"
+                  />
+                </div>
+                
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="text-center p-2 bg-white rounded">
+                    <div className="font-bold text-green-600">{progress.aggregatedResult.summary.inserted_count}</div>
+                    <div className="text-green-600">Inserted</div>
+                  </div>
+                  <div className="text-center p-2 bg-white rounded">
+                    <div className="font-bold text-blue-600">{progress.aggregatedResult.summary.updated_count}</div>
+                    <div className="text-blue-600">Updated</div>
+                  </div>
+                </div>
+
+                {progress.aggregatedResult.summary.errors.length > 0 && (
+                  <Alert className="bg-red-50 border-red-200">
+                    <AlertCircle className="h-4 w-4 text-red-600" />
+                    <AlertDescription className="text-red-700">
+                      <strong>{progress.aggregatedResult.summary.errors.length} errors</strong> encountered so far.
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </CardContent>
+            </Card>
           )}
 
           {importResult && (
@@ -459,15 +678,26 @@ export default function ImportRunModal({
           )}
 
           <div className="flex justify-end space-x-2">
-            <Button variant="outline" onClick={handleClose} disabled={isImporting}>
-              Cancel
+            <Button variant="outline" onClick={handleClose} disabled={false}>
+              {isImporting ? 'Close' : 'Cancel'}
             </Button>
+            
+            {isImporting && progress?.canCancel && (
+              <Button variant="destructive" onClick={handleCancel}>
+                <Square className="h-4 w-4 mr-2" />
+                Cancel Import
+              </Button>
+            )}
+            
             <Button 
               onClick={handleImport} 
               disabled={isImporting || (sourceType === 'csv' && !csvData.trim()) || (importResult?.unmapped_engineers && importResult.unmapped_engineers.length > 0)}
             >
               {isImporting ? (
-                'Processing...'
+                <>
+                  <Clock className="h-4 w-4 mr-2 animate-spin" />
+                  Processing...
+                </>
               ) : (
                 <>
                   {dryRun ? (
