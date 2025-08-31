@@ -27,7 +27,7 @@ interface PartnerQuoteJob {
   address: string;
   job_type: string;
   partner_status: string;
-  external_job_id: string;
+  partner_job_id: string;
   created_at: string;
   partner_id: string;
   latest_quote?: {
@@ -105,7 +105,6 @@ export default function AdminPartnerQuotes() {
           id,
           order_number,
           partner_status,
-          external_job_id,
           created_at,
           partner_id,
           client:clients(full_name, address)
@@ -120,7 +119,7 @@ export default function AdminPartnerQuotes() {
           'QUOTE_REWORK_REQUESTED'
         ]);
 
-      // Apply filters
+      // Apply job type filter if valid
       if (filters.job_type && ['installation', 'assessment', 'service_call'].includes(filters.job_type)) {
         query = query.eq('job_type', filters.job_type);
       }
@@ -136,7 +135,7 @@ export default function AdminPartnerQuotes() {
         address: job.client?.address || 'No address',
         job_type: 'EV Charger Installation', // Simplified for now
         partner_status: job.partner_status,
-        external_job_id: job.external_job_id || '',
+        partner_job_id: job.order_number, // Using order_number as fallback
         created_at: job.created_at,
         partner_id: job.partner_id
       }));
@@ -167,7 +166,7 @@ export default function AdminPartnerQuotes() {
   const handleOpenInPartner = (job: PartnerQuoteJob) => {
     const selectedPartnerData = partners.find(p => p.id === selectedPartner);
     if (selectedPartnerData?.name.toLowerCase().includes('ohme')) {
-      const url = `https://connect.ohme-ev.com/en/jobs/job/${job.external_job_id}`;
+      const url = `https://connect.ohme-ev.com/en/jobs/job/${job.partner_job_id}`;
       window.open(url, '_blank');
     } else {
       toast({

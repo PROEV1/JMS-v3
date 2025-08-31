@@ -15,7 +15,7 @@ interface PartnerQuoteJobCardProps {
     job_type: string;
     partner_status: string;
     created_at: string;
-    external_job_id: string;
+    partner_job_id: string;
     latest_quote?: {
       amount: number;
       currency: string;
