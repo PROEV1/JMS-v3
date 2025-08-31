@@ -1,17 +1,10 @@
-
 import React, { useState } from 'react';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { ExternalLink, Plus, RefreshCw } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AddQuoteModal } from './AddQuoteModal';
+import { ExternalLink, FileText, Calendar, MapPin, Phone, Mail, Plus, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface PartnerQuoteDrawerProps {
@@ -20,19 +13,27 @@ interface PartnerQuoteDrawerProps {
     order_number: string;
     client_name: string;
     address: string;
-    job_type: string;
+    job_type: 'installation' | 'assessment' | 'service_call';
     partner_status: string;
     partner_job_id: string;
+    partner_external_id: string;
     created_at: string;
+    partner_id: string;
+    postcode: string;
+    total_amount: number;
     latest_quote?: {
       id: string;
       amount: number;
       currency: string;
-      status: string;
+      status: 'submitted' | 'approved' | 'rejected' | 'rework' | 'withdrawn';
       submitted_at: string;
+      decision_at?: string;
       file_url?: string;
       notes?: string;
+      decision_notes?: string;
     };
+    sla_hours?: number;
+    require_file?: boolean;
   };
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -40,21 +41,8 @@ interface PartnerQuoteDrawerProps {
   partnerName: string;
 }
 
-export function PartnerQuoteDrawer({
-  job,
-  open,
-  onOpenChange,
-  onQuoteUpdated,
-  partnerName
-}: PartnerQuoteDrawerProps) {
-  const [showAddQuote, setShowAddQuote] = useState(false);
-
-  const handleOpenInPartner = () => {
-    if (partnerName.toLowerCase().includes('ohme')) {
-      const url = `https://connect.ohme-ev.com/en/jobs/job/${job.partner_job_id}`;
-      window.open(url, '_blank');
-    }
-  };
+export function PartnerQuoteDrawer({ job, open, onOpenChange, onQuoteUpdated, partnerName }: PartnerQuoteDrawerProps) {
+  const [addQuoteOpen, setAddQuoteOpen] = useState(false);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -67,180 +55,60 @@ export function PartnerQuoteDrawer({
     }
   };
 
-  const canAddQuote = ['AWAITING_QUOTATION', 'QUOTE_REJECTED', 'QUOTE_REWORK_REQUESTED'].includes(job.partner_status);
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'AWAITING_QUOTATION': return 'Awaiting Quotation';
+      case 'QUOTE_SUBMITTED': return 'Quote Submitted';
+      case 'QUOTE_APPROVED': return 'Quote Approved';
+      case 'QUOTE_REJECTED': return 'Quote Rejected';
+      case 'QUOTE_REWORK_REQUESTED': return 'Rework Required';
+      default: return status;
+    }
+  };
 
   return (
     <>
       <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent className="w-[600px] sm:w-[600px]">
+        <SheetContent className="w-full sm:max-w-lg">
           <SheetHeader>
-            <SheetTitle>{job.client_name}</SheetTitle>
-            <SheetDescription>
-              {job.order_number} • Partner Job Details
-            </SheetDescription>
+            <SheetTitle>Job Details</SheetTitle>
+            <SheetDescription>{job.order_number} • {partnerName}</SheetDescription>
           </SheetHeader>
 
-          <div className="mt-6 space-y-6">
-            {/* Job Overview */}
-            <div>
-              <h3 className="font-medium mb-3">Job Details</h3>
-              <div className="space-y-3 text-sm">
-                <div>
-                  <span className="text-muted-foreground">Client: </span>
-                  <span className="font-medium">{job.client_name}</span>
+          <div className="space-y-6 mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Client Information</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div>{job.client_name}</div>
+                  <div className="text-sm text-muted-foreground">{job.address}</div>
+                  <div className="text-sm">Job Type: {job.job_type}</div>
+                  <div className="text-sm">Value: £{job.total_amount}</div>
                 </div>
-                <div>
-                  <span className="text-muted-foreground">Address: </span>
-                  {job.address}
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Job Type: </span>
-                  {job.job_type}
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Partner Job ID: </span>
-                  {job.partner_job_id}
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Imported: </span>
-                  {format(new Date(job.created_at), 'MMM d, yyyy HH:mm')}
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Status: </span>
-                  <Badge className={getStatusColor(job.partner_status)}>
-                    {job.partner_status.replace(/_/g, ' ')}
-                  </Badge>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Partner: </span>
-                  <Badge variant="outline">{partnerName}</Badge>
-                </div>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
 
-            <Separator />
-
-            {/* Quote Section */}
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-medium">Quote Information</h3>
-                {canAddQuote && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowAddQuote(true)}
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    {job.latest_quote ? 'Update Quote' : 'Add Quote'}
-                  </Button>
-                )}
-              </div>
-
-              {job.latest_quote ? (
-                <div className="space-y-3 text-sm">
-                  <div>
-                    <span className="text-muted-foreground">Amount: </span>
-                    <span className="font-medium">
-                      £{job.latest_quote.amount} {job.latest_quote.currency}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Status: </span>
-                    <Badge className={getStatusColor(job.latest_quote.status)}>
-                      {job.latest_quote.status.replace(/_/g, ' ')}
-                    </Badge>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Submitted: </span>
-                    {format(new Date(job.latest_quote.submitted_at), 'MMM d, yyyy HH:mm')}
-                  </div>
-                  {job.latest_quote.notes && (
-                    <div>
-                      <span className="text-muted-foreground">Notes: </span>
-                      <div className="mt-1 p-2 bg-muted rounded text-xs">
-                        {job.latest_quote.notes}
-                      </div>
-                    </div>
-                  )}
-                  {job.latest_quote.file_url && (
-                    <div>
-                      <span className="text-muted-foreground">File: </span>
-                      <Button
-                        variant="link"
-                        size="sm"
-                        className="h-auto p-0 text-xs"
-                        onClick={() => window.open(job.latest_quote!.file_url, '_blank')}
-                      >
-                        View Quote File
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="text-sm text-muted-foreground py-4">
-                  No quote submitted yet
-                </div>
-              )}
-            </div>
-
-            <Separator />
-
-            {/* Activity Feed */}
-            <div>
-              <h3 className="font-medium mb-3">Activity Feed</h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between items-center py-2 border-b">
-                  <span>Job imported from {partnerName}</span>
-                  <span className="text-muted-foreground">
-                    {format(new Date(job.created_at), 'MMM d, HH:mm')}
-                  </span>
-                </div>
-                {job.latest_quote && (
-                  <div className="flex justify-between items-center py-2 border-b">
-                    <span>Quote submitted (£{job.latest_quote.amount})</span>
-                    <span className="text-muted-foreground">
-                      {format(new Date(job.latest_quote.submitted_at), 'MMM d, HH:mm')}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* Actions */}
             <div className="space-y-3">
               <Button
-                variant="outline"
                 className="w-full"
-                onClick={handleOpenInPartner}
+                onClick={() => setAddQuoteOpen(true)}
               >
-                <ExternalLink className="h-4 w-4 mr-2" />
-                Open in {partnerName}
+                <Plus className="h-4 w-4 mr-2" />
+                Add Quote
               </Button>
-
-              {canAddQuote && (
-                <Button
-                  className="w-full"
-                  onClick={() => setShowAddQuote(true)}
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  {job.latest_quote ? 'Update Quote' : 'Add Quote'}
-                </Button>
-              )}
             </div>
           </div>
         </SheetContent>
       </Sheet>
 
       <AddQuoteModal
-        open={showAddQuote}
-        onOpenChange={setShowAddQuote}
         job={job}
-        onQuoteAdded={() => {
-          onQuoteUpdated();
-          setShowAddQuote(false);
-        }}
+        open={addQuoteOpen}
+        onOpenChange={setAddQuoteOpen}
+        onQuoteAdded={onQuoteUpdated}
+        partnerName={partnerName}
       />
     </>
   );

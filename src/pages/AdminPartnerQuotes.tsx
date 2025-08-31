@@ -5,13 +5,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { usePermissions } from '@/hooks/usePermissions';
 import { PartnerQuoteFilters } from '@/components/partner-quotes/PartnerQuoteFilters';
 import { PartnerQuoteKPIs } from '@/components/partner-quotes/PartnerQuoteKPIs';
 import { PartnerQuoteJobCard } from '@/components/partner-quotes/PartnerQuoteJobCard';
 import { PartnerQuoteDrawer } from '@/components/partner-quotes/PartnerQuoteDrawer';
-import { AlertCircle, ExternalLink, Plus } from 'lucide-react';
+import { AddQuoteModal } from '@/components/partner-quotes/AddQuoteModal';
+import { AlertCircle, ExternalLink, Plus, Shield } from 'lucide-react';
 
 interface Partner {
   id: string;
@@ -24,31 +27,41 @@ interface PartnerQuoteJob {
   order_number: string;
   client_name: string;
   address: string;
-  job_type: string;
+  job_type: 'installation' | 'assessment' | 'service_call';
   partner_status: string;
   partner_job_id: string;
+  partner_external_id: string;
   created_at: string;
   partner_id: string;
+  postcode: string;
+  total_amount: number;
   latest_quote?: {
     id: string;
     amount: number;
     currency: string;
-    status: string;
+    status: 'submitted' | 'approved' | 'rejected' | 'rework' | 'withdrawn';
     submitted_at: string;
+    decision_at?: string;
     file_url?: string;
     notes?: string;
+    decision_notes?: string;
   };
+  sla_hours?: number;
+  require_file?: boolean;
 }
 
 export default function AdminPartnerQuotes() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { canManageQuotes, canManageOrders, loading: permissionsLoading } = usePermissions();
   const [selectedPartner, setSelectedPartner] = useState<string>('');
   const [partners, setPartners] = useState<Partner[]>([]);
   const [jobs, setJobs] = useState<PartnerQuoteJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedJob, setSelectedJob] = useState<PartnerQuoteJob | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [partnerSettings, setPartnerSettings] = useState<Record<string, any>>({});
+  const [addQuoteOpen, setAddQuoteOpen] = useState(false);
   const [filters, setFilters] = useState({
     region: '',
     job_type: '',
@@ -65,6 +78,7 @@ export default function AdminPartnerQuotes() {
   useEffect(() => {
     if (selectedPartner) {
       fetchJobs();
+      fetchPartnerSettings();
     }
   }, [selectedPartner, filters]);
 
@@ -93,6 +107,38 @@ export default function AdminPartnerQuotes() {
     }
   };
 
+  const fetchPartnerSettings = async () => {
+    if (!selectedPartner) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('partner_quote_settings')
+        .select('*')
+        .eq('partner_id', selectedPartner)
+        .single();
+
+      if (error && error.code !== 'PGRST116') throw error;
+      
+      // Use defaults if no settings found
+      setPartnerSettings(data || {
+        enabled: true,
+        sla_hours: 24,
+        auto_hide_days: 7,
+        require_file: true,
+        notifications: { sla_breach: true, new_quote: true }
+      });
+    } catch (error) {
+      console.error('Error fetching partner settings:', error);
+      setPartnerSettings({
+        enabled: true,
+        sla_hours: 24,
+        auto_hide_days: 7,
+        require_file: true,
+        notifications: { sla_breach: true, new_quote: true }
+      });
+    }
+  };
+
   const fetchJobs = async () => {
     if (!selectedPartner) return;
     
@@ -104,9 +150,24 @@ export default function AdminPartnerQuotes() {
           id,
           order_number,
           partner_status,
+          partner_external_id,
+          job_type,
+          postcode,
+          total_amount,
           created_at,
           partner_id,
-          client:clients(full_name, address)
+          client:clients(full_name, address),
+          partner_quotes_latest:partner_quotes_latest(
+            id,
+            amount,
+            currency,
+            status,
+            submitted_at,
+            decision_at,
+            file_url,
+            notes,
+            decision_notes
+          )
         `)
         .eq('is_partner_job', true)
         .eq('partner_id', selectedPartner)
@@ -118,10 +179,42 @@ export default function AdminPartnerQuotes() {
           'QUOTE_REWORK_REQUESTED'
         ]);
 
-      // Apply job type filter if valid - using type assertion after validation
-      const validJobTypes = ['installation', 'assessment', 'service_call'] as const;
-      if (filters.job_type && validJobTypes.includes(filters.job_type as any)) {
-        query = query.eq('job_type', filters.job_type as typeof validJobTypes[number]);
+      // Apply filters
+      if (filters.job_type && ['installation', 'assessment', 'service_call'].includes(filters.job_type)) {
+        query = query.eq('job_type', filters.job_type as 'installation' | 'assessment' | 'service_call');
+      }
+
+      if (filters.region) {
+        query = query.ilike('postcode', `${filters.region}%`);
+      }
+
+      if (filters.date_range) {
+        const now = new Date();
+        let startDate: Date;
+        
+        switch (filters.date_range) {
+          case 'today':
+            startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            break;
+          case 'week':
+            startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            break;
+          case 'month':
+            startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+            break;
+          default:
+            startDate = new Date(0);
+        }
+        
+        query = query.gte('created_at', startDate.toISOString());
+      }
+
+      if (filters.quote_value_min) {
+        query = query.gte('total_amount', parseFloat(filters.quote_value_min));
+      }
+
+      if (filters.quote_value_max) {
+        query = query.lte('total_amount', parseFloat(filters.quote_value_max));
       }
       
       const { data, error } = await query.order('created_at', { ascending: false });
@@ -133,14 +226,33 @@ export default function AdminPartnerQuotes() {
         order_number: job.order_number,
         client_name: job.client?.full_name || 'Unknown Client',
         address: job.client?.address || 'No address',
-        job_type: 'EV Charger Installation', // Simplified for now
+        job_type: job.job_type,
         partner_status: job.partner_status,
-        partner_job_id: job.order_number, // Using order_number as fallback
+        partner_job_id: job.partner_external_id || job.order_number,
+        partner_external_id: job.partner_external_id || job.order_number,
         created_at: job.created_at,
-        partner_id: job.partner_id
+        partner_id: job.partner_id,
+        postcode: job.postcode || '',
+        total_amount: job.total_amount || 0,
+        latest_quote: job.partner_quotes_latest?.[0] || undefined,
+        sla_hours: partnerSettings.sla_hours || 24,
+        require_file: partnerSettings.require_file || false
       }));
 
-      setJobs(transformedJobs);
+      // Apply auto-hide for approved quotes
+      const autoHideDays = partnerSettings.auto_hide_days || 7;
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - autoHideDays);
+      
+      const filteredJobs = transformedJobs.filter(job => {
+        if (job.partner_status === 'QUOTE_APPROVED' && job.latest_quote?.decision_at) {
+          const decisionDate = new Date(job.latest_quote.decision_at);
+          return decisionDate >= cutoffDate;
+        }
+        return true;
+      });
+
+      setJobs(filteredJobs);
     } catch (error) {
       console.error('Error fetching jobs:', error);
       toast({
@@ -160,13 +272,13 @@ export default function AdminPartnerQuotes() {
 
   const handleAddQuote = (job: PartnerQuoteJob) => {
     setSelectedJob(job);
-    setDrawerOpen(true);
+    setAddQuoteOpen(true);
   };
 
   const handleOpenInPartner = (job: PartnerQuoteJob) => {
     const selectedPartnerData = partners.find(p => p.id === selectedPartner);
     if (selectedPartnerData?.name.toLowerCase().includes('ohme')) {
-      const url = `https://connect.ohme-ev.com/en/jobs/job/${job.partner_job_id}`;
+      const url = `https://connect.ohme-ev.com/en/jobs/job/${job.partner_external_id}`;
       window.open(url, '_blank');
     } else {
       toast({
@@ -193,6 +305,23 @@ export default function AdminPartnerQuotes() {
   };
 
   const selectedPartnerData = partners.find(p => p.id === selectedPartner);
+  const isReadOnly = !canManageQuotes && !canManageOrders;
+
+  // Permission check
+  if (!permissionsLoading && !canManageQuotes && !canManageOrders) {
+    return (
+      <BrandPage>
+        <BrandContainer>
+          <Alert>
+            <Shield className="h-4 w-4" />
+            <AlertDescription>
+              You don't have permission to access Partner Quote Management. Please contact your administrator.
+            </AlertDescription>
+          </Alert>
+        </BrandContainer>
+      </BrandPage>
+    );
+  }
 
   if (loading && !selectedPartner) {
     return (
@@ -271,11 +400,12 @@ export default function AdminPartnerQuotes() {
                     {getBucketJobs('needs_quotation').map(job => (
                       <PartnerQuoteJobCard
                         key={job.id}
-                        job={job}
-                        onCardClick={() => handleJobClick(job)}
-                        onAddQuote={() => handleAddQuote(job)}
-                        onOpenInPartner={() => handleOpenInPartner(job)}
-                        partnerName={selectedPartnerData?.name || ''}
+        job={job}
+        onCardClick={() => handleJobClick(job)}
+        onAddQuote={!isReadOnly ? () => handleAddQuote(job) : undefined}
+        onOpenInPartner={() => handleOpenInPartner(job)}
+        partnerName={selectedPartnerData?.name || ''}
+        readOnly={isReadOnly}
                       />
                     ))}
                     {getBucketJobs('needs_quotation').length === 0 && (
@@ -360,11 +490,12 @@ export default function AdminPartnerQuotes() {
                     {getBucketJobs('rejected_rework').map(job => (
                       <PartnerQuoteJobCard
                         key={job.id}
-                        job={job}
-                        onCardClick={() => handleJobClick(job)}
-                        onAddQuote={() => handleAddQuote(job)}
-                        onOpenInPartner={() => handleOpenInPartner(job)}
-                        partnerName={selectedPartnerData?.name || ''}
+        job={job}
+        onCardClick={() => handleJobClick(job)}
+        onAddQuote={!isReadOnly ? () => handleAddQuote(job) : undefined}
+        onOpenInPartner={() => handleOpenInPartner(job)}
+        partnerName={selectedPartnerData?.name || ''}
+        readOnly={isReadOnly}
                       />
                     ))}
                     {getBucketJobs('rejected_rework').length === 0 && (
@@ -386,6 +517,17 @@ export default function AdminPartnerQuotes() {
             open={drawerOpen}
             onOpenChange={setDrawerOpen}
             onQuoteUpdated={fetchJobs}
+            partnerName={selectedPartnerData?.name || ''}
+          />
+        )}
+
+        {/* Add Quote Modal */}
+        {selectedJob && (
+          <AddQuoteModal
+            job={selectedJob}
+            open={addQuoteOpen}
+            onOpenChange={setAddQuoteOpen}
+            onQuoteAdded={fetchJobs}
             partnerName={selectedPartnerData?.name || ''}
           />
         )}

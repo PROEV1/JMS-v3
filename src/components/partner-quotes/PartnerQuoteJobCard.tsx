@@ -12,15 +12,26 @@ interface PartnerQuoteJobCardProps {
     order_number: string;
     client_name: string;
     address: string;
-    job_type: string;
+    job_type: 'installation' | 'assessment' | 'service_call';
     partner_status: string;
     created_at: string;
     partner_job_id: string;
+    partner_external_id: string;
+    postcode: string;
+    total_amount: number;
     latest_quote?: {
+      id: string;
       amount: number;
       currency: string;
-      status: string;
+      status: 'submitted' | 'approved' | 'rejected' | 'rework' | 'withdrawn';
+      submitted_at: string;
+      decision_at?: string;
+      file_url?: string;
+      notes?: string;
+      decision_notes?: string;
     };
+    sla_hours?: number;
+    require_file?: boolean;
   };
   onCardClick: () => void;
   onAddQuote?: () => void;
@@ -40,8 +51,9 @@ export function PartnerQuoteJobCard({
   
   const isSLABreached = () => {
     const importDate = new Date(job.created_at);
-    const slaThreshold = subHours(new Date(), 48); // 48 hour SLA
-    return isAfter(importDate, slaThreshold) && job.partner_status === 'AWAITING_QUOTATION';
+    const slaHours = job.sla_hours || 24;
+    const slaThreshold = subHours(new Date(), slaHours);
+    return isAfter(slaThreshold, importDate) && job.partner_status === 'AWAITING_QUOTATION';
   };
 
   const getStatusColor = (status: string) => {
@@ -98,7 +110,7 @@ export function PartnerQuoteJobCard({
         <div className="space-y-2" onClick={onCardClick}>
           <div className="text-xs">
             <span className="text-muted-foreground">Job: </span>
-            {job.job_type}
+            {job.job_type.charAt(0).toUpperCase() + job.job_type.slice(1).replace('_', ' ')}
           </div>
           <div className="text-xs">
             <span className="text-muted-foreground">Import: </span>

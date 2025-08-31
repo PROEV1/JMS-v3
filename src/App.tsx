@@ -44,7 +44,7 @@ function App() {
             <Route path="/admin/schedule/status/:status" element={<AdminScheduleStatus />} />
             <Route path="/admin/schedule/engineer/:engineerId" element={<EngineerAvailability />} />
             <Route path="/admin/messages" element={<AdminMessages />} />
-            <Route path="/admin/ops/quotes" element={<AdminPartnerQuotes />} />
+            <Route path="/ops/quotes" element={<AdminPartnerQuotes />} />
           </Routes>
         </DesignVersionProvider>
       </QueryClientProvider>

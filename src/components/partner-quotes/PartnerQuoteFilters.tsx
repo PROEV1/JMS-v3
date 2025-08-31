@@ -69,8 +69,8 @@ export function PartnerQuoteFilters({ filters, onFiltersChange }: PartnerQuoteFi
             <SelectContent>
               <SelectItem value="">All Types</SelectItem>
               <SelectItem value="installation">Installation</SelectItem>
-              <SelectItem value="maintenance">Maintenance</SelectItem>
-              <SelectItem value="repair">Repair</SelectItem>
+              <SelectItem value="assessment">Assessment</SelectItem>
+              <SelectItem value="service_call">Service Call</SelectItem>
             </SelectContent>
           </Select>
 
