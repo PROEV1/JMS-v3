@@ -168,7 +168,7 @@ export function DeletePartnerJobsModal({ isOpen, onClose, partnerId, partnerName
     onClose();
   };
 
-  const isDeleteDisabled = confirmationText.toUpperCase() !== "DELETE" || !previewStats || previewStats.orders === 0;
+  const isDeleteDisabled = confirmationText.toUpperCase() !== "DELETE" || !previewStats || (previewStats.orders === 0 && previewStats.clients === 0);
 
   return (
     <TooltipProvider>
@@ -288,7 +288,7 @@ export function DeletePartnerJobsModal({ isOpen, onClose, partnerId, partnerName
                 </div>
               </div>
 
-              {previewStats.orders > 0 && (
+              {(previewStats.orders > 0 || previewStats.clients > 0) && (
                 <div className="space-y-4 border-t pt-4">
                   <Alert variant="destructive">
                     <AlertTriangle className="h-4 w-4" />
@@ -336,17 +336,25 @@ export function DeletePartnerJobsModal({ isOpen, onClose, partnerId, partnerName
                     ) : (
                       <>
                         <Trash2 className="mr-2 h-4 w-4" />
-                        Delete {previewStats.orders} Orders
+                        Delete {previewStats.orders > 0 ? `${previewStats.orders} Orders` : `${previewStats.clients} Clients`}
                       </>
                     )}
                   </Button>
                 </div>
               )}
 
-              {previewStats.orders === 0 && (
+              {previewStats.orders === 0 && previewStats.clients === 0 && (
                 <Alert>
                   <AlertDescription>
-                    No matching orders found for deletion.
+                    No matching records found for deletion.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {previewStats.orders === 0 && previewStats.clients > 0 && (
+                <Alert>
+                  <AlertDescription>
+                    Found orphaned clients from failed imports. These will be deleted.
                   </AlertDescription>
                 </Alert>
               )}
