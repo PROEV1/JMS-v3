@@ -27,7 +27,7 @@ interface PartnerQuoteJob {
   address: string;
   job_type: string;
   partner_status: string;
-  partner_job_id: string;
+  external_job_id: string;
   created_at: string;
   partner_id: string;
   latest_quote?: {
@@ -80,11 +80,8 @@ export default function AdminPartnerQuotes() {
 
       setPartners(data || []);
       
-      // Auto-select Ohme if available
-      const ohmePartner = data?.find(p => p.name.toLowerCase().includes('ohme'));
-      if (ohmePartner) {
-        setSelectedPartner(ohmePartner.id);
-      } else if (data?.length > 0) {
+      // Auto-select first partner if available
+      if (data?.length > 0) {
         setSelectedPartner(data[0].id);
       }
     } catch (error) {
@@ -108,13 +105,10 @@ export default function AdminPartnerQuotes() {
           id,
           order_number,
           partner_status,
-          partner_job_id,
+          external_job_id,
           created_at,
           partner_id,
-          client:clients(full_name, address),
-          partner_quotes_latest:partner_quotes_latest(
-            id, amount, currency, status, submitted_at, file_url, notes
-          )
+          client:clients(full_name, address)
         `)
         .eq('is_partner_job', true)
         .eq('partner_id', selectedPartner)
@@ -127,10 +121,7 @@ export default function AdminPartnerQuotes() {
         ]);
 
       // Apply filters
-      if (filters.region) {
-        // This would need postcode prefix filtering - simplified for now
-      }
-      if (filters.job_type) {
+      if (filters.job_type && ['installation', 'assessment', 'service_call'].includes(filters.job_type)) {
         query = query.eq('job_type', filters.job_type);
       }
       
@@ -145,10 +136,9 @@ export default function AdminPartnerQuotes() {
         address: job.client?.address || 'No address',
         job_type: 'EV Charger Installation', // Simplified for now
         partner_status: job.partner_status,
-        partner_job_id: job.partner_job_id,
+        external_job_id: job.external_job_id || '',
         created_at: job.created_at,
-        partner_id: job.partner_id,
-        latest_quote: job.partner_quotes_latest?.[0] || undefined
+        partner_id: job.partner_id
       }));
 
       setJobs(transformedJobs);
@@ -177,7 +167,7 @@ export default function AdminPartnerQuotes() {
   const handleOpenInPartner = (job: PartnerQuoteJob) => {
     const selectedPartnerData = partners.find(p => p.id === selectedPartner);
     if (selectedPartnerData?.name.toLowerCase().includes('ohme')) {
-      const url = `https://connect.ohme-ev.com/en/jobs/job/${job.partner_job_id}`;
+      const url = `https://connect.ohme-ev.com/en/jobs/job/${job.external_job_id}`;
       window.open(url, '_blank');
     } else {
       toast({
