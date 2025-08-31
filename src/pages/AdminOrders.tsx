@@ -164,6 +164,7 @@ export default function AdminOrders() {
     { value: 'scheduled', label: 'Scheduled' },
     { value: 'in_progress', label: 'In Progress' },
     { value: 'install_completed_pending_qa', label: 'Pending QA' },
+    { value: 'on_hold_parts_docs', label: 'On Hold - Parts/Docs' },
     { value: 'completed', label: 'Completed' },
   ];
 

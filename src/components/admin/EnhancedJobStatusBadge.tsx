@@ -17,7 +17,8 @@ export type OrderStatusEnhanced =
   | 'install_completed_pending_qa'
   | 'completed'
   | 'revisit_required'
-  | 'awaiting_final_payment';
+  | 'awaiting_final_payment'
+  | 'on_hold_parts_docs';
 
 interface EnhancedJobStatusBadgeProps {
   status: OrderStatusEnhanced;
@@ -105,6 +106,11 @@ const statusConfig = {
     label: "Awaiting Final Payment",
     color: "bg-amber-100 text-amber-800 border-amber-200",
     icon: "💰"
+  },
+  on_hold_parts_docs: {
+    label: "On Hold - Parts/Docs",
+    color: "bg-purple-100 text-purple-800 border-purple-200",
+    icon: "📦"
   }
 };
 
