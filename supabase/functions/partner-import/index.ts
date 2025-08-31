@@ -870,6 +870,25 @@ serve(async (req: Request): Promise<Response> => {
             }
           }
 
+          // Enhanced data validation before creating order
+          if (!mappedData.partner_external_id && !mappedData.job_id) {
+            results.errors.push({
+              row: rowIndex + 1,
+              message: 'Missing required job identifier: partner_external_id or job_id is required',
+              data: { available_fields: Object.keys(mappedData) }
+            });
+            continue; // Skip this row - don't process further
+          }
+
+          if (!clientId && !needsClientCreation && !createMissingOrders) {
+            results.errors.push({
+              row: rowIndex + 1,
+              message: 'Client ID not found and createMissingOrders is disabled',
+              data: { client_email: mappedData.client_email, client_name: mappedData.client_name }
+            });
+            continue; // Skip this row
+          }
+
           // Build order data with fingerprint for change detection
           const orderData: any = {
             partner_id: partner.id,
@@ -948,6 +967,8 @@ serve(async (req: Request): Promise<Response> => {
             message: `Processing error: ${error.message} | Stack: ${error.stack?.substring(0, 200)}`,
             data: { row, mappedData, error: error.toString() }
           });
+          // Skip this row - don't add to ordersToProcess to prevent double errors
+          continue;
         }
       }
 
