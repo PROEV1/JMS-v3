@@ -10,6 +10,8 @@ import { useNavigate } from 'react-router-dom';
 import { Search, User, Mail, Phone, MapPin, Calendar, Plus } from 'lucide-react';
 import { BrandPage, BrandContainer, BrandHeading1, BrandLoading } from '@/components/brand';
 import { CreateClientModal } from '@/components/CreateClientModal';
+import { useServerPagination } from '@/hooks/useServerPagination';
+import { Paginator } from '@/components/ui/Paginator';
 
 interface Client {
   id: string;
@@ -26,8 +28,11 @@ export default function AdminClients() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [totalCount, setTotalCount] = useState(0);
+  const [thisMonthCount, setThisMonthCount] = useState(0);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { pagination, controls } = useServerPagination(25);
 
   const handleAddClient = () => {
     setIsCreateModalOpen(true);
@@ -42,19 +47,52 @@ export default function AdminClients() {
     });
   };
 
+  // Reset to first page when search term changes
+  useEffect(() => {
+    controls.resetToFirstPage();
+  }, [searchTerm]);
+
   useEffect(() => {
     fetchClients();
-  }, []);
+  }, [pagination.page, pagination.pageSize, searchTerm]);
 
   const fetchClients = async () => {
     try {
-      const { data, error } = await supabase
+      setLoading(true);
+      
+      // Build the query
+      let query = supabase
         .from('clients')
-        .select('*')
+        .select('*', { count: 'exact' })
         .order('created_at', { ascending: false });
 
+      // Apply search filter if present
+      if (searchTerm.trim()) {
+        query = query.or(`full_name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`);
+      }
+
+      // Apply pagination
+      const { data, error, count } = await query
+        .range(pagination.offset, pagination.offset + pagination.pageSize - 1);
+
       if (error) throw error;
+      
       setClients(data || []);
+      setTotalCount(count || 0);
+
+      // Fetch this month's count separately
+      const startOfMonth = new Date();
+      startOfMonth.setDate(1);
+      startOfMonth.setHours(0, 0, 0, 0);
+
+      const { count: monthCount, error: monthError } = await supabase
+        .from('clients')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', startOfMonth.toISOString());
+
+      if (monthError) throw monthError;
+      setThisMonthCount(monthCount || 0);
+
     } catch (error) {
       console.error('Error fetching clients:', error);
       toast({
@@ -101,11 +139,6 @@ export default function AdminClients() {
     }
   };
 
-  const filteredClients = clients.filter(client =>
-    client.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    client.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
   if (loading) {
     return <BrandLoading />;
   }
@@ -142,7 +175,7 @@ export default function AdminClients() {
                   <User className="h-4 w-4 text-primary" />
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Total Clients</p>
-                    <p className="text-2xl font-bold text-primary">{clients.length}</p>
+                    <p className="text-2xl font-bold text-primary">{totalCount}</p>
                   </div>
                 </div>
               </CardContent>
@@ -154,9 +187,7 @@ export default function AdminClients() {
                   <Calendar className="h-4 w-4 text-brand-green" />
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">This Month</p>
-                    <p className="text-2xl font-bold text-primary">
-                      {clients.filter(c => new Date(c.created_at) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)).length}
-                    </p>
+                    <p className="text-2xl font-bold text-primary">{thisMonthCount}</p>
                   </div>
                 </div>
               </CardContent>
@@ -178,7 +209,7 @@ export default function AdminClients() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredClients.map((client) => (
+                {clients.map((client) => (
                   <TableRow key={client.id} className="brand-card-interactive">
                     <TableCell>
                       <div className="flex items-center space-x-3">
@@ -231,9 +262,22 @@ export default function AdminClients() {
                 ))}
               </TableBody>
             </Table>
+            
+            {/* Pagination */}
+            {totalCount > 0 && (
+              <div className="px-6 py-4 border-t">
+                <Paginator
+                  currentPage={pagination.page}
+                  pageSize={pagination.pageSize}
+                  totalItems={totalCount}
+                  onPageChange={controls.setPage}
+                  onPageSizeChange={controls.setPageSize}
+                />
+              </div>
+            )}
           </Card>
 
-          {filteredClients.length === 0 && (
+          {clients.length === 0 && !loading && (
             <Card>
               <CardContent className="p-12 text-center">
                 <User className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
