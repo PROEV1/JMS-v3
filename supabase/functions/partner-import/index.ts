@@ -346,11 +346,18 @@ async function fetchGoogleSheetData(sheetId: string, sheetName: string, startRow
 
   // Calculate actual data range (add 2 to account for 1-based indexing and header row)
   const dataStartRow = startRow + 2;
-  const dataEndRow = Math.min(startRow + maxRows + 1, totalRows + 1);
+  const effectiveMaxRows = maxRows > 0 ? maxRows : totalRows;
+  const dataEndRow = Math.min(dataStartRow + effectiveMaxRows - 1, totalRows + 1);
+  
+  // Ensure we have a valid range (dataEndRow >= dataStartRow)
+  if (dataEndRow < dataStartRow) {
+    console.log('No valid data range - dataEndRow < dataStartRow');
+    return { headers, dataRows: [], totalRows };
+  }
   
   // Fetch the actual data chunk
   const dataRange = `${sheetName}!A${dataStartRow}:ZZ${dataEndRow}`;
-  console.log(`Fetching data range: ${dataRange} (rows ${startRow + 1}-${Math.min(startRow + maxRows, totalRows)} of ${totalRows})`);
+  console.log(`Fetching data range: ${dataRange} (startRow: ${dataStartRow}, endRow: ${dataEndRow}, totalRows: ${totalRows})`);
   
   const dataResponse = await fetch(
     `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(dataRange)}`,
