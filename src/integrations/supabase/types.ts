@@ -2211,6 +2211,122 @@ export type Database = {
           },
         ]
       }
+      partner_quote_settings: {
+        Row: {
+          auto_hide_days: number
+          created_at: string
+          enabled: boolean
+          id: string
+          notifications: Json
+          partner_id: string
+          require_file: boolean
+          sla_hours: number
+          updated_at: string
+        }
+        Insert: {
+          auto_hide_days?: number
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          notifications?: Json
+          partner_id: string
+          require_file?: boolean
+          sla_hours?: number
+          updated_at?: string
+        }
+        Update: {
+          auto_hide_days?: number
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          notifications?: Json
+          partner_id?: string
+          require_file?: boolean
+          sla_hours?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_quote_settings_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: true
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      partner_quotes: {
+        Row: {
+          amount: number
+          created_at: string
+          currency: string
+          decision_at: string | null
+          decision_notes: string | null
+          file_url: string | null
+          id: string
+          notes: string | null
+          order_id: string
+          partner_id: string
+          status: Database["public"]["Enums"]["partner_quote_status"]
+          storage_bucket: string | null
+          storage_path: string | null
+          submitted_at: string
+          submitted_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          decision_at?: string | null
+          decision_notes?: string | null
+          file_url?: string | null
+          id?: string
+          notes?: string | null
+          order_id: string
+          partner_id: string
+          status?: Database["public"]["Enums"]["partner_quote_status"]
+          storage_bucket?: string | null
+          storage_path?: string | null
+          submitted_at?: string
+          submitted_by?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          decision_at?: string | null
+          decision_notes?: string | null
+          file_url?: string | null
+          id?: string
+          notes?: string | null
+          order_id?: string
+          partner_id?: string
+          status?: Database["public"]["Enums"]["partner_quote_status"]
+          storage_bucket?: string | null
+          storage_path?: string | null
+          submitted_at?: string
+          submitted_by?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_quotes_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partner_quotes_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       partner_users: {
         Row: {
           created_at: string | null
@@ -3478,7 +3594,42 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      partner_quotes_latest: {
+        Row: {
+          amount: number | null
+          created_at: string | null
+          currency: string | null
+          decision_at: string | null
+          decision_notes: string | null
+          file_url: string | null
+          id: string | null
+          notes: string | null
+          order_id: string | null
+          partner_id: string | null
+          status: Database["public"]["Enums"]["partner_quote_status"] | null
+          storage_bucket: string | null
+          storage_path: string | null
+          submitted_at: string | null
+          submitted_by: string | null
+          updated_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_quotes_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partner_quotes_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       admin_delete_order: {
@@ -3783,6 +3934,12 @@ export type Database = {
         | "soft_hold"
         | "confirmed"
         | "blocked"
+      partner_quote_status:
+        | "submitted"
+        | "approved"
+        | "rejected"
+        | "rework"
+        | "withdrawn"
       purchase_order_status:
         | "draft"
         | "pending"
@@ -3978,6 +4135,13 @@ export const Constants = {
         "soft_hold",
         "confirmed",
         "blocked",
+      ],
+      partner_quote_status: [
+        "submitted",
+        "approved",
+        "rejected",
+        "rework",
+        "withdrawn",
       ],
       purchase_order_status: [
         "draft",
