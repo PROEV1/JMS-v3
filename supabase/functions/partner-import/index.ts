@@ -338,10 +338,10 @@ async function fetchGoogleSheetData(sheetId: string, sheetName: string, startRow
     totalRows = await getTotalRowCount(sheetId, sheetName, accessToken);
   }
   
-  // If startRow is 0 and maxRows >= totalRows, this is likely a count check
-  if (startRow === 0 && maxRows >= totalRows) {
-    console.log('Returning total row count without fetching data');
-    return { headers, dataRows: [], totalRows };
+  // If no data rows available, return early
+  if (totalRows === 0) {
+    console.log('No data rows found in sheet');
+    return { headers, dataRows: [], totalRows: 0 };
   }
 
   // Calculate actual data range (add 2 to account for 1-based indexing and header row)
