@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BrandPage, BrandContainer } from '@/components/brand';
@@ -119,9 +118,10 @@ export default function AdminPartnerQuotes() {
           'QUOTE_REWORK_REQUESTED'
         ]);
 
-      // Apply job type filter if valid
-      if (filters.job_type && ['installation', 'assessment', 'service_call'].includes(filters.job_type)) {
-        query = query.eq('job_type', filters.job_type);
+      // Apply job type filter if valid - using type assertion after validation
+      const validJobTypes = ['installation', 'assessment', 'service_call'] as const;
+      if (filters.job_type && validJobTypes.includes(filters.job_type as any)) {
+        query = query.eq('job_type', filters.job_type as typeof validJobTypes[number]);
       }
       
       const { data, error } = await query.order('created_at', { ascending: false });
