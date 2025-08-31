@@ -333,8 +333,8 @@ async function fetchGoogleSheetData(sheetId: string, sheetName: string, startRow
     throw new Error('No headers found in the sheet');
   }
 
-  // Get total row count only if not provided
-  if (totalRows === undefined) {
+  // Get total row count only if not provided or if null/invalid
+  if (totalRows === undefined || totalRows === null || !Number.isFinite(totalRows)) {
     totalRows = await getTotalRowCount(sheetId, sheetName, accessToken);
   }
   
