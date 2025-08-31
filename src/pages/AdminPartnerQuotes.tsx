@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useUserRole } from '@/hooks/useUserRole';
 import { usePermissions } from '@/hooks/usePermissions';
 import { PartnerQuoteFilters } from '@/components/partner-quotes/PartnerQuoteFilters';
 import { PartnerQuoteKPIs } from '@/components/partner-quotes/PartnerQuoteKPIs';
@@ -54,6 +55,7 @@ interface PartnerQuoteJob {
 export default function AdminPartnerQuotes() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { role } = useUserRole();
   const { canManageQuotes, canManageOrders, loading: permissionsLoading } = usePermissions();
   const [selectedPartner, setSelectedPartner] = useState<string>('');
   const [partners, setPartners] = useState<Partner[]>([]);
@@ -311,20 +313,32 @@ export default function AdminPartnerQuotes() {
   const selectedPartnerData = partners.find(p => p.id === selectedPartner);
   const isReadOnly = !canManageQuotes && !canManageOrders;
 
-  // Permission check
+  // Permission check - but allow admin users through
+  console.log('AdminPartnerQuotes permission check:', { 
+    permissionsLoading, 
+    canManageQuotes, 
+    canManageOrders,
+    userRole: role 
+  });
+  
   if (!permissionsLoading && !canManageQuotes && !canManageOrders) {
-    return (
-      <BrandPage>
-        <BrandContainer>
-          <Alert>
-            <Shield className="h-4 w-4" />
-            <AlertDescription>
-              You don't have permission to access Partner Quote Management. Please contact your administrator.
-            </AlertDescription>
-          </Alert>
-        </BrandContainer>
-      </BrandPage>
-    );
+    // Allow admin users through even if permissions haven't loaded yet
+    if (role === 'admin') {
+      console.log('Admin user detected, allowing access despite permission check');
+    } else {
+      return (
+        <BrandPage>
+          <BrandContainer>
+            <Alert>
+              <Shield className="h-4 w-4" />
+              <AlertDescription>
+                You don't have permission to access Partner Quote Management. Please contact your administrator.
+              </AlertDescription>
+            </Alert>
+          </BrandContainer>
+        </BrandPage>
+      );
+    }
   }
 
   if (loading && !selectedPartner) {
