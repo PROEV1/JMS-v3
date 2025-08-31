@@ -60,6 +60,26 @@ interface Results {
   errors: Array<{ row: number; message: string; data?: any }>;
 }
 
+// Helper functions for email and phone handling
+function generatePlaceholderEmail(partnerId: string, clientName: string | null, rowIndex: number): string {
+  const cleanName = (clientName || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+  const shortPartnerId = partnerId.slice(0, 8);
+  return `${cleanName || 'client'}_${shortPartnerId}_${rowIndex}@placeholder.local`;
+}
+
+function normalizeEmail(email: string | null | undefined): string | null {
+  if (!email || typeof email !== 'string') return null;
+  
+  const trimmed = email.trim();
+  if (!trimmed) return null;
+  
+  // Basic email validation
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(trimmed)) return null;
+  
+  return trimmed.toLowerCase();
+}
+
 function normalizePhone(phone: string | null | undefined): string | null {
   if (!phone || typeof phone !== 'string') {
     return null;
@@ -820,8 +840,8 @@ serve(async (req: Request): Promise<Response> => {
               if (!clientEmail) {
                 clientEmail = generatePlaceholderEmail(
                   partner.id,
-                  mappedData.partner_external_id,
-                  mappedData.client_name
+                  mappedData.client_name,
+                  rowIndex
                 );
                 isPlaceholderEmail = true;
                 
