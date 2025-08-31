@@ -113,17 +113,9 @@ export default function AdminOrders() {
         query = query.eq('engineer_id', engineerFilter);
       }
 
-      // Apply server-side search with OR filters
+      // Apply server-side search - only on orders table columns for now
       if (searchTerm) {
-        const searchPattern = `%${searchTerm}%`;
-        query = query.or(`
-          order_number.ilike.${searchPattern},
-          clients.full_name.ilike.${searchPattern},
-          clients.email.ilike.${searchPattern},
-          clients.phone.ilike.${searchPattern},
-          quotes.quote_number.ilike.${searchPattern},
-          partners.name.ilike.${searchPattern}
-        `);
+        query = query.or(`order_number.ilike.%${searchTerm}%,partner_external_id.ilike.%${searchTerm}%,job_address.ilike.%${searchTerm}%,postcode.ilike.%${searchTerm}%`);
       }
 
       // Apply pagination
@@ -132,14 +124,34 @@ export default function AdminOrders() {
       const { data, error, count } = await query;
       if (error) throw error;
 
-      // Transform data
-      const transformedData = data?.map(order => ({
+      // Transform data and apply client-side filtering for related table searches
+      let transformedData = data?.map(order => ({
         ...order,
         client: order.clients || null,
         quote: order.quotes || null,
         engineer: order.engineers || null,
         partner: order.partners || null
       })) || [];
+
+      // Apply additional client-side filtering for related table searches
+      if (searchTerm) {
+        const searchLower = searchTerm.toLowerCase();
+        transformedData = transformedData.filter(order => {
+          return (
+            // Already handled by server-side search
+            order.order_number?.toLowerCase().includes(searchLower) ||
+            order.partner_external_id?.toLowerCase().includes(searchLower) ||
+            order.job_address?.toLowerCase().includes(searchLower) ||
+            order.postcode?.toLowerCase().includes(searchLower) ||
+            // Client-side filtering for related tables
+            order.client?.full_name?.toLowerCase().includes(searchLower) ||
+            order.client?.email?.toLowerCase().includes(searchLower) ||
+            order.client?.phone?.toLowerCase().includes(searchLower) ||
+            order.quote?.quote_number?.toLowerCase().includes(searchLower) ||
+            order.partner?.name?.toLowerCase().includes(searchLower)
+          );
+        });
+      }
 
       return { data: transformedData, count: count || 0 };
     },
