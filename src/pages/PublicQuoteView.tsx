@@ -72,6 +72,9 @@ export default function PublicQuoteView() {
   useEffect(() => {
     if (shareToken) {
       fetchQuote();
+    } else {
+      // No token provided, show landing page instead
+      setLoading(false);
     }
   }, [shareToken]);
 
@@ -233,6 +236,37 @@ export default function PublicQuoteView() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-brand-teal"></div>
+      </div>
+    );
+  }
+
+  if (!shareToken) {
+    // Show landing page when no token is provided
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="container mx-auto px-6 py-8">
+          <div className="flex items-center justify-between mb-8">
+            <ProEVLogo variant="main" size="lg" />
+            <Button onClick={() => window.location.href = '/auth'}>
+              Login
+            </Button>
+          </div>
+          
+          <div className="max-w-2xl mx-auto text-center space-y-6">
+            <h1 className="text-4xl font-bold brand-heading-1">Pro EV Management System</h1>
+            <p className="text-xl text-muted-foreground brand-body">
+              Professional EV charger installation and project management
+            </p>
+            <div className="space-y-4">
+              <Button size="lg" onClick={() => window.location.href = '/auth'}>
+                Access Admin Portal
+              </Button>
+              <p className="text-sm text-muted-foreground">
+                Need a quote link? Contact your Pro EV representative
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
