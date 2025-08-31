@@ -49,6 +49,7 @@ export function AppSidebar({ userRole }: AppSidebarProps) {
   const adminMenuItems = [
     { icon: Home, label: 'Dashboard', href: '/admin', action: () => navigate('/admin') },
     { icon: FileText, label: 'Quotes', href: '/admin/quotes', action: () => navigate('/admin/quotes') },
+    { icon: BarChart3, label: 'Quote Dashboard', href: '/ops/quotes', action: () => navigate('/ops/quotes') },
     { icon: ShoppingCart, label: 'Orders', href: '/admin/orders', action: () => navigate('/admin/orders') },
     { icon: Calendar, label: 'Schedule', href: '/admin/schedule', action: () => navigate('/admin/schedule') },
     { icon: FormInput, label: 'Surveys', href: '/admin/survey-forms', action: () => navigate('/admin/survey-forms') },
