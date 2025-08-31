@@ -112,19 +112,26 @@ export default function AdminOrders() {
         query = query.eq('engineer_id', engineerFilter);
       }
 
-      // Apply search filter at database level if possible
+      // For search functionality, we need to handle this differently
+      // If there's a search term, fetch more data and filter client-side
+      let shouldPaginate = true;
       if (searchTerm) {
-        query = query.or(`order_number.ilike.%${searchTerm}%,clients.full_name.ilike.%${searchTerm}%,clients.email.ilike.%${searchTerm}%,quotes.quote_number.ilike.%${searchTerm}%`);
+        // When searching, fetch a larger chunk to ensure we capture results
+        // that might not be in the first page when filtered
+        shouldPaginate = false;
+        query = query.limit(1000); // Fetch up to 1000 orders for search
       }
 
-      // Apply pagination
-      query = query.range(pagination.offset, pagination.offset + pagination.pageSize - 1);
+      if (shouldPaginate) {
+        // Apply pagination only when not searching
+        query = query.range(pagination.offset, pagination.offset + pagination.pageSize - 1);
+      }
 
       const { data, error, count } = await query;
       if (error) throw error;
 
       // Transform data
-      const transformedData = data?.map(order => ({
+      const allData = data?.map(order => ({
         ...order,
         client: order.clients || null,
         quote: order.quotes || null,
@@ -132,7 +139,34 @@ export default function AdminOrders() {
         partner: order.partners || null
       })) || [];
 
-      return { data: transformedData, count: count || 0 };
+      // Apply client-side search filtering
+      let filteredData = allData;
+      if (searchTerm) {
+        const searchLower = searchTerm.toLowerCase();
+        filteredData = allData.filter(order => {
+          return (
+            order.order_number?.toLowerCase().includes(searchLower) ||
+            order.client?.full_name?.toLowerCase().includes(searchLower) ||
+            order.client?.email?.toLowerCase().includes(searchLower) ||
+            order.quote?.quote_number?.toLowerCase().includes(searchLower) ||
+            order.partner?.name?.toLowerCase().includes(searchLower)
+          );
+        });
+      }
+
+      // Apply client-side pagination when searching
+      if (searchTerm) {
+        const startIndex = pagination.offset;
+        const endIndex = startIndex + pagination.pageSize;
+        const paginatedData = filteredData.slice(startIndex, endIndex);
+        
+        return { 
+          data: paginatedData, 
+          count: filteredData.length // Use filtered count for search results
+        };
+      }
+
+      return { data: filteredData, count: count || 0 };
     },
     placeholderData: keepPreviousData,
   });
