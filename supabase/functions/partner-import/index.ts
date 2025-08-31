@@ -812,15 +812,34 @@ serve(async (req: Request): Promise<Response> => {
                 });
               }
 
+              // Handle email - validate and generate placeholder if needed
+              const normalizedEmail = normalizeEmail(mappedData.client_email);
+              let clientEmail = normalizedEmail;
+              let isPlaceholderEmail = false;
+              
+              if (!clientEmail) {
+                clientEmail = generatePlaceholderEmail(
+                  partner.id,
+                  mappedData.partner_external_id,
+                  mappedData.client_name
+                );
+                isPlaceholderEmail = true;
+                
+                if (verbose) {
+                  console.log(`Generated placeholder email for row ${rowIndex + 1}: ${clientEmail}`);
+                }
+              }
+
               const clientData = {
                 full_name: mappedData.client_name || 'Unknown Client',
-                email: mappedData.client_email || null,
+                email: clientEmail,
                 phone: normalizedPhone,
                 address: consolidatedCustomerAddress || null,
                 postcode: mappedData.customer_address_post_code || mappedData.postcode || null,
                 is_partner_client: true,
                 partner_id: partner.id,
-                _clientKey: clientKey // Add for matching later
+                _clientKey: clientKey, // Add for matching later
+                _isPlaceholderEmail: isPlaceholderEmail
               };
               
               clientsToCreate.push(clientData);
