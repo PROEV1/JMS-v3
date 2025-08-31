@@ -858,8 +858,7 @@ serve(async (req: Request): Promise<Response> => {
                 postcode: mappedData.customer_address_post_code || mappedData.postcode || null,
                 is_partner_client: true,
                 partner_id: partner.id,
-                _clientKey: clientKey, // Add for matching later
-                _isPlaceholderEmail: isPlaceholderEmail
+                _clientKey: clientKey // Add for matching later
               };
               
               clientsToCreate.push(clientData);
