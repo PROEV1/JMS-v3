@@ -12,6 +12,10 @@ import AdminClients from '@/pages/AdminClients';
 import AdminEngineers from '@/pages/AdminEngineers';
 import AdminUsers from '@/pages/AdminUsers';
 import AdminSettings from '@/pages/AdminSettings';
+import AdminLeads from '@/pages/AdminLeads';
+import AdminProducts from '@/pages/AdminProducts';
+import AdminInventory from '@/pages/AdminInventory';
+import AdminSurveyForms from '@/pages/AdminSurveyForms';
 import PublicQuoteView from '@/pages/PublicQuoteView';
 import AdminSchedule from '@/pages/AdminSchedule';
 import AdminScheduleStatus from '@/pages/AdminScheduleStatus';
@@ -38,6 +42,10 @@ function App() {
         <Route path="/admin/orders" element={<ProtectedRoute><Layout><AdminOrders /></Layout></ProtectedRoute>} />
         <Route path="/admin/orders/:id" element={<ProtectedRoute><Layout><OrderDetail /></Layout></ProtectedRoute>} />
         <Route path="/admin/clients" element={<ProtectedRoute><Layout><AdminClients /></Layout></ProtectedRoute>} />
+        <Route path="/admin/leads" element={<ProtectedRoute><Layout><AdminLeads /></Layout></ProtectedRoute>} />
+        <Route path="/admin/products" element={<ProtectedRoute><Layout><AdminProducts /></Layout></ProtectedRoute>} />
+        <Route path="/admin/inventory" element={<ProtectedRoute><Layout><AdminInventory /></Layout></ProtectedRoute>} />
+        <Route path="/admin/survey-forms" element={<ProtectedRoute><Layout><AdminSurveyForms /></Layout></ProtectedRoute>} />
         <Route path="/admin/engineers" element={<ProtectedRoute><Layout><AdminEngineers /></Layout></ProtectedRoute>} />
         <Route path="/admin/engineers/:id" element={<ProtectedRoute><Layout><EngineerProfile /></Layout></ProtectedRoute>} />
         <Route path="/admin/users" element={<ProtectedRoute><Layout><AdminUsers /></Layout></ProtectedRoute>} />
