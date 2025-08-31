@@ -1322,7 +1322,8 @@ serve(async (req: Request): Promise<Response> => {
             message: `Batch processing failed: ${batchError.message}`,
             data: { error: batchError }
           });
-        } else {
+        }
+      } else {
         // For dry run, simulate all orders as inserts
         ordersToProcess.forEach(orderData => {
           const processedRow: ProcessedRow = {
