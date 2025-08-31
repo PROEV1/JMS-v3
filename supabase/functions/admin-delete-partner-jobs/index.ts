@@ -92,36 +92,43 @@ serve(async (req) => {
     const orderIds = orders?.map(o => o.id) || []
     const clientIds = orders?.map(o => o.client_id) || []
     
-    // Also find standalone partner clients (clients created but no orders)
-    let standalonePartnerClients = [];
+    // Find ALL partner clients (remove any limits)
+    let allPartnerClients = [];
     
     if (partner_id) {
-      const { data: foundStandaloneClients, error: standaloneError } = await supabase
-        .from('clients')
-        .select('id, full_name, email, partner_id, is_partner_client')
-        .eq('partner_id', partner_id)
-        .eq('is_partner_client', true);
-
-      if (standaloneError) {
-        console.error('Error finding standalone partner clients:', standaloneError);
-      } else {
-        standalonePartnerClients = foundStandaloneClients || [];
-        console.log(`Found standalone partner clients:`, standalonePartnerClients);
-      }
-    }
-
-    const standaloneClientIds = standalonePartnerClients?.map(c => c.id) || [];
-    
-    // Also find ALL partner clients associated with this partner (for debugging)
-    if (partner_id) {
-      const { data: allPartnerClients } = await supabase
-        .from('clients')
-        .select('id, full_name, email, partner_id, is_partner_client')
-        .eq('partner_id', partner_id);
+      let allClientsFetched = false;
+      let from = 0;
+      const pageSize = 1000;
       
-      console.log(`Total clients with partner_id ${partner_id}:`, allPartnerClients?.length || 0);
-      console.log(`All partner clients:`, allPartnerClients);
+      while (!allClientsFetched) {
+        const { data: clientBatch, error: clientsError } = await supabase
+          .from('clients')
+          .select('id, full_name, email, partner_id, is_partner_client')
+          .eq('partner_id', partner_id)
+          .eq('is_partner_client', true)
+          .range(from, from + pageSize - 1);
+
+        if (clientsError) {
+          console.error('Error finding partner clients:', clientsError);
+          break;
+        }
+
+        if (!clientBatch || clientBatch.length === 0) {
+          allClientsFetched = true;
+        } else {
+          allPartnerClients.push(...clientBatch);
+          from += pageSize;
+          
+          if (clientBatch.length < pageSize) {
+            allClientsFetched = true;
+          }
+        }
+      }
+      
+      console.log(`Found ${allPartnerClients.length} total partner clients to delete`);
     }
+
+    const standaloneClientIds = allPartnerClients?.map(c => c.id) || [];
     
     console.log(`Found ${orderIds.length} orders and ${standaloneClientIds.length} standalone partner clients to process`)
 
