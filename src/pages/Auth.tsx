@@ -35,9 +35,9 @@ export default function Auth() {
         sessionStorage.removeItem('authRedirectPath');
         navigate(explicitRedirect, { replace: true });
       } else {
-        // Let Layout.tsx handle role-based routing - just go to root
-        console.log('Auth: No explicit redirect, going to root - Layout will handle role routing');
-        navigate('/', { replace: true });
+        // Default redirect to admin for authenticated users
+        console.log('Auth: No explicit redirect, going to admin');
+        navigate('/admin', { replace: true });
       }
     }
   }, [user, authLoading, navigate]);
