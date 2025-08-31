@@ -962,26 +962,36 @@ serve(async (req: Request): Promise<Response> => {
           results.inserted.push(processedRow);
         });
       } else {
+        console.log('=== STARTING ACTUAL IMPORT ===');
+        console.log(`Orders to process: ${ordersToProcess.length}`);
+        console.log(`Clients to find: ${clientsToFind.length}`);
+        console.log(`Clients to create: ${clientsToCreate.length}`);
+        
         try {
+          console.log('=== STEP 1: Finding existing clients ===');
           // Batch 1: Find existing clients
           const existingClientEmails = [...new Set(clientsToFind)].filter(Boolean);
           const existingClientsMap = new Map();
           
           if (existingClientEmails.length > 0) {
+            console.log(`Searching for ${existingClientEmails.length} existing client emails`);
             const { data: existingClients } = await supabase
               .from('clients')
               .select('id, email, full_name')
               .in('email', existingClientEmails);
             
             if (existingClients) {
+              console.log(`Found ${existingClients.length} existing clients`);
               existingClients.forEach(client => {
                 existingClientsMap.set(client.email, client);
               });
             }
           }
 
+          console.log('=== STEP 2: Creating missing clients ===');
           // Batch 2: Create missing clients first
           if (clientsToCreate.length > 0) {
+            console.log(`Creating ${clientsToCreate.length} new clients`);
             const { data: createdClients, error: clientError } = await supabase
               .from('clients')
               .insert(clientsToCreate)
@@ -1004,6 +1014,7 @@ serve(async (req: Request): Promise<Response> => {
             }
           }
 
+          console.log('=== STEP 3: Updating order client IDs ===');
           // Batch 3: Update order client IDs with resolved clients
           ordersToProcess.forEach(orderData => {
             if (orderData.client_email && existingClientsMap.has(orderData.client_email)) {
@@ -1011,6 +1022,7 @@ serve(async (req: Request): Promise<Response> => {
             }
           });
 
+          console.log('=== STEP 4: Categorizing orders for insert vs update ===');
           // Batch 3a: Categorize orders for insert vs update
           const ordersToInsert: Array<{data: any, rowIndex: number}> = [];
           const ordersToUpdate: Array<{data: any, id: string, rowIndex: number}> = [];
@@ -1050,7 +1062,10 @@ serve(async (req: Request): Promise<Response> => {
               });
             }
           }
+          
+          console.log(`Orders to insert: ${ordersToInsert.length}, Orders to update: ${ordersToUpdate.length}`);
 
+          console.log('=== STEP 5: Bulk insert new orders ===');
           // Batch 4: Enhanced bulk insert for new orders with optimistic insert strategy
           if (ordersToInsert.length > 0) {
             console.log(`Attempting bulk insert of ${ordersToInsert.length} orders...`);
