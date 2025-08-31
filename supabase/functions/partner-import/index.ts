@@ -487,6 +487,9 @@ serve(async (req: Request): Promise<Response> => {
     const dryRun = requestBody.dry_run ?? requestBody.dryRun ?? true;
     const createMissingOrders = requestBody.create_missing_orders ?? requestBody.createMissingOrders ?? true;
     
+    // Import run ID for tracking and deletion
+    const runId = requestBody.run_id || `import-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
     // Chunking parameters
     const startRow = requestBody.start_row ?? 0;
     const maxRows = requestBody.max_rows ?? 200;  // Increased default chunk size
@@ -998,6 +1001,7 @@ serve(async (req: Request): Promise<Response> => {
           
           orderData.partner_metadata = orderData.partner_metadata || {};
           orderData.partner_metadata.import_fingerprint = fingerprint;
+          orderData.partner_metadata.import_run_id = runId;
 
           ordersToProcess.push(orderData);
 
@@ -1400,6 +1404,7 @@ serve(async (req: Request): Promise<Response> => {
 
     return new Response(JSON.stringify({
       success: true,
+      run_id: runId, // Include run_id in response for deletion tracking
       dry_run: dryRun,
       chunk_info: {
         start_row: startRow,
