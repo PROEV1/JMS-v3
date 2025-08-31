@@ -29,8 +29,8 @@ export function PartnerQuoteFilters({ filters, onFiltersChange }: PartnerQuoteFi
   const clearFilters = () => {
     onFiltersChange({
       region: '',
-      job_type: '',
-      date_range: '',
+      job_type: 'all',
+      date_range: 'all',
       assigned_user: '',
       quote_value_min: '',
       quote_value_max: ''
@@ -67,7 +67,7 @@ export function PartnerQuoteFilters({ filters, onFiltersChange }: PartnerQuoteFi
               <SelectValue placeholder="Job Type" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Types</SelectItem>
+              <SelectItem value="all">All Types</SelectItem>
               <SelectItem value="installation">Installation</SelectItem>
               <SelectItem value="assessment">Assessment</SelectItem>
               <SelectItem value="service_call">Service Call</SelectItem>
@@ -79,7 +79,7 @@ export function PartnerQuoteFilters({ filters, onFiltersChange }: PartnerQuoteFi
               <SelectValue placeholder="Date Range" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Time</SelectItem>
+              <SelectItem value="all">All Time</SelectItem>
               <SelectItem value="today">Today</SelectItem>
               <SelectItem value="week">This Week</SelectItem>
               <SelectItem value="month">This Month</SelectItem>

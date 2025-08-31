@@ -67,8 +67,8 @@ export default function AdminPartnerQuotes() {
   const [addQuoteOpen, setAddQuoteOpen] = useState(false);
   const [filters, setFilters] = useState({
     region: '',
-    job_type: '',
-    date_range: '',
+    job_type: 'all',
+    date_range: 'all',
     assigned_user: '',
     quote_value_min: '',
     quote_value_max: ''
@@ -186,7 +186,7 @@ export default function AdminPartnerQuotes() {
         ]);
 
       // Apply filters
-      if (filters.job_type && ['installation', 'assessment', 'service_call'].includes(filters.job_type)) {
+      if (filters.job_type && filters.job_type !== 'all' && ['installation', 'assessment', 'service_call'].includes(filters.job_type)) {
         query = query.eq('job_type', filters.job_type as 'installation' | 'assessment' | 'service_call');
       }
 
@@ -194,7 +194,7 @@ export default function AdminPartnerQuotes() {
         query = query.ilike('postcode', `${filters.region}%`);
       }
 
-      if (filters.date_range) {
+      if (filters.date_range && filters.date_range !== 'all') {
         const now = new Date();
         let startDate: Date;
         
