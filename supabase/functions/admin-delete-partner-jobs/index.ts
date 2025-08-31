@@ -313,28 +313,44 @@ serve(async (req) => {
       }
     }
 
-    // After all order-related deletions, delete standalone partner clients in batches
+    // After all order-related deletions, delete standalone partner clients in small batches
     if (standaloneClientIds.length > 0) {
       console.log(`Deleting ${standaloneClientIds.length} standalone partner clients...`);
       
-      // Delete clients in batches to avoid URL length limits
-      const clientBatchSize = 100; // Smaller batch size for safety
+      // Delete clients in very small batches to avoid URL length limits
+      const clientBatchSize = 50; // Even smaller batch size for safety
       let deletedClientCount = 0;
       
       for (let i = 0; i < standaloneClientIds.length; i += clientBatchSize) {
         const clientBatch = standaloneClientIds.slice(i, i + clientBatchSize);
-        console.log(`Deleting client batch ${Math.floor(i/clientBatchSize) + 1}: ${clientBatch.length} clients`);
+        const batchNumber = Math.floor(i/clientBatchSize) + 1;
+        const totalBatches = Math.ceil(standaloneClientIds.length / clientBatchSize);
         
-        const { error: standaloneClientsError } = await supabase
-          .from('clients')
-          .delete()
-          .in('id', clientBatch);
+        console.log(`Deleting client batch ${batchNumber}/${totalBatches}: ${clientBatch.length} clients`);
+        console.log('Client IDs in this batch:', clientBatch.slice(0, 3).map(id => id.substring(0, 8)).join(', ') + '...');
         
-        if (standaloneClientsError) {
-          console.error(`Standalone clients batch ${Math.floor(i/clientBatchSize) + 1} deletion error:`, standaloneClientsError);
-        } else {
-          deletedClientCount += clientBatch.length;
-          console.log(`Successfully deleted client batch ${Math.floor(i/clientBatchSize) + 1}: ${clientBatch.length} clients`);
+        try {
+          const { error: standaloneClientsError, count } = await supabase
+            .from('clients')
+            .delete({ count: 'exact' })
+            .in('id', clientBatch);
+          
+          if (standaloneClientsError) {
+            console.error(`Standalone clients batch ${batchNumber} deletion error:`, standaloneClientsError);
+            // Continue with next batch even if this one fails
+          } else {
+            const actualDeleted = count || clientBatch.length;
+            deletedClientCount += actualDeleted;
+            console.log(`Successfully deleted client batch ${batchNumber}: ${actualDeleted} clients`);
+          }
+        } catch (batchError) {
+          console.error(`Exception in client batch ${batchNumber}:`, batchError);
+          // Continue with next batch
+        }
+
+        // Add a small delay between batches to avoid overwhelming the database
+        if (i + clientBatchSize < standaloneClientIds.length) {
+          await new Promise(resolve => setTimeout(resolve, 100));
         }
       }
       
