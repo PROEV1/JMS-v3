@@ -688,7 +688,10 @@ serve(async (req: Request): Promise<Response> => {
             if (isFinite(parsedAmount) && !isNaN(parsedAmount)) {
               sanitizedQuoteAmount = parsedAmount;
             } else {
-              console.log(`Invalid quote amount '${mappedData.quote_amount}' -> setting to 0`);
+              // Only log if verbose mode is on to reduce log noise
+              if (verbose) {
+                console.log(`Invalid quote amount '${mappedData.quote_amount}' -> setting to 0`);
+              }
               results.warnings.push({
                 row: rowIndex + 1,
                 column: 'quote_amount',
@@ -915,22 +918,42 @@ serve(async (req: Request): Promise<Response> => {
           }
 
           // Enhanced data validation before creating order
+          const validationErrors = [];
+
+          // Check for required job identifier
           if (!mappedData.partner_external_id && !mappedData.job_id) {
-            results.errors.push({
-              row: rowIndex + 1,
-              message: 'Missing required job identifier: partner_external_id or job_id is required',
-              data: { available_fields: Object.keys(mappedData) }
-            });
-            continue; // Skip this row - don't process further
+            validationErrors.push('Missing required job identifier: partner_external_id or job_id is required');
           }
 
+          // Check for client availability
           if (!clientId && !needsClientCreation && !createMissingOrders) {
+            validationErrors.push('Client ID not found and createMissingOrders is disabled');
+          }
+
+          // Check for essential client data if creating new client
+          if (needsClientCreation && (!mappedData.client_name || !mappedData.client_email)) {
+            validationErrors.push('Client name and email are required when creating new clients');
+          }
+
+          // Validate quote amount - treat extreme values as suspicious
+          if (sanitizedQuoteAmount < 0 || sanitizedQuoteAmount > 1000000) {
+            validationErrors.push(`Quote amount ${sanitizedQuoteAmount} seems unrealistic`);
+          }
+
+          // If we have validation errors, add them and skip this row
+          if (validationErrors.length > 0) {
             results.errors.push({
               row: rowIndex + 1,
-              message: 'Client ID not found and createMissingOrders is disabled',
-              data: { client_email: mappedData.client_email, client_name: mappedData.client_name }
+              message: validationErrors.join('; '),
+              data: { 
+                available_fields: Object.keys(mappedData),
+                client_email: mappedData.client_email, 
+                client_name: mappedData.client_name,
+                partner_external_id: mappedData.partner_external_id,
+                quote_amount: mappedData.quote_amount
+              }
             });
-            continue; // Skip this row
+            continue; // Skip this row - don't process further
           }
 
           // Build order data with fingerprint for change detection
@@ -1196,21 +1219,39 @@ serve(async (req: Request): Promise<Response> => {
                   if (singleError) {
                     // Check if it's a duplicate constraint violation
                     if (singleError.code === '23505' && singleError.message?.includes('orders_order_number_key')) {
-                      // Try to find the existing order and update it instead
-                      const existingOrderQuery = await supabase
-                        .from('orders')
-                        .select('id, order_number, partner_external_id')
-                        .eq('partner_id', partner.id)
-                        .eq('client_id', item.data.client_id)
-                        .eq('job_address', item.data.job_address || '')
-                        .limit(1);
+                      // Try to find the existing order by partner_external_id first (more reliable)
+                      let existingOrderQuery = null;
                       
-                      if (existingOrderQuery.data?.[0]) {
+                      if (item.data.partner_external_id) {
+                        existingOrderQuery = await supabase
+                          .from('orders')
+                          .select('id, order_number, partner_external_id')
+                          .eq('partner_id', partner.id)
+                          .eq('partner_external_id', item.data.partner_external_id)
+                          .limit(1);
+                      }
+                      
+                      // Fallback to client + job address matching if no partner_external_id match
+                      if (!existingOrderQuery?.data?.[0] && item.data.client_id && item.data.job_address) {
+                        existingOrderQuery = await supabase
+                          .from('orders')
+                          .select('id, order_number, partner_external_id')
+                          .eq('partner_id', partner.id)
+                          .eq('client_id', item.data.client_id)
+                          .eq('job_address', item.data.job_address)
+                          .limit(1);
+                      }
+                      
+                      if (existingOrderQuery?.data?.[0]) {
                         const existingOrder = existingOrderQuery.data[0];
                         console.log(`Found existing order to update: ${existingOrder.order_number} (ID: ${existingOrder.id})`);
                         
                         // Update the existing order instead
                         const sanitizedUpdateData = sanitizeForDatabase(item.data);
+                        // Remove id and order_number from update data to avoid conflicts
+                        delete sanitizedUpdateData.id;
+                        delete sanitizedUpdateData.order_number;
+                        
                         const { error: updateError } = await supabase
                           .from('orders')
                           .update(sanitizedUpdateData)
@@ -1230,10 +1271,16 @@ serve(async (req: Request): Promise<Response> => {
                           });
                         }
                       } else {
-                        results.errors.push({
+                        // Log as skipped rather than error for duplicates we can't resolve
+                        results.warnings.push({
                           row: item.rowIndex + 1,
-                          message: `Order number collision but could not find existing order: ${singleError.message}`,
-                          data: item.data
+                          column: 'order_number',
+                          message: `Skipped potential duplicate order - could not find existing order to update: ${singleError.message}`,
+                          data: { 
+                            partner_external_id: item.data.partner_external_id,
+                            client_id: item.data.client_id,
+                            job_address: item.data.job_address
+                          }
                         });
                       }
                     } else {
