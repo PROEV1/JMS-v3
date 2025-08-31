@@ -601,10 +601,12 @@ export default function ImportRunModal({
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span>Rows processed:</span>
-                    <span className="font-medium">{progress.processedRows.toLocaleString()} / {progress.totalRows.toLocaleString()}</span>
+                    <span className="font-medium">
+                      {progress.processedRows?.toLocaleString() || 0} / {progress.totalRows?.toLocaleString() || 'Unknown'}
+                    </span>
                   </div>
                   <Progress 
-                    value={(progress.processedRows / progress.totalRows) * 100} 
+                    value={progress.totalRows ? (progress.processedRows / progress.totalRows) * 100 : 0} 
                     className="h-2"
                   />
                 </div>
