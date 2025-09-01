@@ -73,14 +73,36 @@ export function PartnerQuoteKPIs({ partnerId, jobs }: PartnerQuoteKPIsProps) {
         return approvalStatuses.includes(job.partner_status) && scheduledStatuses.includes(job.status_enhanced);
       };
 
-      // Filter out review jobs from waiting approval count
-      const waitingApprovalJobs = jobs.filter(j => 
-        ['WAITING_FOR_APPROVAL', 'WAITING_FOR_OHME_APPROVAL'].includes(j.partner_status) && !isReviewJob(j)
-      );
+      // Apply the same filtering logic as the tabs
+      const getBucketJobs = (...statuses: string[]) => {
+        return jobs.filter(job => {
+          // Check for quote overrides first
+          if (job.quote_override) {
+            if (job.quote_override.override_type === 'quoted_pending_approval') {
+              return statuses.includes('WAITING_FOR_APPROVAL');
+            }
+            if (job.quote_override.override_type === 'standard_quote_marked') {
+              return statuses.includes('NEEDS_SCHEDULING');
+            }
+          }
+
+          // For waiting approval, exclude review jobs
+          if (statuses.includes('WAITING_FOR_APPROVAL') || statuses.includes('WAITING_FOR_OHME_APPROVAL')) {
+            if (isReviewJob(job)) return false; // Exclude review jobs from waiting approval
+          }
+
+          // Check partner status
+          if (statuses.includes(job.partner_status)) {
+            return true;
+          }
+
+          return false;
+        });
+      };
 
       setKpiData({
-        needsQuotation: jobs.filter(j => ['NEW_JOB', 'AWAITING_QUOTATION'].includes(j.partner_status)).length,
-        waitingApproval: waitingApprovalJobs.length,
+        needsQuotation: getBucketJobs('NEW_JOB', 'AWAITING_QUOTATION').length,
+        waitingApproval: getBucketJobs('WAITING_FOR_APPROVAL', 'WAITING_FOR_OHME_APPROVAL').length,
         approvedLast7Days,
         rejectedLast7Days,
         avgApprovalTimeHours
