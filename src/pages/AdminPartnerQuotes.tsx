@@ -276,7 +276,7 @@ export default function AdminPartnerQuotes() {
   // Status counts for tabs
   const statusCounts = useMemo(() => {
     return {
-      needs_quotation: getBucketJobs('NEW_JOB').length,
+      needs_quotation: getBucketJobs('NEW_JOB', 'AWAITING_QUOTATION').length,
       waiting_approval: getBucketJobs('WAITING_FOR_APPROVAL').length,
       approved: getBucketJobs('APPROVED').length,
       rejected_rework: getBucketJobs('REJECTED', 'REWORK_REQUESTED').length
@@ -287,7 +287,7 @@ export default function AdminPartnerQuotes() {
   const activeJobs = useMemo(() => {
     switch (activeStatus) {
       case 'needs_quotation':
-        return getBucketJobs('NEW_JOB');
+        return getBucketJobs('NEW_JOB', 'AWAITING_QUOTATION');
       case 'waiting_approval':
         return getBucketJobs('WAITING_FOR_APPROVAL');
       case 'approved':
@@ -295,7 +295,7 @@ export default function AdminPartnerQuotes() {
       case 'rejected_rework':
         return getBucketJobs('REJECTED', 'REWORK_REQUESTED');
       default:
-        return getBucketJobs('NEW_JOB');
+        return getBucketJobs('NEW_JOB', 'AWAITING_QUOTATION');
     }
   }, [jobs, activeStatus]);
 
