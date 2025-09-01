@@ -172,6 +172,14 @@ export default function AdminPartnerQuotes() {
     
     setLoading(true);
     try {
+      // First, get child partners to include in the query
+      const { data: childPartners } = await supabase
+        .from('partners')
+        .select('id')
+        .eq('parent_partner_id', selectedPartner);
+
+      const partnerIds = [selectedPartner, ...(childPartners?.map(p => p.id) || [])];
+
       let query = supabase
         .from('orders')
         .select(`
@@ -186,17 +194,17 @@ export default function AdminPartnerQuotes() {
           partner_id,
           partner_external_id,
           status_enhanced,
-          clients!inner(
+          clients(
             full_name,
             email,
             postcode
           ),
-          partners!inner(
+          partners(
             name
           )
         `)
         .eq('is_partner_job', true)
-        .eq('partner_id', selectedPartner);
+        .in('partner_id', partnerIds);
 
       // Apply filters
       if (filters.job_type && filters.job_type !== 'all' && 
@@ -256,15 +264,15 @@ export default function AdminPartnerQuotes() {
       const transformedJobs: PartnerQuoteJob[] = (data || []).map(job => ({
         id: job.id,
         order_number: job.order_number,
-        client_name: job.clients.full_name,
-        address: job.clients.postcode || 'No address',
+        client_name: job.clients?.full_name || 'Unknown Client',
+        address: job.clients?.postcode || 'No address',
         client: {
-          full_name: job.clients.full_name,
-          email: job.clients.email,
-          postcode: job.clients.postcode
+          full_name: job.clients?.full_name || 'Unknown Client',
+          email: job.clients?.email || '',
+          postcode: job.clients?.postcode
         },
         partner: {
-          name: job.partners.name
+          name: job.partners?.name || 'Unknown Partner'
         },
         partner_status: job.partner_status || 'NEW_JOB',
         partner_job_id: job.partner_external_id || job.order_number,
@@ -274,11 +282,28 @@ export default function AdminPartnerQuotes() {
         total_amount: job.total_amount || 0,
         partner_id: job.partner_id,
         partner_external_url: job.partner_external_url,
-        postcode: job.postcode || job.clients.postcode || '',
+        postcode: job.postcode || job.clients?.postcode || '',
         require_file: false,
         quote_override: overrideMap.get(job.id),
         status_enhanced: job.status_enhanced
       }));
+
+      // Debug logging for job counts by status
+      const statusBreakdown = transformedJobs.reduce((acc, job) => {
+        acc[job.partner_status] = (acc[job.partner_status] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      console.log('🔍 Partner Jobs Fetched:', {
+        totalJobs: transformedJobs.length,
+        partnerIds: partnerIds,
+        childPartnerCount: childPartners?.length || 0,
+        statusBreakdown,
+        expectedAWAITING_QUOTATION: 34,
+        expectedWAITING_FOR_OHME_APPROVAL: 26,
+        actualAWAITING_QUOTATION: statusBreakdown['AWAITING_QUOTATION'] || 0,
+        actualWAITING_FOR_OHME_APPROVAL: statusBreakdown['WAITING_FOR_OHME_APPROVAL'] || 0
+      });
 
       setJobs(transformedJobs);
     } catch (error) {
