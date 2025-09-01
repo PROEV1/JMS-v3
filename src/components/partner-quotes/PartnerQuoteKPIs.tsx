@@ -75,8 +75,12 @@ export function PartnerQuoteKPIs({ partnerId, jobs }: PartnerQuoteKPIsProps) {
       // Helper to check if job should be in review bucket (has scheduled date AND awaiting approval)
       const isReview = (job: any) => {
         const approvalStatuses = ['WAITING_FOR_APPROVAL', 'WAITING_FOR_OHME_APPROVAL'];
-        const isApprovalStatus = approvalStatuses.includes(job.partner_status);
-        const hasScheduledDate = job.status_enhanced === 'scheduled' || 
+        const normalizedStatus = normalizePartnerStatus(job.partner_status || '');
+        
+        // A job is in review if it has approval status AND has been scheduled
+        const isApprovalStatus = approvalStatuses.includes(job.partner_status || '') || normalizedStatus === 'WAITING_FOR_APPROVAL';
+        const hasScheduledDate = job.scheduled_install_date || 
+                               job.status_enhanced === 'scheduled' || 
                                job.status_enhanced === 'in_progress' || 
                                job.status_enhanced === 'install_completed_pending_qa' ||
                                job.status_enhanced === 'completed';
@@ -87,7 +91,7 @@ export function PartnerQuoteKPIs({ partnerId, jobs }: PartnerQuoteKPIsProps) {
       // Apply the same filtering logic as the tabs
       const getBucketJobs = (...statuses: string[]) => {
         return jobs.filter(job => {
-          const normalizedStatus = normalizePartnerStatus(job.partner_status);
+          const normalizedStatus = normalizePartnerStatus(job.partner_status || '');
           
           // Check for quote overrides first
           if (job.quote_override) {
@@ -97,6 +101,11 @@ export function PartnerQuoteKPIs({ partnerId, jobs }: PartnerQuoteKPIsProps) {
             if (job.quote_override.override_type === 'standard_quote_marked') {
               return statuses.includes('NEEDS_SCHEDULING');
             }
+          }
+
+          // Special handling for review bucket
+          if (statuses.includes('REVIEW')) {
+            return isReview(job);
           }
 
           // For waiting approval, exclude review jobs
@@ -112,8 +121,15 @@ export function PartnerQuoteKPIs({ partnerId, jobs }: PartnerQuoteKPIsProps) {
           }
 
           // Check original partner status for backward compatibility
-          if (statuses.includes(job.partner_status)) {
+          if (statuses.includes(job.partner_status || '')) {
             return true;
+          }
+
+          // For needs scheduling bucket, also check status_enhanced
+          if (statuses.includes('NEEDS_SCHEDULING')) {
+            return job.status_enhanced === 'awaiting_install_booking' ||
+                   job.partner_status === 'AWAITING_INSTALL_DATE' ||
+                   job.partner_status === 'INSTALL_DATE_CONFIRMED';
           }
 
           return false;

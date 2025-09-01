@@ -70,6 +70,7 @@ interface PartnerQuoteJob {
     created_at: string;
   };
   status_enhanced?: string;
+  scheduled_install_date?: string;
 }
 
 export default function AdminPartnerQuotes() {
@@ -129,9 +130,17 @@ export default function AdminPartnerQuotes() {
 
       setPartners(data || []);
       
-      // Auto-select first partner if available and no query partner ID is present
+      // Auto-select partner: prefer Ohme, fallback to first partner
       if (data?.length > 0 && !queryPartnerId) {
-        setSelectedPartner(data[0].id);
+        const ohmePartner = data.find(p => p.name.toLowerCase().includes('ohme'));
+        const preferredPartner = ohmePartner || data[0];
+        setSelectedPartner(preferredPartner.id);
+        // Update URL to reflect selected partner
+        setSearchParams(prev => {
+          const newParams = new URLSearchParams(prev);
+          newParams.set('partnerId', preferredPartner.id);
+          return newParams;
+        });
       } else if (queryPartnerId && data?.find(p => p.id === queryPartnerId)) {
         // Validate that the query partner ID exists in the partners list
         setSelectedPartner(queryPartnerId);
@@ -194,6 +203,7 @@ export default function AdminPartnerQuotes() {
           partner_id,
           partner_external_id,
           status_enhanced,
+          scheduled_install_date,
           clients(
             full_name,
             email,
@@ -285,7 +295,8 @@ export default function AdminPartnerQuotes() {
         postcode: job.postcode || job.clients?.postcode || '',
         require_file: false,
         quote_override: overrideMap.get(job.id),
-        status_enhanced: job.status_enhanced
+        status_enhanced: job.status_enhanced,
+        scheduled_install_date: job.scheduled_install_date
       }));
 
       setJobs(transformedJobs);
@@ -310,9 +321,12 @@ export default function AdminPartnerQuotes() {
   // Helper to check if job should be in review bucket (has scheduled date AND awaiting approval)
   const isReview = (job: PartnerQuoteJob) => {
     const approvalStatuses = ['WAITING_FOR_APPROVAL', 'WAITING_FOR_OHME_APPROVAL'];
-    // A job is in review if it has approval status AND has been scheduled (has scheduled_install_date or is in scheduled statuses)
-    const isApprovalStatus = approvalStatuses.includes(job.partner_status);
-    const hasScheduledDate = job.status_enhanced === 'scheduled' || 
+    const normalizedStatus = normalizePartnerStatus(job.partner_status);
+    
+    // A job is in review if it has approval status AND has been scheduled
+    const isApprovalStatus = approvalStatuses.includes(job.partner_status) || normalizedStatus === 'WAITING_FOR_APPROVAL';
+    const hasScheduledDate = job.scheduled_install_date || 
+                           job.status_enhanced === 'scheduled' || 
                            job.status_enhanced === 'in_progress' || 
                            job.status_enhanced === 'install_completed_pending_qa' ||
                            job.status_enhanced === 'completed';
@@ -559,7 +573,14 @@ export default function AdminPartnerQuotes() {
           {/* Partner Selector */}
           <div className="flex items-center gap-4">
             <span className="text-sm font-medium">Partner:</span>
-            <Select value={selectedPartner || ''} onValueChange={setSelectedPartner}>
+            <Select value={selectedPartner || ''} onValueChange={(partnerId) => {
+              setSelectedPartner(partnerId);
+              setSearchParams(prev => {
+                const newParams = new URLSearchParams(prev);
+                newParams.set('partnerId', partnerId);
+                return newParams;
+              });
+            }}>
               <SelectTrigger className="w-48">
                 <SelectValue placeholder="Select partner..." />
               </SelectTrigger>
