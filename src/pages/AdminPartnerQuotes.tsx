@@ -301,16 +301,30 @@ export default function AdminPartnerQuotes() {
     }
   };
 
-  // Helper to check if job should be in review bucket (scheduled but awaiting approval)
-  const isReview = (job: PartnerQuoteJob) => {
-    const approvalStatuses = ['WAITING_FOR_APPROVAL', 'WAITING_FOR_OHME_APPROVAL'];
-    const scheduledStatuses = ['scheduled', 'in_progress', 'install_completed_pending_qa', 'completed'];
-    return approvalStatuses.includes(job.partner_status) && scheduledStatuses.includes(job.status_enhanced);
+  // Normalize partner status to handle variations
+  const normalizePartnerStatus = (status: string) => {
+    if (status === 'WAITING_FOR_OHME_APPROVAL') return 'WAITING_FOR_APPROVAL';
+    return status;
   };
 
-  // Helper function to get jobs by status with new logic
+  // Helper to check if job should be in review bucket (has scheduled date AND awaiting approval)
+  const isReview = (job: PartnerQuoteJob) => {
+    const approvalStatuses = ['WAITING_FOR_APPROVAL', 'WAITING_FOR_OHME_APPROVAL'];
+    // A job is in review if it has approval status AND has been scheduled (has scheduled_install_date or is in scheduled statuses)
+    const isApprovalStatus = approvalStatuses.includes(job.partner_status);
+    const hasScheduledDate = job.status_enhanced === 'scheduled' || 
+                           job.status_enhanced === 'in_progress' || 
+                           job.status_enhanced === 'install_completed_pending_qa' ||
+                           job.status_enhanced === 'completed';
+    
+    return isApprovalStatus && hasScheduledDate;
+  };
+
+  // Helper function to get jobs by status with normalized logic
   const getBucketJobs = (...statuses: string[]) => {
-    return jobs.filter(job => {
+    const filteredJobs = jobs.filter(job => {
+      const normalizedStatus = normalizePartnerStatus(job.partner_status);
+      
       // Check for quote overrides first
       if (job.quote_override) {
         if (job.quote_override.override_type === 'quoted_pending_approval') {
@@ -327,11 +341,18 @@ export default function AdminPartnerQuotes() {
       }
 
       // For waiting approval, exclude review jobs
-      if (statuses.includes('WAITING_FOR_APPROVAL') || statuses.includes('WAITING_FOR_OHME_APPROVAL')) {
+      if (statuses.includes('WAITING_FOR_APPROVAL')) {
         if (isReview(job)) return false; // Exclude review jobs from waiting approval
+        // Include both normalized status and original status
+        return normalizedStatus === 'WAITING_FOR_APPROVAL' || job.partner_status === 'WAITING_FOR_OHME_APPROVAL';
       }
 
-      // Check partner status
+      // Check normalized partner status
+      if (statuses.includes(normalizedStatus)) {
+        return true;
+      }
+
+      // Check original partner status for backward compatibility
       if (statuses.includes(job.partner_status)) {
         return true;
       }
@@ -345,35 +366,75 @@ export default function AdminPartnerQuotes() {
 
       return false;
     });
+
+    // Debug logging
+    if (statuses.includes('WAITING_FOR_APPROVAL')) {
+      console.log('Waiting for Approval bucket debug:', {
+        totalJobs: jobs.length,
+        waitingApprovalJobs: filteredJobs.length,
+        jobsWithApprovalStatus: jobs.filter(j => 
+          j.partner_status === 'WAITING_FOR_APPROVAL' || j.partner_status === 'WAITING_FOR_OHME_APPROVAL'
+        ).length,
+        reviewJobs: jobs.filter(j => isReview(j)).length,
+        filteredJobStatuses: filteredJobs.map(j => ({
+          id: j.id,
+          partner_status: j.partner_status,
+          status_enhanced: j.status_enhanced,
+          isReview: isReview(j)
+        }))
+      });
+    }
+
+    return filteredJobs;
   };
 
   // Status counts for tabs
   const statusCounts = useMemo(() => {
-    return {
+    const counts = {
       needs_quotation: getBucketJobs('NEW_JOB', 'AWAITING_QUOTATION').length,
-      waiting_approval: getBucketJobs('WAITING_FOR_APPROVAL', 'WAITING_FOR_OHME_APPROVAL').length,
+      waiting_approval: getBucketJobs('WAITING_FOR_APPROVAL').length,
       review: getBucketJobs('REVIEW').length,
       needs_scheduling: getBucketJobs('NEEDS_SCHEDULING').length,
       rejected_rework: getBucketJobs('REJECTED', 'REWORK_REQUESTED').length
     };
+
+    console.log('Status counts calculated:', counts);
+    console.log('Total jobs:', jobs.length);
+    console.log('Jobs by partner status:', {
+      WAITING_FOR_APPROVAL: jobs.filter(j => j.partner_status === 'WAITING_FOR_APPROVAL').length,
+      WAITING_FOR_OHME_APPROVAL: jobs.filter(j => j.partner_status === 'WAITING_FOR_OHME_APPROVAL').length,
+      NEW_JOB: jobs.filter(j => j.partner_status === 'NEW_JOB').length,
+      AWAITING_QUOTATION: jobs.filter(j => j.partner_status === 'AWAITING_QUOTATION').length
+    });
+
+    return counts;
   }, [jobs]);
 
   // Active jobs for current status
   const activeJobs = useMemo(() => {
+    let jobs_for_status;
     switch (activeStatus) {
       case 'needs_quotation':
-        return getBucketJobs('NEW_JOB', 'AWAITING_QUOTATION');
+        jobs_for_status = getBucketJobs('NEW_JOB', 'AWAITING_QUOTATION');
+        break;
       case 'waiting_approval':
-        return getBucketJobs('WAITING_FOR_APPROVAL', 'WAITING_FOR_OHME_APPROVAL');
+        jobs_for_status = getBucketJobs('WAITING_FOR_APPROVAL');
+        break;
       case 'review':
-        return getBucketJobs('REVIEW');
+        jobs_for_status = getBucketJobs('REVIEW');
+        break;
       case 'needs_scheduling':
-        return getBucketJobs('NEEDS_SCHEDULING');
+        jobs_for_status = getBucketJobs('NEEDS_SCHEDULING');
+        break;
       case 'rejected_rework':
-        return getBucketJobs('REJECTED', 'REWORK_REQUESTED');
+        jobs_for_status = getBucketJobs('REJECTED', 'REWORK_REQUESTED');
+        break;
       default:
-        return getBucketJobs('NEW_JOB', 'AWAITING_QUOTATION');
+        jobs_for_status = getBucketJobs('NEW_JOB', 'AWAITING_QUOTATION');
     }
+
+    console.log(`Active jobs for status "${activeStatus}":`, jobs_for_status.length);
+    return jobs_for_status;
   }, [jobs, activeStatus]);
 
   // Handle status change

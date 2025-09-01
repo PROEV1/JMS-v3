@@ -66,16 +66,29 @@ export function PartnerQuoteKPIs({ partnerId, jobs }: PartnerQuoteKPIsProps) {
         avgApprovalTimeHours = Math.round(totalHours / approvedQuotes.length);
       }
 
-      // Helper to check if job should be in review bucket (scheduled but awaiting approval)
-      const isReviewJob = (job: any) => {
+      // Normalize partner status to handle variations
+      const normalizePartnerStatus = (status: string) => {
+        if (status === 'WAITING_FOR_OHME_APPROVAL') return 'WAITING_FOR_APPROVAL';
+        return status;
+      };
+
+      // Helper to check if job should be in review bucket (has scheduled date AND awaiting approval)
+      const isReview = (job: any) => {
         const approvalStatuses = ['WAITING_FOR_APPROVAL', 'WAITING_FOR_OHME_APPROVAL'];
-        const scheduledStatuses = ['scheduled', 'in_progress', 'install_completed_pending_qa', 'completed'];
-        return approvalStatuses.includes(job.partner_status) && scheduledStatuses.includes(job.status_enhanced);
+        const isApprovalStatus = approvalStatuses.includes(job.partner_status);
+        const hasScheduledDate = job.status_enhanced === 'scheduled' || 
+                               job.status_enhanced === 'in_progress' || 
+                               job.status_enhanced === 'install_completed_pending_qa' ||
+                               job.status_enhanced === 'completed';
+        
+        return isApprovalStatus && hasScheduledDate;
       };
 
       // Apply the same filtering logic as the tabs
       const getBucketJobs = (...statuses: string[]) => {
         return jobs.filter(job => {
+          const normalizedStatus = normalizePartnerStatus(job.partner_status);
+          
           // Check for quote overrides first
           if (job.quote_override) {
             if (job.quote_override.override_type === 'quoted_pending_approval') {
@@ -87,11 +100,18 @@ export function PartnerQuoteKPIs({ partnerId, jobs }: PartnerQuoteKPIsProps) {
           }
 
           // For waiting approval, exclude review jobs
-          if (statuses.includes('WAITING_FOR_APPROVAL') || statuses.includes('WAITING_FOR_OHME_APPROVAL')) {
-            if (isReviewJob(job)) return false; // Exclude review jobs from waiting approval
+          if (statuses.includes('WAITING_FOR_APPROVAL')) {
+            if (isReview(job)) return false; // Exclude review jobs from waiting approval
+            // Include both normalized status and original status
+            return normalizedStatus === 'WAITING_FOR_APPROVAL' || job.partner_status === 'WAITING_FOR_OHME_APPROVAL';
           }
 
-          // Check partner status
+          // Check normalized partner status
+          if (statuses.includes(normalizedStatus)) {
+            return true;
+          }
+
+          // Check original partner status for backward compatibility
           if (statuses.includes(job.partner_status)) {
             return true;
           }
@@ -100,13 +120,26 @@ export function PartnerQuoteKPIs({ partnerId, jobs }: PartnerQuoteKPIsProps) {
         });
       };
 
-      setKpiData({
+      const kpiCounts = {
         needsQuotation: getBucketJobs('NEW_JOB', 'AWAITING_QUOTATION').length,
-        waitingApproval: getBucketJobs('WAITING_FOR_APPROVAL', 'WAITING_FOR_OHME_APPROVAL').length,
+        waitingApproval: getBucketJobs('WAITING_FOR_APPROVAL').length,
         approvedLast7Days,
         rejectedLast7Days,
         avgApprovalTimeHours
+      };
+
+      console.log('KPI Debug:', {
+        totalJobs: jobs.length,
+        kpiCounts,
+        jobsByStatus: {
+          WAITING_FOR_APPROVAL: jobs.filter(j => j.partner_status === 'WAITING_FOR_APPROVAL').length,
+          WAITING_FOR_OHME_APPROVAL: jobs.filter(j => j.partner_status === 'WAITING_FOR_OHME_APPROVAL').length,
+          NEW_JOB: jobs.filter(j => j.partner_status === 'NEW_JOB').length,
+          AWAITING_QUOTATION: jobs.filter(j => j.partner_status === 'AWAITING_QUOTATION').length
+        }
       });
+
+      setKpiData(kpiCounts);
     } catch (error) {
       console.error('Error calculating KPIs:', error);
     }
