@@ -11,6 +11,8 @@ import OrderDetail from '@/pages/OrderDetail';
 import AdminClients from '@/pages/AdminClients';
 import AdminEngineers from '@/pages/AdminEngineers';
 import AdminUsers from '@/pages/AdminUsers';
+import AdminUserInvite from '@/pages/AdminUserInvite';
+import AdminUserDetail from '@/pages/AdminUserDetail';
 import AdminSettings from '@/pages/AdminSettings';
 import AdminLeads from '@/pages/AdminLeads';
 import AdminProducts from '@/pages/AdminProducts';
@@ -57,6 +59,8 @@ function App() {
         <Route path="/admin/engineers" element={<ProtectedRoute><Layout><AdminEngineers /></Layout></ProtectedRoute>} />
         <Route path="/admin/engineers/:id" element={<ProtectedRoute><Layout><EngineerProfile /></Layout></ProtectedRoute>} />
         <Route path="/admin/users" element={<ProtectedRoute><Layout><AdminUsers /></Layout></ProtectedRoute>} />
+        <Route path="/admin/users/new" element={<ProtectedRoute><Layout><AdminUserInvite /></Layout></ProtectedRoute>} />
+        <Route path="/admin/users/:id" element={<ProtectedRoute><Layout><AdminUserDetail /></Layout></ProtectedRoute>} />
         <Route path="/admin/settings" element={<ProtectedRoute><Layout><AdminSettings /></Layout></ProtectedRoute>} />
         <Route path="/admin/schedule" element={<ProtectedRoute><Layout><AdminSchedule /></Layout></ProtectedRoute>} />
         <Route path="/admin/schedule/status/:status" element={<ProtectedRoute><Layout><AdminScheduleStatus /></Layout></ProtectedRoute>} />
