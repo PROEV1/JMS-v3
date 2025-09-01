@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { User, Mail, Key, UserCheck, AlertTriangle } from 'lucide-react';
+import { User, Mail, Key, UserCheck, AlertTriangle, UserPlus } from 'lucide-react';
 
 interface EngineerUserSetupProps {
   engineer: {
@@ -23,6 +23,9 @@ export function EngineerUserSetup({ engineer, onUpdate }: EngineerUserSetupProps
   const [userAccount, setUserAccount] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [creatingAccount, setCreatingAccount] = useState(false);
+  const [showPasswordSetup, setShowPasswordSetup] = useState(false);
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -75,6 +78,59 @@ export function EngineerUserSetup({ engineer, onUpdate }: EngineerUserSetupProps
       onUpdate();
     } catch (error: any) {
       console.error('Error creating user account:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create user account",
+        variant: "destructive",
+      });
+    } finally {
+      setCreatingAccount(false);
+    }
+  };
+
+  const createUserWithPassword = async () => {
+    if (!password || password !== confirmPassword) {
+      toast({
+        title: "Error",
+        description: "Passwords do not match or are empty",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (password.length < 6) {
+      toast({
+        title: "Error",
+        description: "Password must be at least 6 characters long",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setCreatingAccount(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-create-engineer-user', {
+        body: {
+          email: engineer.email,
+          full_name: engineer.name,
+          password: password,
+          engineer_id: engineer.id
+        }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "User Account Created",
+        description: `Account created successfully for ${engineer.name}. They can now log in with the password you set.`,
+      });
+
+      setPassword('');
+      setConfirmPassword('');
+      setShowPasswordSetup(false);
+      onUpdate();
+    } catch (error: any) {
+      console.error('Error creating user account with password:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to create user account",
@@ -187,30 +243,84 @@ export function EngineerUserSetup({ engineer, onUpdate }: EngineerUserSetupProps
               </p>
             </div>
 
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button size="sm" disabled={creatingAccount}>
-                  <Mail className="h-3 w-3 mr-1" />
-                  {creatingAccount ? "Creating..." : "Create User Account"}
-                </Button>
-              </AlertDialogTrigger>
+            <div className="flex flex-col space-y-2">
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button size="sm" disabled={creatingAccount}>
+                    <Mail className="h-3 w-3 mr-1" />
+                    {creatingAccount ? "Creating..." : "Send Invite Email"}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Send Email Invite</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will create a login account for {engineer.name} and send them login credentials via email to {engineer.email}.
+                      
+                      The engineer will be able to:
+                      • Log in to the web dashboard
+                      • View and update their job assignments
+                      • Manage their availability and schedule
+                      • Upload job completion photos and documents
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={createUserAccount}>
+                      Create Account & Send Credentials
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+
+              <Button 
+                variant="outline" 
+                size="sm" 
+                disabled={creatingAccount}
+                onClick={() => setShowPasswordSetup(true)}
+              >
+                <UserPlus className="h-3 w-3 mr-1" />
+                Create with Password
+              </Button>
+            </div>
+
+            <AlertDialog open={showPasswordSetup} onOpenChange={setShowPasswordSetup}>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Create User Account</AlertDialogTitle>
+                  <AlertDialogTitle>Create Account with Password</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This will create a login account for {engineer.name} and send them login credentials via email to {engineer.email}.
-                    
-                    The engineer will be able to:
-                    • Log in to the web dashboard
-                    • View and update their job assignments
-                    • Manage their availability and schedule
-                    • Upload job completion photos and documents
+                    Create a login account for {engineer.name} and set their password directly (no email required).
                   </AlertDialogDescription>
                 </AlertDialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Password</Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Enter password (min 6 characters)"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="confirmPassword">Confirm Password</Label>
+                    <Input
+                      id="confirmPassword"
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Confirm password"
+                    />
+                  </div>
+                </div>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={createUserAccount}>
-                    Create Account & Send Credentials
+                  <AlertDialogAction 
+                    onClick={createUserWithPassword}
+                    disabled={!password || password !== confirmPassword || password.length < 6}
+                  >
+                    {creatingAccount ? "Creating..." : "Create Account"}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>

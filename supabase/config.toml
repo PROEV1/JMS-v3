@@ -51,3 +51,6 @@ verify_jwt = true
 
 [functions.send-user-invite]
 verify_jwt = true
+
+[functions.admin-create-engineer-user]
+verify_jwt = true
