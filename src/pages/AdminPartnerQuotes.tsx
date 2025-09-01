@@ -293,6 +293,13 @@ export default function AdminPartnerQuotes() {
     }
   };
 
+  // Helper to check if job should be in review bucket (scheduled but awaiting approval)
+  const isReview = (job: PartnerQuoteJob) => {
+    const approvalStatuses = ['WAITING_FOR_APPROVAL', 'WAITING_FOR_OHME_APPROVAL'];
+    const scheduledStatuses = ['scheduled', 'in_progress', 'install_completed_pending_qa', 'completed'];
+    return approvalStatuses.includes(job.partner_status) && scheduledStatuses.includes(job.status_enhanced);
+  };
+
   // Helper function to get jobs by status with new logic
   const getBucketJobs = (...statuses: string[]) => {
     return jobs.filter(job => {
@@ -304,6 +311,16 @@ export default function AdminPartnerQuotes() {
         if (job.quote_override.override_type === 'standard_quote_marked') {
           return statuses.includes('NEEDS_SCHEDULING');
         }
+      }
+
+      // Special handling for review bucket
+      if (statuses.includes('REVIEW')) {
+        return isReview(job);
+      }
+
+      // For waiting approval, exclude review jobs
+      if (statuses.includes('WAITING_FOR_APPROVAL') || statuses.includes('WAITING_FOR_OHME_APPROVAL')) {
+        if (isReview(job)) return false; // Exclude review jobs from waiting approval
       }
 
       // Check partner status
@@ -327,6 +344,7 @@ export default function AdminPartnerQuotes() {
     return {
       needs_quotation: getBucketJobs('NEW_JOB', 'AWAITING_QUOTATION').length,
       waiting_approval: getBucketJobs('WAITING_FOR_APPROVAL', 'WAITING_FOR_OHME_APPROVAL').length,
+      review: getBucketJobs('REVIEW').length,
       needs_scheduling: getBucketJobs('NEEDS_SCHEDULING').length,
       rejected_rework: getBucketJobs('REJECTED', 'REWORK_REQUESTED').length
     };
@@ -339,6 +357,8 @@ export default function AdminPartnerQuotes() {
         return getBucketJobs('NEW_JOB', 'AWAITING_QUOTATION');
       case 'waiting_approval':
         return getBucketJobs('WAITING_FOR_APPROVAL', 'WAITING_FOR_OHME_APPROVAL');
+      case 'review':
+        return getBucketJobs('REVIEW');
       case 'needs_scheduling':
         return getBucketJobs('NEEDS_SCHEDULING');
       case 'rejected_rework':

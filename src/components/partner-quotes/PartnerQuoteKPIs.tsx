@@ -66,9 +66,21 @@ export function PartnerQuoteKPIs({ partnerId, jobs }: PartnerQuoteKPIsProps) {
         avgApprovalTimeHours = Math.round(totalHours / approvedQuotes.length);
       }
 
+      // Helper to check if job should be in review bucket (scheduled but awaiting approval)
+      const isReviewJob = (job: any) => {
+        const approvalStatuses = ['WAITING_FOR_APPROVAL', 'WAITING_FOR_OHME_APPROVAL'];
+        const scheduledStatuses = ['scheduled', 'in_progress', 'install_completed_pending_qa', 'completed'];
+        return approvalStatuses.includes(job.partner_status) && scheduledStatuses.includes(job.status_enhanced);
+      };
+
+      // Filter out review jobs from waiting approval count
+      const waitingApprovalJobs = jobs.filter(j => 
+        ['WAITING_FOR_APPROVAL', 'WAITING_FOR_OHME_APPROVAL'].includes(j.partner_status) && !isReviewJob(j)
+      );
+
       setKpiData({
-        needsQuotation: jobs.filter(j => j.partner_status === 'NEW_JOB').length,
-        waitingApproval: jobs.filter(j => j.partner_status === 'WAITING_FOR_APPROVAL').length,
+        needsQuotation: jobs.filter(j => ['NEW_JOB', 'AWAITING_QUOTATION'].includes(j.partner_status)).length,
+        waitingApproval: waitingApprovalJobs.length,
         approvedLast7Days,
         rejectedLast7Days,
         avgApprovalTimeHours

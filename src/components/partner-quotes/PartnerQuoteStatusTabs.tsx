@@ -2,7 +2,7 @@
 import React from 'react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { FileText, Clock, Calendar, XCircle } from 'lucide-react';
+import { FileText, Clock, Calendar, XCircle, Eye } from 'lucide-react';
 
 interface PartnerQuoteStatusTabsProps {
   activeStatus: string;
@@ -22,6 +22,12 @@ const statusConfigs = [
     label: 'Waiting for Approval',
     icon: Clock,
     colorClass: 'text-blue-600 bg-blue-50 border-blue-200'
+  },
+  {
+    id: 'review',
+    label: 'Review',
+    icon: Eye,
+    colorClass: 'text-purple-600 bg-purple-50 border-purple-200'
   },
   {
     id: 'needs_scheduling',
@@ -44,7 +50,7 @@ export function PartnerQuoteStatusTabs({
 }: PartnerQuoteStatusTabsProps) {
   return (
     <Tabs value={activeStatus} onValueChange={onStatusChange} className="w-full">
-      <TabsList className="grid w-full grid-cols-4 bg-muted p-1 h-auto">
+      <TabsList className="grid w-full grid-cols-5 bg-muted p-1 h-auto">
         {statusConfigs.map((status) => {
           const IconComponent = status.icon;
           const count = statusCounts[status.id] || 0;

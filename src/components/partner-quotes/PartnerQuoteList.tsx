@@ -103,7 +103,15 @@ function QuoteJobMobileCard({
   onOpenInPartner: (job: PartnerQuoteJob) => void;
   readOnly?: boolean;
 }) {
-  const getStatusBadge = (status: string, override?: any) => {
+  const getStatusBadge = (status: string, override?: any, statusEnhanced?: string) => {
+    // Check if this is a review case (awaiting approval but already scheduled)
+    const approvalStatuses = ['WAITING_FOR_APPROVAL', 'WAITING_FOR_OHME_APPROVAL'];
+    const scheduledStatuses = ['scheduled', 'in_progress', 'install_completed_pending_qa', 'completed'];
+    
+    if (approvalStatuses.includes(status) && scheduledStatuses.includes(statusEnhanced || '')) {
+      return <Badge variant="outline" className="text-purple-600 bg-purple-50">Review</Badge>;
+    }
+
     // Show override status if present
     if (override) {
       if (override.override_type === 'quoted_pending_approval') {
@@ -140,7 +148,7 @@ function QuoteJobMobileCard({
           <div className="space-y-1">
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="font-medium text-sm">{job.order_number}</h3>
-              {getStatusBadge(job.partner_status, job.quote_override)}
+              {getStatusBadge(job.partner_status, job.quote_override, job.status_enhanced)}
             </div>
             <p className="text-sm text-muted-foreground">{job.client.full_name}</p>
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -233,7 +241,15 @@ export function PartnerQuoteList({
   loading = false,
   readOnly = false
 }: PartnerQuoteListProps) {
-  const getStatusBadge = (status: string, override?: any) => {
+  const getStatusBadge = (status: string, override?: any, statusEnhanced?: string) => {
+    // Check if this is a review case (awaiting approval but already scheduled)
+    const approvalStatuses = ['WAITING_FOR_APPROVAL', 'WAITING_FOR_OHME_APPROVAL'];
+    const scheduledStatuses = ['scheduled', 'in_progress', 'install_completed_pending_qa', 'completed'];
+    
+    if (approvalStatuses.includes(status) && scheduledStatuses.includes(statusEnhanced || '')) {
+      return <Badge variant="outline" className="text-purple-600 bg-purple-50">Review</Badge>;
+    }
+
     // Show override status if present
     if (override) {
       if (override.override_type === 'quoted_pending_approval') {
@@ -330,7 +346,7 @@ export function PartnerQuoteList({
                     {job.partner.name}
                   </TableCell>
                   <TableCell>
-                    {getStatusBadge(job.partner_status, job.quote_override)}
+                    {getStatusBadge(job.partner_status, job.quote_override, job.status_enhanced)}
                   </TableCell>
                   <TableCell>
                     {job.job_type ? (
