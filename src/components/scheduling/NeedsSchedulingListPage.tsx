@@ -4,8 +4,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { ScheduleStatusNavigation } from './ScheduleStatusNavigation';
 import { ScheduleStatusListPage } from './ScheduleStatusListPage';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, Users, UserCheck } from 'lucide-react';
 import { useServerPagination } from '@/hooks/useServerPagination';
@@ -18,28 +16,23 @@ export function NeedsSchedulingListPage() {
   const { pagination, controls } = useServerPagination();
   const [searchParams, setSearchParams] = useSearchParams();
   
-  // Get include assigned engineers setting from URL
-  const [includeAssigned, setIncludeAssigned] = useState(() => {
-    return searchParams.get('includeAssigned') === 'true';
-  });
-
-  // Update URL when toggle changes
-  useEffect(() => {
-    const newSearchParams = new URLSearchParams(searchParams);
-    if (includeAssigned) {
-      newSearchParams.set('includeAssigned', 'true');
-    } else {
-      newSearchParams.delete('includeAssigned');
-    }
-    setSearchParams(newSearchParams, { replace: true });
-  }, [includeAssigned, searchParams, setSearchParams]);
+  // Always include assigned engineers - no toggle needed
   
   const { data: ordersResponse = { data: [], count: 0, unassignedCount: 0, assignedCount: 0 }, isLoading: ordersLoading, error: ordersError, refetch: refetchOrders } = useQuery({
-    queryKey: ['orders', 'needs-scheduling', pagination.page, pagination.pageSize, includeAssigned],
+    queryKey: ['orders', 'needs-scheduling', pagination.page, pagination.pageSize],
     queryFn: async () => {
       console.log('NeedsSchedulingListPage: Fetching orders...');
       
-      // Base query for orders that need scheduling
+      // First get all active offers to exclude orders with them
+      const { data: activeOffers } = await supabase
+        .from('job_offers')
+        .select('order_id')
+        .eq('status', 'pending')
+        .gt('expires_at', new Date().toISOString());
+
+      const activeOfferOrderIds = activeOffers?.map(offer => offer.order_id) || [];
+
+      // Base query for orders that need scheduling (excluding those with active offers)
       let query = supabase
         .from('orders')
         .select(`
@@ -52,15 +45,18 @@ export function NeedsSchedulingListPage() {
         .eq('scheduling_suppressed', false)
         .order('created_at', { ascending: false });
 
-      // Conditionally filter by engineer assignment
-      if (!includeAssigned) {
-        query = query.is('engineer_id', null);
+      // Exclude orders with active offers
+      if (activeOfferOrderIds.length > 0) {
+        query = query.not('id', 'in', `(${activeOfferOrderIds.map(id => `'${id}'`).join(',')})`);
       }
+
+      // Get total count first
+      const { count: totalCount } = await query;
 
       // Apply pagination
       query = query.range(pagination.offset, pagination.offset + pagination.pageSize - 1);
 
-      const { data: ordersData, error: ordersError, count } = await query;
+      const { data: ordersData, error: ordersError } = await query;
 
       if (ordersError) {
         console.error('NeedsSchedulingListPage: Error fetching orders:', ordersError);
@@ -69,30 +65,15 @@ export function NeedsSchedulingListPage() {
       
       console.log('NeedsSchedulingListPage: Got orders:', ordersData?.length);
       
-      if (!ordersData?.length) return { data: [], count: count || 0 };
-
-      // Get active offers to exclude orders that have them (for the paginated results only)
-      const orderIds = ordersData.map(order => order.id);
-      const { data: activeOffers } = await supabase
-        .from('job_offers')
-        .select('order_id')
-        .eq('status', 'pending')
-        .gt('expires_at', new Date().toISOString())
-        .in('order_id', orderIds);
-
-      const ordersWithActiveOffers = new Set(activeOffers?.map(offer => offer.order_id) || []);
+      if (!ordersData?.length) return { data: [], count: totalCount || 0, unassignedCount: 0, assignedCount: 0 };
       
-      // Filter out orders that have active offers
-      const filteredOrders = ordersData.filter(order => !ordersWithActiveOffers.has(order.id));
-      console.log('NeedsSchedulingListPage: Filtered orders:', filteredOrders.length);
-      
-      // Get counts for assigned vs unassigned
-      const unassignedCount = filteredOrders.filter(order => !order.engineer_id).length;
-      const assignedCount = filteredOrders.filter(order => order.engineer_id).length;
+      // Get counts for assigned vs unassigned from the paginated results
+      const unassignedCount = ordersData.filter(order => !order.engineer_id).length;
+      const assignedCount = ordersData.filter(order => order.engineer_id).length;
       
       return { 
-        data: filteredOrders, 
-        count: count || 0,
+        data: ordersData, 
+        count: totalCount || 0,
         unassignedCount,
         assignedCount
       };
@@ -225,16 +206,6 @@ export function NeedsSchedulingListPage() {
                 </Badge>
               </div>
             </CardTitle>
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="include-assigned"
-                checked={includeAssigned}
-                onCheckedChange={setIncludeAssigned}
-              />
-              <Label htmlFor="include-assigned" className="text-sm font-medium">
-                Include assigned engineers
-              </Label>
-            </div>
           </div>
         </CardHeader>
         <CardContent>

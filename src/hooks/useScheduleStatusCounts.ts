@@ -86,40 +86,33 @@ export function useScheduleStatusCounts() {
           .eq('availability', false)
       ]);
 
-      // For needs-scheduling, get count of orders with no engineer and no active offers
+      // For needs-scheduling, get count of ALL orders (assigned and unassigned) with no active offers
       // Exclude scheduling_suppressed orders
       let needsSchedulingCount = 0;
         
-      // First get orders that need scheduling (no engineer assigned) and not suppressed
-      const { count: unassignedOrdersCount } = await supabase
+      // Get active offers to exclude
+      const { data: activeOffers } = await supabase
+        .from('job_offers')
+        .select('order_id')
+        .eq('status', 'pending')
+        .gt('expires_at', new Date().toISOString());
+
+      const activeOfferOrderIds = activeOffers?.map(offer => offer.order_id) || [];
+
+      // Count ALL orders that need scheduling (regardless of engineer assignment)
+      let query = supabase
         .from('orders')
         .select('*', { count: 'exact', head: true })
         .eq('status_enhanced', 'awaiting_install_booking')
-        .is('engineer_id', null)
         .eq('scheduling_suppressed', false);
-        
-      needsSchedulingCount = unassignedOrdersCount || 0;
-        
-      // Subtract any unassigned orders that have active offers
-      if (needsSchedulingCount > 0) {
-        const { data: activeOffers } = await supabase
-          .from('job_offers')
-          .select('order_id')
-          .eq('status', 'pending')
-          .gt('expires_at', new Date().toISOString());
-          
-        if (activeOffers?.length) {
-          const { count: unassignedOrdersWithOffersCount } = await supabase
-            .from('orders')
-            .select('*', { count: 'exact', head: true })
-            .eq('status_enhanced', 'awaiting_install_booking')
-            .is('engineer_id', null)
-            .eq('scheduling_suppressed', false)
-            .in('id', activeOffers.map(offer => offer.order_id));
-            
-          needsSchedulingCount = Math.max(0, needsSchedulingCount - (unassignedOrdersWithOffersCount || 0));
-        }
+
+      // Exclude orders with active offers
+      if (activeOfferOrderIds.length > 0) {
+        query = query.not('id', 'in', `(${activeOfferOrderIds.map(id => `'${id}'`).join(',')})`);
       }
+
+      const { count } = await query;
+      needsSchedulingCount = count || 0;
 
       // For ready-to-book, count orders with accepted offers that haven't been scheduled yet
       // Exclude scheduling_suppressed orders
