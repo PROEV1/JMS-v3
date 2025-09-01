@@ -107,6 +107,9 @@ export default function AdminPartnerQuotes() {
     quote_value_min: '',
     quote_value_max: ''
   });
+  const [dataTruncated, setDataTruncated] = useState(false);
+  const [totalCount, setTotalCount] = useState(0);
+  const [fetchedCount, setFetchedCount] = useState(0);
 
   useEffect(() => {
     fetchPartners();
@@ -176,10 +179,38 @@ export default function AdminPartnerQuotes() {
     }
   };
 
+  // Helper function for paginated fetching
+  const fetchJobsPaginated = async (partnerIds: string[], baseQuery: any) => {
+    const pageSize = 1000;
+    let allJobs: any[] = [];
+    let offset = 0;
+    let hasMore = true;
+
+    while (hasMore) {
+      const { data, error } = await baseQuery
+        .range(offset, offset + pageSize - 1)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        allJobs = [...allJobs, ...data];
+        offset += pageSize;
+        hasMore = data.length === pageSize;
+      } else {
+        hasMore = false;
+      }
+    }
+
+    return allJobs;
+  };
+
   const fetchJobs = async () => {
     if (!selectedPartner) return;
     
     setLoading(true);
+    setDataTruncated(false);
+    
     try {
       // First, get child partners to include in the query
       const { data: childPartners } = await supabase
@@ -189,6 +220,20 @@ export default function AdminPartnerQuotes() {
 
       const partnerIds = [selectedPartner, ...(childPartners?.map(p => p.id) || [])];
 
+      // Get total count first with status/schedule filtering
+      let countQuery = supabase
+        .from('orders')
+        .select('id', { count: 'exact', head: true })
+        .eq('is_partner_job', true)
+        .in('partner_id', partnerIds);
+
+      // Add status/schedule OR filter for relevant jobs
+      countQuery = countQuery.or(`
+        partner_status.in.(AWAITING_QUOTATION,WAITING_FOR_OHME_APPROVAL,WAITING_FOR_APPROVAL,REWORK_REQUESTED,REJECTED),
+        scheduled_install_date.not.is.null
+      `);
+
+      // Build the main query with status/schedule filtering
       let query = supabase
         .from('orders')
         .select(`
@@ -216,14 +261,22 @@ export default function AdminPartnerQuotes() {
         .eq('is_partner_job', true)
         .in('partner_id', partnerIds);
 
-      // Apply filters
+      // Add status/schedule OR filter - focus on relevant statuses and scheduled jobs
+      query = query.or(`
+        partner_status.in.(AWAITING_QUOTATION,WAITING_FOR_OHME_APPROVAL,WAITING_FOR_APPROVAL,REWORK_REQUESTED,REJECTED),
+        scheduled_install_date.not.is.null
+      `);
+
+      // Apply user filters
       if (filters.job_type && filters.job_type !== 'all' && 
           ['installation', 'assessment', 'service_call'].includes(filters.job_type)) {
         query = query.eq('job_type', filters.job_type as 'installation' | 'assessment' | 'service_call');
+        countQuery = countQuery.eq('job_type', filters.job_type as 'installation' | 'assessment' | 'service_call');
       }
 
       if (filters.region) {
         query = query.ilike('postcode', `${filters.region}%`);
+        countQuery = countQuery.ilike('postcode', `${filters.region}%`);
       }
 
       if (filters.date_range && filters.date_range !== 'all') {
@@ -245,19 +298,29 @@ export default function AdminPartnerQuotes() {
         }
         
         query = query.gte('created_at', startDate.toISOString());
+        countQuery = countQuery.gte('created_at', startDate.toISOString());
       }
 
       if (filters.quote_value_min) {
         query = query.gte('total_amount', parseFloat(filters.quote_value_min));
+        countQuery = countQuery.gte('total_amount', parseFloat(filters.quote_value_min));
       }
 
       if (filters.quote_value_max) {
         query = query.lte('total_amount', parseFloat(filters.quote_value_max));
+        countQuery = countQuery.lte('total_amount', parseFloat(filters.quote_value_max));
       }
-      
-      const { data, error } = await query.order('created_at', { ascending: false });
 
-      if (error) throw error;
+      // Get total count
+      const { count, error: countError } = await countQuery;
+      if (countError) throw countError;
+      
+      // Fetch all relevant jobs using pagination
+      const data = await fetchJobsPaginated(partnerIds, query);
+
+      setTotalCount(count || 0);
+      setFetchedCount(data.length);
+      setDataTruncated((count || 0) > data.length);
 
       // Fetch quote overrides for these orders
       const orderIds = (data || []).map(job => job.id);
@@ -300,6 +363,24 @@ export default function AdminPartnerQuotes() {
       }));
 
       setJobs(transformedJobs);
+
+      // Console logging for diagnostics
+      console.log('Partner Jobs Fetch Summary:', {
+        partnerId: selectedPartner,
+        partnerName: partners.find(p => p.id === selectedPartner)?.name,
+        totalCount: count || 0,
+        fetchedCount: data.length,
+        dataTruncated: (count || 0) > data.length,
+        statusBreakdown: {
+          AWAITING_QUOTATION: transformedJobs.filter(j => j.partner_status === 'AWAITING_QUOTATION').length,
+          WAITING_FOR_APPROVAL: transformedJobs.filter(j => j.partner_status === 'WAITING_FOR_APPROVAL').length,
+          WAITING_FOR_OHME_APPROVAL: transformedJobs.filter(j => j.partner_status === 'WAITING_FOR_OHME_APPROVAL').length,
+          REWORK_REQUESTED: transformedJobs.filter(j => j.partner_status === 'REWORK_REQUESTED').length,
+          REJECTED: transformedJobs.filter(j => j.partner_status === 'REJECTED').length,
+          scheduled: transformedJobs.filter(j => j.scheduled_install_date).length
+        }
+      });
+
     } catch (error) {
       console.error('Error fetching jobs:', error);
       toast({
@@ -620,6 +701,16 @@ export default function AdminPartnerQuotes() {
             />
 
             <Separator />
+
+            {/* Data truncation warning */}
+            {dataTruncated && (
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  Loaded {fetchedCount.toLocaleString()} of {totalCount.toLocaleString()} total jobs. Narrow filters to see all jobs.
+                </AlertDescription>
+              </Alert>
+            )}
 
             {/* Read-only banner for needs scheduling tab */}
             {activeStatus === 'needs_scheduling' && (
