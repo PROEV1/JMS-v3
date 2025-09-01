@@ -9,13 +9,14 @@ import { useToast } from '@/hooks/use-toast';
 import { useUserRole } from '@/hooks/useUserRole';
 import { usePermissions } from '@/hooks/usePermissions';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Settings } from 'lucide-react';
 import { 
   PartnerQuoteKPIs, 
   PartnerQuoteFilters, 
   PartnerQuoteDrawer, 
   AddQuoteModal 
 } from '@/components/partner-quotes';
+import { PartnerQuoteSettingsModal } from '@/components/partner-quotes/PartnerQuoteSettingsModal';
 import { PartnerQuoteStatusTabs } from '@/components/partner-quotes/PartnerQuoteStatusTabs';
 import { PartnerQuoteList } from '@/components/partner-quotes/PartnerQuoteList';
 
@@ -84,6 +85,7 @@ export default function AdminPartnerQuotes() {
   const [showAddQuoteModal, setShowAddQuoteModal] = useState(false);
   const [jobForQuote, setJobForQuote] = useState<PartnerQuoteJob | null>(null);
   const [partnerSettings, setPartnerSettings] = useState<any>(null);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [filters, setFilters] = useState({
     region: '',
     job_type: 'all',
@@ -369,6 +371,16 @@ export default function AdminPartnerQuotes() {
                 ))}
               </SelectContent>
             </Select>
+            {selectedPartner && (
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setShowSettingsModal(true)}
+                title="Partner Settings"
+              >
+                <Settings className="h-4 w-4" />
+              </Button>
+            )}
           </div>
         </div>
 
@@ -432,6 +444,18 @@ export default function AdminPartnerQuotes() {
             setJobForQuote(null);
           }}
           partnerName={partners.find(p => p.id === selectedPartner)?.name || ''}
+        />
+      )}
+
+      {selectedPartner && (
+        <PartnerQuoteSettingsModal
+          open={showSettingsModal}
+          onOpenChange={setShowSettingsModal}
+          partnerId={selectedPartner}
+          partnerName={partners.find(p => p.id === selectedPartner)?.name || ''}
+          onSettingsUpdated={() => {
+            fetchPartnerSettings(selectedPartner);
+          }}
         />
       )}
     </div>

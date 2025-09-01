@@ -67,8 +67,8 @@ export function PartnerQuoteKPIs({ partnerId, jobs }: PartnerQuoteKPIsProps) {
       }
 
       setKpiData({
-        needsQuotation: jobs.filter(j => j.partner_status === 'AWAITING_QUOTATION').length,
-        waitingApproval: jobs.filter(j => j.partner_status === 'QUOTE_SUBMITTED').length,
+        needsQuotation: jobs.filter(j => j.partner_status === 'NEW_JOB').length,
+        waitingApproval: jobs.filter(j => j.partner_status === 'WAITING_FOR_APPROVAL').length,
         approvedLast7Days,
         rejectedLast7Days,
         avgApprovalTimeHours
