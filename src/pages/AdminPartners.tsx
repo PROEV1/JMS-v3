@@ -474,6 +474,14 @@ export default function AdminPartners() {
                 <Button
                   variant="outline"
                   size="sm"
+                  onClick={() => navigate(`/ops/quotes?partnerId=${partner.id}`)}
+                >
+                  <Upload className="h-4 w-4 mr-1" />
+                  Quote Dashboard
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => handleEdit(partner)}
                 >
                   <Edit className="h-4 w-4" />

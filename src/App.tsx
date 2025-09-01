@@ -18,6 +18,8 @@ import AdminInventory from '@/pages/AdminInventory';
 import AdminSurveyForms from '@/pages/AdminSurveyForms';
 import AdminChargers from '@/pages/AdminChargers';
 import AdminPartners from '@/pages/AdminPartners';
+import AdminPartnerProfiles from '@/pages/AdminPartnerProfiles';
+import AdminPartnerUsers from '@/pages/AdminPartnerUsers';
 import PublicQuoteView from '@/pages/PublicQuoteView';
 import AdminSchedule from '@/pages/AdminSchedule';
 import AdminScheduleStatus from '@/pages/AdminScheduleStatus';
@@ -50,6 +52,8 @@ function App() {
         <Route path="/admin/survey-forms" element={<ProtectedRoute><Layout><AdminSurveyForms /></Layout></ProtectedRoute>} />
         <Route path="/admin/chargers" element={<ProtectedRoute><Layout><AdminChargers /></Layout></ProtectedRoute>} />
         <Route path="/admin/partners" element={<ProtectedRoute><Layout><AdminPartners /></Layout></ProtectedRoute>} />
+        <Route path="/admin/partners/:id/users" element={<ProtectedRoute><Layout><AdminPartnerUsers /></Layout></ProtectedRoute>} />
+        <Route path="/admin/partners/:id/profiles" element={<ProtectedRoute><Layout><AdminPartnerProfiles /></Layout></ProtectedRoute>} />
         <Route path="/admin/engineers" element={<ProtectedRoute><Layout><AdminEngineers /></Layout></ProtectedRoute>} />
         <Route path="/admin/engineers/:id" element={<ProtectedRoute><Layout><EngineerProfile /></Layout></ProtectedRoute>} />
         <Route path="/admin/users" element={<ProtectedRoute><Layout><AdminUsers /></Layout></ProtectedRoute>} />
@@ -58,7 +62,6 @@ function App() {
         <Route path="/admin/schedule/status/:status" element={<ProtectedRoute><Layout><AdminScheduleStatus /></Layout></ProtectedRoute>} />
         <Route path="/admin/schedule/engineer/:engineerId" element={<ProtectedRoute><Layout><EngineerAvailability /></Layout></ProtectedRoute>} />
         <Route path="/admin/messages" element={<ProtectedRoute><Layout><AdminMessages /></Layout></ProtectedRoute>} />
-        <Route path="/admin/partners/:id/profiles" element={<ProtectedRoute><Layout><AdminPartnerQuotes /></Layout></ProtectedRoute>} />
         <Route path="/ops/quotes" element={<ProtectedRoute><Layout><AdminPartnerQuotes /></Layout></ProtectedRoute>} />
       </Routes>
     </Router>

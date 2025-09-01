@@ -71,15 +71,15 @@ export default function AdminPartnerQuotes() {
   const { role } = useUserRole();
   const { canManageQuotes, canManageOrders, loading: permissionsLoading } = usePermissions();
   
-  // Extract partner ID from URL if present (e.g., /admin/partners/:id/profiles)
-  const urlPartnerId = location.pathname.match(/\/admin\/partners\/([^\/]+)\/profiles/)?.[1];
+  // Extract partner ID from URL query parameter
+  const queryPartnerId = searchParams.get('partnerId');
   
   // URL-driven state for active status
   const [activeStatus, setActiveStatus] = useState(
     searchParams.get('status') || 'needs_quotation'
   );
   
-  const [selectedPartner, setSelectedPartner] = useState<string | null>(urlPartnerId || null);
+  const [selectedPartner, setSelectedPartner] = useState<string | null>(queryPartnerId || null);
   const [partners, setPartners] = useState<Partner[]>([]);
   const [jobs, setJobs] = useState<PartnerQuoteJob[]>([]);
   const [loading, setLoading] = useState(true);
@@ -120,12 +120,12 @@ export default function AdminPartnerQuotes() {
 
       setPartners(data || []);
       
-      // Auto-select first partner if available and no URL partner ID is present
-      if (data?.length > 0 && !urlPartnerId) {
+      // Auto-select first partner if available and no query partner ID is present
+      if (data?.length > 0 && !queryPartnerId) {
         setSelectedPartner(data[0].id);
-      } else if (urlPartnerId && data?.find(p => p.id === urlPartnerId)) {
-        // Validate that the URL partner ID exists in the partners list
-        setSelectedPartner(urlPartnerId);
+      } else if (queryPartnerId && data?.find(p => p.id === queryPartnerId)) {
+        // Validate that the query partner ID exists in the partners list
+        setSelectedPartner(queryPartnerId);
       }
     } catch (error) {
       console.error('Error fetching partners:', error);
