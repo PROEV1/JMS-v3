@@ -670,8 +670,7 @@ export function ScheduleStatusListPage({
     }
   };
 
-  // Main render with error boundary and debugging
-  console.log('About to render ScheduleStatusListPage with', filteredAndSortedOrders.length, 'orders');
+  // Main render with error boundary
   
   try {
     return (
@@ -681,7 +680,7 @@ export function ScheduleStatusListPage({
           <div>
             <h2 className="text-2xl font-bold">{title}</h2>
             <p className="text-muted-foreground">
-              {filteredAndSortedOrders.length} job{filteredAndSortedOrders.length !== 1 ? 's' : ''} | DEBUG: Original count: {orders?.length || 0}
+              {filteredAndSortedOrders.length} job{filteredAndSortedOrders.length !== 1 ? 's' : ''}
             </p>
           </div>
         

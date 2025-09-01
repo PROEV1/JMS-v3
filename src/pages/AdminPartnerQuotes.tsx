@@ -288,23 +288,6 @@ export default function AdminPartnerQuotes() {
         status_enhanced: job.status_enhanced
       }));
 
-      // Debug logging for job counts by status
-      const statusBreakdown = transformedJobs.reduce((acc, job) => {
-        acc[job.partner_status] = (acc[job.partner_status] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>);
-
-      console.log('🔍 Partner Jobs Fetched:', {
-        totalJobs: transformedJobs.length,
-        partnerIds: partnerIds,
-        childPartnerCount: childPartners?.length || 0,
-        statusBreakdown,
-        expectedAWAITING_QUOTATION: 34,
-        expectedWAITING_FOR_OHME_APPROVAL: 26,
-        actualAWAITING_QUOTATION: statusBreakdown['AWAITING_QUOTATION'] || 0,
-        actualWAITING_FOR_OHME_APPROVAL: statusBreakdown['WAITING_FOR_OHME_APPROVAL'] || 0
-      });
-
       setJobs(transformedJobs);
     } catch (error) {
       console.error('Error fetching jobs:', error);
