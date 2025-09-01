@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, UserPlus, Mail } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ArrowLeft, UserPlus, Mail, Key } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export default function AdminUserInvite() {
@@ -18,6 +19,10 @@ export default function AdminUserInvite() {
     email: '',
     full_name: '',
     role: 'client' as 'admin' | 'client' | 'engineer' | 'manager'
+  });
+  const [passwordData, setPasswordData] = useState({
+    password: '',
+    confirmPassword: ''
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -68,6 +73,77 @@ export default function AdminUserInvite() {
     }
   };
 
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!formData.email.trim() || !formData.full_name.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Email and full name are required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!passwordData.password || passwordData.password !== passwordData.confirmPassword) {
+      toast({
+        title: "Password Error",
+        description: "Passwords do not match or are empty",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (passwordData.password.length < 6) {
+      toast({
+        title: "Password Error",
+        description: "Password must be at least 6 characters long",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-create-user-with-password', {
+        body: {
+          email: formData.email.trim(),
+          full_name: formData.full_name.trim(),
+          password: passwordData.password,
+          role: formData.role
+        }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "User Created",
+        description: `User account created successfully for ${formData.full_name}. They can now log in with the password you set.`,
+      });
+
+      // Reset forms
+      setFormData({
+        email: '',
+        full_name: '',
+        role: 'client'
+      });
+      setPasswordData({
+        password: '',
+        confirmPassword: ''
+      });
+
+    } catch (error: any) {
+      console.error('Error creating user with password:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create user account",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <BrandPage>
       <BrandContainer>
@@ -95,85 +171,200 @@ export default function AdminUserInvite() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Mail className="h-5 w-5" />
-                <span>User Invitation</span>
-              </CardTitle>
+              <CardTitle>Create New User</CardTitle>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="email">Email Address *</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      placeholder="user@example.com"
-                      required
-                    />
-                    <p className="text-sm text-muted-foreground mt-1">
-                      An invitation email will be sent to this address
-                    </p>
-                  </div>
+              <Tabs defaultValue="email" className="space-y-6">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="email" className="flex items-center space-x-2">
+                    <Mail className="h-4 w-4" />
+                    <span>Send Email Invite</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="password" className="flex items-center space-x-2">
+                    <Key className="h-4 w-4" />
+                    <span>Set Password Directly</span>
+                  </TabsTrigger>
+                </TabsList>
 
-                  <div>
-                    <Label htmlFor="full_name">Full Name *</Label>
-                    <Input
-                      id="full_name"
-                      value={formData.full_name}
-                      onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-                      placeholder="John Smith"
-                      required
-                    />
-                  </div>
+                <TabsContent value="email" className="space-y-6">
+                  <form onSubmit={handleSubmit} className="space-y-6">
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="email">Email Address *</Label>
+                        <Input
+                          id="email"
+                          type="email"
+                          value={formData.email}
+                          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                          placeholder="user@example.com"
+                          required
+                        />
+                        <p className="text-sm text-muted-foreground mt-1">
+                          An invitation email will be sent to this address
+                        </p>
+                      </div>
 
-                  <div>
-                    <Label htmlFor="role">User Role *</Label>
-                    <Select value={formData.role} onValueChange={(value: any) => setFormData({ ...formData, role: value })}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select user role" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="client">Client</SelectItem>
-                        <SelectItem value="engineer">Engineer</SelectItem>
-                        <SelectItem value="manager">Manager</SelectItem>
-                        <SelectItem value="admin">Admin</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {formData.role === 'client' && "Can view their own orders and quotes"}
-                      {formData.role === 'engineer' && "Can manage installation jobs and update job status"}
-                      {formData.role === 'manager' && "Can manage leads, quotes, and orders"}
-                      {formData.role === 'admin' && "Full system access and user management"}
-                    </p>
-                  </div>
-                </div>
+                      <div>
+                        <Label htmlFor="full_name">Full Name *</Label>
+                        <Input
+                          id="full_name"
+                          value={formData.full_name}
+                          onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                          placeholder="John Smith"
+                          required
+                        />
+                      </div>
 
-                <div className="bg-blue-50 p-4 rounded-lg">
-                  <h4 className="font-medium text-blue-900 mb-2">What happens next?</h4>
-                  <ul className="text-sm text-blue-800 space-y-1">
-                    <li>• An email invitation will be sent to the user</li>
-                    <li>• They will receive a temporary password to log in</li>
-                    <li>• They can change their password after first login</li>
-                    <li>• Their account will be created with the selected role</li>
-                  </ul>
-                </div>
+                      <div>
+                        <Label htmlFor="role">User Role *</Label>
+                        <Select value={formData.role} onValueChange={(value: any) => setFormData({ ...formData, role: value })}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select user role" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="client">Client</SelectItem>
+                            <SelectItem value="engineer">Engineer</SelectItem>
+                            <SelectItem value="manager">Manager</SelectItem>
+                            <SelectItem value="admin">Admin</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          {formData.role === 'client' && "Can view their own orders and quotes"}
+                          {formData.role === 'engineer' && "Can manage installation jobs and update job status"}
+                          {formData.role === 'manager' && "Can manage leads, quotes, and orders"}
+                          {formData.role === 'admin' && "Full system access and user management"}
+                        </p>
+                      </div>
+                    </div>
 
-                <div className="flex justify-end space-x-3">
-                  <Button 
-                    type="button" 
-                    variant="outline"
-                    onClick={() => navigate('/admin/users')}
-                  >
-                    Cancel
-                  </Button>
-                  <Button type="submit" disabled={loading}>
-                    {loading ? "Sending Invitation..." : "Send Invitation"}
-                  </Button>
-                </div>
-              </form>
+                    <div className="bg-blue-50 p-4 rounded-lg">
+                      <h4 className="font-medium text-blue-900 mb-2">What happens next?</h4>
+                      <ul className="text-sm text-blue-800 space-y-1">
+                        <li>• An email invitation will be sent to the user</li>
+                        <li>• They will receive a temporary password to log in</li>
+                        <li>• They can change their password after first login</li>
+                        <li>• Their account will be created with the selected role</li>
+                      </ul>
+                    </div>
+
+                    <div className="flex justify-end space-x-3">
+                      <Button 
+                        type="button" 
+                        variant="outline"
+                        onClick={() => navigate('/admin/users')}
+                      >
+                        Cancel
+                      </Button>
+                      <Button type="submit" disabled={loading}>
+                        {loading ? "Sending Invitation..." : "Send Invitation"}
+                      </Button>
+                    </div>
+                  </form>
+                </TabsContent>
+
+                <TabsContent value="password" className="space-y-6">
+                  <form onSubmit={handlePasswordSubmit} className="space-y-6">
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="email-pwd">Email Address *</Label>
+                        <Input
+                          id="email-pwd"
+                          type="email"
+                          value={formData.email}
+                          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                          placeholder="user@example.com"
+                          required
+                        />
+                        <p className="text-sm text-muted-foreground mt-1">
+                          This will be their login username
+                        </p>
+                      </div>
+
+                      <div>
+                        <Label htmlFor="full_name-pwd">Full Name *</Label>
+                        <Input
+                          id="full_name-pwd"
+                          value={formData.full_name}
+                          onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                          placeholder="John Smith"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <Label htmlFor="role-pwd">User Role *</Label>
+                        <Select value={formData.role} onValueChange={(value: any) => setFormData({ ...formData, role: value })}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select user role" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="client">Client</SelectItem>
+                            <SelectItem value="engineer">Engineer</SelectItem>
+                            <SelectItem value="manager">Manager</SelectItem>
+                            <SelectItem value="admin">Admin</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          {formData.role === 'client' && "Can view their own orders and quotes"}
+                          {formData.role === 'engineer' && "Can manage installation jobs and update job status"}
+                          {formData.role === 'manager' && "Can manage leads, quotes, and orders"}
+                          {formData.role === 'admin' && "Full system access and user management"}
+                        </p>
+                      </div>
+
+                      <div>
+                        <Label htmlFor="password">Password *</Label>
+                        <Input
+                          id="password"
+                          type="password"
+                          value={passwordData.password}
+                          onChange={(e) => setPasswordData({ ...passwordData, password: e.target.value })}
+                          placeholder="Enter password (min 6 characters)"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <Label htmlFor="confirmPassword">Confirm Password *</Label>
+                        <Input
+                          id="confirmPassword"
+                          type="password"
+                          value={passwordData.confirmPassword}
+                          onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                          placeholder="Confirm password"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="bg-green-50 p-4 rounded-lg">
+                      <h4 className="font-medium text-green-900 mb-2">What happens next?</h4>
+                      <ul className="text-sm text-green-800 space-y-1">
+                        <li>• User account will be created immediately</li>
+                        <li>• No email will be sent</li>
+                        <li>• They can log in right away with the password you set</li>
+                        <li>• They can change their password after logging in</li>
+                      </ul>
+                    </div>
+
+                    <div className="flex justify-end space-x-3">
+                      <Button 
+                        type="button" 
+                        variant="outline"
+                        onClick={() => navigate('/admin/users')}
+                      >
+                        Cancel
+                      </Button>
+                      <Button 
+                        type="submit" 
+                        disabled={loading || !passwordData.password || passwordData.password !== passwordData.confirmPassword || passwordData.password.length < 6}
+                      >
+                        {loading ? "Creating Account..." : "Create Account"}
+                      </Button>
+                    </div>
+                  </form>
+                </TabsContent>
+              </Tabs>
             </CardContent>
           </Card>
         </div>

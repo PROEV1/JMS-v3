@@ -54,3 +54,6 @@ verify_jwt = true
 
 [functions.admin-create-engineer-user]
 verify_jwt = true
+
+[functions.admin-create-user-with-password]
+verify_jwt = true
