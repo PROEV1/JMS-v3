@@ -184,7 +184,7 @@ export default function AdminPartnerQuotes() {
           total_amount,
           created_at,
           partner_id,
-          partner_job_id,
+          partner_external_id,
           status_enhanced,
           clients!inner(
             full_name,
@@ -267,8 +267,8 @@ export default function AdminPartnerQuotes() {
           name: job.partners.name
         },
         partner_status: job.partner_status || 'NEW_JOB',
-        partner_job_id: job.partner_job_id || job.order_number,
-        partner_external_id: job.order_number,
+        partner_job_id: job.partner_external_id || job.order_number,
+        partner_external_id: job.partner_external_id || job.order_number,
         job_type: job.job_type as 'installation' | 'assessment' | 'service_call',
         created_at: job.created_at,
         total_amount: job.total_amount || 0,
@@ -418,7 +418,7 @@ export default function AdminPartnerQuotes() {
   };
 
   const handleOpenInPartner = (job: PartnerQuoteJob) => {
-    const partnerUrl = `https://connect.ohme-ev.com/en/jobs/job/${job.partner_job_id}`;
+    const partnerUrl = `https://connect.ohme-ev.com/en/jobs/job/${job.partner_external_id}`;
     window.open(partnerUrl, '_blank');
   };
 
