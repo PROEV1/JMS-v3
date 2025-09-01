@@ -677,13 +677,6 @@ export function ScheduleStatusListPage({
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold">{title}</h2>
-            <p className="text-muted-foreground">
-              {filteredAndSortedOrders.length} job{filteredAndSortedOrders.length !== 1 ? 's' : ''}
-            </p>
-          </div>
-        
         <div className="flex items-center gap-3">
           {showAutoSchedule && (
             <Button 
