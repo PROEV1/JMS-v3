@@ -2211,6 +2211,44 @@ export type Database = {
           },
         ]
       }
+      partner_quote_overrides: {
+        Row: {
+          cleared_at: string | null
+          created_at: string
+          created_by: string
+          id: string
+          notes: string | null
+          order_id: string
+          override_type: Database["public"]["Enums"]["partner_quote_override_type"]
+        }
+        Insert: {
+          cleared_at?: string | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          notes?: string | null
+          order_id: string
+          override_type: Database["public"]["Enums"]["partner_quote_override_type"]
+        }
+        Update: {
+          cleared_at?: string | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          notes?: string | null
+          order_id?: string
+          override_type?: Database["public"]["Enums"]["partner_quote_override_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_quote_overrides_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       partner_quote_settings: {
         Row: {
           auto_hide_days: number
@@ -3934,6 +3972,9 @@ export type Database = {
         | "soft_hold"
         | "confirmed"
         | "blocked"
+      partner_quote_override_type:
+        | "quoted_pending_approval"
+        | "standard_quote_marked"
       partner_quote_status:
         | "submitted"
         | "approved"
@@ -4135,6 +4176,10 @@ export const Constants = {
         "soft_hold",
         "confirmed",
         "blocked",
+      ],
+      partner_quote_override_type: [
+        "quoted_pending_approval",
+        "standard_quote_marked",
       ],
       partner_quote_status: [
         "submitted",

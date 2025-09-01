@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,7 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useUserRole } from '@/hooks/useUserRole';
 import { usePermissions } from '@/hooks/usePermissions';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Settings } from 'lucide-react';
+import { Loader2, Settings, AlertCircle } from 'lucide-react';
 import { 
   PartnerQuoteKPIs, 
   PartnerQuoteFilters, 
@@ -19,6 +20,7 @@ import {
 import { PartnerQuoteSettingsModal } from '@/components/partner-quotes/PartnerQuoteSettingsModal';
 import { PartnerQuoteStatusTabs } from '@/components/partner-quotes/PartnerQuoteStatusTabs';
 import { PartnerQuoteList } from '@/components/partner-quotes/PartnerQuoteList';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface Partner {
   id: string;
@@ -61,6 +63,13 @@ interface PartnerQuoteJob {
   postcode: string;
   assigned_user?: string;
   require_file?: boolean;
+  quote_override?: {
+    id: string;
+    override_type: 'quoted_pending_approval' | 'standard_quote_marked';
+    notes?: string;
+    created_at: string;
+  };
+  status_enhanced?: string;
 }
 
 export default function AdminPartnerQuotes() {
@@ -175,6 +184,8 @@ export default function AdminPartnerQuotes() {
           total_amount,
           created_at,
           partner_id,
+          partner_job_id,
+          status_enhanced,
           clients!inner(
             full_name,
             email,
@@ -230,6 +241,18 @@ export default function AdminPartnerQuotes() {
 
       if (error) throw error;
 
+      // Fetch quote overrides for these orders
+      const orderIds = (data || []).map(job => job.id);
+      const { data: overrides } = await supabase
+        .from('partner_quote_overrides')
+        .select('*')
+        .in('order_id', orderIds)
+        .is('cleared_at', null);
+
+      const overrideMap = new Map(
+        (overrides || []).map(override => [override.order_id, override])
+      );
+
       const transformedJobs: PartnerQuoteJob[] = (data || []).map(job => ({
         id: job.id,
         order_number: job.order_number,
@@ -244,7 +267,7 @@ export default function AdminPartnerQuotes() {
           name: job.partners.name
         },
         partner_status: job.partner_status || 'NEW_JOB',
-        partner_job_id: job.order_number,
+        partner_job_id: job.partner_job_id || job.order_number,
         partner_external_id: job.order_number,
         job_type: job.job_type as 'installation' | 'assessment' | 'service_call',
         created_at: job.created_at,
@@ -252,7 +275,9 @@ export default function AdminPartnerQuotes() {
         partner_id: job.partner_id,
         partner_external_url: job.partner_external_url,
         postcode: job.postcode || job.clients.postcode || '',
-        require_file: false
+        require_file: false,
+        quote_override: overrideMap.get(job.id),
+        status_enhanced: job.status_enhanced
       }));
 
       setJobs(transformedJobs);
@@ -268,17 +293,41 @@ export default function AdminPartnerQuotes() {
     }
   };
 
-  // Helper function to get jobs by status
+  // Helper function to get jobs by status with new logic
   const getBucketJobs = (...statuses: string[]) => {
-    return jobs.filter(job => statuses.includes(job.partner_status));
+    return jobs.filter(job => {
+      // Check for quote overrides first
+      if (job.quote_override) {
+        if (job.quote_override.override_type === 'quoted_pending_approval') {
+          return statuses.includes('WAITING_FOR_APPROVAL');
+        }
+        if (job.quote_override.override_type === 'standard_quote_marked') {
+          return statuses.includes('NEEDS_SCHEDULING');
+        }
+      }
+
+      // Check partner status
+      if (statuses.includes(job.partner_status)) {
+        return true;
+      }
+
+      // For needs scheduling bucket, also check status_enhanced
+      if (statuses.includes('NEEDS_SCHEDULING')) {
+        return job.status_enhanced === 'awaiting_install_booking' ||
+               job.partner_status === 'AWAITING_INSTALL_DATE' ||
+               job.partner_status === 'INSTALL_DATE_CONFIRMED';
+      }
+
+      return false;
+    });
   };
 
   // Status counts for tabs
   const statusCounts = useMemo(() => {
     return {
       needs_quotation: getBucketJobs('NEW_JOB', 'AWAITING_QUOTATION').length,
-      waiting_approval: getBucketJobs('WAITING_FOR_APPROVAL').length,
-      approved: getBucketJobs('APPROVED').length,
+      waiting_approval: getBucketJobs('WAITING_FOR_APPROVAL', 'WAITING_FOR_OHME_APPROVAL').length,
+      needs_scheduling: getBucketJobs('NEEDS_SCHEDULING').length,
       rejected_rework: getBucketJobs('REJECTED', 'REWORK_REQUESTED').length
     };
   }, [jobs]);
@@ -289,9 +338,9 @@ export default function AdminPartnerQuotes() {
       case 'needs_quotation':
         return getBucketJobs('NEW_JOB', 'AWAITING_QUOTATION');
       case 'waiting_approval':
-        return getBucketJobs('WAITING_FOR_APPROVAL');
-      case 'approved':
-        return getBucketJobs('APPROVED');
+        return getBucketJobs('WAITING_FOR_APPROVAL', 'WAITING_FOR_OHME_APPROVAL');
+      case 'needs_scheduling':
+        return getBucketJobs('NEEDS_SCHEDULING');
       case 'rejected_rework':
         return getBucketJobs('REJECTED', 'REWORK_REQUESTED');
       default:
@@ -310,13 +359,67 @@ export default function AdminPartnerQuotes() {
     setShowDrawer(true);
   };
 
-  const handleAddQuote = (job: PartnerQuoteJob) => {
-    setJobForQuote(job);
-    setShowAddQuoteModal(true);
+  const handleMarkAsQuoted = async (job: PartnerQuoteJob, quoteType: 'custom' | 'standard') => {
+    try {
+      const overrideType = quoteType === 'standard' ? 'standard_quote_marked' : 'quoted_pending_approval';
+      
+      const { error } = await supabase
+        .from('partner_quote_overrides')
+        .insert({
+          order_id: job.id,
+          override_type: overrideType,
+          notes: `Marked as ${quoteType} quote via admin interface`
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: `Job marked as ${quoteType} quote`,
+      });
+
+      // Refresh jobs to show updated status
+      fetchJobs();
+    } catch (error) {
+      console.error('Error marking job as quoted:', error);
+      toast({
+        title: "Error",
+        description: "Failed to mark job as quoted",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleOpenInPartner = (url: string) => {
-    window.open(url, '_blank');
+  const handleClearOverride = async (job: PartnerQuoteJob) => {
+    if (!job.quote_override) return;
+
+    try {
+      const { error } = await supabase
+        .from('partner_quote_overrides')
+        .update({ cleared_at: new Date().toISOString() })
+        .eq('id', job.quote_override.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Quote override cleared",
+      });
+
+      fetchJobs();
+    } catch (error) {
+      console.error('Error clearing override:', error);
+      toast({
+        title: "Error",
+        description: "Failed to clear override",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleOpenInPartner = (job: PartnerQuoteJob) => {
+    const partnerUrl = `https://connect.ohme-ev.com/en/jobs/job/${job.partner_job_id}`;
+    window.open(partnerUrl, '_blank');
   };
 
   // Permission check
@@ -354,6 +457,8 @@ export default function AdminPartnerQuotes() {
       </div>
     );
   }
+
+  const selectedPartnerName = partners.find(p => p.id === selectedPartner)?.name || '';
 
   return (
     <div className="container mx-auto py-8">
@@ -406,6 +511,16 @@ export default function AdminPartnerQuotes() {
 
             <Separator />
 
+            {/* Read-only banner for needs scheduling tab */}
+            {activeStatus === 'needs_scheduling' && (
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  This tab is read-only. Jobs shown here are ready for scheduling and should be managed from the main Scheduling interface.
+                </AlertDescription>
+              </Alert>
+            )}
+
             {/* Status Tabs */}
             <PartnerQuoteStatusTabs
               activeStatus={activeStatus}
@@ -417,9 +532,11 @@ export default function AdminPartnerQuotes() {
             <PartnerQuoteList
               jobs={activeJobs}
               onJobClick={handleJobClick}
-              onAddQuote={handleAddQuote}
+              onMarkAsQuoted={handleMarkAsQuoted}
+              onClearOverride={handleClearOverride}
               onOpenInPartner={handleOpenInPartner}
               loading={loading}
+              readOnly={activeStatus === 'needs_scheduling'}
             />
           </>
         )}
@@ -435,21 +552,9 @@ export default function AdminPartnerQuotes() {
             fetchJobs();
             setShowDrawer(false);
           }}
-          partnerName={partners.find(p => p.id === selectedPartner)?.name || ''}
-        />
-      )}
-
-      {jobForQuote && (
-        <AddQuoteModal
-          job={jobForQuote}
-          open={showAddQuoteModal}
-          onOpenChange={setShowAddQuoteModal}
-          onQuoteAdded={() => {
-            fetchJobs();
-            setShowAddQuoteModal(false);
-            setJobForQuote(null);
-          }}
-          partnerName={partners.find(p => p.id === selectedPartner)?.name || ''}
+          partnerName={selectedPartnerName}
+          onMarkAsQuoted={handleMarkAsQuoted}
+          onClearOverride={handleClearOverride}
         />
       )}
 
@@ -458,7 +563,7 @@ export default function AdminPartnerQuotes() {
           open={showSettingsModal}
           onOpenChange={setShowSettingsModal}
           partnerId={selectedPartner}
-          partnerName={partners.find(p => p.id === selectedPartner)?.name || ''}
+          partnerName={selectedPartnerName}
           onSettingsUpdated={() => {
             fetchPartnerSettings(selectedPartner);
           }}

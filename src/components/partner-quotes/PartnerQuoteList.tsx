@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -13,20 +14,24 @@ import {
 import { 
   MoreHorizontal, 
   ExternalLink, 
-  Plus, 
   Eye, 
   Calendar,
   MapPin,
   User,
-  PoundSterling
+  PoundSterling,
+  Quote,
+  Undo2
 } from 'lucide-react';
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
   DropdownMenuItem, 
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
-import { PartnerJobBadge } from '@/components/admin/PartnerJobBadge';
 import { format } from 'date-fns';
 
 interface PartnerQuoteJob {
@@ -64,35 +69,61 @@ interface PartnerQuoteJob {
   postcode: string;
   assigned_user?: string;
   require_file?: boolean;
+  quote_override?: {
+    id: string;
+    override_type: 'quoted_pending_approval' | 'standard_quote_marked';
+    notes?: string;
+    created_at: string;
+  };
+  status_enhanced?: string;
 }
 
 interface PartnerQuoteListProps {
   jobs: PartnerQuoteJob[];
   onJobClick: (job: PartnerQuoteJob) => void;
-  onAddQuote: (job: PartnerQuoteJob) => void;
-  onOpenInPartner: (url: string) => void;
+  onMarkAsQuoted: (job: PartnerQuoteJob, quoteType: 'custom' | 'standard') => void;
+  onClearOverride: (job: PartnerQuoteJob) => void;
+  onOpenInPartner: (job: PartnerQuoteJob) => void;
   loading?: boolean;
+  readOnly?: boolean;
 }
 
 function QuoteJobMobileCard({ 
   job, 
   onJobClick, 
-  onAddQuote, 
-  onOpenInPartner 
+  onMarkAsQuoted, 
+  onClearOverride, 
+  onOpenInPartner,
+  readOnly 
 }: { 
   job: PartnerQuoteJob;
   onJobClick: (job: PartnerQuoteJob) => void;
-  onAddQuote: (job: PartnerQuoteJob) => void;
-  onOpenInPartner: (url: string) => void;
+  onMarkAsQuoted: (job: PartnerQuoteJob, quoteType: 'custom' | 'standard') => void;
+  onClearOverride: (job: PartnerQuoteJob) => void;
+  onOpenInPartner: (job: PartnerQuoteJob) => void;
+  readOnly?: boolean;
 }) {
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string, override?: any) => {
+    // Show override status if present
+    if (override) {
+      if (override.override_type === 'quoted_pending_approval') {
+        return <Badge variant="outline" className="text-blue-600 bg-blue-50">Custom Quote (Manual)</Badge>;
+      }
+      if (override.override_type === 'standard_quote_marked') {
+        return <Badge variant="outline" className="text-green-600 bg-green-50">Standard Quote (Manual)</Badge>;
+      }
+    }
+
     switch (status) {
       case 'NEW_JOB':
+      case 'AWAITING_QUOTATION':
         return <Badge variant="outline" className="text-orange-600 bg-orange-50">Needs Quotation</Badge>;
       case 'WAITING_FOR_APPROVAL':
+      case 'WAITING_FOR_OHME_APPROVAL':
         return <Badge variant="outline" className="text-blue-600 bg-blue-50">Waiting Approval</Badge>;
-      case 'APPROVED':
-        return <Badge variant="outline" className="text-green-600 bg-green-50">Approved</Badge>;
+      case 'AWAITING_INSTALL_DATE':
+      case 'INSTALL_DATE_CONFIRMED':
+        return <Badge variant="outline" className="text-green-600 bg-green-50">Needs Scheduling</Badge>;
       case 'REWORK_REQUESTED':
         return <Badge variant="outline" className="text-red-600 bg-red-50">Rework</Badge>;
       case 'REJECTED':
@@ -109,7 +140,7 @@ function QuoteJobMobileCard({
           <div className="space-y-1">
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="font-medium text-sm">{job.order_number}</h3>
-              {getStatusBadge(job.partner_status)}
+              {getStatusBadge(job.partner_status, job.quote_override)}
             </div>
             <p className="text-sm text-muted-foreground">{job.client.full_name}</p>
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -129,15 +160,37 @@ function QuoteJobMobileCard({
                 <Eye className="h-4 w-4 mr-2" />
                 View Details
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onAddQuote(job)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Quote
+              <DropdownMenuItem onClick={() => onOpenInPartner(job)}>
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Open in Partner System
               </DropdownMenuItem>
-              {job.partner_external_url && (
-                <DropdownMenuItem onClick={() => onOpenInPartner(job.partner_external_url!)}>
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  Open in Partner
-                </DropdownMenuItem>
+              
+              {!readOnly && (
+                <>
+                  <DropdownMenuSeparator />
+                  
+                  {job.quote_override ? (
+                    <DropdownMenuItem onClick={() => onClearOverride(job)}>
+                      <Undo2 className="h-4 w-4 mr-2" />
+                      Clear Override
+                    </DropdownMenuItem>
+                  ) : (
+                    <DropdownMenuSub>
+                      <DropdownMenuSubTrigger>
+                        <Quote className="h-4 w-4 mr-2" />
+                        Mark as Quoted
+                      </DropdownMenuSubTrigger>
+                      <DropdownMenuSubContent>
+                        <DropdownMenuItem onClick={() => onMarkAsQuoted(job, 'custom')}>
+                          Custom Quote
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onMarkAsQuoted(job, 'standard')}>
+                          Standard Quote
+                        </DropdownMenuItem>
+                      </DropdownMenuSubContent>
+                    </DropdownMenuSub>
+                  )}
+                </>
               )}
             </DropdownMenuContent>
           </DropdownMenu>
@@ -174,18 +227,33 @@ function QuoteJobMobileCard({
 export function PartnerQuoteList({ 
   jobs, 
   onJobClick, 
-  onAddQuote, 
+  onMarkAsQuoted, 
+  onClearOverride, 
   onOpenInPartner, 
-  loading = false 
+  loading = false,
+  readOnly = false
 }: PartnerQuoteListProps) {
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string, override?: any) => {
+    // Show override status if present
+    if (override) {
+      if (override.override_type === 'quoted_pending_approval') {
+        return <Badge variant="outline" className="text-blue-600 bg-blue-50">Custom Quote (Manual)</Badge>;
+      }
+      if (override.override_type === 'standard_quote_marked') {
+        return <Badge variant="outline" className="text-green-600 bg-green-50">Standard Quote (Manual)</Badge>;
+      }
+    }
+
     switch (status) {
       case 'NEW_JOB':
+      case 'AWAITING_QUOTATION':
         return <Badge variant="outline" className="text-orange-600 bg-orange-50">Needs Quotation</Badge>;
       case 'WAITING_FOR_APPROVAL':
+      case 'WAITING_FOR_OHME_APPROVAL':
         return <Badge variant="outline" className="text-blue-600 bg-blue-50">Waiting Approval</Badge>;
-      case 'APPROVED':
-        return <Badge variant="outline" className="text-green-600 bg-green-50">Approved</Badge>;
+      case 'AWAITING_INSTALL_DATE':
+      case 'INSTALL_DATE_CONFIRMED':
+        return <Badge variant="outline" className="text-green-600 bg-green-50">Needs Scheduling</Badge>;
       case 'REWORK_REQUESTED':
         return <Badge variant="outline" className="text-red-600 bg-red-50">Rework</Badge>;
       case 'REJECTED':
@@ -262,7 +330,7 @@ export function PartnerQuoteList({
                     {job.partner.name}
                   </TableCell>
                   <TableCell>
-                    {getStatusBadge(job.partner_status)}
+                    {getStatusBadge(job.partner_status, job.quote_override)}
                   </TableCell>
                   <TableCell>
                     {job.job_type ? (
@@ -289,15 +357,37 @@ export function PartnerQuoteList({
                           <Eye className="h-4 w-4 mr-2" />
                           View Details
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => onAddQuote(job)}>
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add Quote
+                        <DropdownMenuItem onClick={() => onOpenInPartner(job)}>
+                          <ExternalLink className="h-4 w-4 mr-2" />
+                          Open in Partner System
                         </DropdownMenuItem>
-                        {job.partner_external_url && (
-                          <DropdownMenuItem onClick={() => onOpenInPartner(job.partner_external_url!)}>
-                            <ExternalLink className="h-4 w-4 mr-2" />
-                            Open in Partner
-                          </DropdownMenuItem>
+                        
+                        {!readOnly && (
+                          <>
+                            <DropdownMenuSeparator />
+                            
+                            {job.quote_override ? (
+                              <DropdownMenuItem onClick={() => onClearOverride(job)}>
+                                <Undo2 className="h-4 w-4 mr-2" />
+                                Clear Override
+                              </DropdownMenuItem>
+                            ) : (
+                              <DropdownMenuSub>
+                                <DropdownMenuSubTrigger>
+                                  <Quote className="h-4 w-4 mr-2" />
+                                  Mark as Quoted
+                                </DropdownMenuSubTrigger>
+                                <DropdownMenuSubContent>
+                                  <DropdownMenuItem onClick={() => onMarkAsQuoted(job, 'custom')}>
+                                    Custom Quote
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => onMarkAsQuoted(job, 'standard')}>
+                                    Standard Quote
+                                  </DropdownMenuItem>
+                                </DropdownMenuSubContent>
+                              </DropdownMenuSub>
+                            )}
+                          </>
                         )}
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -316,8 +406,10 @@ export function PartnerQuoteList({
             key={job.id}
             job={job}
             onJobClick={onJobClick}
-            onAddQuote={onAddQuote}
+            onMarkAsQuoted={onMarkAsQuoted}
+            onClearOverride={onClearOverride}
             onOpenInPartner={onOpenInPartner}
+            readOnly={readOnly}
           />
         ))}
       </div>

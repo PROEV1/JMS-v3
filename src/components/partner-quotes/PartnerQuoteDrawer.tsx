@@ -1,10 +1,25 @@
+
 import React, { useState } from 'react';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { AddQuoteModal } from './AddQuoteModal';
-import { ExternalLink, FileText, Calendar, MapPin, Phone, Mail, Plus, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { 
+  ExternalLink, 
+  Calendar, 
+  MapPin, 
+  Quote, 
+  Undo2
+} from 'lucide-react';
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger 
+} from '@/components/ui/dropdown-menu';
 import { format } from 'date-fns';
 
 interface PartnerQuoteDrawerProps {
@@ -34,82 +49,185 @@ interface PartnerQuoteDrawerProps {
     };
     sla_hours?: number;
     require_file?: boolean;
+    quote_override?: {
+      id: string;
+      override_type: 'quoted_pending_approval' | 'standard_quote_marked';
+      notes?: string;
+      created_at: string;
+    };
+    client: {
+      full_name: string;
+      email: string;
+      postcode?: string;
+    };
   };
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onQuoteUpdated: () => void;
   partnerName: string;
+  onMarkAsQuoted: (job: any, quoteType: 'custom' | 'standard') => void;
+  onClearOverride: (job: any) => void;
 }
 
-export function PartnerQuoteDrawer({ job, open, onOpenChange, onQuoteUpdated, partnerName }: PartnerQuoteDrawerProps) {
-  const [addQuoteOpen, setAddQuoteOpen] = useState(false);
+export function PartnerQuoteDrawer({ 
+  job, 
+  open, 
+  onOpenChange, 
+  onQuoteUpdated, 
+  partnerName,
+  onMarkAsQuoted,
+  onClearOverride
+}: PartnerQuoteDrawerProps) {
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string, override?: any) => {
+    // Show override status if present
+    if (override) {
+      if (override.override_type === 'quoted_pending_approval') {
+        return 'bg-blue-100 text-blue-800';
+      }
+      if (override.override_type === 'standard_quote_marked') {
+        return 'bg-green-100 text-green-800';
+      }
+    }
+
     switch (status) {
       case 'AWAITING_QUOTATION': return 'bg-orange-100 text-orange-800';
-      case 'QUOTE_SUBMITTED': return 'bg-blue-100 text-blue-800';
-      case 'QUOTE_APPROVED': return 'bg-green-100 text-green-800';
-      case 'QUOTE_REJECTED': return 'bg-red-100 text-red-800';
-      case 'QUOTE_REWORK_REQUESTED': return 'bg-yellow-100 text-yellow-800';
+      case 'WAITING_FOR_APPROVAL': 
+      case 'WAITING_FOR_OHME_APPROVAL': return 'bg-blue-100 text-blue-800';
+      case 'AWAITING_INSTALL_DATE':
+      case 'INSTALL_DATE_CONFIRMED': return 'bg-green-100 text-green-800';
+      case 'REJECTED': return 'bg-red-100 text-red-800';
+      case 'REWORK_REQUESTED': return 'bg-yellow-100 text-yellow-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
 
-  const getStatusLabel = (status: string) => {
+  const getStatusLabel = (status: string, override?: any) => {
+    // Show override status if present
+    if (override) {
+      if (override.override_type === 'quoted_pending_approval') {
+        return 'Custom Quote (Manual)';
+      }
+      if (override.override_type === 'standard_quote_marked') {
+        return 'Standard Quote (Manual)';
+      }
+    }
+
     switch (status) {
       case 'AWAITING_QUOTATION': return 'Awaiting Quotation';
-      case 'QUOTE_SUBMITTED': return 'Quote Submitted';
-      case 'QUOTE_APPROVED': return 'Quote Approved';
-      case 'QUOTE_REJECTED': return 'Quote Rejected';
-      case 'QUOTE_REWORK_REQUESTED': return 'Rework Required';
+      case 'WAITING_FOR_APPROVAL': return 'Waiting for Approval';
+      case 'WAITING_FOR_OHME_APPROVAL': return 'Waiting for Ohme Approval';
+      case 'AWAITING_INSTALL_DATE': return 'Awaiting Install Date';
+      case 'INSTALL_DATE_CONFIRMED': return 'Install Date Confirmed';
+      case 'REJECTED': return 'Quote Rejected';
+      case 'REWORK_REQUESTED': return 'Rework Required';
       default: return status;
     }
   };
 
-  return (
-    <>
-      <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent className="w-full sm:max-w-lg">
-          <SheetHeader>
-            <SheetTitle>Job Details</SheetTitle>
-            <SheetDescription>{job.order_number} • {partnerName}</SheetDescription>
-          </SheetHeader>
+  const handleOpenInPartner = () => {
+    const partnerUrl = `https://connect.ohme-ev.com/en/jobs/job/${job.partner_job_id}`;
+    window.open(partnerUrl, '_blank');
+  };
 
-          <div className="space-y-6 mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Client Information</CardTitle>
-              </CardHeader>
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="w-full sm:max-w-lg">
+        <SheetHeader>
+          <SheetTitle>Job Details</SheetTitle>
+          <SheetDescription>{job.order_number} • {partnerName}</SheetDescription>
+        </SheetHeader>
+
+        <div className="space-y-6 mt-6">
+          {/* Status Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <span>Status</span>
+                <Badge className={getStatusColor(job.partner_status, job.quote_override)}>
+                  {getStatusLabel(job.partner_status, job.quote_override)}
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            {job.quote_override && (
               <CardContent>
-                <div className="space-y-2">
-                  <div>{job.client_name}</div>
-                  <div className="text-sm text-muted-foreground">{job.address}</div>
-                  <div className="text-sm">Job Type: {job.job_type}</div>
-                  <div className="text-sm">Value: £{job.total_amount}</div>
+                <div className="text-sm text-muted-foreground">
+                  <p>Override created: {format(new Date(job.quote_override.created_at), 'PPp')}</p>
+                  {job.quote_override.notes && (
+                    <p className="mt-1">Notes: {job.quote_override.notes}</p>
+                  )}
                 </div>
               </CardContent>
-            </Card>
+            )}
+          </Card>
 
-            <div className="space-y-3">
+          {/* Client Information */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Client Information</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div className="font-medium">{job.client.full_name}</div>
+                <div className="text-sm text-muted-foreground">{job.client.email}</div>
+                <div className="flex items-center gap-1 text-sm">
+                  <MapPin className="h-4 w-4" />
+                  {job.client.postcode || job.postcode}
+                </div>
+                <div className="text-sm">
+                  <span className="font-medium">Job Type:</span> {job.job_type.replace('_', ' ')}
+                </div>
+                <div className="text-sm">
+                  <span className="font-medium">Value:</span> £{job.total_amount.toFixed(2)}
+                </div>
+                <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                  <Calendar className="h-4 w-4" />
+                  Created: {format(new Date(job.created_at), 'PPp')}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Actions */}
+          <div className="space-y-3">
+            <Button
+              className="w-full"
+              onClick={handleOpenInPartner}
+            >
+              <ExternalLink className="h-4 w-4 mr-2" />
+              Open in Partner System
+            </Button>
+
+            {job.quote_override ? (
               <Button
+                variant="outline"
                 className="w-full"
-                onClick={() => setAddQuoteOpen(true)}
+                onClick={() => onClearOverride(job)}
               >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Quote
+                <Undo2 className="h-4 w-4 mr-2" />
+                Clear Override
               </Button>
-            </div>
+            ) : (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="w-full">
+                    <Quote className="h-4 w-4 mr-2" />
+                    Mark as Quoted
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-full">
+                  <DropdownMenuItem onClick={() => onMarkAsQuoted(job, 'custom')}>
+                    Custom Quote
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onMarkAsQuoted(job, 'standard')}>
+                    Standard Quote
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
-        </SheetContent>
-      </Sheet>
-
-      <AddQuoteModal
-        job={job}
-        open={addQuoteOpen}
-        onOpenChange={setAddQuoteOpen}
-        onQuoteAdded={onQuoteUpdated}
-        partnerName={partnerName}
-      />
-    </>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }

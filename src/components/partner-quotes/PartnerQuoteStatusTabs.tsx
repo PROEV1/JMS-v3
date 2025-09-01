@@ -1,7 +1,8 @@
+
 import React from 'react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { FileText, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { FileText, Clock, Calendar, XCircle } from 'lucide-react';
 
 interface PartnerQuoteStatusTabsProps {
   activeStatus: string;
@@ -23,9 +24,9 @@ const statusConfigs = [
     colorClass: 'text-blue-600 bg-blue-50 border-blue-200'
   },
   {
-    id: 'approved',
-    label: 'Approved',
-    icon: CheckCircle,
+    id: 'needs_scheduling',
+    label: 'Needs Scheduling',
+    icon: Calendar,
     colorClass: 'text-green-600 bg-green-50 border-green-200'
   },
   {
