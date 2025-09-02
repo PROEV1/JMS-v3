@@ -25,12 +25,19 @@ interface MappingConfigurationProps {
   hideStatusMappings?: boolean;
 }
 
-const ORDER_FIELDS = [
+interface OrderField {
+  key: string;
+  label: string;
+  required: boolean;
+  helpText?: string;
+}
+
+const ORDER_FIELDS: OrderField[] = [
   { key: 'partner_external_id', label: 'Partner External ID', required: true },
   { key: 'partner_status', label: 'Partner Status', required: true },
   { key: 'engineer_identifier', label: 'Engineer Identifier', required: false },
-  { key: 'scheduled_date', label: 'Scheduled Date', required: false },
-  { key: 'estimated_duration_hours', label: 'Estimated Duration (hours)', required: false },
+  { key: 'install_date', label: 'Install Date', required: false },
+  { key: 'estimated_duration_hours', label: 'Estimated Duration (hours)', required: false, helpText: 'Job duration in hours (1-12). Defaults to 3 hours if not provided. Do NOT use "Scheduled Duration (Hours)" field.' },
   { key: 'sub_partner', label: 'Sub Partner', required: false },
   { key: 'partner_external_url', label: 'Partner External URL', required: false },
   { key: 'client_name', label: 'Client Name', required: false },
@@ -490,6 +497,9 @@ export default function MappingConfiguration({
                       {field.label}
                       {field.required && <Badge variant="destructive" className="text-xs">Required</Badge>}
                     </Label>
+                    {field.helpText && (
+                      <p className="text-xs text-muted-foreground mt-1">{field.helpText}</p>
+                    )}
                   </div>
                   <div className="w-2/3 space-y-1">
                     <Select

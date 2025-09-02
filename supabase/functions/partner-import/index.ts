@@ -256,6 +256,7 @@ serve(async (req) => {
         const engineerIdentifier = row[columnMappings.engineer_identifier] || null
         const installDate = row[columnMappings.install_date] || null
         const quoteAmount = row[columnMappings.quote_amount] || null
+        const estimatedDurationHours = row[columnMappings.estimated_duration_hours] || null
 
         // Skip if no external ID
         if (!partnerExternalId) {
@@ -379,6 +380,22 @@ serve(async (req) => {
           })
         }
 
+        // Parse estimated duration hours - default to 3 if not provided or invalid
+        let parsedEstimatedDurationHours = 3 // Default value
+        if (estimatedDurationHours && estimatedDurationHours !== '' && estimatedDurationHours !== 'NaN') {
+          const numDuration = parseFloat(String(estimatedDurationHours).replace(/[^0-9.-]/g, ''))
+          if (!isNaN(numDuration) && numDuration >= 1 && numDuration <= 12) {
+            parsedEstimatedDurationHours = Math.round(numDuration)
+          } else {
+            warnings.push({
+              row: rowIndex,
+              column: 'estimated_duration_hours',
+              message: `Invalid duration '${estimatedDurationHours}' - using default 3 hours`,
+              data: { original_duration: estimatedDurationHours }
+            })
+          }
+        }
+
         if (!dry_run) {
           // Find or create client
           let client
@@ -447,6 +464,7 @@ serve(async (req) => {
               postcode: postcode,
               partner_status: mappedStatus,
               total_amount: parsedQuoteAmount,
+              estimated_duration_hours: parsedEstimatedDurationHours,
               updated_at: new Date().toISOString()
             }
 
@@ -494,7 +512,8 @@ serve(async (req) => {
               amount_paid: 0,
               deposit_amount: 0,
               status: 'awaiting_payment',
-              survey_required: profile.partners?.client_survey_required ?? true
+              survey_required: profile.partners?.client_survey_required ?? true,
+              estimated_duration_hours: parsedEstimatedDurationHours
             }
 
             if (engineerId) {
