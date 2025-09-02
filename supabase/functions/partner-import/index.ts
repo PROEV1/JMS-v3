@@ -201,24 +201,6 @@ serve(async (req) => {
     console.log(`Fetched ${rawRows.length} rows from Google Sheets (${totalRows} total rows)`)
     console.log('Headers:', headers)
 
-    // Check for missing rows (filtered out by Google Sheets API)
-    const expectedRows = totalRows
-    const actualRows = rawRows.length
-    const missingRowsCount = expectedRows - actualRows
-    
-    if (missingRowsCount > 0) {
-      console.log(`WARNING: ${missingRowsCount} rows missing from Google Sheets response (likely empty rows filtered out)`)
-      // Add missing rows as errors
-      for (let i = 0; i < missingRowsCount; i++) {
-        errors.push({
-          row: actualRows + i + 1,
-          message: `Row missing from Google Sheets (likely empty or filtered out)`,
-          data: { reason: 'google_sheets_filtered' }
-        })
-        results.errors++
-      }
-    }
-
     if (rawRows.length === 0) {
       console.log('No data to process')
       return new Response(JSON.stringify({
@@ -326,28 +308,6 @@ serve(async (req) => {
       errors: []
     }
 
-    // Check for missing rows that were filtered out by Google Sheets API
-    const expectedRows = totalRows
-    const actualRows = rawRows.length  // Use rawRows before job filtering
-    const missingRowsCount = expectedRows - actualRows
-    
-    if (missingRowsCount > 0) {
-      console.log(`WARNING: ${missingRowsCount} rows missing from Google Sheets response (likely empty rows filtered out)`)
-      // Add missing rows as errors to help identify what didn't import
-      for (let i = 0; i < missingRowsCount; i++) {
-        const missingRowNumber = actualRows + start_row + i + 2 // +2 for header and 1-based indexing
-        errors.push({
-          row: missingRowNumber,
-          message: `Row missing from Google Sheets (likely empty or filtered out)`,
-          data: { reason: 'google_sheets_filtered', expected_total: expectedRows, actual_total: actualRows }
-        })
-        results.errors++
-        details.errors.push({
-          row: missingRowNumber,
-          reason: 'Row missing from Google Sheets (likely empty or filtered out)'
-        })
-      }
-    }
 
     // STAGE 4: Process the data
     const dataProcessingStartTime = performance.now();
@@ -818,12 +778,13 @@ serve(async (req) => {
           p_partner_id: profile.partner_id,
           p_profile_id: profile.id,
           p_dry_run: dry_run,
-          p_total_rows: filteredData.length,
+          p_total_rows: totalRows, // Use sheet total, not filtered data length
           p_inserted_count: results.inserted,
           p_updated_count: results.updated,
           p_skipped_count: results.skipped,
           p_warnings: warnings,
-          p_errors: errors
+          p_errors: errors,
+          p_skipped_details: details.skipped // Add skipped details
         })
         
         performanceMetrics.database_calls.total_count++;

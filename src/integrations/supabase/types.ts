@@ -2042,6 +2042,7 @@ export type Database = {
           profile_id: string | null
           run_id: string | null
           skipped_count: number
+          skipped_details: Json | null
           total_rows: number
           updated_count: number
           warnings: Json
@@ -2057,6 +2058,7 @@ export type Database = {
           profile_id?: string | null
           run_id?: string | null
           skipped_count?: number
+          skipped_details?: Json | null
           total_rows?: number
           updated_count?: number
           warnings?: Json
@@ -2072,6 +2074,7 @@ export type Database = {
           profile_id?: string | null
           run_id?: string | null
           skipped_count?: number
+          skipped_details?: Json | null
           total_rows?: number
           updated_count?: number
           warnings?: Json
@@ -3849,18 +3852,32 @@ export type Database = {
         Returns: string
       }
       log_partner_import: {
-        Args: {
-          p_dry_run: boolean
-          p_errors?: Json
-          p_inserted_count: number
-          p_partner_id: string
-          p_profile_id: string
-          p_run_id: string
-          p_skipped_count: number
-          p_total_rows: number
-          p_updated_count: number
-          p_warnings?: Json
-        }
+        Args:
+          | {
+              p_dry_run: boolean
+              p_errors?: Json
+              p_inserted_count: number
+              p_partner_id: string
+              p_profile_id: string
+              p_run_id: string
+              p_skipped_count: number
+              p_skipped_details?: Json
+              p_total_rows: number
+              p_updated_count: number
+              p_warnings?: Json
+            }
+          | {
+              p_dry_run: boolean
+              p_errors?: Json
+              p_inserted_count: number
+              p_partner_id: string
+              p_profile_id: string
+              p_run_id: string
+              p_skipped_count: number
+              p_total_rows: number
+              p_updated_count: number
+              p_warnings?: Json
+            }
         Returns: string
       }
       log_user_action: {

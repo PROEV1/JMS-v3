@@ -18,6 +18,7 @@ interface ImportLog {
   dry_run: boolean;
   errors: any;
   warnings: any;
+  skipped_details: any;
 }
 
 interface ImportHistoryModalProps {
@@ -47,7 +48,8 @@ export default function ImportHistoryModal({
       return data.map(log => ({
         ...log,
         errors: Array.isArray(log.errors) ? log.errors : [],
-        warnings: Array.isArray(log.warnings) ? log.warnings : []
+        warnings: Array.isArray(log.warnings) ? log.warnings : [],
+        skipped_details: Array.isArray(log.skipped_details) ? log.skipped_details : []
       })) as ImportLog[];
     },
     enabled: isOpen
@@ -121,6 +123,89 @@ export default function ImportHistoryModal({
     document.body.removeChild(link);
   };
 
+  const downloadSkippedReport = (importLog: ImportLog) => {
+    const skipped = importLog.skipped_details || [];
+    console.log('Downloading skipped:', skipped);
+    
+    if (skipped.length === 0) {
+      alert('No skipped records to download for this import run.');
+      return;
+    }
+
+    const csvData = [
+      ['Row Number', 'Reason', 'Partner External ID', 'Extra Data'],
+      ...skipped.map(skip => [
+        String(skip.row || ''),
+        String(skip.reason || skip.message || ''),
+        String(skip.data?.partner_external_id || skip.partner_external_id || ''),
+        JSON.stringify(skip.data || {})
+      ])
+    ];
+
+    const csvContent = csvData.map(row => 
+      row.map(cell => `"${String(cell).replace(/"/g, '""')}"`)
+    ).join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `import-skipped-${importLog.run_id}-${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const downloadAllCombined = (type: 'errors' | 'warnings' | 'skipped') => {
+    if (!importLogs || importLogs.length === 0) {
+      alert('No import data available.');
+      return;
+    }
+
+    let allData: any[] = [];
+    let headers = ['Row Number', 'Message', 'Partner External ID', 'Extra Data', 'Import Run ID', 'Import Date'];
+    
+    importLogs.forEach(log => {
+      const items = type === 'errors' ? log.errors : 
+                   type === 'warnings' ? log.warnings : 
+                   log.skipped_details;
+      
+      if (items && items.length > 0) {
+        items.forEach((item: any) => {
+          allData.push([
+            String(item.row || ''),
+            String(item.message || item.reason || item.error || ''),
+            String(item.data?.partner_external_id || item.partner_external_id || ''),
+            JSON.stringify(item.data || {}),
+            String(log.run_id),
+            new Date(log.created_at).toLocaleString()
+          ]);
+        });
+      }
+    });
+
+    if (allData.length === 0) {
+      alert(`No ${type} to download across all import runs.`);
+      return;
+    }
+
+    const csvData = [headers, ...allData];
+    const csvContent = csvData.map(row => 
+      row.map(cell => `"${String(cell).replace(/"/g, '""')}"`)
+    ).join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `all-import-${type}-${partnerName}-${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
@@ -132,6 +217,39 @@ export default function ImportHistoryModal({
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* Combined Download Buttons */}
+          {importLogs && importLogs.length > 0 && (
+            <div className="bg-slate-50 p-4 rounded-lg border">
+              <h3 className="text-sm font-medium mb-3">Download Combined Reports (Last 20 Runs)</h3>
+              <div className="flex gap-2 flex-wrap">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => downloadAllCombined('errors')}
+                >
+                  <Download className="h-3 w-3 mr-1" />
+                  All Errors
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => downloadAllCombined('warnings')}
+                >
+                  <Download className="h-3 w-3 mr-1" />
+                  All Warnings
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => downloadAllCombined('skipped')}
+                >
+                  <Download className="h-3 w-3 mr-1" />
+                  All Skipped
+                </Button>
+              </div>
+            </div>
+          )}
+
           {isLoading && (
             <div className="text-center py-8">Loading import history...</div>
           )}
@@ -186,7 +304,7 @@ export default function ImportHistoryModal({
                   </div>
                 </div>
 
-                {((log.errors && log.errors.length > 0) || (log.warnings && log.warnings.length > 0)) && (
+                {((log.errors && log.errors.length > 0) || (log.warnings && log.warnings.length > 0) || (log.skipped_details && log.skipped_details.length > 0)) && (
                   <div className="flex items-center justify-between pt-4 border-t">
                     <div className="flex items-center gap-4 text-sm">
                       {log.errors && log.errors.length > 0 && (
@@ -197,6 +315,11 @@ export default function ImportHistoryModal({
                       {log.warnings && log.warnings.length > 0 && (
                         <span className="text-yellow-600">
                           {log.warnings.length} warning{log.warnings.length > 1 ? 's' : ''}
+                        </span>
+                      )}
+                      {log.skipped_details && log.skipped_details.length > 0 && (
+                        <span className="text-orange-600">
+                          {log.skipped_details.length} skipped detail{log.skipped_details.length > 1 ? 's' : ''}
                         </span>
                       )}
                     </div>
@@ -219,6 +342,16 @@ export default function ImportHistoryModal({
                         >
                           <Download className="h-3 w-3 mr-1" />
                           Download Warnings
+                        </Button>
+                      )}
+                      {log.skipped_details && log.skipped_details.length > 0 && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => downloadSkippedReport(log)}
+                        >
+                          <Download className="h-3 w-3 mr-1" />
+                          Download Skipped
                         </Button>
                       )}
                     </div>
