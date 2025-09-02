@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, XCircle, Clock, Pause, Play, Square } from 'lucide-react';
+import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, XCircle, Clock, Pause, Play, Square, Download } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -421,6 +421,38 @@ export default function ImportRunModal({
       };
       reader.readAsText(file);
     }
+  };
+
+  const downloadErrorReport = (result: ImportResult) => {
+    const errors = result.summary.errors || [];
+    if (errors.length === 0) {
+      alert('No errors to download.');
+      return;
+    }
+
+    const csvData = [
+      ['Row Number', 'Error Message', 'Partner External ID', 'Extra Data'],
+      ...errors.map(error => [
+        error.row.toString(),
+        error.error,
+        error.data?.partner_external_id || '',
+        JSON.stringify(error.data || {})
+      ])
+    ];
+
+    const csvContent = csvData.map(row => 
+      row.map(cell => `"${cell.replace(/"/g, '""')}"`)
+    ).join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `import-errors-${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (

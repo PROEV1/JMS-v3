@@ -720,6 +720,14 @@ export default function AdminPartnerProfiles() {
                 <Button
                   variant="outline"
                   size="sm"
+                  onClick={() => setShowHistoryDialog(profile.id)}
+                >
+                  <Clock className="h-4 w-4 mr-1" />
+                  Import History
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => setShowImportDialog(profile.id)}
                 >
                   <Upload className="h-4 w-4 mr-1" />
@@ -772,6 +780,16 @@ export default function AdminPartnerProfiles() {
           sourceType={profiles?.find(p => p.id === showImportDialog)?.source_type || 'csv'}
           gsheetId={profiles?.find(p => p.id === showImportDialog)?.gsheet_id || undefined}
           gsheetSheetName={profiles?.find(p => p.id === showImportDialog)?.gsheet_sheet_name || undefined}
+        />
+      )}
+
+      {/* Import History Modal */}
+      {showHistoryDialog && partnerId && partner && (
+        <ImportHistoryModal
+          isOpen={!!showHistoryDialog}
+          onClose={() => setShowHistoryDialog(null)}
+          partnerId={partnerId}
+          partnerName={partner.name}
         />
       )}
 
