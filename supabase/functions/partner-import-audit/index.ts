@@ -164,26 +164,44 @@ serve(async (req: Request): Promise<Response> => {
       duplicateJobIds: duplicateJobIds.length,
     });
 
-    // Analyze database
-    const { data: existingOrders, error: ordersError } = await supabase
-      .from('orders')
-      .select('partner_external_id')
-      .eq('partner_id', profile.partner_id)
-      .not('partner_external_id', 'is', null);
+    // Analyze database - fetch ALL orders with pagination
+    let allExistingOrders: any[] = [];
+    let hasMore = true;
+    let offset = 0;
+    const batchSize = 1000;
 
-    if (ordersError) {
-      console.error('Orders fetch error:', ordersError);
-      return new Response(JSON.stringify({ 
-        success: false, 
-        error: 'Failed to fetch existing orders' 
-      }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    while (hasMore) {
+      const { data: orderBatch, error: ordersError } = await supabase
+        .from('orders')
+        .select('partner_external_id')
+        .eq('partner_id', profile.partner_id)
+        .not('partner_external_id', 'is', null)
+        .range(offset, offset + batchSize - 1);
+
+      if (ordersError) {
+        console.error('Orders fetch error:', ordersError);
+        return new Response(JSON.stringify({ 
+          success: false, 
+          error: 'Failed to fetch existing orders' 
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      if (orderBatch && orderBatch.length > 0) {
+        allExistingOrders = allExistingOrders.concat(orderBatch);
+        offset += batchSize;
+        hasMore = orderBatch.length === batchSize; // Continue if we got a full batch
+      } else {
+        hasMore = false;
+      }
     }
 
-    const existingJobIds = existingOrders?.map(o => o.partner_external_id) || [];
-    const missingJobIds = uniqueJobIds.filter(id => !existingJobIds.includes(id));
+    const existingJobIds = allExistingOrders?.map(o => o.partner_external_id).filter(Boolean) || [];
+    // Remove duplicates from existing job IDs
+    const uniqueExistingJobIds = [...new Set(existingJobIds)];
+    const missingJobIds = uniqueJobIds.filter(id => !uniqueExistingJobIds.includes(id));
 
     // Count totals for partner
     const { count: totalOrders } = await supabase
@@ -233,8 +251,8 @@ serve(async (req: Request): Promise<Response> => {
         blank_names: blankNames,
       },
       database_analysis: {
-        existing_job_ids_count: existingJobIds.length,
-        existing_job_ids: existingJobIds,
+        existing_job_ids_count: uniqueExistingJobIds.length,
+        existing_job_ids: uniqueExistingJobIds,
         missing_job_ids_count: missingJobIds.length,
         missing_job_ids: missingJobIds,
         total_orders_for_partner: totalOrders || 0,
@@ -246,7 +264,7 @@ serve(async (req: Request): Promise<Response> => {
     console.log('Audit complete:', {
       sheetRows: sheetRows.length,
       uniqueJobIds: uniqueJobIds.length,
-      existingInDB: existingJobIds.length,
+      existingInDB: uniqueExistingJobIds.length,
       missingFromDB: missingJobIds.length,
     });
 
