@@ -572,6 +572,7 @@ export default function MappingConfiguration({
                     <Badge>{STATUS_OPTIONS.find(s => s.key === internalStatus)?.label || internalStatus}</Badge>
                   </div>
                   <Button 
+                    type="button"
                     onClick={() => removeStatusMapping(partnerStatus)} 
                     variant="ghost" 
                     size="sm"
@@ -609,7 +610,7 @@ export default function MappingConfiguration({
                 />
                 <Label>Suppress Scheduling</Label>
               </div>
-              <Button onClick={addOverrideRule} size="sm">
+              <Button type="button" onClick={addOverrideRule} size="sm">
                 <Plus className="h-4 w-4" />
               </Button>
             </div>
@@ -626,6 +627,7 @@ export default function MappingConfiguration({
                     </Badge>
                   </div>
                   <Button 
+                    type="button"
                     onClick={() => removeOverrideRule(status)} 
                     variant="ghost" 
                     size="sm"
@@ -762,7 +764,7 @@ export default function MappingConfiguration({
                   </SelectContent>
                 </Select>
               </div>
-              <Button onClick={addEngineerMapping} size="sm">
+              <Button type="button" onClick={addEngineerMapping} size="sm">
                 <Plus className="h-4 w-4" />
               </Button>
             </div>
@@ -779,6 +781,7 @@ export default function MappingConfiguration({
                       <Badge>{engineer ? `${engineer.name} (${engineer.email})` : internalEngineerId}</Badge>
                     </div>
                     <Button 
+                      type="button"
                       onClick={() => removeEngineerMapping(partnerEngineer)} 
                       variant="ghost" 
                       size="sm"

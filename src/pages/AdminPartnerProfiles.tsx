@@ -352,10 +352,10 @@ export default function AdminPartnerProfiles() {
       gsheet_id: profile.gsheet_id || '',
       gsheet_sheet_name: profile.gsheet_sheet_name || '',
       column_mappings: profile.column_mappings,
-      status_mappings: { ...getDefaultStatusMappings(), ...profile.status_mappings },
+      status_mappings: profile.status_mappings || {},
       engineer_mapping_rules: profile.engineer_mapping_rules,
       status_override_rules: profile.status_override_rules,
-      status_actions: { ...getDefaultStatusActions(), ...normalizedStatusActions },
+      status_actions: normalizedStatusActions,
       engineer_mappings: engineerMappings,
       is_active: profile.is_active
     });
@@ -533,14 +533,14 @@ export default function AdminPartnerProfiles() {
                 statusOverrideRules={formData.status_override_rules}
                 engineerMappings={formData.engineer_mappings}
                 onColumnMappingsChange={(mappings) => setFormData({ ...formData, column_mappings: mappings })}
-                onStatusMappingsChange={(mappings) => setFormData({ ...formData, status_mappings: { ...getDefaultStatusMappings(), ...mappings } })}
+                onStatusMappingsChange={(mappings) => setFormData({ ...formData, status_mappings: mappings })}
                 onStatusOverrideRulesChange={(rules) => setFormData({ ...formData, status_override_rules: rules })}
                 onEngineerMappingsChange={(mappings) => setFormData({ ...formData, engineer_mappings: mappings })}
               />
 
               <PartnerStatusMappingEditor
                 statusActions={formData.status_actions as Record<string, any>}
-                onUpdate={(statusActions) => setFormData({ ...formData, status_actions: { ...getDefaultStatusActions(), ...statusActions } })}
+                onUpdate={(statusActions) => setFormData({ ...formData, status_actions: statusActions })}
               />
 
               <div className="flex items-center space-x-2">
