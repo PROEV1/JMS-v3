@@ -55,6 +55,8 @@ export default function ImportHistoryModal({
 
   const downloadErrorReport = (importLog: ImportLog) => {
     const errors = importLog.errors || [];
+    console.log('Downloading errors:', errors);
+    
     if (errors.length === 0) {
       alert('No errors to download for this import run.');
       return;
@@ -63,15 +65,15 @@ export default function ImportHistoryModal({
     const csvData = [
       ['Row Number', 'Error Message', 'Partner External ID', 'Extra Data'],
       ...errors.map(error => [
-        error.row.toString(),
-        error.error,
-        error.data?.partner_external_id || '',
+        String(error.row || ''),
+        String(error.message || error.error || ''),
+        String(error.data?.partner_external_id || error.partner_external_id || ''),
         JSON.stringify(error.data || {})
       ])
     ];
 
     const csvContent = csvData.map(row => 
-      row.map(cell => `"${cell.replace(/"/g, '""')}"`)
+      row.map(cell => `"${String(cell).replace(/"/g, '""')}"`)
     ).join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -87,6 +89,8 @@ export default function ImportHistoryModal({
 
   const downloadWarningReport = (importLog: ImportLog) => {
     const warnings = importLog.warnings || [];
+    console.log('Downloading warnings:', warnings);
+    
     if (warnings.length === 0) {
       alert('No warnings to download for this import run.');
       return;
@@ -95,15 +99,15 @@ export default function ImportHistoryModal({
     const csvData = [
       ['Row Number', 'Warning Message', 'Partner External ID', 'Extra Data'],
       ...warnings.map(warning => [
-        warning.row.toString(),
-        warning.warning,
-        warning.data?.partner_external_id || '',
+        String(warning.row || ''),
+        String(warning.message || warning.warning || ''),
+        String(warning.data?.partner_external_id || warning.partner_external_id || ''),
         JSON.stringify(warning.data || {})
       ])
     ];
 
     const csvContent = csvData.map(row => 
-      row.map(cell => `"${cell.replace(/"/g, '""')}"`)
+      row.map(cell => `"${String(cell).replace(/"/g, '""')}"`)
     ).join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });

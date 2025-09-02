@@ -245,10 +245,7 @@ export default function AdminPartnerQuotes() {
         .in('partner_id', partnerIds);
 
       // Add status/schedule OR filter for relevant jobs
-      countQuery = countQuery.or(`
-        partner_status.in.(AWAITING_QUOTATION,WAITING_FOR_OHME_APPROVAL,WAITING_FOR_APPROVAL,REWORK_REQUESTED,REJECTED),
-        scheduled_install_date.not.is.null
-      `);
+      countQuery = countQuery.or('partner_status.in.(AWAITING_QUOTATION,WAITING_FOR_OHME_APPROVAL,WAITING_FOR_APPROVAL,REWORK_REQUESTED,REJECTED),scheduled_install_date.not.is.null');
 
       // Build the main query with status/schedule filtering
       let query = supabase
@@ -279,10 +276,7 @@ export default function AdminPartnerQuotes() {
         .in('partner_id', partnerIds);
 
       // Add status/schedule OR filter - focus on relevant statuses and scheduled jobs
-      query = query.or(`
-        partner_status.in.(AWAITING_QUOTATION,WAITING_FOR_OHME_APPROVAL,WAITING_FOR_APPROVAL,REWORK_REQUESTED,REJECTED),
-        scheduled_install_date.not.is.null
-      `);
+      query = query.or('partner_status.in.(AWAITING_QUOTATION,WAITING_FOR_OHME_APPROVAL,WAITING_FOR_APPROVAL,REWORK_REQUESTED,REJECTED),scheduled_install_date.not.is.null');
 
       // Apply user filters
       if (filters.job_type && filters.job_type !== 'all' && 

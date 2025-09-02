@@ -425,6 +425,8 @@ export default function ImportRunModal({
 
   const downloadErrorReport = (result: ImportResult) => {
     const errors = result.summary.errors || [];
+    console.log('Downloading import errors:', errors);
+    
     if (errors.length === 0) {
       alert('No errors to download.');
       return;
@@ -433,15 +435,15 @@ export default function ImportRunModal({
     const csvData = [
       ['Row Number', 'Error Message', 'Partner External ID', 'Extra Data'],
       ...errors.map(error => [
-        error.row.toString(),
-        error.error,
-        error.data?.partner_external_id || '',
+        String(error.row || ''),
+        String(error.error || ''),
+        String(error.data?.partner_external_id || ''),
         JSON.stringify(error.data || {})
       ])
     ];
 
     const csvContent = csvData.map(row => 
-      row.map(cell => `"${cell.replace(/"/g, '""')}"`)
+      row.map(cell => `"${String(cell).replace(/"/g, '""')}"`)
     ).join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -889,6 +891,20 @@ export default function ImportRunModal({
                       )}
                     </TabsContent>
                   </Tabs>
+                )}
+
+                {/* Download buttons for errors/warnings */}
+                {importResult.summary.errors.length > 0 && (
+                  <div className="flex justify-start mt-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => downloadErrorReport(importResult)}
+                    >
+                      <Download className="h-3 w-3 mr-1" />
+                      Download Errors CSV
+                    </Button>
+                  </div>
                 )}
 
                 {importResult.summary.warnings.length > 0 && (
