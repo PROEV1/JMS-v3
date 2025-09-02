@@ -37,53 +37,61 @@ Deno.serve(async (req) => {
   try {
     console.log('Processing Google Sheets preview request...');
     
-    // Validate JWT and admin access
-    const authHeader = req.headers.get('authorization');
-    if (!authHeader) {
-      console.log('No authorization header provided');
-      return new Response(JSON.stringify({ 
-        success: false,
-        error: 'Authorization required' 
-      }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    const token = authHeader.replace('Bearer ', '');
-    console.log('Auth token present:', !!token);
+    // Check for service role key (edge function to edge function calls)
+    const apikeyHeader = req.headers.get('apikey');
+    const isServiceRole = apikeyHeader === Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
-    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token);
-    
-    if (authError || !user) {
-      console.error('Authentication failed:', authError);
-      return new Response(JSON.stringify({ 
-        success: false,
-        error: 'Invalid authentication' 
-      }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-    console.log('Authenticated user:', user.id);
+    if (!isServiceRole) {
+      // Validate JWT and admin access for regular web requests
+      const authHeader = req.headers.get('authorization');
+      if (!authHeader) {
+        console.log('No authorization header provided');
+        return new Response(JSON.stringify({ 
+          success: false,
+          error: 'Authorization required' 
+        }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
 
-    const { data: profile, error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .select('role')
-      .eq('user_id', user.id)
-      .single();
+      const token = authHeader.replace('Bearer ', '');
+      console.log('Auth token present:', !!token);
+      
+      const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token);
+      
+      if (authError || !user) {
+        console.error('Authentication failed:', authError);
+        return new Response(JSON.stringify({ 
+          success: false,
+          error: 'Invalid authentication' 
+        }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      console.log('Authenticated user:', user.id);
 
-    if (profileError || !profile || profile.role !== 'admin') {
-      console.error('Authorization failed:', profileError, 'role:', profile?.role);
-      return new Response(JSON.stringify({ 
-        success: false,
-        error: 'Admin access required' 
-      }), {
-        status: 403,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      const { data: profile, error: profileError } = await supabaseAdmin
+        .from('profiles')
+        .select('role')
+        .eq('user_id', user.id)
+        .single();
+
+      if (profileError || !profile || profile.role !== 'admin') {
+        console.error('Authorization failed:', profileError, 'role:', profile?.role);
+        return new Response(JSON.stringify({ 
+          success: false,
+          error: 'Admin access required' 
+        }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      console.log('Admin access confirmed');
+    } else {
+      console.log('Service role access granted');
     }
-    console.log('Admin access confirmed');
 
     let body: GoogleSheetsRequest;
     try {
