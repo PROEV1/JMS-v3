@@ -591,39 +591,83 @@ serve(async (req) => {
             }
           }
 
-          console.log(`Row ${rowIndex}: Upserting order with data:`, orderData)
+          console.log(`Row ${rowIndex}: Processing order with partner_external_id: ${partnerExternalId}`)
 
-          // Use the unique index for true upsert behavior
-          const { data: orderResult, error: orderError } = await supabase
+          // First check if order already exists
+          const { data: existingOrder } = await supabase
             .from('orders')
-            .upsert(orderData, {
-              onConflict: 'partner_id,partner_external_id',
-              ignoreDuplicates: false
-            })
             .select('id, order_number')
+            .eq('partner_id', profile.partner_id)
+            .eq('partner_external_id', partnerExternalId)
             .maybeSingle()
 
           performanceMetrics.database_calls.total_count++;
-          performanceMetrics.database_calls.insert_operations++;
+          performanceMetrics.database_calls.order_queries++;
 
-          if (orderError) {
-            console.error(`Row ${rowIndex}: Order upsert error (partner_external_id: ${partnerExternalId}):`, orderError)
-            errors.push({
-              row: rowIndex,
-              partner_external_id: partnerExternalId,
-              message: `Order upsert failed: ${orderError.message}`,
-              data: { error: orderError }
-            })
-            results.errors++
-          } else if (orderResult) {
-            console.log(`Row ${rowIndex}: Successfully processed order ${orderResult.id} with number ${orderResult.order_number}`)
-            results.inserted++
-            details.inserted.push({
-              row: rowIndex,
-              order_id: orderResult.id,
-              order_number: orderResult.order_number,
-              partner_external_id: partnerExternalId
-            })
+          let orderResult;
+          if (existingOrder) {
+            // Update existing order
+            const { data: updatedOrder, error: updateError } = await supabase
+              .from('orders')
+              .update(orderData)
+              .eq('id', existingOrder.id)
+              .select('id, order_number')
+              .single()
+
+            performanceMetrics.database_calls.total_count++;
+            performanceMetrics.database_calls.update_operations++;
+
+            if (updateError) {
+              console.error(`Row ${rowIndex}: Order update error (partner_external_id: ${partnerExternalId}):`, updateError)
+              errors.push({
+                row: rowIndex,
+                partner_external_id: partnerExternalId,
+                message: `Order update failed: ${updateError.message}`,
+                data: { error: updateError }
+              })
+              results.errors++
+            } else {
+              orderResult = updatedOrder
+              results.updated++
+              details.updated.push({
+                row: rowIndex,
+                order_id: orderResult.id,
+                order_number: orderResult.order_number,
+                partner_external_id: partnerExternalId
+              })
+              console.log(`Row ${rowIndex}: Successfully updated order ${orderResult.id} with number ${orderResult.order_number}`)
+            }
+          } else {
+            // Insert new order - let trigger generate order_number
+            const { data: newOrder, error: insertError } = await supabase
+              .from('orders')
+              .insert(orderData)
+              .select('id, order_number')
+              .single()
+
+            performanceMetrics.database_calls.total_count++;
+            performanceMetrics.database_calls.insert_operations++;
+
+            if (insertError) {
+              console.error(`Row ${rowIndex}: Order insert error (partner_external_id: ${partnerExternalId}):`, insertError)
+              errors.push({
+                row: rowIndex,
+                partner_external_id: partnerExternalId,
+                message: `Order insert failed: ${insertError.message}`,
+                data: { error: insertError }
+              })
+              results.errors++
+            } else {
+              orderResult = newOrder
+              results.inserted++
+              details.inserted.push({
+                row: rowIndex,
+                order_id: orderResult.id,
+                order_number: orderResult.order_number,
+                partner_external_id: partnerExternalId
+              })
+              console.log(`Row ${rowIndex}: Successfully inserted order ${orderResult.id} with number ${orderResult.order_number}`)
+            }
           }
         } else {
           // Dry run - just count as inserted for simulation
