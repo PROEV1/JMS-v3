@@ -20,7 +20,61 @@ interface ImportResults {
   errors: number;
 }
 
+interface PerformanceMetrics {
+  overall_time_ms: number;
+  stages: {
+    profile_fetch_ms: number;
+    sheets_fetch_ms: number;
+    mappings_fetch_ms: number;
+    data_processing_ms: number;
+    logging_ms: number;
+  };
+  row_processing: {
+    total_time_ms: number;
+    average_time_ms: number;
+    slowest_rows: Array<{
+      row_index: number;
+      time_ms: number;
+      partner_external_id?: string;
+    }>;
+  };
+  database_calls: {
+    total_count: number;
+    client_queries: number;
+    order_queries: number;
+    insert_operations: number;
+    update_operations: number;
+  };
+  rows_per_second: number;
+}
+
 serve(async (req) => {
+  // Initialize performance tracking
+  const overallStartTime = performance.now();
+  const performanceMetrics: PerformanceMetrics = {
+    overall_time_ms: 0,
+    stages: {
+      profile_fetch_ms: 0,
+      sheets_fetch_ms: 0,
+      mappings_fetch_ms: 0,
+      data_processing_ms: 0,
+      logging_ms: 0,
+    },
+    row_processing: {
+      total_time_ms: 0,
+      average_time_ms: 0,
+      slowest_rows: [],
+    },
+    database_calls: {
+      total_count: 0,
+      client_queries: 0,
+      order_queries: 0,
+      insert_operations: 0,
+      update_operations: 0,
+    },
+    rows_per_second: 0,
+  };
+
   console.log('=== PARTNER IMPORT FUNCTION START ===');
   console.log('Method:', req.method);
   console.log('Headers:', Object.fromEntries(req.headers.entries()));
@@ -44,7 +98,8 @@ serve(async (req) => {
       max_rows = null,
       start_row = 0,
       chunk_size = null,
-      job_ids_filter = null
+      job_ids_filter = null,
+      benchmark_mode = false
     } = body
 
     // Use max_rows if provided, otherwise fall back to chunk_size, otherwise default to 200
@@ -63,8 +118,10 @@ serve(async (req) => {
 
     console.log(`Starting import for profile: ${profile_id}`)
     console.log(`Dry run: ${dry_run}, Max rows: ${max_rows}, Start row: ${start_row}, Actual chunk size: ${actualChunkSize}`)
+    console.log(`Benchmark mode: ${benchmark_mode}`)
 
-    // Get import profile with all necessary data
+    // STAGE 1: Get import profile with all necessary data
+    const profileStartTime = performance.now();
     const { data: profile, error: profileError } = await supabase
       .from('partner_import_profiles')
       .select(`
@@ -81,6 +138,9 @@ serve(async (req) => {
       .eq('id', profile_id)
       .eq('is_active', true)
       .single()
+    
+    performanceMetrics.stages.profile_fetch_ms = performance.now() - profileStartTime;
+    performanceMetrics.database_calls.total_count++;
 
     if (profileError || !profile) {
       console.error('Profile error:', profileError)
@@ -106,10 +166,12 @@ serve(async (req) => {
       })
     }
 
-    // Get Google Sheets data
+    // STAGE 2: Get Google Sheets data
     console.log('Fetching Google Sheets data...')
     console.log('Profile gsheet_id:', profile.gsheet_id)
     console.log('Profile gsheet_sheet_name:', profile.gsheet_sheet_name)
+    
+    const sheetsStartTime = performance.now();
     const { data: sheetsData, error: sheetsError } = await supabase.functions.invoke('google-sheets-preview', {
       body: {
         gsheet_id: profile.gsheet_id,
@@ -118,6 +180,7 @@ serve(async (req) => {
         max_rows: actualChunkSize
       }
     })
+    performanceMetrics.stages.sheets_fetch_ms = performance.now() - sheetsStartTime;
 
     if (sheetsError || !sheetsData?.success) {
       console.error('Sheets error:', sheetsError, sheetsData)
@@ -187,11 +250,16 @@ serve(async (req) => {
       }
     }
 
+    // STAGE 3: Get engineer and status mappings
+    const mappingsStartTime = performance.now();
+    
     // Get engineer mappings
     const { data: engineerMappings } = await supabase
       .from('partner_engineer_mappings')
       .select('partner_engineer_identifier, engineer_id, engineers(name)')
       .eq('partner_id', profile.partner_id)
+    
+    performanceMetrics.database_calls.total_count++;
 
     const engineerMap = new Map()
     if (engineerMappings) {
@@ -207,6 +275,8 @@ serve(async (req) => {
       .select('partner_status, internal_status')
       .eq('partner_id', profile.partner_id)
 
+    performanceMetrics.database_calls.total_count++;
+
     const statusMap = new Map()
     if (statusMappings) {
       statusMappings.forEach(mapping => {
@@ -214,6 +284,8 @@ serve(async (req) => {
       })
     }
     console.log(`Loaded ${statusMap.size} status mappings`)
+    
+    performanceMetrics.stages.mappings_fetch_ms = performance.now() - mappingsStartTime;
 
     // Process the data
     const results: ImportResults = {
@@ -236,9 +308,14 @@ serve(async (req) => {
       errors: []
     }
 
+    // STAGE 4: Process the data
+    const dataProcessingStartTime = performance.now();
+    const rowTimes: Array<{ row_index: number; time_ms: number; partner_external_id?: string }> = [];
+    
     console.log('Starting data processing...')
 
     for (let i = 0; i < filteredData.length; i++) {
+      const rowStartTime = performance.now();
       const row = filteredData[i]
       const rowIndex = start_row + i + 1 // +1 because we skip header row
 
@@ -405,6 +482,9 @@ serve(async (req) => {
             .eq('email', clientEmail.toLowerCase())
             .eq('partner_id', profile.partner_id)
             .single()
+          
+          performanceMetrics.database_calls.total_count++;
+          performanceMetrics.database_calls.client_queries++;
 
           if (existingClient) {
             client = existingClient
@@ -419,6 +499,9 @@ serve(async (req) => {
                 updated_at: new Date().toISOString()
               })
               .eq('id', existingClient.id)
+            
+            performanceMetrics.database_calls.total_count++;
+            performanceMetrics.database_calls.update_operations++;
           } else {
             // Create new client
             const { data: newClient, error: clientError } = await supabase
@@ -434,6 +517,9 @@ serve(async (req) => {
               })
               .select('id')
               .single()
+
+            performanceMetrics.database_calls.total_count++;
+            performanceMetrics.database_calls.insert_operations++;
 
             if (clientError) {
               console.error(`Row ${rowIndex}: Client creation error:`, clientError)
@@ -455,6 +541,9 @@ serve(async (req) => {
             .eq('partner_id', profile.partner_id)
             .eq('partner_external_id', partnerExternalId)
             .single()
+          
+          performanceMetrics.database_calls.total_count++;
+          performanceMetrics.database_calls.order_queries++;
 
           if (existingOrder) {
             // Update existing order
@@ -480,6 +569,9 @@ serve(async (req) => {
               .from('orders')
               .update(updateData)
               .eq('id', existingOrder.id)
+
+            performanceMetrics.database_calls.total_count++;
+            performanceMetrics.database_calls.update_operations++;
 
             if (updateError) {
               console.error(`Row ${rowIndex}: Order update error:`, updateError)
@@ -539,6 +631,9 @@ serve(async (req) => {
                 .select('id, order_number')
                 .single()
 
+              performanceMetrics.database_calls.total_count++;
+              performanceMetrics.database_calls.insert_operations++;
+
               if (currentOrderError) {
                 // Check if it's a duplicate order_number error
                 if (currentOrderError.code === '23505' && currentOrderError.message.includes('orders_order_number_key')) {
@@ -591,6 +686,15 @@ serve(async (req) => {
           })
         }
 
+        // Track row processing time
+        const rowEndTime = performance.now();
+        const rowTime = rowEndTime - rowStartTime;
+        rowTimes.push({
+          row_index: rowIndex,
+          time_ms: rowTime,
+          partner_external_id: partnerExternalId
+        });
+
       } catch (error) {
         console.error(`Row ${rowIndex}: Processing error:`, error)
         errors.push({
@@ -601,6 +705,17 @@ serve(async (req) => {
         results.errors++
       }
     }
+
+    performanceMetrics.stages.data_processing_ms = performance.now() - dataProcessingStartTime;
+
+    // Calculate row processing metrics
+    performanceMetrics.row_processing.total_time_ms = rowTimes.reduce((sum, row) => sum + row.time_ms, 0);
+    performanceMetrics.row_processing.average_time_ms = rowTimes.length > 0 ? performanceMetrics.row_processing.total_time_ms / rowTimes.length : 0;
+    
+    // Get top 10 slowest rows
+    performanceMetrics.row_processing.slowest_rows = rowTimes
+      .sort((a, b) => b.time_ms - a.time_ms)
+      .slice(0, 10);
 
     // Add warnings to results
     results.warnings = warnings.length
@@ -617,11 +732,55 @@ serve(async (req) => {
     const hasMore = filteredData.length === actualChunkSize
     const nextStartRow = hasMore ? start_row + actualChunkSize : null
 
+    // STAGE 5: Logging
+    const loggingStartTime = performance.now();
+    
+    // Log the import run if not dry run
+    if (!dry_run) {
+      try {
+        await supabase.rpc('log_partner_import', {
+          p_run_id: runId,
+          p_partner_id: profile.partner_id,
+          p_profile_id: profile.id,
+          p_dry_run: dry_run,
+          p_total_rows: filteredData.length,
+          p_inserted_count: results.inserted,
+          p_updated_count: results.updated,
+          p_skipped_count: results.skipped,
+          p_warnings: warnings,
+          p_errors: errors
+        })
+        
+        performanceMetrics.database_calls.total_count++;
+      } catch (logError) {
+        console.error('Failed to log import:', logError)
+      }
+    }
+    
+    performanceMetrics.stages.logging_ms = performance.now() - loggingStartTime;
+
+    // Final performance calculations
+    performanceMetrics.overall_time_ms = performance.now() - overallStartTime;
+    performanceMetrics.rows_per_second = filteredData.length > 0 ? 
+      (filteredData.length / (performanceMetrics.overall_time_ms / 1000)) : 0;
+
+    console.log('=== PERFORMANCE METRICS ===');
+    console.log(`Overall time: ${performanceMetrics.overall_time_ms.toFixed(2)}ms`);
+    console.log(`Profile fetch: ${performanceMetrics.stages.profile_fetch_ms.toFixed(2)}ms`);
+    console.log(`Sheets fetch: ${performanceMetrics.stages.sheets_fetch_ms.toFixed(2)}ms`);
+    console.log(`Mappings fetch: ${performanceMetrics.stages.mappings_fetch_ms.toFixed(2)}ms`);
+    console.log(`Data processing: ${performanceMetrics.stages.data_processing_ms.toFixed(2)}ms`);
+    console.log(`Logging: ${performanceMetrics.stages.logging_ms.toFixed(2)}ms`);
+    console.log(`Average row time: ${performanceMetrics.row_processing.average_time_ms.toFixed(2)}ms`);
+    console.log(`Rows per second: ${performanceMetrics.rows_per_second.toFixed(2)}`);
+    console.log(`Database calls: ${performanceMetrics.database_calls.total_count} (${performanceMetrics.database_calls.client_queries} client, ${performanceMetrics.database_calls.order_queries} order, ${performanceMetrics.database_calls.insert_operations} inserts, ${performanceMetrics.database_calls.update_operations} updates)`);
+
     const response = {
       success: true,
       run_id: runId,
       dry_run,
       job_ids_filter,
+      benchmark_mode,
       chunk_info: {
         start_row,
         end_row: start_row + filteredData.length - 1,
@@ -649,27 +808,8 @@ serve(async (req) => {
         warnings: warnings,
         dry_run
       },
+      performance_metrics: performanceMetrics,
       details
-    }
-
-    // Log the import run if not dry run
-    if (!dry_run) {
-      try {
-        await supabase.rpc('log_partner_import', {
-          p_run_id: runId,
-          p_partner_id: profile.partner_id,
-          p_profile_id: profile.id,
-          p_dry_run: dry_run,
-          p_total_rows: filteredData.length,
-          p_inserted_count: results.inserted,
-          p_updated_count: results.updated,
-          p_skipped_count: results.skipped,
-          p_warnings: warnings,
-          p_errors: errors
-        })
-      } catch (logError) {
-        console.error('Failed to log import:', logError)
-      }
     }
 
     return new Response(JSON.stringify(response), {

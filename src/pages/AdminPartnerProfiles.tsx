@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Edit, Upload, FileSpreadsheet, Trash2 } from 'lucide-react';
+import { Plus, Edit, Upload, FileSpreadsheet, Trash2, Activity } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import MappingConfiguration from '@/components/admin/MappingConfiguration';
@@ -205,6 +205,8 @@ export default function AdminPartnerProfiles() {
   const [showImportDialog, setShowImportDialog] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showAuditDialog, setShowAuditDialog] = useState<string | null>(null);
+  const [showPerformanceDialog, setShowPerformanceDialog] = useState(false);
+  const [performanceMetrics, setPerformanceMetrics] = useState<any>(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -396,7 +398,8 @@ export default function AdminPartnerProfiles() {
       const body: any = {
         profile_id: profileId,
         dry_run: dryRun,
-        create_missing_orders: createMissingOrders
+        create_missing_orders: createMissingOrders,
+        benchmark_mode: false
       };
       
       if (csvData) {
@@ -436,6 +439,12 @@ export default function AdminPartnerProfiles() {
           title: dryRun ? 'Dry run completed' : 'Import completed',
           description: `Processed ${data.summary.processed} rows. ${data.summary.inserted_count} inserted, ${data.summary.updated_count} updated, ${data.summary.skipped_count} skipped. ${data.summary.errors.length} errors.`
         });
+        
+        // Show performance metrics if available
+        if (data.performance_metrics) {
+          setPerformanceMetrics(data.performance_metrics);
+          setShowPerformanceDialog(true);
+        }
       } else if (startRow === undefined && !data.success) {
         toast({
           title: 'Import failed',
@@ -455,6 +464,46 @@ export default function AdminPartnerProfiles() {
         });
       }
       throw error; // Re-throw so the modal can handle it
+    }
+  };
+
+  const runBenchmark = async (profileId: string) => {
+    try {
+      const body = {
+        profile_id: profileId,
+        dry_run: true,
+        benchmark_mode: true,
+        max_rows: 500 // Benchmark with first 500 rows
+      };
+
+      toast({
+        title: 'Running benchmark...',
+        description: 'Performance analysis in progress'
+      });
+
+      const { data, error } = await supabase.functions.invoke('partner-import', {
+        body
+      });
+
+      if (error) {
+        console.error('Benchmark error:', error);
+        throw error;
+      }
+
+      if (data.success && data.performance_metrics) {
+        setPerformanceMetrics(data.performance_metrics);
+        setShowPerformanceDialog(true);
+        toast({
+          title: 'Benchmark completed',
+          description: `Analyzed ${data.summary.processed} rows in ${Math.round(data.performance_metrics.overall_time_ms)}ms`
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Benchmark failed',
+        description: error.message,
+        variant: 'destructive'
+      });
     }
   };
 
@@ -631,6 +680,14 @@ export default function AdminPartnerProfiles() {
                 <Button
                   variant="outline"
                   size="sm"
+                  onClick={() => runBenchmark(profile.id)}
+                >
+                  <Activity className="h-4 w-4 mr-1" />
+                  Benchmark
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => setShowAuditDialog(profile.id)}
                 >
                   <FileSpreadsheet className="h-4 w-4 mr-1" />
@@ -703,6 +760,80 @@ export default function AdminPartnerProfiles() {
           partnerName={partner.name}
         />
       )}
+
+      {/* Performance Metrics Modal */}
+      <Dialog open={showPerformanceDialog} onOpenChange={setShowPerformanceDialog}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Import Performance Analysis</DialogTitle>
+          </DialogHeader>
+          {performanceMetrics && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm">Overall Performance</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2 text-sm">
+                      <p>Total Time: <strong>{Math.round(performanceMetrics.overall_time_ms)}ms</strong></p>
+                      <p>Rows/Second: <strong>{performanceMetrics.rows_per_second.toFixed(1)}</strong></p>
+                      <p>Avg Row Time: <strong>{performanceMetrics.row_processing.average_time_ms.toFixed(1)}ms</strong></p>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm">Database Activity</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2 text-sm">
+                      <p>Total Calls: <strong>{performanceMetrics.database_calls.total_count}</strong></p>
+                      <p>Client Queries: <strong>{performanceMetrics.database_calls.client_queries}</strong></p>
+                      <p>Order Queries: <strong>{performanceMetrics.database_calls.order_queries}</strong></p>
+                      <p>Insert Ops: <strong>{performanceMetrics.database_calls.insert_operations}</strong></p>
+                      <p>Update Ops: <strong>{performanceMetrics.database_calls.update_operations}</strong></p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+              
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm">Stage Breakdown</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-5 gap-4 text-sm">
+                    <div>Profile Fetch: <strong>{Math.round(performanceMetrics.stages.profile_fetch_ms)}ms</strong></div>
+                    <div>Sheets Fetch: <strong>{Math.round(performanceMetrics.stages.sheets_fetch_ms)}ms</strong></div>
+                    <div>Mappings: <strong>{Math.round(performanceMetrics.stages.mappings_fetch_ms)}ms</strong></div>
+                    <div>Processing: <strong>{Math.round(performanceMetrics.stages.data_processing_ms)}ms</strong></div>
+                    <div>Logging: <strong>{Math.round(performanceMetrics.stages.logging_ms)}ms</strong></div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {performanceMetrics.row_processing.slowest_rows.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm">Slowest Rows</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-1 text-sm">
+                      {performanceMetrics.row_processing.slowest_rows.map((row: any, idx: number) => (
+                        <div key={idx} className="flex justify-between">
+                          <span>Row {row.row_index} ({row.partner_external_id || 'N/A'})</span>
+                          <span><strong>{Math.round(row.time_ms)}ms</strong></span>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
