@@ -1109,7 +1109,7 @@ serve(async (req: Request): Promise<Response> => {
             const { data: createdClients, error: clientError } = await supabase
               .from('clients')
               .upsert(sanitizedClients, { 
-                onConflict: '(email_normalized)',
+                onConflict: 'email_normalized',
                 ignoreDuplicates: false 
               })
               .select('id, email, email_normalized, full_name');
@@ -1211,7 +1211,7 @@ serve(async (req: Request): Promise<Response> => {
               const { data: upsertResult, error: upsertError } = await supabase
                 .from('orders')
                 .upsert(ordersForUpsert, { 
-                  onConflict: '(partner_id,partner_external_id)',
+                  onConflict: 'partner_id,partner_external_id',
                   ignoreDuplicates: false 
                 })
                 .select('id, partner_external_id');
