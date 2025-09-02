@@ -19,6 +19,9 @@ verify_jwt = false
 [functions.partner-import]
 verify_jwt = true
 
+[functions.partner-import-audit]
+verify_jwt = true
+
 [functions.test-partner-import]
 verify_jwt = false
 
