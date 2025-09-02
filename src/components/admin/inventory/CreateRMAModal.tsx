@@ -135,21 +135,37 @@ export function CreateRMAModal({ open, onOpenChange }: CreateRMAModalProps) {
     }
 
     try {
-      const rmaData = {
-        rma_number: rmaNumber,
-        supplier_id: supplierId,
-        rma_type: rmaType,
-        original_order_id: originalOrderId || undefined,
-        reason,
-        lines: lines.map(({ id, ...line }) => line)
-      };
+      const currentUser = (await supabase.auth.getUser()).data.user;
+      
+      // Create one RMA record per item/quantity
+      const rmaRecords = [];
+      for (const line of lines) {
+        // For quantities > 1, create multiple records
+        for (let i = 0; i < line.qty; i++) {
+          const recordNumber = lines.length > 1 || line.qty > 1 
+            ? `${rmaNumber}-${String(rmaRecords.length + 1).padStart(2, '0')}` 
+            : rmaNumber;
+            
+          rmaRecords.push({
+            rma_number: recordNumber,
+            item_id: line.item_id,
+            supplier_id: supplierId,
+            return_reason: `${reason} - ${line.reason} (${line.condition})`,
+            notes: `Type: ${line.item_type}, Condition: ${line.condition}`,
+            created_by: currentUser?.id
+          });
+        }
+      }
 
-      // TODO: Implement actual RMA creation
-      console.log('Creating RMA:', rmaData);
+      const { error: insertError } = await supabase
+        .from('returns_rmas')
+        .insert(rmaRecords);
+
+      if (insertError) throw insertError;
       
       toast({
         title: 'Success',
-        description: 'RMA created successfully',
+        description: `${rmaRecords.length} RMA record(s) created successfully`,
       });
 
       onOpenChange(false);
@@ -161,9 +177,10 @@ export function CreateRMAModal({ open, onOpenChange }: CreateRMAModalProps) {
       setReason('');
       setLines([{ id: '1', item_id: '', item_type: 'inventory', qty: 1, reason: '', condition: 'damaged' }]);
     } catch (error) {
+      console.error('Error creating RMA:', error);
       toast({
         title: 'Error',
-        description: 'Failed to create RMA',
+        description: 'Failed to create RMA. Please try again.',
         variant: 'destructive',
       });
     }
