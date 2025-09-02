@@ -22,6 +22,7 @@ interface MappingConfigurationProps {
   onStatusMappingsChange: (mappings: Record<string, string>) => void;
   onStatusOverrideRulesChange: (rules: Record<string, boolean>) => void;
   onEngineerMappingsChange: (mappings: Record<string, string>) => void;
+  hideStatusMappings?: boolean;
 }
 
 const ORDER_FIELDS = [
@@ -66,7 +67,8 @@ export default function MappingConfiguration({
   onColumnMappingsChange,
   onStatusMappingsChange,
   onStatusOverrideRulesChange,
-  onEngineerMappingsChange
+  onEngineerMappingsChange,
+  hideStatusMappings = false
 }: MappingConfigurationProps) {
   const { toast } = useToast();
   // Seed availableColumns with existing mapped values to ensure they're always visible
@@ -522,69 +524,74 @@ export default function MappingConfiguration({
         </CardContent>
       </Card>
 
-      {/* Status Mappings */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Status Mappings</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {/* Add new mapping */}
-            <div className="flex items-end gap-2">
-              <div className="flex-1">
-                <Label>Partner Status</Label>
-                <Input
-                  value={newStatusMapping.partner}
-                  onChange={(e) => setNewStatusMapping({ ...newStatusMapping, partner: e.target.value })}
-                  placeholder="e.g., AWAITING_INSTALL_DATE"
-                />
-              </div>
-              <div className="flex-1">
-                <Label>Maps To</Label>
-                <Select
-                  value={newStatusMapping.internal}
-                  onValueChange={(value) => setNewStatusMapping({ ...newStatusMapping, internal: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select internal status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {STATUS_OPTIONS.map((status) => (
-                      <SelectItem key={status.key} value={status.key}>
-                        {status.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button onClick={addStatusMapping} size="sm">
-                <Plus className="h-4 w-4" />
-              </Button>
-            </div>
-
-            {/* Existing mappings */}
-            <div className="space-y-2">
-              {Object.entries(statusMappings).map(([partnerStatus, internalStatus]) => (
-                <div key={partnerStatus} className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                  <div className="flex items-center gap-4">
-                    <Badge variant="outline">{partnerStatus}</Badge>
-                    <span>→</span>
-                    <Badge>{STATUS_OPTIONS.find(s => s.key === internalStatus)?.label || internalStatus}</Badge>
-                  </div>
-                  <Button 
-                    type="button"
-                    onClick={() => removeStatusMapping(partnerStatus)} 
-                    variant="ghost" 
-                    size="sm"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
+      {/* Status Mappings - Hidden when using richer status actions editor */}
+      {!hideStatusMappings && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Import Status Override</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              ⚠️ Legacy feature: These simple status mappings are replaced by the richer "Partner Status Mappings" below.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {/* Add new mapping */}
+              <div className="flex items-end gap-2">
+                <div className="flex-1">
+                  <Label>Partner Status</Label>
+                  <Input
+                    value={newStatusMapping.partner}
+                    onChange={(e) => setNewStatusMapping({ ...newStatusMapping, partner: e.target.value })}
+                    placeholder="e.g., AWAITING_INSTALL_DATE"
+                  />
                 </div>
-              ))}
+                <div className="flex-1">
+                  <Label>Maps To</Label>
+                  <Select
+                    value={newStatusMapping.internal}
+                    onValueChange={(value) => setNewStatusMapping({ ...newStatusMapping, internal: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select internal status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {STATUS_OPTIONS.map((status) => (
+                        <SelectItem key={status.key} value={status.key}>
+                          {status.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button onClick={addStatusMapping} size="sm">
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+
+              {/* Existing mappings */}
+              <div className="space-y-2">
+                {Object.entries(statusMappings).map(([partnerStatus, internalStatus]) => (
+                  <div key={partnerStatus} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                    <div className="flex items-center gap-4">
+                      <Badge variant="outline">{partnerStatus}</Badge>
+                      <span>→</span>
+                      <Badge>{STATUS_OPTIONS.find(s => s.key === internalStatus)?.label || internalStatus}</Badge>
+                    </div>
+                    <Button 
+                      type="button"
+                      onClick={() => removeStatusMapping(partnerStatus)} 
+                      variant="ghost" 
+                      size="sm"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Status Override Rules */}
       <Card>

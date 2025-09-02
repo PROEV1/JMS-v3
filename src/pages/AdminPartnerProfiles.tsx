@@ -37,6 +37,19 @@ interface ImportProfile {
   updated_at: string;
 }
 
+// Helper function to convert status_actions to status_mappings for backward compatibility
+const convertStatusActionsToMappings = (statusActions: Record<string, any>): Record<string, string> => {
+  const mappings: Record<string, string> = {};
+  
+  Object.entries(statusActions || {}).forEach(([partnerStatus, actionConfig]) => {
+    if (actionConfig && typeof actionConfig === 'object' && actionConfig.jms_status) {
+      mappings[partnerStatus] = actionConfig.jms_status;
+    }
+  });
+  
+  return mappings;
+};
+
 // Default status mappings for common partner statuses
 const getDefaultStatusMappings = () => ({
   'AWAITING_INSTALL_DATE': 'needs_scheduling',
@@ -242,6 +255,9 @@ export default function AdminPartnerProfiles() {
         partner_identifier: partnerIdentifier,
         engineer_id: engineerId
       }));
+
+      // Convert status_actions to status_mappings for backward compatibility
+      const statusMappings = convertStatusActionsToMappings(data.status_actions);
       
       const { error } = await supabase
         .from('partner_import_profiles')
@@ -252,7 +268,7 @@ export default function AdminPartnerProfiles() {
           gsheet_id: data.gsheet_id || null,
           gsheet_sheet_name: data.gsheet_sheet_name || null,
           column_mappings: data.column_mappings,
-          status_mappings: data.status_mappings,
+          status_mappings: statusMappings,
           engineer_mapping_rules: engineerMappingRules,
           status_override_rules: data.status_override_rules,
           status_actions: data.status_actions,
@@ -282,6 +298,9 @@ export default function AdminPartnerProfiles() {
         partner_identifier: partnerIdentifier,
         engineer_id: engineerId
       }));
+
+      // Convert status_actions to status_mappings for backward compatibility
+      const statusMappings = convertStatusActionsToMappings(data.status_actions);
       
       const { error } = await supabase
         .from('partner_import_profiles')
@@ -291,7 +310,7 @@ export default function AdminPartnerProfiles() {
           gsheet_id: data.gsheet_id || null,
           gsheet_sheet_name: data.gsheet_sheet_name || null,
           column_mappings: data.column_mappings,
-          status_mappings: data.status_mappings,
+          status_mappings: statusMappings,
           engineer_mapping_rules: engineerMappingRules,
           status_override_rules: data.status_override_rules,
           status_actions: data.status_actions,
@@ -536,12 +555,25 @@ export default function AdminPartnerProfiles() {
                 onStatusMappingsChange={(mappings) => setFormData({ ...formData, status_mappings: mappings })}
                 onStatusOverrideRulesChange={(rules) => setFormData({ ...formData, status_override_rules: rules })}
                 onEngineerMappingsChange={(mappings) => setFormData({ ...formData, engineer_mappings: mappings })}
+                hideStatusMappings={true}
               />
 
-              <PartnerStatusMappingEditor
-                statusActions={formData.status_actions as Record<string, any>}
-                onUpdate={(statusActions) => setFormData({ ...formData, status_actions: statusActions })}
-              />
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">Partner Status Mappings</h3>
+                </div>
+                <div className="text-sm text-muted-foreground space-y-1 p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <p><strong>Configure how partner statuses are handled:</strong></p>
+                  <p>• <strong>JMS Status:</strong> The internal status jobs will be set to</p>
+                  <p>• <strong>Bucket:</strong> Which scheduling bucket jobs will appear in</p>
+                  <p>• <strong>Actions:</strong> Scheduling automation rules (suppress scheduling, keep calendar blocks, etc.)</p>
+                  <p>• Changes take effect immediately on the next import</p>
+                </div>
+                <PartnerStatusMappingEditor
+                  statusActions={formData.status_actions as Record<string, any>}
+                  onUpdate={(statusActions) => setFormData({ ...formData, status_actions: statusActions })}
+                />
+              </div>
 
               <div className="flex items-center space-x-2">
                 <Switch
