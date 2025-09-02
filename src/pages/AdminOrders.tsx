@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,6 +18,7 @@ import type { Database } from "@/integrations/supabase/types";
 import { useServerPagination } from '@/hooks/useServerPagination';
 import { Paginator } from '@/components/ui/Paginator';
 import { keepPreviousData } from '@tanstack/react-query';
+import { useDebounce } from '@/hooks/useDebounce';
 
 type OrderStatusEnhanced = Database['public']['Enums']['order_status_enhanced'];
 
@@ -26,6 +27,7 @@ export default function AdminOrders() {
   const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState("");
+  const debouncedSearchTerm = useDebounce(searchTerm, 300); // 300ms delay
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [engineerFilter, setEngineerFilter] = useState<string>("all");
   const [deletingOrderId, setDeletingOrderId] = useState<string | null>(null);
@@ -38,28 +40,23 @@ export default function AdminOrders() {
   // Reset to first page when filters change
   useEffect(() => {
     controls.resetToFirstPage();
-  }, [searchTerm, statusFilter, engineerFilter]);
+  }, [debouncedSearchTerm, statusFilter, engineerFilter]);
 
   const deleteMutation = useMutation({
     mutationFn: async (orderId: string) => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Not authenticated");
-
-      const response = await fetch(`https://qvppvstgconmzzjsryna.supabase.co/functions/v1/admin-delete-order`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
-        },
-        body: JSON.stringify({ orderId })
+      const { data, error } = await supabase.functions.invoke('admin-delete-order', {
+        body: { orderId }
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to delete order');
+      if (error) {
+        throw new Error(error.message || 'Failed to delete order');
       }
 
-      return response.json();
+      if (!data?.success) {
+        throw new Error(data?.error || 'Failed to delete order');
+      }
+
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-orders'] });
@@ -82,90 +79,9 @@ export default function AdminOrders() {
     }
   };
 
-  const { data: ordersResponse, isLoading, error } = useQuery({
-    queryKey: ['admin-orders', pagination.page, pagination.pageSize, searchTerm, statusFilter, engineerFilter],
-    queryFn: async () => {
-      let orderIds: string[] = [];
-
-      // If there's a search term, find matching order IDs from multiple sources
-      if (searchTerm) {
-        const searchPattern = `%${searchTerm}%`;
-        
-        // Search in orders table
-        const { data: orderMatches } = await supabase
-          .from('orders')
-          .select('id')
-          .or(`order_number.ilike.${searchPattern},partner_external_id.ilike.${searchPattern},job_address.ilike.${searchPattern},postcode.ilike.${searchPattern}`);
-        
-        if (orderMatches) {
-          orderIds.push(...orderMatches.map(o => o.id));
-        }
-
-        // Search in clients table and get their order IDs
-        const { data: clientMatches } = await supabase
-          .from('clients')
-          .select('id')
-          .or(`full_name.ilike.${searchPattern},email.ilike.${searchPattern},phone.ilike.${searchPattern}`);
-        
-        if (clientMatches) {
-          const clientIds = clientMatches.map(c => c.id);
-          if (clientIds.length > 0) {
-            const { data: clientOrders } = await supabase
-              .from('orders')
-              .select('id')
-              .in('client_id', clientIds);
-            
-            if (clientOrders) {
-              orderIds.push(...clientOrders.map(o => o.id));
-            }
-          }
-        }
-
-        // Search in quotes table and get their order IDs
-        const { data: quoteMatches } = await supabase
-          .from('quotes')
-          .select('id')
-          .ilike('quote_number', searchPattern);
-        
-        if (quoteMatches) {
-          const quoteIds = quoteMatches.map(q => q.id);
-          if (quoteIds.length > 0) {
-            const { data: quoteOrders } = await supabase
-              .from('orders')
-              .select('id')
-              .in('quote_id', quoteIds);
-            
-            if (quoteOrders) {
-              orderIds.push(...quoteOrders.map(o => o.id));
-            }
-          }
-        }
-
-        // Search in partners table and get their order IDs
-        const { data: partnerMatches } = await supabase
-          .from('partners')
-          .select('id')
-          .ilike('name', searchPattern);
-        
-        if (partnerMatches) {
-          const partnerIds = partnerMatches.map(p => p.id);
-          if (partnerIds.length > 0) {
-            const { data: partnerOrders } = await supabase
-              .from('orders')
-              .select('id')
-              .in('partner_id', partnerIds);
-            
-            if (partnerOrders) {
-              orderIds.push(...partnerOrders.map(o => o.id));
-            }
-          }
-        }
-
-        // Remove duplicates
-        orderIds = [...new Set(orderIds)];
-      }
-
-      // Build the main query
+  // Optimized search function that uses a single query with proper joins
+  const buildSearchQuery = useMemo(() => {
+    return (withPagination = true, withCount = true) => {
       let query = supabase
         .from('orders')
         .select(`
@@ -187,16 +103,23 @@ export default function AdminOrders() {
           partners!orders_partner_id_fkey(
             name
           )
-        `, { count: 'exact' })
+        `, withCount ? { count: 'exact' } : {})
         .order('created_at', { ascending: false });
 
-      // Apply search filter if we have matching order IDs
-      if (searchTerm) {
-        if (orderIds.length === 0) {
-          // No matches found, return empty result
-          return { data: [], count: 0 };
-        }
-        query = query.in('id', orderIds);
+      // Apply search filter using advanced text search
+      if (debouncedSearchTerm) {
+        const searchPattern = `%${debouncedSearchTerm}%`;
+        query = query.or(`
+          order_number.ilike.${searchPattern},
+          partner_external_id.ilike.${searchPattern},
+          job_address.ilike.${searchPattern},
+          postcode.ilike.${searchPattern},
+          clients.full_name.ilike.${searchPattern},
+          clients.email.ilike.${searchPattern},
+          clients.phone.ilike.${searchPattern},
+          quotes.quote_number.ilike.${searchPattern},
+          partners.name.ilike.${searchPattern}
+        `);
       }
 
       // Apply other filters
@@ -208,24 +131,42 @@ export default function AdminOrders() {
         query = query.eq('engineer_id', engineerFilter);
       }
 
-      // Apply pagination
-      query = query.range(pagination.offset, pagination.offset + pagination.pageSize - 1);
+      // Apply pagination if requested
+      if (withPagination) {
+        query = query.range(pagination.offset, pagination.offset + pagination.pageSize - 1);
+      }
 
-      const { data, error, count } = await query;
-      if (error) throw error;
+      return query;
+    };
+  }, [debouncedSearchTerm, statusFilter, engineerFilter, pagination.offset, pagination.pageSize]);
 
-      // Transform data
-      const transformedData = data?.map(order => ({
-        ...order,
-        client: order.clients || null,
-        quote: order.quotes || null,
-        engineer: order.engineers || null,
-        partner: order.partners || null
-      })) || [];
+  const { data: ordersResponse, isLoading, error } = useQuery({
+    queryKey: ['admin-orders', pagination.page, pagination.pageSize, debouncedSearchTerm, statusFilter, engineerFilter],
+    queryFn: async () => {
+      try {
+        const query = buildSearchQuery(true, true);
+        const { data, error, count } = await query;
+        
+        if (error) throw error;
 
-      return { data: transformedData, count: count || 0 };
+        // Transform data
+        const transformedData = data?.map(order => ({
+          ...order,
+          client: order.clients || null,
+          quote: order.quotes || null,
+          engineer: order.engineers || null,
+          partner: order.partners || null
+        })) || [];
+
+        return { data: transformedData, count: count || 0 };
+      } catch (error) {
+        console.error('Orders query error:', error);
+        throw error;
+      }
     },
     placeholderData: keepPreviousData,
+    retry: 2,
+    retryDelay: 1000,
   });
 
   const orders = ordersResponse?.data || [];
@@ -234,15 +175,21 @@ export default function AdminOrders() {
   const { data: engineers } = useQuery({
     queryKey: ['engineers-list'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('engineers')
-        .select('id, name')
-        .eq('availability', true)
-        .order('name');
-      
-      if (error) throw error;
-      return data || [];
+      try {
+        const { data, error } = await supabase
+          .from('engineers')
+          .select('id, name')
+          .eq('availability', true)
+          .order('name');
+        
+        if (error) throw error;
+        return data || [];
+      } catch (error) {
+        console.error('Engineers query error:', error);
+        throw error;
+      }
     },
+    retry: 2,
   });
 
   const statusOptions = [
@@ -285,132 +232,6 @@ export default function AdminOrders() {
     return shortNames[formatted] || formatted;
   };
 
-  // CSV Export functionality
-  const resolveSearchOrderIds = async () => {
-    if (!searchTerm) return [];
-    
-    let orderIds: string[] = [];
-    const searchPattern = `%${searchTerm}%`;
-    
-    // Search in orders table
-    const { data: orderMatches } = await supabase
-      .from('orders')
-      .select('id')
-      .or(`order_number.ilike.${searchPattern},partner_external_id.ilike.${searchPattern},job_address.ilike.${searchPattern},postcode.ilike.${searchPattern}`);
-    
-    if (orderMatches) {
-      orderIds.push(...orderMatches.map(o => o.id));
-    }
-
-    // Search in clients table and get their order IDs
-    const { data: clientMatches } = await supabase
-      .from('clients')
-      .select('id')
-      .or(`full_name.ilike.${searchPattern},email.ilike.${searchPattern},phone.ilike.${searchPattern}`);
-    
-    if (clientMatches) {
-      const clientIds = clientMatches.map(c => c.id);
-      if (clientIds.length > 0) {
-        const { data: clientOrders } = await supabase
-          .from('orders')
-          .select('id')
-          .in('client_id', clientIds);
-        
-        if (clientOrders) {
-          orderIds.push(...clientOrders.map(o => o.id));
-        }
-      }
-    }
-
-    // Search in quotes table and get their order IDs
-    const { data: quoteMatches } = await supabase
-      .from('quotes')
-      .select('id')
-      .ilike('quote_number', searchPattern);
-    
-    if (quoteMatches) {
-      const quoteIds = quoteMatches.map(q => q.id);
-      if (quoteIds.length > 0) {
-        const { data: quoteOrders } = await supabase
-          .from('orders')
-          .select('id')
-          .in('quote_id', quoteIds);
-        
-        if (quoteOrders) {
-          orderIds.push(...quoteOrders.map(o => o.id));
-        }
-      }
-    }
-
-    // Search in partners table and get their order IDs
-    const { data: partnerMatches } = await supabase
-      .from('partners')
-      .select('id')
-      .ilike('name', searchPattern);
-    
-    if (partnerMatches) {
-      const partnerIds = partnerMatches.map(p => p.id);
-      if (partnerIds.length > 0) {
-        const { data: partnerOrders } = await supabase
-          .from('orders')
-          .select('id')
-          .in('partner_id', partnerIds);
-        
-        if (partnerOrders) {
-          orderIds.push(...partnerOrders.map(o => o.id));
-        }
-      }
-    }
-
-    // Remove duplicates
-    return [...new Set(orderIds)];
-  };
-
-  const buildExportQuery = (orderIds?: string[]) => {
-    let query = supabase
-      .from('orders')
-      .select(`
-        *,
-        clients!orders_client_id_fkey(
-          id,
-          full_name,
-          email,
-          phone
-        ),
-        quotes!orders_quote_id_fkey(
-          id,
-          quote_number
-        ),
-        engineers!orders_engineer_id_fkey(
-          id,
-          name
-        ),
-        partners!orders_partner_id_fkey(
-          name
-        )
-      `)
-      .order('created_at', { ascending: false });
-
-    // Apply search filter if we have matching order IDs
-    if (searchTerm) {
-      if (!orderIds || orderIds.length === 0) {
-        return null; // No matches found
-      }
-      query = query.in('id', orderIds);
-    }
-
-    // Apply other filters
-    if (statusFilter !== 'all') {
-      query = query.eq('status_enhanced', statusFilter as OrderStatusEnhanced);
-    }
-
-    if (engineerFilter !== 'all') {
-      query = query.eq('engineer_id', engineerFilter);
-    }
-
-    return query;
-  };
-
   const csvEscape = (value: any): string => {
     if (value == null) return '';
     const str = String(value);
@@ -420,22 +241,15 @@ export default function AdminOrders() {
     return str;
   };
 
+  // Simplified export functionality
   const handleExportCSV = async () => {
     if (isExporting) return;
     
     setIsExporting(true);
     try {
-      // Resolve search order IDs first
-      const orderIds = await resolveSearchOrderIds();
+      // Build query without pagination for export
+      const exportQuery = buildSearchQuery(false, false);
       
-      // Build query without pagination
-      const baseQuery = buildExportQuery(orderIds);
-      
-      if (!baseQuery) {
-        toast.warning("No orders found matching your search criteria");
-        return;
-      }
-
       // Fetch data in batches (max 10,000 total)
       const batchSize = 1000;
       const maxRecords = 10000;
@@ -443,7 +257,7 @@ export default function AdminOrders() {
       let offset = 0;
 
       while (offset < maxRecords) {
-        const { data: batch, error } = await baseQuery
+        const { data: batch, error } = await exportQuery
           .range(offset, offset + batchSize - 1);
 
         if (error) throw error;
