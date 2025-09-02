@@ -15,6 +15,8 @@ interface StatusMapping {
   partnerStatus: string;
   jmsStatus: string;
   bucket: string;
+  quoteBucket: string | null;
+  includeInQuoteDashboard: boolean;
   actions: {
     suppress_scheduling?: boolean;
     suppression_reason?: string;
@@ -43,6 +45,14 @@ const bucketOptions = [
   'on_hold', 'cancelled', 'not_in_scheduling'
 ];
 
+const quoteBucketOptions = [
+  { value: 'needs_quotation', label: 'Needs Quotation' },
+  { value: 'waiting_approval', label: 'Waiting Approval' },
+  { value: 'review', label: 'Review' },
+  { value: 'needs_scheduling', label: 'Needs Scheduling' },
+  { value: 'rejected_rework', label: 'Rejected/Rework' }
+];
+
 export function PartnerStatusMappingEditor({ statusActions, onUpdate }: PartnerStatusMappingEditorProps) {
   const [mappings, setMappings] = useState<StatusMapping[]>(() => {
     return Object.entries(statusActions || {}).map(([partnerStatus, config]: [string, any]) => {
@@ -58,6 +68,8 @@ export function PartnerStatusMappingEditor({ statusActions, onUpdate }: PartnerS
         partnerStatus,
         jmsStatus: config.jms_status || 'awaiting_install_booking',
         bucket: config.bucket || 'needs_scheduling',
+        quoteBucket: config.quote_bucket || null,
+        includeInQuoteDashboard: config.include_in_quote_dashboard || false,
         actions
       };
     });
@@ -78,6 +90,8 @@ export function PartnerStatusMappingEditor({ statusActions, onUpdate }: PartnerS
         partnerStatus,
         jmsStatus: config.jms_status || 'awaiting_install_booking',
         bucket: config.bucket || 'needs_scheduling',
+        quoteBucket: config.quote_bucket || null,
+        includeInQuoteDashboard: config.include_in_quote_dashboard || false,
         actions
       };
     });
@@ -89,6 +103,8 @@ export function PartnerStatusMappingEditor({ statusActions, onUpdate }: PartnerS
       partnerStatus: '',
       jmsStatus: 'awaiting_install_booking',
       bucket: 'needs_scheduling',
+      quoteBucket: null,
+      includeInQuoteDashboard: false,
       actions: {}
     }]);
   };
@@ -104,7 +120,7 @@ export function PartnerStatusMappingEditor({ statusActions, onUpdate }: PartnerS
     if (field === 'actions') {
       newMappings[index].actions = { ...newMappings[index].actions, ...value };
     } else {
-      newMappings[index][field] = value;
+      (newMappings[index] as any)[field] = value;
     }
     setMappings(newMappings);
     updateParent(newMappings);
@@ -116,6 +132,8 @@ export function PartnerStatusMappingEditor({ statusActions, onUpdate }: PartnerS
         acc[mapping.partnerStatus] = {
           jms_status: mapping.jmsStatus,
           bucket: mapping.bucket,
+          quote_bucket: mapping.quoteBucket,
+          include_in_quote_dashboard: mapping.includeInQuoteDashboard,
           actions: mapping.actions
         };
       }
@@ -195,6 +213,41 @@ export function PartnerStatusMappingEditor({ statusActions, onUpdate }: PartnerS
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label>Quote Dashboard Bucket</Label>
+                  <Select
+                    value={mapping.quoteBucket || 'none'}
+                    onValueChange={(value) => updateMapping(index, 'quoteBucket', value === 'none' ? null : value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select quote bucket..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      {quoteBucketOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <Label htmlFor={`quote-dashboard-${index}`} className="text-sm">
+                    Include in Quote Dashboard
+                  </Label>
+                  <Switch
+                    id={`quote-dashboard-${index}`}
+                    checked={mapping.includeInQuoteDashboard}
+                    onCheckedChange={(checked) => 
+                      updateMapping(index, 'includeInQuoteDashboard', checked)
+                    }
+                  />
                 </div>
               </div>
 

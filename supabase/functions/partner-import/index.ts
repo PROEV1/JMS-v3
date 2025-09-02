@@ -564,6 +564,23 @@ serve(async (req) => {
             if (parsedInstallDate) {
               updateData.scheduled_install_date = parsedInstallDate
             }
+            
+            // Apply status actions if defined in profile
+            if (partnerStatus) {
+              const statusActions = profile.status_actions || {}
+              const statusAction = statusActions[partnerStatus]
+              
+              if (statusAction) {
+                // Apply scheduling suppression based on status actions
+                if (statusAction.actions?.suppress_scheduling) {
+                  updateData.scheduling_suppressed = true
+                  updateData.scheduling_suppressed_reason = statusAction.actions.suppression_reason || 'status_mapping'
+                } else {
+                  updateData.scheduling_suppressed = false
+                  updateData.scheduling_suppressed_reason = null
+                }
+              }
+            }
 
             const { error: updateError } = await supabase
               .from('orders')
@@ -614,6 +631,23 @@ serve(async (req) => {
 
             if (parsedInstallDate) {
               orderData.scheduled_install_date = parsedInstallDate
+            }
+            
+            // Apply status actions if defined in profile
+            if (partnerStatus) {
+              const statusActions = profile.status_actions || {}
+              const statusAction = statusActions[partnerStatus]
+              
+              if (statusAction) {
+                // Apply scheduling suppression based on status actions
+                if (statusAction.actions?.suppress_scheduling) {
+                  orderData.scheduling_suppressed = true
+                  orderData.scheduling_suppressed_reason = statusAction.actions.suppression_reason || 'status_mapping'
+                } else {
+                  orderData.scheduling_suppressed = false
+                  orderData.scheduling_suppressed_reason = null
+                }
+              }
             }
 
             console.log(`Row ${rowIndex}: Creating order with data:`, orderData)

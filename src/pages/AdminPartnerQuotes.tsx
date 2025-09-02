@@ -162,18 +162,35 @@ export default function AdminPartnerQuotes() {
     if (!partnerId) return;
     
     try {
-      const { data, error } = await supabase
-        .from('partner_quote_settings')
-        .select('*')
-        .eq('partner_id', partnerId)
-        .maybeSingle();
+      // Fetch both partner settings and import profiles
+      const [settingsResult, profilesResult] = await Promise.all([
+        supabase
+          .from('partner_quote_settings')
+          .select('*')
+          .eq('partner_id', partnerId)
+          .maybeSingle(),
+        supabase
+          .from('partner_import_profiles')
+          .select('*')
+          .eq('partner_id', partnerId)
+          .eq('is_active', true)
+      ]);
 
-      if (error) {
-        console.error('Error fetching partner settings:', error);
-        return;
+      if (settingsResult.error) {
+        console.error('Error fetching partner settings:', settingsResult.error);
       }
 
-      setPartnerSettings(data);
+      if (profilesResult.error) {
+        console.error('Error fetching import profiles:', profilesResult.error);
+      }
+
+      // Combine settings and import profiles
+      const combinedSettings = {
+        ...settingsResult.data,
+        import_profiles: profilesResult.data || []
+      };
+
+      setPartnerSettings(combinedSettings);
     } catch (error) {
       console.error('Error in fetchPartnerSettings:', error);
     }
@@ -427,6 +444,28 @@ export default function AdminPartnerQuotes() {
         }
         if (job.quote_override.override_type === 'standard_quote_marked') {
           return statuses.includes('NEEDS_SCHEDULING');
+        }
+      }
+
+      // Check import profile status mappings if available
+      if (partnerSettings?.import_profiles?.length > 0) {
+        const activeProfile = partnerSettings.import_profiles.find((p: any) => p.is_active);
+        if (activeProfile?.status_actions) {
+          const statusAction = activeProfile.status_actions[job.partner_status];
+          if (statusAction?.include_in_quote_dashboard && statusAction.quote_bucket) {
+            const bucketMapping = {
+              'needs_quotation': ['AWAITING_QUOTATION'],
+              'waiting_approval': ['WAITING_FOR_APPROVAL'],
+              'review': ['REVIEW'],
+              'needs_scheduling': ['NEEDS_SCHEDULING'],
+              'rejected_rework': ['REJECTED', 'REWORK_REQUESTED']
+            };
+            
+            const targetBucket = statusAction.quote_bucket;
+            if (bucketMapping[targetBucket]) {
+              return statuses.some(s => bucketMapping[targetBucket].includes(s));
+            }
+          }
         }
       }
 

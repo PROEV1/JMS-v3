@@ -71,6 +71,8 @@ const getDefaultStatusActions = () => ({
   'AWAITING_INSTALL_DATE': {
     jms_status: 'needs_scheduling',
     bucket: 'needs_scheduling',
+    quote_bucket: null,
+    include_in_quote_dashboard: false,
     actions: {
       suppress_scheduling: false,
       keep_calendar_block: false,
@@ -80,6 +82,8 @@ const getDefaultStatusActions = () => ({
   'INSTALL_DATE_CONFIRMED': {
     jms_status: 'scheduled',
     bucket: 'scheduled',
+    quote_bucket: null,
+    include_in_quote_dashboard: false,
     actions: {
       suppress_scheduling: false,
       keep_calendar_block: true,
@@ -89,6 +93,8 @@ const getDefaultStatusActions = () => ({
   'INSTALLED': {
     jms_status: 'install_completed_pending_qa',
     bucket: 'completion_pending',
+    quote_bucket: null,
+    include_in_quote_dashboard: false,
     actions: {
       suppress_scheduling: false,
       keep_calendar_block: true,
@@ -98,6 +104,8 @@ const getDefaultStatusActions = () => ({
   'COMPLETION_PENDING': {
     jms_status: 'install_completed_pending_qa',
     bucket: 'completion_pending',
+    quote_bucket: null,
+    include_in_quote_dashboard: false,
     actions: {
       suppress_scheduling: false,
       keep_calendar_block: true,
@@ -107,6 +115,8 @@ const getDefaultStatusActions = () => ({
   'COMPLETE': {
     jms_status: 'completed',
     bucket: 'completed',
+    quote_bucket: null,
+    include_in_quote_dashboard: false,
     actions: {
       suppress_scheduling: true,
       keep_calendar_block: false,
@@ -117,6 +127,8 @@ const getDefaultStatusActions = () => ({
   'WAITING_FOR_OHME_APPROVAL': {
     jms_status: 'on_hold_parts_docs',
     bucket: 'on_hold',
+    quote_bucket: 'waiting_approval',
+    include_in_quote_dashboard: true,
     actions: {
       suppress_scheduling: true,
       keep_calendar_block: true,
@@ -127,6 +139,8 @@ const getDefaultStatusActions = () => ({
   'ON_HOLD': {
     jms_status: 'on_hold_parts_docs',
     bucket: 'on_hold',
+    quote_bucket: null,
+    include_in_quote_dashboard: false,
     actions: {
       suppress_scheduling: true,
       keep_calendar_block: true,
@@ -137,6 +151,8 @@ const getDefaultStatusActions = () => ({
   'SWITCH_JOB_SUB_TYPE_REQUESTED': {
     jms_status: 'on_hold_parts_docs',
     bucket: 'on_hold',
+    quote_bucket: null,
+    include_in_quote_dashboard: false,
     actions: {
       suppress_scheduling: true,
       keep_calendar_block: true,
@@ -147,6 +163,8 @@ const getDefaultStatusActions = () => ({
   'CANCELLATION_REQUESTED': {
     jms_status: 'cancelled',
     bucket: 'cancelled',
+    quote_bucket: null,
+    include_in_quote_dashboard: false,
     actions: {
       suppress_scheduling: true,
       keep_calendar_block: false,
@@ -157,6 +175,8 @@ const getDefaultStatusActions = () => ({
   'CANCELLED': {
     jms_status: 'cancelled',
     bucket: 'cancelled',
+    quote_bucket: null,
+    include_in_quote_dashboard: false,
     actions: {
       suppress_scheduling: true,
       keep_calendar_block: false,
@@ -167,6 +187,8 @@ const getDefaultStatusActions = () => ({
   'ABANDONED': {
     jms_status: 'cancelled',
     bucket: 'cancelled',
+    quote_bucket: null,
+    include_in_quote_dashboard: false,
     actions: {
       suppress_scheduling: true,
       keep_calendar_block: false,
@@ -177,6 +199,8 @@ const getDefaultStatusActions = () => ({
   'AWAITING_QUOTATION': {
     jms_status: 'awaiting_install_booking',
     bucket: 'not_in_scheduling',
+    quote_bucket: 'needs_quotation',
+    include_in_quote_dashboard: true,
     actions: {
       suppress_scheduling: true,
       keep_calendar_block: false,
