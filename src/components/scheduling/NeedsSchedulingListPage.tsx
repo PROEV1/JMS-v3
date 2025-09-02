@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { ScheduleStatusNavigation } from './ScheduleStatusNavigation';
 import { ScheduleStatusListPage } from './ScheduleStatusListPage';
+import { buildSafeUuidInClause } from '@/utils/schedulingUtils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, Users, UserCheck } from 'lucide-react';
@@ -47,7 +48,10 @@ export function NeedsSchedulingListPage() {
 
       // Exclude orders with active offers
       if (activeOfferOrderIds.length > 0) {
-        query = query.not('id', 'in', `(${activeOfferOrderIds.map(id => `'${id}'`).join(',')})`);
+        const safeIds = buildSafeUuidInClause(activeOfferOrderIds);
+        if (safeIds) {
+          query = query.not('id', 'in', `(${safeIds})`);
+        }
       }
 
       // Get total count first

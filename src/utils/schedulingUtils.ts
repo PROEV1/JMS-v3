@@ -5,6 +5,21 @@ import { calculateDayFit } from './dayFitUtils';
 // Duration constants and helpers
 export const DEFAULT_JOB_DURATION_HOURS = 3;
 
+// Utility function to safely build UUID IN clauses for Supabase queries
+export const buildSafeUuidInClause = (ids: string[]): string => {
+  if (!ids?.length) return '';
+  
+  // Remove any quotes and ensure we have clean UUIDs
+  const cleanIds = ids
+    .filter(id => id && typeof id === 'string')
+    .map(id => id.replace(/['"]/g, '').trim())
+    .filter(id => id.length > 0);
+    
+  if (!cleanIds.length) return '';
+  
+  return cleanIds.join(',');
+};
+
 export const getOrderEstimatedHours = (order: Order): number => {
   // Return 3 hours as default if not specified
   return order.estimated_duration_hours || DEFAULT_JOB_DURATION_HOURS;

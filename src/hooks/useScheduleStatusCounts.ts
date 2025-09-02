@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { buildSafeUuidInClause } from '@/utils/schedulingUtils';
 
 interface StatusCounts {
   needsScheduling: number;
@@ -108,7 +109,10 @@ export function useScheduleStatusCounts() {
 
       // Exclude orders with active offers
       if (activeOfferOrderIds.length > 0) {
-        query = query.not('id', 'in', `(${activeOfferOrderIds.map(id => `'${id}'`).join(',')})`);
+        const safeIds = buildSafeUuidInClause(activeOfferOrderIds);
+        if (safeIds) {
+          query = query.not('id', 'in', `(${safeIds})`);
+        }
       }
 
       const { count } = await query;
