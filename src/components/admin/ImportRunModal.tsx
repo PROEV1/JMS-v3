@@ -27,6 +27,7 @@ interface ImportResult {
     inserted_count: number;
     updated_count: number;
     skipped_count: number;
+    duplicates_count?: number; // Add duplicates count
     errors: Array<{ row: number; error: string; data?: any }>;
     warnings: Array<{ row: number; warning: string; data?: any }>;
     dry_run?: boolean;
@@ -128,6 +129,7 @@ export default function ImportRunModal({
           inserted_count: 0,
           updated_count: 0,
           skipped_count: 0,
+          duplicates_count: 0, // Initialize duplicates count
           errors: [],
           warnings: [],
           dry_run: dryRun
@@ -179,6 +181,7 @@ export default function ImportRunModal({
             aggregatedResult.summary.inserted_count += chunkResult.summary.inserted_count;
             aggregatedResult.summary.updated_count += chunkResult.summary.updated_count;
             aggregatedResult.summary.skipped_count += chunkResult.summary.skipped_count;
+            aggregatedResult.summary.duplicates_count = (aggregatedResult.summary.duplicates_count || 0) + (chunkResult.summary.duplicates_count || 0);
             aggregatedResult.summary.errors.push(...chunkResult.summary.errors);
             aggregatedResult.summary.warnings.push(...chunkResult.summary.warnings);
 
@@ -261,6 +264,7 @@ export default function ImportRunModal({
             aggregatedResult.summary.inserted_count += result.summary.inserted_count;
             aggregatedResult.summary.updated_count += result.summary.updated_count;
             aggregatedResult.summary.skipped_count += result.summary.skipped_count;
+            aggregatedResult.summary.duplicates_count = (aggregatedResult.summary.duplicates_count || 0) + (result.summary.duplicates_count || 0);
             aggregatedResult.summary.errors.push(...result.summary.errors);
             aggregatedResult.summary.warnings.push(...result.summary.warnings);
 
@@ -318,6 +322,7 @@ export default function ImportRunModal({
             aggregatedResult.summary.inserted_count += chunkResult.summary.inserted_count;
             aggregatedResult.summary.updated_count += chunkResult.summary.updated_count;
             aggregatedResult.summary.skipped_count += chunkResult.summary.skipped_count;
+            aggregatedResult.summary.duplicates_count = (aggregatedResult.summary.duplicates_count || 0) + (chunkResult.summary.duplicates_count || 0);
             aggregatedResult.summary.errors.push(...chunkResult.summary.errors);
             aggregatedResult.summary.warnings.push(...chunkResult.summary.warnings);
 
@@ -381,6 +386,7 @@ export default function ImportRunModal({
           inserted_count: 0,
           updated_count: 0,
           skipped_count: 0,
+          duplicates_count: 0,
           errors: [{ row: 0, error: error.message }],
           warnings: []
         }
@@ -623,6 +629,12 @@ export default function ImportRunModal({
                     <div className="font-bold text-blue-600">{progress.aggregatedResult.summary.updated_count}</div>
                     <div className="text-blue-600">Updated</div>
                   </div>
+                  {progress.aggregatedResult.summary.duplicates_count > 0 && (
+                    <div className="text-center p-2 bg-white rounded">
+                      <div className="font-bold text-orange-600">{progress.aggregatedResult.summary.duplicates_count}</div>
+                      <div className="text-orange-600">Duplicates</div>
+                    </div>
+                  )}
                 </div>
 
                 {progress.aggregatedResult.summary.errors.length > 0 && (

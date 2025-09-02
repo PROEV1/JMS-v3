@@ -61,6 +61,7 @@ interface Results {
   inserted: ProcessedRow[];
   updated: ProcessedRow[];
   skipped: ProcessedRow[];
+  duplicates?: ProcessedRow[]; // Add duplicates tracking
   warnings: Array<{ row: number; column?: string; message: string; data?: any }>;
   errors: Array<{ row: number; message: string; data?: any }>;
 }
@@ -608,6 +609,7 @@ serve(async (req: Request): Promise<Response> => {
       inserted: [],
       updated: [],
       skipped: [],
+      duplicates: [], // Initialize duplicates array
       warnings: [],
       errors: []
     };
@@ -1424,6 +1426,7 @@ serve(async (req: Request): Promise<Response> => {
       inserted: results.inserted.length,
       updated: results.updated.length,
       skipped: results.skipped.length,
+      duplicates: results.duplicates?.length || 0,
       warnings: results.warnings.length,
       errors: results.errors.length,
       dry_run: dryRun
@@ -1465,6 +1468,7 @@ serve(async (req: Request): Promise<Response> => {
         inserted: results.inserted.length,
         updated: results.updated.length,
         skipped: results.skipped.length,
+        duplicates: results.duplicates?.length || 0,
         warnings: results.warnings.length,
         errors: results.errors.length
       },
@@ -1474,6 +1478,7 @@ serve(async (req: Request): Promise<Response> => {
         inserted_count: results.inserted.length,
         updated_count: results.updated.length,
         skipped_count: results.skipped.length,
+        duplicates_count: results.duplicates?.length || 0,
         errors: results.errors,
         warnings: results.warnings,
         dry_run: dryRun
@@ -1482,6 +1487,7 @@ serve(async (req: Request): Promise<Response> => {
         inserted: results.inserted,
         updated: results.updated,
         skipped: results.skipped,
+        duplicates: results.duplicates || [],
         warnings: results.warnings,
         errors: results.errors
       }
