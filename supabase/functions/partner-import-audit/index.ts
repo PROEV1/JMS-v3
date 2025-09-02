@@ -53,7 +53,7 @@ serve(async (req: Request): Promise<Response> => {
       .select(`
         *,
         partners (
-          id, name, google_sheet_url
+          id, name
         )
       `)
       .eq('id', profile_id)
