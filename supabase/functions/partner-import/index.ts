@@ -43,8 +43,11 @@ serve(async (req) => {
       dry_run = false, 
       max_rows = null,
       start_row = 0,
-      chunk_size = 200
+      chunk_size = null
     } = body
+
+    // Use max_rows if provided, otherwise fall back to chunk_size, otherwise default to 200
+    const actualChunkSize = max_rows || chunk_size || 200
 
     if (!profile_id) {
       console.error('Missing profile_id')
@@ -58,7 +61,7 @@ serve(async (req) => {
     }
 
     console.log(`Starting import for profile: ${profile_id}`)
-    console.log(`Dry run: ${dry_run}, Max rows: ${max_rows}, Start row: ${start_row}`)
+    console.log(`Dry run: ${dry_run}, Max rows: ${max_rows}, Start row: ${start_row}, Actual chunk size: ${actualChunkSize}`)
 
     // Get import profile with all necessary data
     const { data: profile, error: profileError } = await supabase
@@ -111,7 +114,7 @@ serve(async (req) => {
         gsheet_id: profile.gsheet_id,
         sheet_name: profile.gsheet_sheet_name,
         start_row: start_row,
-        max_rows: chunk_size
+        max_rows: actualChunkSize
       }
     })
 
@@ -146,7 +149,8 @@ serve(async (req) => {
           processed_count: 0,
           total_rows: totalRows,
           has_more: false,
-          next_start_row: null
+          next_start_row: null,
+          chunk_size: actualChunkSize
         }
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -544,8 +548,8 @@ serve(async (req) => {
     const runId = `import-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`
 
     // Determine if there are more rows to process
-    const hasMore = rawData.length === chunk_size
-    const nextStartRow = hasMore ? start_row + chunk_size : null
+    const hasMore = rawData.length === actualChunkSize
+    const nextStartRow = hasMore ? start_row + actualChunkSize : null
 
     const response = {
       success: true,
@@ -557,7 +561,8 @@ serve(async (req) => {
         processed_count: rawData.length,
         total_rows: sheetsData.total_rows || rawData.length,
         has_more: hasMore,
-        next_start_row: nextStartRow
+        next_start_row: nextStartRow,
+        chunk_size: actualChunkSize
       },
       results: {
         inserted: results.inserted,
