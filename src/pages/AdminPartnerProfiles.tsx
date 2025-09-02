@@ -199,10 +199,10 @@ export default function AdminPartnerProfiles() {
     gsheet_id: '',
     gsheet_sheet_name: '',
     column_mappings: {} as Record<string, string>,
-    status_mappings: getDefaultStatusMappings(),
+    status_mappings: {} as Record<string, string>,
     engineer_mapping_rules: [] as Array<any>,
     status_override_rules: {} as Record<string, boolean>,
-    status_actions: getDefaultStatusActions(),
+    status_actions: {} as Record<string, any>,
     engineer_mappings: {} as Record<string, string>,
     is_active: true
   });
@@ -320,10 +320,10 @@ export default function AdminPartnerProfiles() {
       gsheet_id: '',
       gsheet_sheet_name: '',
       column_mappings: {},
-      status_mappings: getDefaultStatusMappings(),
+      status_mappings: {} as Record<string, string>,
       engineer_mapping_rules: [],
       status_override_rules: {},
-      status_actions: getDefaultStatusActions(),
+      status_actions: {} as Record<string, any>,
       engineer_mappings: {},
       is_active: true
     });
@@ -352,10 +352,10 @@ export default function AdminPartnerProfiles() {
       gsheet_id: profile.gsheet_id || '',
       gsheet_sheet_name: profile.gsheet_sheet_name || '',
       column_mappings: profile.column_mappings,
-      status_mappings: profile.status_mappings || {},
+      status_mappings: profile.status_mappings || {} as Record<string, string>,
       engineer_mapping_rules: profile.engineer_mapping_rules,
       status_override_rules: profile.status_override_rules,
-      status_actions: normalizedStatusActions,
+      status_actions: normalizedStatusActions as Record<string, any>,
       engineer_mappings: engineerMappings,
       is_active: profile.is_active
     });
