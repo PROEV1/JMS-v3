@@ -381,7 +381,6 @@ serve(async (req) => {
               .insert({
                 full_name: clientName,
                 email: clientEmail.toLowerCase(),
-                email_normalized: clientEmail.toLowerCase(),
                 phone: normalizedPhone,
                 address: jobAddress,
                 postcode: postcode,
