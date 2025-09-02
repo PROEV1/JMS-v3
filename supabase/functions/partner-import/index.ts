@@ -1146,265 +1146,105 @@ serve(async (req: Request): Promise<Response> => {
             }
           });
 
-          console.log('=== STEP 4: Categorizing orders for insert vs update ===');
-          // Batch 3a: Categorize orders for insert vs update
-          const ordersToInsert: Array<{data: any, rowIndex: number}> = [];
-          const ordersToUpdate: Array<{data: any, id: string, rowIndex: number}> = [];
-
-          // Check for existing orders to determine insert vs update
-          for (const orderData of ordersToProcess) {
-            if (orderData.partner_external_id) {
-              const { data: existingOrders } = await supabase
-                .from('orders')
-                .select('id, partner_metadata')
-                .eq('partner_id', partner.id)
-                .eq('partner_external_id', orderData.partner_external_id)
-                .limit(1);
-
-              if (existingOrders && existingOrders.length > 0) {
-                const existingOrder = existingOrders[0];
-                const currentFingerprint = orderData.partner_metadata?.import_fingerprint;
-                const lastFingerprint = existingOrder.partner_metadata?.import_fingerprint;
-
-                if (currentFingerprint !== lastFingerprint) {
-                  ordersToUpdate.push({
-                    data: orderData,
-                    id: existingOrder.id,
-                    rowIndex: orderData._rowIndex
-                  });
-                }
-              } else {
-                ordersToInsert.push({
-                  data: orderData,
-                  rowIndex: orderData._rowIndex
-                });
-              }
-            } else {
-              ordersToInsert.push({
-                data: orderData,
-                rowIndex: orderData._rowIndex
-              });
-            }
+          console.log('=== STEP 4: Bulk fetch existing orders & deduplicate ===');
+          
+          // Extract unique partner_external_ids from this chunk
+          const partnerExternalIds = [...new Set(ordersToProcess.map(o => o.partner_external_id).filter(Boolean))];
+          console.log(`Unique partner_external_ids in chunk: ${partnerExternalIds.length}`);
+          
+          // Bulk fetch existing orders for this partner
+          const { data: existingOrdersData, error: existingOrdersError } = await supabase
+            .from('orders')
+            .select('id, partner_external_id')
+            .eq('partner_id', partner.id)
+            .in('partner_external_id', partnerExternalIds);
+          
+          if (existingOrdersError) {
+            console.error('Error fetching existing orders:', existingOrdersError);
+            throw new Error(`Failed to fetch existing orders: ${existingOrdersError.message}`);
           }
           
-          console.log(`Orders to insert: ${ordersToInsert.length}, Orders to update: ${ordersToUpdate.length}`);
-
-          console.log('=== STEP 5: Bulk insert new orders ===');
-          // Batch 4: Enhanced bulk insert for new orders with optimistic insert strategy
-          if (ordersToInsert.length > 0) {
-            console.log(`Attempting bulk insert of ${ordersToInsert.length} orders...`);
-            const insertData = ordersToInsert.map(item => sanitizeForDatabase(item.data));
-            
-            if (verbose) {
-              console.log('Sample sanitized order data:', JSON.stringify(insertData[0], null, 2));
-            }
-            
-            const { data: insertedOrders, error: insertError } = await supabase
-              .from('orders')
-              .insert(insertData)
-              .select('id, order_number');
-
-            if (insertError) {
-              console.log('Bulk insert failed, falling back to individual processing:', insertError.message);
-              
-              // If batch insert fails, try individual inserts to identify specific failures
-              console.log('Falling back to individual order insertion...');
-              
-              for (const item of ordersToInsert) {
-                try {
-                  const sanitizedData = sanitizeForDatabase(item.data);
-                  const { data: singleInsert, error: singleError } = await supabase
-                    .from('orders')
-                    .insert([sanitizedData])
-                    .select('id');
-                  
-                  if (singleError) {
-                    // Check if it's a duplicate constraint violation
-                    if (singleError.code === '23505' && singleError.message?.includes('orders_order_number_key')) {
-                      // Try to find the existing order by partner_external_id first (more reliable)
-                      let existingOrderQuery = null;
-                      
-                      if (item.data.partner_external_id) {
-                        existingOrderQuery = await supabase
-                          .from('orders')
-                          .select('id, order_number, partner_external_id')
-                          .eq('partner_id', partner.id)
-                          .eq('partner_external_id', item.data.partner_external_id)
-                          .limit(1);
-                      }
-                      
-                      // Fallback to client + job address matching if no partner_external_id match
-                      if (!existingOrderQuery?.data?.[0] && item.data.client_id && item.data.job_address) {
-                        existingOrderQuery = await supabase
-                          .from('orders')
-                          .select('id, order_number, partner_external_id')
-                          .eq('partner_id', partner.id)
-                          .eq('client_id', item.data.client_id)
-                          .eq('job_address', item.data.job_address)
-                          .limit(1);
-                      }
-                      
-                      if (existingOrderQuery?.data?.[0]) {
-                        const existingOrder = existingOrderQuery.data[0];
-                        console.log(`Found existing order to update: ${existingOrder.order_number} (ID: ${existingOrder.id})`);
-                        
-                        // Update the existing order instead
-                        const sanitizedUpdateData = sanitizeForDatabase(item.data);
-                        // Remove id and order_number from update data to avoid conflicts
-                        delete sanitizedUpdateData.id;
-                        delete sanitizedUpdateData.order_number;
-                        
-                        const { error: updateError } = await supabase
-                          .from('orders')
-                          .update(sanitizedUpdateData)
-                          .eq('id', existingOrder.id);
-                        
-                        if (updateError) {
-                          results.errors.push({
-                            row: item.rowIndex + 1,
-                            message: `Failed to update existing order ${existingOrder.order_number}: ${updateError.message}`,
-                            data: item.data
-                          });
-                        } else {
-                          results.updated.push({
-                            type: 'update',
-                            data: { ...item.data, id: existingOrder.id },
-                            reason: 'Converted duplicate insert to update'
-                          });
-                        }
-                      } else {
-                        // Log as skipped rather than error for duplicates we can't resolve
-                        results.warnings.push({
-                          row: item.rowIndex + 1,
-                          column: 'order_number',
-                          message: `Skipped potential duplicate order - could not find existing order to update: ${singleError.message}`,
-                          data: { 
-                            partner_external_id: item.data.partner_external_id,
-                            client_id: item.data.client_id,
-                            job_address: item.data.job_address
-                          }
-                        });
-                      }
-                    } else {
-                        results.errors.push({
-                          row: item.rowIndex + 1,
-                          message: `Failed to insert order: ${singleError.message}`,
-                          data: { 
-                            original: item.data, 
-                            sanitized: sanitizedData,
-                            error_details: singleError
-                          }
-                        });
-                    }
-                  } else if (singleInsert?.[0]) {
-                    results.inserted.push({
-                      type: 'insert',
-                      data: { ...item.data, id: singleInsert[0].id }
-                    });
-                  }
-                } catch (individualError: any) {
-                  results.errors.push({
-                    row: item.rowIndex + 1,
-                    message: `Individual insert failed: ${individualError.message}`,
-                    data: {
-                      original: item.data,
-                      sanitized: sanitizeForDatabase(item.data),
-                      error_details: individualError
-                    }
-                  });
-                }
-              }
-            } else if (insertedOrders) {
-              ordersToInsert.forEach((item, index) => {
-                results.inserted.push({
-                  type: 'insert',
-                  data: { ...item.data, id: insertedOrders[index].id }
-                });
+          // Create lookup map for existing orders
+          const existingOrdersMap = new Map();
+          (existingOrdersData || []).forEach(order => {
+            existingOrdersMap.set(order.partner_external_id, order.id);
+          });
+          
+          console.log(`Found ${existingOrdersMap.size} existing orders to potentially update`);
+          
+          // Pre-deduplicate orders within this chunk by partner_external_id
+          const ordersByExternalId = new Map();
+          let duplicatesCount = 0;
+          
+          for (const order of ordersToProcess) {
+            const externalId = order.partner_external_id;
+            if (ordersByExternalId.has(externalId)) {
+              duplicatesCount++;
+              console.log(`Duplicate partner_external_id in chunk: ${externalId}`);
+              results.duplicates = results.duplicates || [];
+              results.duplicates.push({
+                type: 'duplicate',
+                data: order,
+                reason: 'Duplicate partner_external_id within chunk'
               });
+              continue; // Skip duplicates within the chunk
             }
+            ordersByExternalId.set(externalId, order);
           }
-
-          // Batch 5: Optimized bulk update for existing orders
-          if (ordersToUpdate.length > 0) {
-            // Process updates in chunks of 50 to avoid query complexity limits
-            const updateChunkSize = 50;
-            for (let i = 0; i < ordersToUpdate.length; i += updateChunkSize) {
-              const updateChunk = ordersToUpdate.slice(i, i + updateChunkSize);
+          
+          const deduplicatedOrders = Array.from(ordersByExternalId.values());
+          console.log(`After deduplication: ${deduplicatedOrders.length} orders (${duplicatesCount} duplicates removed)`);
+          
+          console.log('=== STEP 5: Single upsert operation ===');
+          
+          if (deduplicatedOrders.length > 0) {
+            try {
+              // Remove order_number from all orders to avoid conflicts
+              const ordersForUpsert = deduplicatedOrders.map(order => {
+                const sanitized = sanitizeForDatabase(order);
+                delete sanitized.order_number; // Never set order_number, let DB generate it
+                return sanitized;
+              });
               
-              try {
-                // For small batches, use individual updates for safety
-                if (updateChunk.length <= 5) {
-                  for (const updateItem of updateChunk) {
-                    const sanitizedUpdateData = sanitizeForDatabase(updateItem.data);
-                    const { error: updateError } = await supabase
-                      .from('orders')
-                      .update(sanitizedUpdateData)
-                      .eq('id', updateItem.id);
-
-                    if (updateError) {
-                      results.errors.push({
-                        row: updateItem.rowIndex + 1,
-                        message: `Failed to update order: ${updateError.message}`,
-                        data: updateItem.data
-                      });
-                    } else {
-                      results.updated.push({
-                        type: 'update',
-                        data: { ...updateItem.data, id: updateItem.id }
-                      });
-                      if (verbose) {
-                        console.log(`Updated order: ${updateItem.id}`);
-                      }
-                    }
-                  }
-                } else {
-                  // For larger batches, use upsert operation
-                  const upsertData = updateChunk.map(item => ({
-                    id: item.id,
-                    ...item.data,
-                    updated_at: new Date().toISOString()
-                  }));
-
-                  const { data: upsertedOrders, error: upsertError } = await supabase
-                    .from('orders')
-                    .upsert(upsertData, { 
-                      onConflict: 'id',
-                      ignoreDuplicates: false
-                    })
-                    .select('id');
-
-                  if (upsertError) {
-                    console.error('Batch order upsert error:', upsertError);
-                    updateChunk.forEach(item => {
-                      results.errors.push({
-                        row: item.rowIndex + 1,
-                        message: `Failed to update order: ${upsertError.message}`,
-                        data: item.data
-                      });
-                    });
-                  } else if (upsertedOrders) {
-                    updateChunk.forEach((item, index) => {
-                      if (upsertedOrders[index]) {
-                        results.updated.push({
-                          type: 'update',
-                          data: { ...item.data, id: item.id }
-                        });
-                        if (verbose) {
-                          console.log(`Updated order: ${item.id}`);
-                        }
-                      }
-                    });
-                  }
-                }
-              } catch (error: any) {
-                updateChunk.forEach(item => {
-                  results.errors.push({
-                    row: item.rowIndex + 1,
-                    message: `Update batch error: ${error.message}`,
-                    data: item.data
-                  });
-                });
+              console.log(`Performing upsert for ${ordersForUpsert.length} orders...`);
+              
+              const { data: upsertResult, error: upsertError } = await supabase
+                .from('orders')
+                .upsert(ordersForUpsert, { 
+                  onConflict: 'partner_id,partner_external_id',
+                  ignoreDuplicates: false 
+                })
+                .select('id, partner_external_id');
+              
+              if (upsertError) {
+                console.error('Upsert failed:', upsertError);
+                throw new Error(`Upsert operation failed: ${upsertError.message}`);
               }
+              
+              // Count inserts vs updates based on existing orders map
+              for (const order of deduplicatedOrders) {
+                if (existingOrdersMap.has(order.partner_external_id)) {
+                  results.updated.push({
+                    type: 'update',
+                    data: order
+                  });
+                } else {
+                  results.inserted.push({
+                    type: 'insert',
+                    data: order
+                  });
+                }
+              }
+              
+              console.log(`Upsert completed: ${results.inserted.length} inserted, ${results.updated.length} updated`);
+              
+            } catch (upsertException) {
+              console.error('Upsert exception:', upsertException);
+              results.errors.push({
+                row: 0,
+                message: `Upsert operation failed: ${upsertException.message}`,
+                data: { error: upsertException }
+              });
             }
           }
 

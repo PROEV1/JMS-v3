@@ -711,18 +711,24 @@ export default function ImportRunModal({
                 {!importResult.unmapped_engineers && (
                   <>
                      {/* Summary Statistics */}
-                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                       <div className="text-center p-3 bg-blue-50 rounded-lg">
-                         <div className="text-2xl font-bold text-blue-600">{importResult.summary.updated_count}</div>
-                         <div className="text-sm text-blue-600">{importResult.summary.dry_run ? 'Would Update' : 'Updates'}</div>
-                       </div>
-                       <div className="text-center p-3 bg-yellow-50 rounded-lg">
-                         <div className="text-2xl font-bold text-yellow-600">{importResult.summary.skipped_count}</div>
-                         <div className="text-sm text-yellow-600">Skipped</div>
+                     <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                       <div className="text-center p-3 bg-purple-50 rounded-lg">
+                         <div className="text-2xl font-bold text-purple-600">
+                           {(importResult.summary.inserted_count || 0) + (importResult.summary.updated_count || 0)}
+                         </div>
+                         <div className="text-sm text-purple-600">{importResult.summary.dry_run ? 'Would Affect' : 'Affected'}</div>
                        </div>
                        <div className="text-center p-3 bg-green-50 rounded-lg">
                          <div className="text-2xl font-bold text-green-600">{importResult.summary.inserted_count}</div>
                          <div className="text-sm text-green-600">{importResult.summary.dry_run ? 'Would Insert' : 'Inserted'}</div>
+                       </div>
+                       <div className="text-center p-3 bg-blue-50 rounded-lg">
+                         <div className="text-2xl font-bold text-blue-600">{importResult.summary.updated_count}</div>
+                         <div className="text-sm text-blue-600">{importResult.summary.dry_run ? 'Would Update' : 'Updated'}</div>
+                       </div>
+                       <div className="text-center p-3 bg-orange-50 rounded-lg">
+                         <div className="text-2xl font-bold text-orange-600">{importResult.summary.duplicates_count || 0}</div>
+                         <div className="text-sm text-orange-600">Duplicates</div>
                        </div>
                        <div className="text-center p-3 bg-red-50 rounded-lg">
                          <div className="text-2xl font-bold text-red-600">{importResult.summary.errors.length}</div>
