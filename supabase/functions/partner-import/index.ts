@@ -335,18 +335,25 @@ serve(async (req) => {
           }
         }
 
-        // Parse quote amount
-        let parsedQuoteAmount = 0
+        // Parse quote amount - allow null for missing/invalid amounts
+        let parsedQuoteAmount = null
         if (quoteAmount && quoteAmount !== '' && quoteAmount !== 'NaN') {
           const numAmount = parseFloat(String(quoteAmount).replace(/[^0-9.-]/g, ''))
           if (!isNaN(numAmount)) {
             parsedQuoteAmount = numAmount
+          } else {
+            warnings.push({
+              row: rowIndex,
+              column: 'quote_amount',
+              message: `Invalid quote amount '${quoteAmount}' left blank`,
+              data: { original_amount: quoteAmount }
+            })
           }
         } else if (quoteAmount === 'NaN') {
           warnings.push({
             row: rowIndex,
             column: 'quote_amount',
-            message: `Invalid quote amount '${quoteAmount}' converted to 0`,
+            message: `Quote amount contains 'NaN' - left blank`,
             data: { original_amount: quoteAmount }
           })
         }

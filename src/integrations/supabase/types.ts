@@ -1781,7 +1781,7 @@ export type Database = {
           survey_token: string | null
           survey_token_expires_at: string | null
           time_window: string | null
-          total_amount: number
+          total_amount: number | null
           travel_time_minutes: number | null
           updated_at: string
         }
@@ -1832,7 +1832,7 @@ export type Database = {
           survey_token?: string | null
           survey_token_expires_at?: string | null
           time_window?: string | null
-          total_amount?: number
+          total_amount?: number | null
           travel_time_minutes?: number | null
           updated_at?: string
         }
@@ -1883,7 +1883,7 @@ export type Database = {
           survey_token?: string | null
           survey_token_expires_at?: string | null
           time_window?: string | null
-          total_amount?: number
+          total_amount?: number | null
           travel_time_minutes?: number | null
           updated_at?: string
         }
