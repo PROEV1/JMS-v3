@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Edit, Upload, FileSpreadsheet, Trash2, Activity } from 'lucide-react';
+import { Plus, Edit, Upload, FileSpreadsheet, Trash2, Activity, History } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import MappingConfiguration from '@/components/admin/MappingConfiguration';
@@ -19,6 +19,7 @@ import { DeletePartnerJobsModal } from '@/components/admin/DeletePartnerJobsModa
 import { ImportProfileActions } from '@/components/admin/ImportProfileActions';
 import { TestPartnerImport } from '@/components/TestPartnerImport';
 import { PartnerImportAuditModal } from '@/components/admin/PartnerImportAuditModal';
+import ImportHistoryModal from '@/components/admin/ImportHistoryModal';
 
 interface ImportProfile {
   id: string;
@@ -229,6 +230,7 @@ export default function AdminPartnerProfiles() {
   const [showImportDialog, setShowImportDialog] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showAuditDialog, setShowAuditDialog] = useState<string | null>(null);
+  const [showHistoryDialog, setShowHistoryDialog] = useState<string | null>(null);
   const [showPerformanceDialog, setShowPerformanceDialog] = useState(false);
   const [performanceMetrics, setPerformanceMetrics] = useState<any>(null);
 
@@ -722,7 +724,7 @@ export default function AdminPartnerProfiles() {
                   size="sm"
                   onClick={() => setShowHistoryDialog(profile.id)}
                 >
-                  <Clock className="h-4 w-4 mr-1" />
+                  <History className="h-4 w-4 mr-1" />
                   Import History
                 </Button>
                 <Button

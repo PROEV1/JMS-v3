@@ -16,8 +16,8 @@ interface ImportLog {
   updated_count: number;
   skipped_count: number;
   dry_run: boolean;
-  errors: Array<{ row: number; error: string; data?: any }>;
-  warnings: Array<{ row: number; warning: string; data?: any }>;
+  errors: any;
+  warnings: any;
 }
 
 interface ImportHistoryModalProps {
@@ -44,7 +44,11 @@ export default function ImportHistoryModal({
         .limit(20);
 
       if (error) throw error;
-      return data as ImportLog[];
+      return data.map(log => ({
+        ...log,
+        errors: Array.isArray(log.errors) ? log.errors : [],
+        warnings: Array.isArray(log.warnings) ? log.warnings : []
+      })) as ImportLog[];
     },
     enabled: isOpen
   });
