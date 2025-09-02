@@ -19,7 +19,6 @@ interface StatusMapping {
     suppress_scheduling?: boolean;
     suppression_reason?: string;
     keep_calendar_block?: boolean;
-    create_calendar_block?: boolean;
     release_calendar_block?: boolean;
     lock_scheduling?: boolean;
     surface_to_qa?: boolean;
@@ -46,22 +45,42 @@ const bucketOptions = [
 
 export function PartnerStatusMappingEditor({ statusActions, onUpdate }: PartnerStatusMappingEditorProps) {
   const [mappings, setMappings] = useState<StatusMapping[]>(() => {
-    return Object.entries(statusActions || {}).map(([partnerStatus, config]: [string, any]) => ({
-      partnerStatus,
-      jmsStatus: config.jms_status || 'awaiting_install_booking',
-      bucket: config.bucket || 'needs_scheduling',
-      actions: config.actions || {}
-    }));
+    return Object.entries(statusActions || {}).map(([partnerStatus, config]: [string, any]) => {
+      // Backward compatibility: if create_calendar_block was true, set keep_calendar_block to true
+      const actions = { ...config.actions || {} };
+      if (actions.create_calendar_block && !actions.keep_calendar_block) {
+        actions.keep_calendar_block = true;
+      }
+      // Remove create_calendar_block from actions
+      delete actions.create_calendar_block;
+
+      return {
+        partnerStatus,
+        jmsStatus: config.jms_status || 'awaiting_install_booking',
+        bucket: config.bucket || 'needs_scheduling',
+        actions
+      };
+    });
   });
 
   // Re-hydrate state when statusActions prop changes
   useEffect(() => {
-    const newMappings = Object.entries(statusActions || {}).map(([partnerStatus, config]: [string, any]) => ({
-      partnerStatus,
-      jmsStatus: config.jms_status || 'awaiting_install_booking',
-      bucket: config.bucket || 'needs_scheduling',
-      actions: config.actions || {}
-    }));
+    const newMappings = Object.entries(statusActions || {}).map(([partnerStatus, config]: [string, any]) => {
+      // Backward compatibility: if create_calendar_block was true, set keep_calendar_block to true
+      const actions = { ...config.actions || {} };
+      if (actions.create_calendar_block && !actions.keep_calendar_block) {
+        actions.keep_calendar_block = true;
+      }
+      // Remove create_calendar_block from actions
+      delete actions.create_calendar_block;
+
+      return {
+        partnerStatus,
+        jmsStatus: config.jms_status || 'awaiting_install_booking',
+        bucket: config.bucket || 'needs_scheduling',
+        actions
+      };
+    });
     setMappings(newMappings);
   }, [statusActions]);
 
@@ -196,27 +215,19 @@ export function PartnerStatusMappingEditor({ statusActions, onUpdate }: PartnerS
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <Label htmlFor={`calendar-${index}`} className="text-sm">
-                      Keep Calendar Block
-                    </Label>
+                    <div>
+                      <Label htmlFor={`calendar-${index}`} className="text-sm">
+                        Keep Calendar Block
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        Maintain engineer's calendar block when this status is received
+                      </p>
+                    </div>
                     <Switch
                       id={`calendar-${index}`}
                       checked={mapping.actions.keep_calendar_block || false}
                       onCheckedChange={(checked) => 
                         updateMapping(index, 'actions', { keep_calendar_block: checked })
-                      }
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor={`create-calendar-${index}`} className="text-sm">
-                      Create Calendar Block
-                    </Label>
-                    <Switch
-                      id={`create-calendar-${index}`}
-                      checked={mapping.actions.create_calendar_block || false}
-                      onCheckedChange={(checked) => 
-                        updateMapping(index, 'actions', { create_calendar_block: checked })
                       }
                     />
                   </div>
