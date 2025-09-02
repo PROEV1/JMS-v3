@@ -653,11 +653,11 @@ serve(async (req) => {
 
             console.log(`Row ${rowIndex}: Creating order with data:`, orderData)
 
-            // Try creating order with retry logic for duplicate order_number
+            // Try creating order with enhanced retry logic for duplicate order_number
             let newOrder = null
             let orderError = null
             let retryCount = 0
-            const maxRetries = 1
+            const maxRetries = 5 // Increased from 1 to 5
 
             while (retryCount <= maxRetries && !newOrder) {
               const { data: orderResult, error: currentOrderError } = await supabase
@@ -674,8 +674,11 @@ serve(async (req) => {
                 if (currentOrderError.code === '23505' && currentOrderError.message.includes('orders_order_number_key')) {
                   console.log(`Row ${rowIndex}: Duplicate order_number collision (attempt ${retryCount + 1}), retrying...`)
                   if (retryCount < maxRetries) {
-                    // Small delay before retry
-                    await new Promise(resolve => setTimeout(resolve, 100))
+                    // Exponential backoff with jitter
+                    const baseDelay = 100
+                    const jitter = Math.random() * 200
+                    const delay = baseDelay * Math.pow(1.5, retryCount) + jitter
+                    await new Promise(resolve => setTimeout(resolve, delay))
                     retryCount++
                     continue
                   } else {
