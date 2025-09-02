@@ -1,1358 +1,598 @@
-import { serve } from 'https://deno.land/std@0.208.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
-import { parse } from 'https://deno.land/std@0.208.0/csv/mod.ts';
+
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-interface ImportProfile {
-  id: string;
-  partner_id: string;
-  gsheet_id?: string;
-  gsheet_sheet_name?: string;
-  source_type: 'csv' | 'gsheet';
-  column_mappings: Record<string, string>;
-  status_mappings: Record<string, string>;
-  status_actions: Record<string, any>;
-  engineer_mapping_rules: Array<{
-    partner_identifier: string;
-    engineer_id: string;
-  }>;
 }
 
-interface MappedData {
-  client_name?: string;
-  client_email?: string;
-  client_phone?: string;
-  customer_address_line_1?: string;
-  customer_address_line_2?: string;
-  customer_address_city?: string;
-  customer_address_post_code?: string;
-  job_address?: string;
-  postcode?: string;
-  partner_status?: string;
-  status?: string;
-  partner_external_id?: string;
-  partner_external_url?: string;
-  quote_id?: string;
-  quote_amount?: string;
-  client_id?: string;
-  engineer_identifier?: string;
-  engineer_name?: string;
-  engineer_email?: string;
-  is_partner_job?: boolean;
-  sub_partner?: string;
-  scheduled_date?: string;
-  job_notes?: string;
-  job_type?: string;
-  type?: string;
-  estimated_duration_hours?: string;
+interface ImportRow {
+  [key: string]: string | null;
 }
 
-interface ProcessedRow {
-  type: 'insert' | 'update' | 'skip';
-  data: any;
-  reason?: string;
+interface ImportResults {
+  inserted: number;
+  updated: number;
+  skipped: number;
+  duplicates: number;
+  warnings: number;
+  errors: number;
 }
 
-interface Results {
-  inserted: ProcessedRow[];
-  updated: ProcessedRow[];
-  skipped: ProcessedRow[];
-  duplicates?: ProcessedRow[]; // Add duplicates tracking
-  warnings: Array<{ row: number; column?: string; message: string; data?: any }>;
-  errors: Array<{ row: number; message: string; data?: any }>;
-}
-
-// Helper function to sanitize objects before database operations
-function sanitizeForDatabase(obj: any): any {
-  const sanitized = { ...obj };
+serve(async (req) => {
+  console.log('=== PARTNER IMPORT FUNCTION START ===');
+  console.log('Method:', req.method);
+  console.log('Headers:', Object.fromEntries(req.headers.entries()));
   
-  // Remove all fields starting with underscore (meta fields)
-  Object.keys(sanitized).forEach(key => {
-    if (key.startsWith('_')) {
-      delete sanitized[key];
-    }
-  });
-  
-  return sanitized;
-}
-
-// Helper functions for email and phone handling
-function generatePlaceholderEmail(partnerId: string, clientName: string | null, rowIndex: number): string {
-  const cleanName = (clientName || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-  const shortPartnerId = partnerId.slice(0, 8);
-  return `${cleanName || 'client'}_${shortPartnerId}_${rowIndex}@placeholder.local`;
-}
-
-function normalizeEmail(email: string | null | undefined): string | null {
-  if (!email || typeof email !== 'string') return null;
-  
-  const trimmed = email.trim();
-  if (!trimmed) return null;
-  
-  // Basic email validation
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(trimmed)) return null;
-  
-  return trimmed.toLowerCase();
-}
-
-function normalizePhone(phone: string | null | undefined): string | null {
-  if (!phone || typeof phone !== 'string') {
-    return null;
-  }
-
-  // Handle scientific notation (e.g., "4.41234567891E12" -> "441234567891")
-  let normalizedPhone = phone.toString();
-  if (normalizedPhone.includes('E') || normalizedPhone.includes('e')) {
-    try {
-      // Convert scientific notation to regular number string
-      const numValue = parseFloat(normalizedPhone);
-      if (!isNaN(numValue)) {
-        normalizedPhone = numValue.toFixed(0);
-      }
-    } catch (e) {
-      console.warn('Failed to parse scientific notation phone:', phone);
-    }
-  }
-
-  // Remove all non-digit characters
-  const digitsOnly = normalizedPhone.replace(/\D/g, '');
-  
-  if (!digitsOnly) {
-    return null;
-  }
-
-  // Handle UK phone numbers
-  if (digitsOnly.startsWith('44')) {
-    // Convert 44XXXXXXXXXX to 0XXXXXXXXXX (UK format)
-    const ukNumber = '0' + digitsOnly.substring(2);
-    if (ukNumber.length === 11) {
-      return ukNumber;
-    }
-  } else if (digitsOnly.length === 10) {
-    // Add leading 0 to 10-digit numbers (assuming UK)
-    return '0' + digitsOnly;
-  } else if (digitsOnly.length === 11 && digitsOnly.startsWith('0')) {
-    // Already correct UK format
-    return digitsOnly;
-  }
-
-  // Return as-is if it doesn't match common patterns
-  return digitsOnly.length >= 10 ? digitsOnly : null;
-}
-
-function parseDate(dateStr: string | null | undefined): string | null {
-  if (!dateStr || dateStr.trim() === '') {
-    return null;
-  }
-  
-  const trimmed = dateStr.trim();
-  
-  // If already in YYYY-MM-DD format, return as is (remove time if present)
-  if (trimmed.match(/^\d{4}-\d{2}-\d{2}/)) {
-    return trimmed.split('T')[0].split(' ')[0]; // Remove time component if present
-  }
-  
-  // Strip time component from various formats (e.g., "22/08/2025 14:00" -> "22/08/2025")
-  const dateOnly = trimmed.split(' ')[0];
-  
-  // Try to parse DD/MM/YYYY format first (UK format - preferred)
-  const ddmmyyyyMatch = dateOnly.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (ddmmyyyyMatch) {
-    const [, day, month, year] = ddmmyyyyMatch;
-    
-    // Validate date components
-    const dayNum = parseInt(day, 10);
-    const monthNum = parseInt(month, 10);
-    
-    if (dayNum < 1 || dayNum > 31 || monthNum < 1 || monthNum > 12) {
-      return null;
-    }
-    
-    // Convert to YYYY-MM-DD format
-    const isoDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-    
-    // Validate the final date is actually valid
-    const testDate = new Date(isoDate);
-    if (testDate.getFullYear() != parseInt(year) || 
-        testDate.getMonth() + 1 != monthNum || 
-        testDate.getDate() != dayNum) {
-      return null;
-    }
-    
-    return isoDate;
-  }
-  
-  // Try MM/DD/YYYY format (US format - fallback)
-  const mmddyyyyMatch = dateOnly.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (mmddyyyyMatch) {
-    const [, month, day, year] = mmddyyyyMatch;
-    
-    // Validate date components
-    const dayNum = parseInt(day, 10);
-    const monthNum = parseInt(month, 10);
-    
-    if (dayNum < 1 || dayNum > 31 || monthNum < 1 || monthNum > 12) {
-      return null;
-    }
-    
-    // For ambiguous dates (like 01/02/2025), prefer DD/MM unless it's clearly MM/DD
-    // If day > 12, it must be DD/MM format, so this is MM/DD
-    if (monthNum > 12) {
-      return null; // Invalid month in MM/DD format
-    }
-    
-    // Convert to YYYY-MM-DD format
-    const isoDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-    
-    // Validate the final date is actually valid
-    const testDate = new Date(isoDate);
-    if (testDate.getFullYear() != parseInt(year) || 
-        testDate.getMonth() + 1 != monthNum || 
-        testDate.getDate() != dayNum) {
-      return null;
-    }
-    
-    return isoDate;
-  }
-  
-  // Try other common formats like DD-MM-YYYY or MM-DD-YYYY
-  const dashMatch = dateOnly.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
-  if (dashMatch) {
-    const [, first, second, year] = dashMatch;
-    const firstNum = parseInt(first, 10);
-    const secondNum = parseInt(second, 10);
-    
-    // Assume DD-MM-YYYY if first > 12, otherwise treat as MM-DD-YYYY
-    let day, month;
-    if (firstNum > 12) {
-      day = firstNum;
-      month = secondNum;
-    } else {
-      month = firstNum;
-      day = secondNum;
-    }
-    
-    if (day < 1 || day > 31 || month < 1 || month > 12) {
-      return null;
-    }
-    
-    const isoDate = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
-    
-    // Validate the final date
-    const testDate = new Date(isoDate);
-    if (testDate.getFullYear() != parseInt(year) || 
-        testDate.getMonth() + 1 != month || 
-        testDate.getDate() != day) {
-      return null;
-    }
-    
-    return isoDate;
-  }
-  
-  return null;
-}
-
-async function fetchImportProfile(supabase: any, partnerImportProfileId: string): Promise<ImportProfile | null> {
-  const { data, error } = await supabase
-    .from('partner_import_profiles')
-    .select('*')
-    .eq('id', partnerImportProfileId)
-    .single();
-
-  if (error) {
-    console.error('Error fetching import profile:', error);
-    return null;
-  }
-
-  return data;
-}
-
-async function fetchPartner(supabase: any, partnerId: string) {
-  const { data, error } = await supabase
-    .from('partners')
-    .select('*')
-    .eq('id', partnerId)
-    .single();
-
-  if (error) {
-    console.error('Error fetching partner:', error);
-    return null;
-  }
-
-  return data;
-}
-
-async function getGoogleSheetsAuth() {
-  const serviceAccountKey = Deno.env.get('GOOGLE_SERVICE_ACCOUNT_KEY');
-  if (!serviceAccountKey) {
-    throw new Error('Google Service Account Key not configured');
-  }
-
-  const credentials = JSON.parse(serviceAccountKey);
-  console.log('Google credentials parsed successfully, client_email:', credentials.client_email);
-
-  const jwt = await createJWT(credentials);
-  console.log('JWT generated successfully');
-
-  const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-      assertion: jwt
-    })
-  });
-
-  if (!tokenResponse.ok) {
-    const errorText = await tokenResponse.text();
-    throw new Error(`Failed to get access token: ${errorText}`);
-  }
-
-  const tokenData = await tokenResponse.json();
-  if (!tokenData.access_token) {
-    throw new Error('No access token received');
-  }
-  console.log('Access token obtained successfully');
-  
-  return tokenData.access_token;
-}
-
-async function getTotalRowCount(sheetId: string, sheetName: string, accessToken: string): Promise<number> {
-  // Get all values in column A to count non-empty rows
-  const range = `${sheetName}!A:A`;
-  const sheetResponse = await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(range)}`,
-    {
-      headers: { 'Authorization': `Bearer ${accessToken}` }
-    }
-  );
-
-  if (!sheetResponse.ok) {
-    const errorText = await sheetResponse.text();
-    console.error('Sheets API error getting row count:', errorText);
-    throw new Error(`Failed to get row count: ${errorText}`);
-  }
-
-  const sheetData = await sheetResponse.json();
-  const rows = sheetData.values || [];
-  
-  // Count non-empty rows, subtract 1 for header
-  const totalRows = Math.max(0, rows.filter(row => row && row[0] && row[0].toString().trim()).length - 1);
-  console.log(`Total data rows found: ${totalRows}`);
-  
-  return totalRows;
-}
-
-async function fetchGoogleSheetData(sheetId: string, sheetName: string, startRow: number = 0, maxRows: number = 1000, totalRows?: number) {
-  const accessToken = await getGoogleSheetsAuth();
-  
-  // Always fetch headers first
-  const headersRange = `${sheetName}!A1:ZZ1`;
-  const headersResponse = await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(headersRange)}`,
-    {
-      headers: { 'Authorization': `Bearer ${accessToken}` }
-    }
-  );
-
-  if (!headersResponse.ok) {
-    const errorText = await headersResponse.text();
-    console.error('Sheets API error getting headers:', errorText);
-    throw new Error(`Failed to fetch headers: ${errorText}`);
-  }
-
-  const headersData = await headersResponse.json();
-  const headers = headersData.values?.[0] || [];
-  
-  if (headers.length === 0) {
-    throw new Error('No headers found in the sheet');
-  }
-
-  // Get total row count only if not provided or if null/invalid
-  if (totalRows === undefined || totalRows === null || !Number.isFinite(totalRows)) {
-    totalRows = await getTotalRowCount(sheetId, sheetName, accessToken);
-  }
-  
-  // If no data rows available, return early
-  if (totalRows === 0) {
-    console.log('No data rows found in sheet');
-    return { headers, dataRows: [], totalRows: 0 };
-  }
-
-  // Calculate actual data range (add 2 to account for 1-based indexing and header row)
-  const dataStartRow = startRow + 2;
-  const effectiveMaxRows = maxRows > 0 ? maxRows : totalRows;
-  const dataEndRow = Math.min(dataStartRow + effectiveMaxRows - 1, totalRows + 1);
-  
-  // Ensure we have a valid range (dataEndRow >= dataStartRow)
-  if (dataEndRow < dataStartRow) {
-    console.log('No valid data range - dataEndRow < dataStartRow');
-    return { headers, dataRows: [], totalRows };
-  }
-  
-  // Fetch the actual data chunk
-  const dataRange = `${sheetName}!A${dataStartRow}:ZZ${dataEndRow}`;
-  console.log(`Fetching data range: ${dataRange} (startRow: ${dataStartRow}, endRow: ${dataEndRow}, totalRows: ${totalRows})`);
-  
-  const dataResponse = await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(dataRange)}`,
-    {
-      headers: { 'Authorization': `Bearer ${accessToken}` }
-    }
-  );
-
-  if (!dataResponse.ok) {
-    const errorText = await dataResponse.text();
-    console.error('Sheets API error getting data:', errorText);
-    throw new Error(`Failed to fetch data: ${errorText}`);
-  }
-
-  const sheetData = await dataResponse.json();
-  const rows = sheetData.values || [];
-  
-  console.log(`Google Sheets: Fetched ${rows.length} data rows for range ${dataRange}`);
-
-  // Convert to objects
-  const dataRows = rows.map((row: any[]) => {
-    const obj: Record<string, string> = {};
-    headers.forEach((header: string, index: number) => {
-      obj[header] = row[index] || '';
-    });
-    return obj;
-  });
-
-  return { headers, dataRows, totalRows };
-}
-
-async function createJWT(credentials: any) {
-  const header = { alg: 'RS256', typ: 'JWT' };
-  const now = Math.floor(Date.now() / 1000);
-  const payload = {
-    iss: credentials.client_email,
-    scope: 'https://www.googleapis.com/auth/spreadsheets.readonly',
-    aud: 'https://oauth2.googleapis.com/token',
-    exp: now + 3600,
-    iat: now
-  };
-
-  const encoder = new TextEncoder();
-  const headerBytes = encoder.encode(JSON.stringify(header));
-  const payloadBytes = encoder.encode(JSON.stringify(payload));
-
-  const headerB64 = btoa(String.fromCharCode(...headerBytes)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-  const payloadB64 = btoa(String.fromCharCode(...payloadBytes)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-
-  const message = `${headerB64}.${payloadB64}`;
-  const messageBytes = encoder.encode(message);
-
-  // Import the private key
-  const pemKey = credentials.private_key.replace(/\\n/g, '\n');
-  const keyData = pemKey.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\n/g, '');
-  const keyBytes = Uint8Array.from(atob(keyData), c => c.charCodeAt(0));
-
-  const cryptoKey = await crypto.subtle.importKey(
-    'pkcs8',
-    keyBytes,
-    {
-      name: 'RSASSA-PKCS1-v1_5',
-      hash: 'SHA-256'
-    },
-    false,
-    ['sign']
-  );
-
-  const signature = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', cryptoKey, messageBytes);
-  const signatureB64 = btoa(String.fromCharCode(...new Uint8Array(signature)))
-    .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-
-  return `${message}.${signatureB64}`;
-}
-
-serve(async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    console.log('Processing partner import request...');
-    const requestBody = await req.json();
-    console.log('Request data received');
-
-    const profileId = requestBody.profile_id || requestBody.partnerImportProfileId;
-    const csvData = requestBody.csv_data || requestBody.csvData;
-    const dryRun = requestBody.dry_run ?? requestBody.dryRun ?? true;
-    const createMissingOrders = requestBody.create_missing_orders ?? requestBody.createMissingOrders ?? true;
-    
-    // Import run ID for tracking and deletion
-    const runId = requestBody.run_id || `import-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    
-    // Chunking parameters
-    const startRow = requestBody.start_row ?? 0;
-    const maxRows = requestBody.max_rows ?? 200;  // Increased default chunk size
-    const chunkInfo = requestBody.chunk_info || null;
-    const totalRowsFromPrevious = requestBody.total_rows || null;
-    const verbose = requestBody.verbose ?? false;
-
-    if (!profileId) {
-      return new Response(JSON.stringify({ error: 'Missing profile_id or partnerImportProfileId' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-
-    console.log('Creating Supabase client...');
     const supabase = createClient(
-      supabaseUrl!,
-      supabaseKey!,
-      {
-        global: {
-          headers: { Authorization: `Bearer ${supabaseKey}` }
-        }
-      }
-    );
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    )
 
-    console.log('Fetching import profile...');
-    const importProfile = await fetchImportProfile(supabase, profileId);
-    if (!importProfile) {
-      return new Response(JSON.stringify({ error: 'Import profile not found' }), {
-        status: 404,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
+    const body = await req.json()
+    console.log('Request body:', body)
+    
+    const { 
+      profile_id, 
+      dry_run = false, 
+      max_rows = null,
+      start_row = 0,
+      chunk_size = 200
+    } = body
 
-    const partner = await fetchPartner(supabase, importProfile.partner_id);
-    if (!partner) {
-      return new Response(JSON.stringify({ error: 'Partner not found' }), {
-        status: 404,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    console.log('Import profile:', {
-      id: importProfile.id,
-      partner_id: importProfile.partner_id,
-      source_type: importProfile.source_type,
-      column_mappings_count: Object.keys(importProfile.column_mappings || {}).length,
-      status_mappings_count: Object.keys(importProfile.status_mappings || {}).length
-    });
-
-    let parsedData: any[] = [];
-    let totalRows = 0;
-
-    // Fetch data based on source type
-    if (importProfile.source_type === 'gsheet' && !csvData) {
-      if (!importProfile.gsheet_id) {
-        return new Response(JSON.stringify({ error: 'Google Sheet ID not configured for this profile' }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
-      console.log('Fetching Google Sheet data...');
-      const sheetResult = await fetchGoogleSheetData(
-        importProfile.gsheet_id, 
-        importProfile.gsheet_sheet_name || 'Sheet1',
-        startRow,
-        maxRows,
-        totalRowsFromPrevious // Pass total rows to avoid re-counting
-      );
-      parsedData = sheetResult.dataRows;
-      totalRows = sheetResult.totalRows;
-    } else if (csvData) {
-      const allCsvData = parse(csvData, {
-        skipFirstRow: true,
-        columns: undefined
-      }) as any[];
-      
-      totalRows = allCsvData.length;
-      const endRow = Math.min(startRow + maxRows, totalRows);
-      
-      if (startRow > 0 || maxRows < totalRows) {
-        console.log(`Processing CSV chunk: rows ${startRow + 1}-${endRow} of ${totalRows}`);
-        parsedData = allCsvData.slice(startRow, endRow);
-      } else {
-        parsedData = allCsvData;
-      }
-    } else {
-      return new Response(JSON.stringify({ error: 'No data source provided' }), {
+    if (!profile_id) {
+      console.error('Missing profile_id')
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'profile_id is required' 
+      }), {
         status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
     }
 
-    const endRow = Math.min(startRow + parsedData.length, totalRows);
+    console.log(`Starting import for profile: ${profile_id}`)
+    console.log(`Dry run: ${dry_run}, Max rows: ${max_rows}, Start row: ${start_row}`)
 
-    if (verbose) {
-      console.log(`Processing ${parsedData.length} rows in chunk (${startRow + 1}-${endRow} of ${totalRows})...`);
-      
-      // Log first and last few Job IDs for reconciliation
-      if (parsedData.length > 0) {
-        const firstFewIds = parsedData.slice(0, 3).map((row, idx) => 
-          `Row ${startRow + idx + 1}: ${row['Job ID'] || 'N/A'}`
-        ).join(', ');
-        const lastFewIds = parsedData.slice(-3).map((row, idx) => 
-          `Row ${startRow + parsedData.length - 3 + idx + 1}: ${row['Job ID'] || 'N/A'}`
-        ).join(', ');
-        console.log(`Sheet reconciliation - Chunk first rows: ${firstFewIds}`);
-        console.log(`Sheet reconciliation - Chunk last rows: ${lastFewIds}`);
+    // Get import profile with all necessary data
+    const { data: profile, error: profileError } = await supabase
+      .from('partner_import_profiles')
+      .select(`
+        *,
+        partners (
+          id,
+          name,
+          is_active,
+          client_survey_required,
+          client_payment_required,
+          client_agreement_required
+        )
+      `)
+      .eq('id', profile_id)
+      .eq('is_active', true)
+      .single()
+
+    if (profileError || !profile) {
+      console.error('Profile error:', profileError)
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'Import profile not found or inactive' 
+      }), {
+        status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    console.log('Found profile:', profile.name)
+    console.log('Partner:', profile.partners?.name)
+
+    if (!profile.partners?.is_active) {
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'Partner is not active' 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Get Google Sheets data
+    console.log('Fetching Google Sheets data...')
+    const { data: sheetsData, error: sheetsError } = await supabase.functions.invoke('google-sheets-preview', {
+      body: {
+        spreadsheet_id: profile.spreadsheet_id,
+        sheet_name: profile.sheet_name,
+        start_row: start_row,
+        max_rows: chunk_size
       }
+    })
+
+    if (sheetsError || !sheetsData?.success) {
+      console.error('Sheets error:', sheetsError, sheetsData)
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'Failed to fetch Google Sheets data',
+        details: sheetsError || sheetsData
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
     }
 
-    const results: Results = {
+    const rawData = sheetsData.data || []
+    console.log(`Fetched ${rawData.length} rows from Google Sheets`)
+
+    if (rawData.length === 0) {
+      console.log('No data to process')
+      return new Response(JSON.stringify({
+        success: true,
+        message: 'No data to process',
+        results: { inserted: 0, updated: 0, skipped: 0, duplicates: 0, warnings: 0, errors: 0 },
+        chunk_info: {
+          start_row,
+          end_row: start_row,
+          processed_count: 0,
+          total_rows: 0,
+          has_more: false,
+          next_start_row: null
+        }
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Get column mappings
+    const columnMappings = profile.column_mappings || {}
+    console.log('Column mappings:', columnMappings)
+
+    // Get engineer mappings
+    const { data: engineerMappings } = await supabase
+      .from('partner_engineer_mappings')
+      .select('partner_engineer_identifier, engineer_id, engineers(name)')
+      .eq('partner_id', profile.partner_id)
+
+    const engineerMap = new Map()
+    if (engineerMappings) {
+      engineerMappings.forEach(mapping => {
+        engineerMap.set(mapping.partner_engineer_identifier, mapping.engineer_id)
+      })
+    }
+    console.log(`Loaded ${engineerMap.size} engineer mappings`)
+
+    // Get status mappings
+    const { data: statusMappings } = await supabase
+      .from('partner_status_mappings')
+      .select('partner_status, internal_status')
+      .eq('partner_id', profile.partner_id)
+
+    const statusMap = new Map()
+    if (statusMappings) {
+      statusMappings.forEach(mapping => {
+        statusMap.set(mapping.partner_status, mapping.internal_status)
+      })
+    }
+    console.log(`Loaded ${statusMap.size} status mappings`)
+
+    // Process the data
+    const results: ImportResults = {
+      inserted: 0,
+      updated: 0,
+      skipped: 0,
+      duplicates: 0,
+      warnings: 0,
+      errors: 0
+    }
+
+    const warnings: any[] = []
+    const errors: any[] = []
+    const details = {
       inserted: [],
       updated: [],
       skipped: [],
-      duplicates: [], // Initialize duplicates array
+      duplicates: [],
       warnings: [],
       errors: []
-    };
-
-    const columnMappings = importProfile.column_mappings || {};
-    const statusMappings = importProfile.status_mappings || {};
-    const statusActions = importProfile.status_actions || {};
-    const engineerMapping: Record<string, string> = {};
-
-    // Build engineer mapping from rules
-    if (importProfile.engineer_mapping_rules) {
-      for (const rule of importProfile.engineer_mapping_rules) {
-        if (rule.partner_identifier && rule.engineer_id) {
-          engineerMapping[rule.partner_identifier.toLowerCase()] = rule.engineer_id;
-        }
-      }
     }
 
-    // Log first few headers and first mapped row for debugging
-    if (verbose && parsedData.length > 0) {
-      const firstRow = parsedData[0];
-      console.log('Available columns:', Object.keys(firstRow));
-      console.log('Column mappings:', columnMappings);
-    }
+    console.log('Starting data processing...')
 
-    // Prepare batch collections for bulk operations
-    const clientsToCreate: any[] = [];
-    const clientsToFind: string[] = [];
-    const ordersToProcess: any[] = [];
-    const processedRows: ProcessedRow[] = [];
+    for (let i = 0; i < rawData.length; i++) {
+      const row = rawData[i]
+      const rowIndex = start_row + i
 
-    // STEP 1: Map and validate all rows first
-    for (const [index, row] of parsedData.entries()) {
-      const rowIndex = startRow + index;  // Adjust for chunk offset
-        
       try {
-        // Map columns based on configuration
-        const mappedData: MappedData = {};
-        
-        for (const [dbField, csvColumn] of Object.entries(columnMappings)) {
-          if (csvColumn && row[csvColumn] !== undefined) {
-            (mappedData as any)[dbField] = row[csvColumn];
-          }
+        console.log(`Processing row ${rowIndex}:`, row)
+
+        // Extract and validate data using column mappings
+        const clientName = row[columnMappings.client_name] || null
+        const clientEmail = row[columnMappings.client_email] || null
+        const clientPhone = row[columnMappings.client_phone] || null
+        const jobAddress = row[columnMappings.job_address] || null
+        const postcode = row[columnMappings.postcode] || null
+        const partnerExternalId = row[columnMappings.partner_external_id] || null
+        const partnerStatus = row[columnMappings.partner_status] || null
+        const engineerIdentifier = row[columnMappings.engineer_identifier] || null
+        const installDate = row[columnMappings.install_date] || null
+        const quoteAmount = row[columnMappings.quote_amount] || null
+
+        // Skip if no external ID
+        if (!partnerExternalId) {
+          console.log(`Row ${rowIndex}: Skipping - no partner external ID`)
+          results.skipped++
+          details.skipped.push({ row: rowIndex, reason: 'No partner external ID' })
+          continue
         }
 
-        if (verbose) {
-          console.log(`Row ${rowIndex + 1} mapped data:`, mappedData);
+        // Validate required fields
+        if (!clientName || !clientEmail) {
+          console.log(`Row ${rowIndex}: Skipping - missing required client data`)
+          results.skipped++
+          details.skipped.push({ row: rowIndex, reason: 'Missing required client data' })
+          continue
         }
 
-          // Build consolidated customer address
-          const addressParts = [
-            mappedData.customer_address_line_1,
-            mappedData.customer_address_line_2,
-            mappedData.customer_address_city
-          ].filter(Boolean);
-          const consolidatedCustomerAddress = addressParts.length > 0 ? addressParts.join(', ') : null;
-
-          // Set job_address if not provided but customer address is available
-          if (!mappedData.job_address && consolidatedCustomerAddress) {
-            mappedData.job_address = consolidatedCustomerAddress;
-          }
-
-          // Set postcode from customer fields if not provided
-          if (!mappedData.postcode && mappedData.customer_address_post_code) {
-            mappedData.postcode = mappedData.customer_address_post_code;
-          }
-
-          // Parse and sanitize quote amount
-          let sanitizedQuoteAmount = 0;
-          if (mappedData.quote_amount) {
-            const cleanAmount = String(mappedData.quote_amount)
-              .replace(/[£,$\s]/g, '')  // Remove currency symbols, commas, and whitespace
-              .trim();
-            
-            const parsedAmount = parseFloat(cleanAmount);
-            
-            // Check if the parsed amount is a valid finite number
-            if (isFinite(parsedAmount) && !isNaN(parsedAmount)) {
-              sanitizedQuoteAmount = parsedAmount;
-            } else {
-              // Only log if verbose mode is on to reduce log noise
-              if (verbose) {
-                console.log(`Invalid quote amount '${mappedData.quote_amount}' -> setting to 0`);
+        // Normalize phone number
+        let normalizedPhone: string | null = null
+        if (clientPhone && clientPhone !== '#ERROR!') {
+          let phone = clientPhone.trim()
+          
+          // Handle scientific notation
+          if (phone.includes('E+') || phone.includes('e+')) {
+            try {
+              const num = parseFloat(phone)
+              if (!isNaN(num)) {
+                phone = num.toString()
               }
-              results.warnings.push({
-                row: rowIndex + 1,
-                column: 'quote_amount',
-                message: `Invalid quote amount '${mappedData.quote_amount}' converted to 0`,
-                data: { original_amount: mappedData.quote_amount }
-              });
-            }
-          }
-          mappedData.quote_amount = sanitizedQuoteAmount.toString();
-
-          // Generate partner external ID if missing
-          if (!mappedData.partner_external_id) {
-            mappedData.partner_external_id = `${partner.name}-${rowIndex + 1}-${Date.now()}`;
-          }
-
-          // Set partner job flag
-          mappedData.is_partner_job = true;
-
-          // Map status
-          const partnerStatusFromColumn = mappedData.partner_status || mappedData.status;
-          const originalPartnerStatus = partnerStatusFromColumn ? String(partnerStatusFromColumn).trim().toUpperCase() : 'UNKNOWN';
-          const mappedStatus = statusMappings[originalPartnerStatus] || originalPartnerStatus.toLowerCase();
-
-          if (verbose) {
-            console.log(`Processing row ${rowIndex + 1}: Partner Status = '${originalPartnerStatus}'`);
-          }
-
-          // Use status actions as primary mapping
-          const actionConfig = statusActions[originalPartnerStatus] || {};
-          
-          let jmsStatus = mappedStatus;
-          let suppressScheduling = false;
-          let suppressionReason = null;
-
-          // Prefer status_actions over old status_mappings
-          if (actionConfig.jms_status) {
-            jmsStatus = actionConfig.jms_status;
-            if (verbose) {
-              console.log(`Using status action mapping: ${originalPartnerStatus} -> ${jmsStatus}`);
-            }
-          } else {
-            // Default mappings for common partner statuses
-            const defaultPartnerMappings: Record<string, string> = {
-              'AWAITING_INSTALL_DATE': 'awaiting_install_booking',
-              'AWAITING_QUOTATION': 'awaiting_install_booking',
-              'CANCELLATION_REQUESTED': 'cancelled',
-              'CANCELLED': 'cancelled',
-              'COMPLETE': 'completed',
-              'INSTALL_DATE_CONFIRMED': 'scheduled',
-              'INSTALLED': 'install_completed_pending_qa',
-              'ON_HOLD': 'on_hold_parts_docs',
-              'SWITCH_JOB_SUB_TYPE_REQUESTED': 'on_hold_parts_docs',
-              'UNKNOWN': 'awaiting_install_booking'
-            };
-            
-            if (defaultPartnerMappings[originalPartnerStatus]) {
-              jmsStatus = defaultPartnerMappings[originalPartnerStatus];
-              if (verbose) {
-                console.log(`Using default mapping: ${originalPartnerStatus} -> ${jmsStatus}`);
-              }
-            }
-          }
-          
-          if (actionConfig.actions) {
-            if (actionConfig.actions.suppress_scheduling === true) {
-              suppressScheduling = true;
-              suppressionReason = actionConfig.actions.suppression_reason || `partner_status_${originalPartnerStatus.toLowerCase()}`;
-            } else if (actionConfig.actions.suppress_scheduling === false) {
-              suppressScheduling = false;
-              suppressionReason = null;
-            }
-          } else {
-            // Default suppression rules for certain statuses
-            const suppressByDefault = ['AWAITING_QUOTATION', 'CANCELLED', 'CANCELLATION_REQUESTED', 'COMPLETE', 'ON_HOLD'];
-            suppressScheduling = suppressByDefault.includes(originalPartnerStatus);
-            if (suppressScheduling) {
-              suppressionReason = `partner_status_${originalPartnerStatus.toLowerCase()}`;
-            }
-          }
-
-          // Validate JMS status is a valid database enum value
-          const validOrderStatuses = [
-            'quote_accepted', 'awaiting_payment', 'payment_received', 'awaiting_agreement', 
-            'agreement_signed', 'awaiting_install_booking', 'scheduled', 'in_progress',
-            'install_completed_pending_qa', 'completed', 'revisit_required', 'cancelled',
-            'needs_scheduling', 'date_offered', 'date_accepted', 'date_rejected', 
-            'offer_expired', 'on_hold_parts_docs', 'awaiting_final_payment'
-          ];
-          
-          if (!validOrderStatuses.includes(jmsStatus)) {
-            const statusDefaults: Record<string, string> = {
-              'unknown': 'awaiting_install_booking',
-              'pending': 'awaiting_install_booking',
-              'confirmed': 'scheduled', 
-              'complete': 'completed',
-              'completed': 'completed',
-              'scheduled': 'scheduled',
-              'in_progress': 'in_progress',
-              'cancelled': 'cancelled',
-              'on_hold': 'on_hold_parts_docs'
-            };
-            
-            const defaultStatus = statusDefaults[jmsStatus.toLowerCase()] || 'awaiting_install_booking';
-            console.log(`Status flow: Invalid '${jmsStatus}' -> Default: ${defaultStatus}`);
-            
-            results.warnings.push({
-              row: rowIndex + 1,
-              column: 'status',
-              message: `Invalid status '${jmsStatus}' mapped to '${defaultStatus}'`,
-              data: { original_status: originalPartnerStatus, mapped_status: jmsStatus }
-            });
-            
-            jmsStatus = defaultStatus;
-          }
-
-          // Map engineer
-          let engineerId = null;
-          const engineerIdentifier = mappedData.engineer_identifier || mappedData.engineer_name || mappedData.engineer_email;
-          
-          if (engineerIdentifier) {
-            const engineerKey = String(engineerIdentifier).toLowerCase().trim();
-            
-            if (engineerMapping[engineerKey]) {
-              engineerId = engineerMapping[engineerKey];
-            } else {
-              if (verbose) {
-                console.log(`No engineer mapping found for: '${engineerKey}'`);
-              }
-              
-              results.warnings.push({
-                row: rowIndex + 1,
-                column: 'engineer_identifier',
-                message: `No engineer mapping found for identifier: '${engineerIdentifier}'`,
-                data: { engineer_identifier: engineerIdentifier }
-              });
-            }
-          }
-
-          // Parse and validate estimated duration
-          let estimatedDurationHours = 3; // Default to 3 hours
-          if (mappedData.estimated_duration_hours) {
-            const durationStr = String(mappedData.estimated_duration_hours).trim();
-            const parsedDuration = parseFloat(durationStr);
-            
-            if (isFinite(parsedDuration) && !isNaN(parsedDuration) && parsedDuration > 0 && parsedDuration <= 24) {
-              estimatedDurationHours = parsedDuration;
-              if (verbose) {
-                console.log(`Row ${rowIndex + 1}: Valid duration parsed: '${durationStr}' -> ${estimatedDurationHours} hours`);
-              }
-            } else {
-              console.log(`Row ${rowIndex + 1}: Invalid duration '${durationStr}' -> defaulting to ${estimatedDurationHours} hours`);
-              results.warnings.push({
-                row: rowIndex + 1,
-                column: 'estimated_duration_hours',
-                message: `Invalid estimated duration '${durationStr}' (must be 0-24 hours), defaulting to ${estimatedDurationHours} hours`,
-                data: { original_duration: durationStr, default_duration: estimatedDurationHours }
-              });
-            }
-          } else {
-            if (verbose) {
-              console.log(`Row ${rowIndex + 1}: No duration field provided, using default ${estimatedDurationHours} hours`);
-            }
-          }
-
-          // Store client info for batch processing
-          let clientId = mappedData.client_id;
-          let needsClientCreation = false;
-          
-          if (!clientId && createMissingOrders && (mappedData.client_name || mappedData.client_email)) {
-            // For batch processing, we'll create a unique key for client lookup
-            const clientKey = `${mappedData.client_email || 'no-email'}_${mappedData.client_name || 'no-name'}`;
-            
-            if (mappedData.client_email) {
-              clientsToFind.push(mappedData.client_email);
-            }
-            
-            if (!dryRun) {
-              needsClientCreation = true;
-              
-              const normalizedPhone = normalizePhone(mappedData.client_phone);
-              if (mappedData.client_phone && !normalizedPhone) {
-                results.warnings.push({
-                  row: rowIndex + 1,
-                  column: 'client_phone',
-                  message: `Invalid phone number format: '${mappedData.client_phone}'. Phone number skipped.`,
-                  data: { original_phone: mappedData.client_phone }
-                });
-              }
-
-              // Handle email - validate and generate placeholder if needed
-              const normalizedEmail = normalizeEmail(mappedData.client_email);
-              let clientEmail = normalizedEmail;
-              let isPlaceholderEmail = false;
-              
-              if (!clientEmail) {
-                clientEmail = generatePlaceholderEmail(
-                  partner.id,
-                  mappedData.client_name,
-                  rowIndex
-                );
-                isPlaceholderEmail = true;
-                
-                if (verbose) {
-                  console.log(`Generated placeholder email for row ${rowIndex + 1}: ${clientEmail}`);
-                }
-              }
-
-              const clientData = {
-                full_name: mappedData.client_name || 'Unknown Client',
-                email: clientEmail,
-                phone: normalizedPhone,
-                address: consolidatedCustomerAddress || null,
-                postcode: mappedData.customer_address_post_code || mappedData.postcode || null,
-                is_partner_client: true,
-                partner_id: partner.id,
-                _clientKey: clientKey // Keep for linking after creation
-              };
-              
-              clientsToCreate.push(clientData);
-            } else {
-              // For dry run, simulate client creation
-              clientId = 'placeholder-client-id';
-            }
-          }
-
-          // Enhanced data validation before creating order
-          const validationErrors = [];
-
-          // Check for required job identifier
-          if (!mappedData.partner_external_id && !mappedData.job_id) {
-            validationErrors.push('Missing required job identifier: partner_external_id or job_id is required');
-          }
-
-          // Check for client availability
-          if (!clientId && !needsClientCreation && !createMissingOrders) {
-            validationErrors.push('Client ID not found and createMissingOrders is disabled');
-          }
-
-          // Check for essential client data if creating new client
-          if (needsClientCreation && (!mappedData.client_name || !mappedData.client_email)) {
-            validationErrors.push('Client name and email are required when creating new clients');
-          }
-
-          // Validate quote amount - treat extreme values as suspicious
-          if (sanitizedQuoteAmount < 0 || sanitizedQuoteAmount > 1000000) {
-            validationErrors.push(`Quote amount ${sanitizedQuoteAmount} seems unrealistic`);
-          }
-
-          // If we have validation errors, add them and skip this row
-          if (validationErrors.length > 0) {
-            results.errors.push({
-              row: rowIndex + 1,
-              message: validationErrors.join('; '),
-              data: { 
-                available_fields: Object.keys(mappedData),
-                client_email: mappedData.client_email, 
-                client_name: mappedData.client_name,
-                partner_external_id: mappedData.partner_external_id,
-                quote_amount: mappedData.quote_amount
-              }
-            });
-            continue; // Skip this row - don't process further
-          }
-
-          // Build order data with fingerprint for change detection
-          const orderData: any = {
-            partner_id: partner.id,
-            client_id: clientId,
-            partner_external_id: mappedData.partner_external_id,
-            partner_external_url: mappedData.partner_external_url || null,
-            job_address: mappedData.job_address || null,
-            postcode: mappedData.postcode || null,
-            status_enhanced: jmsStatus,
-            partner_status: originalPartnerStatus, // Store the original partner status
-            is_partner_job: true,
-            engineer_id: engineerId,
-            job_type: (mappedData.job_type || mappedData.type || 'installation').toLowerCase(),
-            installation_notes: mappedData.job_notes || null,
-            sub_partner: mappedData.sub_partner || null,
-            total_amount: sanitizedQuoteAmount,
-            estimated_duration_hours: estimatedDurationHours,
-            scheduling_suppressed: suppressScheduling,
-            scheduling_suppressed_reason: suppressionReason,
-            // order_number will be auto-generated by trigger
-            status: 'awaiting_payment',
-            deposit_amount: 0,
-            amount_paid: 0,
-            _needsClientCreation: needsClientCreation,
-            _clientEmail: mappedData.client_email, // For linking after client creation
-            _clientKey: needsClientCreation ? `${mappedData.client_email || 'no-email'}_${mappedData.client_name || 'no-name'}` : null,
-            _rowIndex: rowIndex
-          };
-
-          // Handle scheduled date
-          if (mappedData.scheduled_date) {
-            const parsedDate = parseDate(mappedData.scheduled_date);
-            if (parsedDate) {
-              orderData.scheduled_install_date = parsedDate;
-              
-              // If both engineer and date are assigned, force status to 'scheduled'
-              if (engineerId && !suppressScheduling) {
-                if (verbose) {
-                  console.log(`Row ${rowIndex + 1}: Both engineer and date assigned, forcing status to 'scheduled'`);
-                }
-                orderData.status_enhanced = 'scheduled';
-                orderData.scheduling_suppressed = false;
-                orderData.scheduling_suppressed_reason = null;
-              }
-            } else {
-              results.warnings.push({
-                row: rowIndex + 1,
-                column: 'scheduled_date',
-                message: `Invalid date format: '${mappedData.scheduled_date}'. Expected DD/MM/YYYY HH:MM, MM/DD/YYYY HH:MM, or YYYY-MM-DD formats. Time component will be ignored.`,
-                data: { scheduled_date: mappedData.scheduled_date }
-              });
-            }
-          }
-
-          // Create fingerprint for change detection
-          const fingerprint = JSON.stringify({
-            status: orderData.status_enhanced,
-            partner_status: orderData.partner_status,
-            engineer_id: orderData.engineer_id,
-            scheduled_date: orderData.scheduled_install_date,
-            job_address: orderData.job_address,
-            total_amount: orderData.total_amount,
-            estimated_duration_hours: orderData.estimated_duration_hours,
-            suppressed: orderData.scheduling_suppressed
-          });
-          
-          orderData.partner_metadata = orderData.partner_metadata || {};
-          orderData.partner_metadata.import_fingerprint = fingerprint;
-          orderData.partner_metadata.import_run_id = runId;
-
-          ordersToProcess.push(orderData);
-
-        } catch (error: any) {
-          console.error(`Error processing row ${rowIndex + 1}:`, error);
-          console.error(`Row data:`, JSON.stringify(row, null, 2));
-          console.error(`Mapped data:`, JSON.stringify(mappedData, null, 2));
-          console.error(`Error stack:`, error.stack);
-          results.errors.push({
-            row: rowIndex + 1,
-            message: `Processing error: ${error.message} | Stack: ${error.stack?.substring(0, 200)}`,
-            data: { row, mappedData, error: error.toString() }
-          });
-          // Skip this row - don't add to ordersToProcess to prevent double errors
-          continue;
-        }
-      }
-
-      // STEP 2: Batch database operations for performance
-      if (dryRun) {
-        // For dry run, simulate all orders as inserts
-        ordersToProcess.forEach(orderData => {
-          const processedRow: ProcessedRow = {
-            type: 'insert',
-            data: orderData
-          };
-          results.inserted.push(processedRow);
-        });
-      } else {
-        console.log('=== STARTING ACTUAL IMPORT ===');
-        console.log(`Orders to process: ${ordersToProcess.length}`);
-        console.log(`Clients to find: ${clientsToFind.length}`);
-        console.log(`Clients to create: ${clientsToCreate.length}`);
-        
-        try {
-          console.log('=== STEP 1: Finding existing clients ===');
-          // Batch 1: Find existing clients using email_normalized
-          
-          // Deduplicate clients within this chunk by email_normalized
-          const uniqueClientsMap = new Map();
-          clientsToCreate.forEach(client => {
-            const normalizedEmail = client.email?.toLowerCase()?.trim();
-            if (normalizedEmail && !uniqueClientsMap.has(normalizedEmail)) {
-              uniqueClientsMap.set(normalizedEmail, client);
-            }
-          });
-          const deduplicatedClientsToCreate = Array.from(uniqueClientsMap.values());
-          
-          const existingClientEmails = [...new Set(clientsToFind)].filter(Boolean);
-          const normalizedEmailsToFind = existingClientEmails.map(email => email.toLowerCase().trim());
-          const existingClientsMap = new Map();
-          
-          if (normalizedEmailsToFind.length > 0) {
-            console.log(`Searching for ${normalizedEmailsToFind.length} existing client emails`);
-            const { data: existingClients } = await supabase
-              .from('clients')
-              .select('id, email, email_normalized, full_name')
-              .in('email_normalized', normalizedEmailsToFind);
-            
-            if (existingClients) {
-              console.log(`Found ${existingClients.length} existing clients`);
-              existingClients.forEach(client => {
-                existingClientsMap.set(client.email_normalized || client.email.toLowerCase().trim(), client);
-              });
-            }
-          }
-
-          console.log('=== STEP 2: Creating missing clients ===');
-          // Batch 2: Create missing clients with upsert for concurrency safety
-          const existingEmailsSet = new Set(Array.from(existingClientsMap.keys()));
-          const newClientsToInsert = deduplicatedClientsToCreate.filter(c => 
-            !existingEmailsSet.has(c.email.toLowerCase().trim())
-          );
-          
-          if (newClientsToInsert.length > 0) {
-            console.log(`Creating ${newClientsToInsert.length} new clients (deduplicated from ${clientsToCreate.length})`);
-            const sanitizedClients = newClientsToInsert.map(sanitizeForDatabase);
-            
-            // Use upsert to handle concurrent imports safely
-            const { data: createdClients, error: clientError } = await supabase
-              .from('clients')
-              .upsert(sanitizedClients, { 
-                onConflict: 'email_normalized',
-                ignoreDuplicates: false 
+            } catch (e) {
+              console.log(`Row ${rowIndex}: Invalid phone format: ${clientPhone}`)
+              warnings.push({
+                row: rowIndex,
+                column: 'client_phone',
+                message: `Invalid phone number format: '${clientPhone}'. Phone number skipped.`,
+                data: { original_phone: clientPhone }
               })
-              .select('id, email, email_normalized, full_name');
+            }
+          }
+          
+          // Remove non-digits and validate
+          const cleanPhone = phone.replace(/\D/g, '')
+          if (cleanPhone.startsWith('44') && cleanPhone.length >= 12) {
+            normalizedPhone = '0' + cleanPhone.substring(2)
+          } else if (cleanPhone.length >= 10 && cleanPhone.length <= 11) {
+            normalizedPhone = cleanPhone
+          }
+        } else if (clientPhone === '#ERROR!') {
+          warnings.push({
+            row: rowIndex,
+            column: 'client_phone',
+            message: `Invalid phone number format: '${clientPhone}'. Phone number skipped.`,
+            data: { original_phone: clientPhone }
+          })
+        }
+
+        // Engineer mapping
+        let engineerId: string | null = null
+        if (engineerIdentifier) {
+          engineerId = engineerMap.get(engineerIdentifier) || null
+          if (!engineerId) {
+            warnings.push({
+              row: rowIndex,
+              column: 'engineer_identifier',
+              message: `No engineer mapping found for identifier: '${engineerIdentifier}'`,
+              data: { engineer_identifier: engineerIdentifier }
+            })
+          }
+        }
+
+        // Status mapping
+        let mappedStatus: string | null = null
+        if (partnerStatus) {
+          mappedStatus = statusMap.get(partnerStatus) || partnerStatus
+        }
+
+        // Parse install date
+        let parsedInstallDate: string | null = null
+        if (installDate && installDate !== 'TBC' && installDate !== '') {
+          try {
+            // Try different date formats
+            let dateObj: Date | null = null
+            
+            if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(installDate)) {
+              // DD/MM/YYYY or D/M/YYYY format
+              const [day, month, year] = installDate.split('/')
+              dateObj = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+            } else if (/^\d{4}-\d{2}-\d{2}$/.test(installDate)) {
+              // YYYY-MM-DD format
+              dateObj = new Date(installDate)
+            }
+            
+            if (dateObj && !isNaN(dateObj.getTime())) {
+              parsedInstallDate = dateObj.toISOString().split('T')[0]
+            }
+          } catch (e) {
+            console.log(`Row ${rowIndex}: Invalid date format: ${installDate}`)
+          }
+        }
+
+        // Parse quote amount
+        let parsedQuoteAmount = 0
+        if (quoteAmount && quoteAmount !== '' && quoteAmount !== 'NaN') {
+          const numAmount = parseFloat(String(quoteAmount).replace(/[^0-9.-]/g, ''))
+          if (!isNaN(numAmount)) {
+            parsedQuoteAmount = numAmount
+          }
+        } else if (quoteAmount === 'NaN') {
+          warnings.push({
+            row: rowIndex,
+            column: 'quote_amount',
+            message: `Invalid quote amount '${quoteAmount}' converted to 0`,
+            data: { original_amount: quoteAmount }
+          })
+        }
+
+        if (!dry_run) {
+          // Find or create client
+          let client
+          const { data: existingClient } = await supabase
+            .from('clients')
+            .select('id')
+            .eq('email', clientEmail.toLowerCase())
+            .eq('partner_id', profile.partner_id)
+            .single()
+
+          if (existingClient) {
+            client = existingClient
+            // Update client info
+            await supabase
+              .from('clients')
+              .update({
+                full_name: clientName,
+                phone: normalizedPhone,
+                address: jobAddress,
+                postcode: postcode,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', existingClient.id)
+          } else {
+            // Create new client
+            const { data: newClient, error: clientError } = await supabase
+              .from('clients')
+              .insert({
+                full_name: clientName,
+                email: clientEmail.toLowerCase(),
+                email_normalized: clientEmail.toLowerCase(),
+                phone: normalizedPhone,
+                address: jobAddress,
+                postcode: postcode,
+                is_partner_client: true,
+                partner_id: profile.partner_id
+              })
+              .select('id')
+              .single()
 
             if (clientError) {
-              console.error('Client creation error:', clientError);
-              newClientsToInsert.forEach((clientData, index) => {
-                results.errors.push({
-                  row: 0, // Will be updated when processing orders
-                  message: `Failed to create client: ${clientError.message}`,
-                  data: clientData
-                });
-              });
-            } else if (createdClients) {
-              console.log(`Successfully created ${createdClients.length} clients`);
-              createdClients.forEach(client => {
-                const normalizedEmail = client.email_normalized || client.email.toLowerCase().trim();
-                existingClientsMap.set(normalizedEmail, client);
-              });
+              console.error(`Row ${rowIndex}: Client creation error:`, clientError)
+              errors.push({
+                row: rowIndex,
+                message: `Client creation failed: ${clientError.message}`,
+                data: { error: clientError }
+              })
+              results.errors++
+              continue
             }
+            client = newClient
           }
 
-          console.log('=== STEP 3: Updating order client IDs ===');
-          // Batch 3: Update order client IDs with resolved clients
-          ordersToProcess.forEach(orderData => {
-            if (orderData._clientEmail) {
-              const normalizedEmail = orderData._clientEmail.toLowerCase().trim();
-              if (existingClientsMap.has(normalizedEmail)) {
-                orderData.client_id = existingClientsMap.get(normalizedEmail).id;
-                if (verbose) {
-                  console.log(`Linked order to client: ${orderData._clientEmail} -> ${orderData.client_id}`);
-                }
-              }
-            }
-          });
-
-          console.log('=== STEP 4: Bulk fetch existing orders & deduplicate ===');
-          
-          // Extract unique partner_external_ids from this chunk
-          const partnerExternalIds = [...new Set(ordersToProcess.map(o => o.partner_external_id).filter(Boolean))];
-          console.log(`Unique partner_external_ids in chunk: ${partnerExternalIds.length}`);
-          
-          // Bulk fetch existing orders for this partner
-          const { data: existingOrdersData, error: existingOrdersError } = await supabase
+          // Check for existing order
+          const { data: existingOrder } = await supabase
             .from('orders')
-            .select('id, partner_external_id')
-            .eq('partner_id', partner.id)
-            .in('partner_external_id', partnerExternalIds);
-          
-          if (existingOrdersError) {
-            console.error('Error fetching existing orders:', existingOrdersError);
-            throw new Error(`Failed to fetch existing orders: ${existingOrdersError.message}`);
-          }
-          
-          // Create lookup map for existing orders
-          const existingOrdersMap = new Map();
-          (existingOrdersData || []).forEach(order => {
-            existingOrdersMap.set(order.partner_external_id, order.id);
-          });
-          
-          console.log(`Found ${existingOrdersMap.size} existing orders to potentially update`);
-          
-          // Pre-deduplicate orders within this chunk by partner_external_id
-          const ordersByExternalId = new Map();
-          let duplicatesCount = 0;
-          
-          for (const order of ordersToProcess) {
-            const externalId = order.partner_external_id;
-            if (ordersByExternalId.has(externalId)) {
-              duplicatesCount++;
-              console.log(`Duplicate partner_external_id in chunk: ${externalId}`);
-              results.duplicates = results.duplicates || [];
-              results.duplicates.push({
-                type: 'duplicate',
-                data: order,
-                reason: 'Duplicate partner_external_id within chunk'
-              });
-              continue; // Skip duplicates within the chunk
-            }
-            ordersByExternalId.set(externalId, order);
-          }
-          
-          const deduplicatedOrders = Array.from(ordersByExternalId.values());
-          console.log(`After deduplication: ${deduplicatedOrders.length} orders (${duplicatesCount} duplicates removed)`);
-          
-          console.log('=== STEP 5: Single upsert operation ===');
-          
-          if (deduplicatedOrders.length > 0) {
-            try {
-              // Remove order_number from all orders to avoid conflicts
-              const ordersForUpsert = deduplicatedOrders.map(order => {
-                const sanitized = sanitizeForDatabase(order);
-                delete sanitized.order_number; // Never set order_number, let DB generate it
-                return sanitized;
-              });
-              
-              console.log(`Performing upsert for ${ordersForUpsert.length} orders...`);
-              
-              const { data: upsertResult, error: upsertError } = await supabase
-                .from('orders')
-                .upsert(ordersForUpsert, { 
-                  onConflict: 'partner_id,partner_external_id',
-                  ignoreDuplicates: false 
-                })
-                .select('id, partner_external_id');
-              
-              if (upsertError) {
-                console.error('Upsert failed:', upsertError);
-                throw new Error(`Upsert operation failed: ${upsertError.message}`);
-              }
-              
-              // Count inserts vs updates based on existing orders map
-              for (const order of deduplicatedOrders) {
-                if (existingOrdersMap.has(order.partner_external_id)) {
-                  results.updated.push({
-                    type: 'update',
-                    data: order
-                  });
-                } else {
-                  results.inserted.push({
-                    type: 'insert',
-                    data: order
-                  });
-                }
-              }
-              
-              console.log(`Upsert completed: ${results.inserted.length} inserted, ${results.updated.length} updated`);
-              
-            } catch (upsertException) {
-              console.error('Upsert exception:', upsertException);
-              results.errors.push({
-                row: 0,
-                message: `Upsert operation failed: ${upsertException.message}`,
-                data: { error: upsertException }
-              });
-            }
-          }
+            .select('id, status_enhanced, total_amount')
+            .eq('partner_id', profile.partner_id)
+            .eq('partner_external_id', partnerExternalId)
+            .single()
 
-        } catch (batchError: any) {
-          console.error('Batch processing error:', batchError);
-          results.errors.push({
-            row: 0,
-            message: `Batch processing failed: ${batchError.message}`,
-            data: { error: batchError }
-          });
+          if (existingOrder) {
+            // Update existing order
+            const updateData: any = {
+              client_id: client.id,
+              job_address: jobAddress,
+              postcode: postcode,
+              partner_status: mappedStatus,
+              total_amount: parsedQuoteAmount,
+              updated_at: new Date().toISOString()
+            }
+
+            if (engineerId) {
+              updateData.engineer_id = engineerId
+            }
+
+            if (parsedInstallDate) {
+              updateData.scheduled_install_date = parsedInstallDate
+            }
+
+            const { error: updateError } = await supabase
+              .from('orders')
+              .update(updateData)
+              .eq('id', existingOrder.id)
+
+            if (updateError) {
+              console.error(`Row ${rowIndex}: Order update error:`, updateError)
+              errors.push({
+                row: rowIndex,
+                message: `Order update failed: ${updateError.message}`,
+                data: { error: updateError }
+              })
+              results.errors++
+            } else {
+              console.log(`Row ${rowIndex}: Updated order ${existingOrder.id}`)
+              results.updated++
+              details.updated.push({
+                row: rowIndex,
+                order_id: existingOrder.id,
+                partner_external_id: partnerExternalId
+              })
+            }
+          } else {
+            // Create new order (DO NOT include order_number - let DB generate it)
+            const orderData: any = {
+              client_id: client.id,
+              partner_id: profile.partner_id,
+              partner_external_id: partnerExternalId,
+              is_partner_job: true,
+              job_address: jobAddress,
+              postcode: postcode,
+              partner_status: mappedStatus,
+              total_amount: parsedQuoteAmount,
+              amount_paid: 0,
+              deposit_amount: 0,
+              status: 'awaiting_payment',
+              survey_required: profile.partners?.client_survey_required ?? true
+            }
+
+            if (engineerId) {
+              orderData.engineer_id = engineerId
+            }
+
+            if (parsedInstallDate) {
+              orderData.scheduled_install_date = parsedInstallDate
+            }
+
+            console.log(`Row ${rowIndex}: Creating order with data:`, orderData)
+
+            const { data: newOrder, error: orderError } = await supabase
+              .from('orders')
+              .insert(orderData)
+              .select('id, order_number')
+              .single()
+
+            if (orderError) {
+              console.error(`Row ${rowIndex}: Order creation error:`, orderError)
+              errors.push({
+                row: rowIndex,
+                message: `Upsert operation failed: ${orderError.message}`,
+                data: { error: orderError }
+              })
+              results.errors++
+            } else {
+              console.log(`Row ${rowIndex}: Created order ${newOrder.id} with number ${newOrder.order_number}`)
+              results.inserted++
+              details.inserted.push({
+                row: rowIndex,
+                order_id: newOrder.id,
+                order_number: newOrder.order_number,
+                partner_external_id: partnerExternalId
+              })
+            }
+          }
+        } else {
+          // Dry run - just count as inserted for simulation
+          results.inserted++
+          details.inserted.push({
+            row: rowIndex,
+            partner_external_id: partnerExternalId,
+            dry_run: true
+          })
         }
-      }
 
-    // Log results summary
-    console.log('Import chunk completed:', {
-      chunk_rows: parsedData.length,
-      chunk_range: `${startRow + 1}-${endRow}`,
-      total_available: totalRows,
-      inserted: results.inserted.length,
-      updated: results.updated.length,
-      skipped: results.skipped.length,
-      duplicates: results.duplicates?.length || 0,
-      warnings: results.warnings.length,
-      errors: results.errors.length,
-      dry_run: dryRun
-    });
-
-    // Log import run to database (only if not dry run)
-    if (!dryRun) {
-      try {
-        await supabase.rpc('log_partner_import', {
-          p_run_id: `import-${Date.now()}`,
-          p_partner_id: partner.id,
-          p_profile_id: importProfile.id,
-          p_dry_run: dryRun,
-          p_total_rows: parsedData.length,
-          p_inserted_count: results.inserted.length,
-          p_updated_count: results.updated.length,
-          p_skipped_count: results.skipped.length,
-          p_warnings: results.warnings,
-          p_errors: results.errors
-        });
-      } catch (logError) {
-        console.error('Failed to log import run:', logError);
+      } catch (error) {
+        console.error(`Row ${rowIndex}: Processing error:`, error)
+        errors.push({
+          row: rowIndex,
+          message: `Processing failed: ${error.message}`,
+          data: { error: error }
+        })
+        results.errors++
       }
     }
 
-    return new Response(JSON.stringify({
+    // Add warnings to results
+    results.warnings = warnings.length
+    details.warnings = warnings
+    details.errors = errors
+
+    console.log('Import completed')
+    console.log('Results:', results)
+
+    // Generate run ID for tracking
+    const runId = `import-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`
+
+    // Determine if there are more rows to process
+    const hasMore = rawData.length === chunk_size
+    const nextStartRow = hasMore ? start_row + chunk_size : null
+
+    const response = {
       success: true,
-      run_id: runId, // Include run_id in response for deletion tracking
-      dry_run: dryRun,
+      run_id: runId,
+      dry_run,
       chunk_info: {
-        start_row: startRow,
-        end_row: endRow,
-        processed_count: parsedData.length,
-        total_rows: totalRows,
-        has_more: endRow < totalRows,
-        next_start_row: endRow < totalRows ? endRow : null
+        start_row,
+        end_row: start_row + rawData.length - 1,
+        processed_count: rawData.length,
+        total_rows: sheetsData.total_rows || rawData.length,
+        has_more: hasMore,
+        next_start_row: nextStartRow
       },
       results: {
-        inserted: results.inserted.length,
-        updated: results.updated.length,
-        skipped: results.skipped.length,
-        duplicates: results.duplicates?.length || 0,
-        warnings: results.warnings.length,
-        errors: results.errors.length
-      },
-      // Add backward compatibility for UI
-      summary: {
-        processed: parsedData.length,
-        inserted_count: results.inserted.length,
-        updated_count: results.updated.length,
-        skipped_count: results.skipped.length,
-        duplicates_count: results.duplicates?.length || 0,
-        errors: results.errors,
-        warnings: results.warnings,
-        dry_run: dryRun
-      },
-      details: {
         inserted: results.inserted,
         updated: results.updated,
         skipped: results.skipped,
-        duplicates: results.duplicates || [],
+        duplicates: results.duplicates,
         warnings: results.warnings,
         errors: results.errors
-      }
-    }), {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+      },
+      summary: {
+        processed: rawData.length,
+        inserted_count: results.inserted,
+        updated_count: results.updated,
+        skipped_count: results.skipped,
+        duplicates_count: results.duplicates,
+        errors: errors,
+        warnings: warnings,
+        dry_run
+      },
+      details
+    }
 
-  } catch (error: any) {
-    console.error('Partner import error:', error);
-    
-    return new Response(JSON.stringify({
-      success: false,
-      error: error.message || 'Unknown error',
-      details: error.stack || null,
-      results: {
-        inserted: 0,
-        updated: 0,
-        skipped: 0,
-        warnings: 0,
-        errors: 1
+    // Log the import run if not dry run
+    if (!dry_run) {
+      try {
+        await supabase.rpc('log_partner_import', {
+          p_run_id: runId,
+          p_partner_id: profile.partner_id,
+          p_profile_id: profile.id,
+          p_dry_run: dry_run,
+          p_total_rows: rawData.length,
+          p_inserted_count: results.inserted,
+          p_updated_count: results.updated,
+          p_skipped_count: results.skipped,
+          p_warnings: warnings,
+          p_errors: errors
+        })
+      } catch (logError) {
+        console.error('Failed to log import:', logError)
       }
+    }
+
+    return new Response(JSON.stringify(response), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+
+  } catch (error) {
+    console.error('Function error:', error)
+    return new Response(JSON.stringify({ 
+      success: false, 
+      error: 'Internal server error',
+      details: error.message,
+      stack: error.stack
     }), {
       status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
   }
-});
+})
