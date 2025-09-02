@@ -10,8 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Eye, Search, Filter, Calendar, User, Package, Trash2 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Eye, Search, Filter, Calendar, User, Package, Trash2, Download } from "lucide-react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
@@ -24,11 +24,16 @@ type OrderStatusEnhanced = Database['public']['Enums']['order_status_enhanced'];
 export default function AdminOrders() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [searchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [engineerFilter, setEngineerFilter] = useState<string>("all");
   const [deletingOrderId, setDeletingOrderId] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
   const { pagination, controls } = useServerPagination();
+
+  // Check if export is enabled via URL parameter
+  const exportEnabled = searchParams.get('enableExport') === '1';
 
   // Reset to first page when filters change
   useEffect(() => {
@@ -280,6 +285,238 @@ export default function AdminOrders() {
     return shortNames[formatted] || formatted;
   };
 
+  // CSV Export functionality
+  const resolveSearchOrderIds = async () => {
+    if (!searchTerm) return [];
+    
+    let orderIds: string[] = [];
+    const searchPattern = `%${searchTerm}%`;
+    
+    // Search in orders table
+    const { data: orderMatches } = await supabase
+      .from('orders')
+      .select('id')
+      .or(`order_number.ilike.${searchPattern},partner_external_id.ilike.${searchPattern},job_address.ilike.${searchPattern},postcode.ilike.${searchPattern}`);
+    
+    if (orderMatches) {
+      orderIds.push(...orderMatches.map(o => o.id));
+    }
+
+    // Search in clients table and get their order IDs
+    const { data: clientMatches } = await supabase
+      .from('clients')
+      .select('id')
+      .or(`full_name.ilike.${searchPattern},email.ilike.${searchPattern},phone.ilike.${searchPattern}`);
+    
+    if (clientMatches) {
+      const clientIds = clientMatches.map(c => c.id);
+      if (clientIds.length > 0) {
+        const { data: clientOrders } = await supabase
+          .from('orders')
+          .select('id')
+          .in('client_id', clientIds);
+        
+        if (clientOrders) {
+          orderIds.push(...clientOrders.map(o => o.id));
+        }
+      }
+    }
+
+    // Search in quotes table and get their order IDs
+    const { data: quoteMatches } = await supabase
+      .from('quotes')
+      .select('id')
+      .ilike('quote_number', searchPattern);
+    
+    if (quoteMatches) {
+      const quoteIds = quoteMatches.map(q => q.id);
+      if (quoteIds.length > 0) {
+        const { data: quoteOrders } = await supabase
+          .from('orders')
+          .select('id')
+          .in('quote_id', quoteIds);
+        
+        if (quoteOrders) {
+          orderIds.push(...quoteOrders.map(o => o.id));
+        }
+      }
+    }
+
+    // Search in partners table and get their order IDs
+    const { data: partnerMatches } = await supabase
+      .from('partners')
+      .select('id')
+      .ilike('name', searchPattern);
+    
+    if (partnerMatches) {
+      const partnerIds = partnerMatches.map(p => p.id);
+      if (partnerIds.length > 0) {
+        const { data: partnerOrders } = await supabase
+          .from('orders')
+          .select('id')
+          .in('partner_id', partnerIds);
+        
+        if (partnerOrders) {
+          orderIds.push(...partnerOrders.map(o => o.id));
+        }
+      }
+    }
+
+    // Remove duplicates
+    return [...new Set(orderIds)];
+  };
+
+  const buildExportQuery = (orderIds?: string[]) => {
+    let query = supabase
+      .from('orders')
+      .select(`
+        *,
+        clients!orders_client_id_fkey(
+          id,
+          full_name,
+          email,
+          phone
+        ),
+        quotes!orders_quote_id_fkey(
+          id,
+          quote_number
+        ),
+        engineers!orders_engineer_id_fkey(
+          id,
+          name
+        ),
+        partners!orders_partner_id_fkey(
+          name
+        )
+      `)
+      .order('created_at', { ascending: false });
+
+    // Apply search filter if we have matching order IDs
+    if (searchTerm) {
+      if (!orderIds || orderIds.length === 0) {
+        return null; // No matches found
+      }
+      query = query.in('id', orderIds);
+    }
+
+    // Apply other filters
+    if (statusFilter !== 'all') {
+      query = query.eq('status_enhanced', statusFilter as OrderStatusEnhanced);
+    }
+
+    if (engineerFilter !== 'all') {
+      query = query.eq('engineer_id', engineerFilter);
+    }
+
+    return query;
+  };
+
+  const csvEscape = (value: any): string => {
+    if (value == null) return '';
+    const str = String(value);
+    if (str.includes('"') || str.includes(',') || str.includes('\n') || str.includes('\r')) {
+      return `"${str.replace(/"/g, '""')}"`;
+    }
+    return str;
+  };
+
+  const handleExportCSV = async () => {
+    if (isExporting) return;
+    
+    setIsExporting(true);
+    try {
+      // Resolve search order IDs first
+      const orderIds = await resolveSearchOrderIds();
+      
+      // Build query without pagination
+      const baseQuery = buildExportQuery(orderIds);
+      
+      if (!baseQuery) {
+        toast.warning("No orders found matching your search criteria");
+        return;
+      }
+
+      // Fetch data in batches (max 10,000 total)
+      const batchSize = 1000;
+      const maxRecords = 10000;
+      let allOrders: any[] = [];
+      let offset = 0;
+
+      while (offset < maxRecords) {
+        const { data: batch, error } = await baseQuery
+          .range(offset, offset + batchSize - 1);
+
+        if (error) throw error;
+        if (!batch || batch.length === 0) break;
+
+        allOrders.push(...batch);
+        offset += batchSize;
+
+        // Stop if we got less than batch size (end of data)
+        if (batch.length < batchSize) break;
+      }
+
+      if (allOrders.length === 0) {
+        toast.warning("No orders found to export");
+        return;
+      }
+
+      // Generate CSV
+      const headers = [
+        'Order ID',
+        'Order Number', 
+        'Client Name',
+        'Client Email',
+        'Client Phone',
+        'Status',
+        'Engineer',
+        'Scheduled Date',
+        'Total Amount',
+        'Amount Paid',
+        'Created Date',
+        'Quote Number',
+        'Partner',
+        'Job Address',
+        'Postcode'
+      ];
+
+      const csvContent = [
+        headers.join(','),
+        ...allOrders.map(order => [
+          csvEscape(order.id),
+          csvEscape(order.order_number),
+          csvEscape(order.clients?.full_name),
+          csvEscape(order.clients?.email),
+          csvEscape(order.clients?.phone),
+          csvEscape(formatStatusText(order.status_enhanced || '')),
+          csvEscape(order.engineers?.name),
+          csvEscape(order.scheduled_install_date ? format(new Date(order.scheduled_install_date), 'yyyy-MM-dd') : ''),
+          csvEscape(order.total_amount),
+          csvEscape(order.amount_paid),
+          csvEscape(order.created_at ? format(new Date(order.created_at), 'yyyy-MM-dd HH:mm:ss') : ''),
+          csvEscape(order.quotes?.quote_number),
+          csvEscape(order.partners?.name),
+          csvEscape(order.job_address),
+          csvEscape(order.postcode)
+        ].join(','))
+      ].join('\n');
+
+      // Download CSV
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `orders-export-${format(new Date(), 'yyyy-MM-dd-HHmm')}.csv`;
+      link.click();
+
+      toast.success(`Exported ${allOrders.length} orders to CSV`);
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error('Failed to export orders');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="container mx-auto py-6">
@@ -307,9 +544,23 @@ export default function AdminOrders() {
             Manage and track all orders in the system
           </p>
         </div>
-        <div className="flex items-center gap-sm px-card py-compact bg-muted/50 rounded-lg">
-          <Package className="icon-sm text-muted-foreground" />
-          <span className="text-sm font-medium">{totalCount} Total Orders</span>
+        <div className="flex items-center gap-3">
+          {exportEnabled && (
+            <Button 
+              onClick={handleExportCSV}
+              disabled={isExporting}
+              variant="outline"
+              size="sm"
+              className="gap-2"
+            >
+              <Download className="h-4 w-4" />
+              {isExporting ? 'Exporting...' : 'Export CSV'}
+            </Button>
+          )}
+          <div className="flex items-center gap-sm px-card py-compact bg-muted/50 rounded-lg">
+            <Package className="icon-sm text-muted-foreground" />
+            <span className="text-sm font-medium">{totalCount} Total Orders</span>
+          </div>
         </div>
       </div>
 
