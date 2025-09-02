@@ -127,10 +127,14 @@ serve(async (req) => {
       })
     }
 
-    const rawData = sheetsData.data || []
-    console.log(`Fetched ${rawData.length} rows from Google Sheets`)
+    const headers = sheetsData.headers || []
+    const rawRows = sheetsData.rows || []
+    const totalRows = sheetsData.total_rows || 0
+    
+    console.log(`Fetched ${rawRows.length} rows from Google Sheets (${totalRows} total rows)`)
+    console.log('Headers:', headers)
 
-    if (rawData.length === 0) {
+    if (rawRows.length === 0) {
       console.log('No data to process')
       return new Response(JSON.stringify({
         success: true,
@@ -140,7 +144,7 @@ serve(async (req) => {
           start_row,
           end_row: start_row,
           processed_count: 0,
-          total_rows: 0,
+          total_rows: totalRows,
           has_more: false,
           next_start_row: null
         }
@@ -148,6 +152,15 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
+
+    // Convert rows back to objects using headers
+    const rawData: ImportRow[] = rawRows.map(row => {
+      const rowObj: ImportRow = {}
+      headers.forEach((header, index) => {
+        rowObj[header] = row[index] || null
+      })
+      return rowObj
+    })
 
     // Get column mappings
     const columnMappings = profile.column_mappings || {}
@@ -206,7 +219,7 @@ serve(async (req) => {
 
     for (let i = 0; i < rawData.length; i++) {
       const row = rawData[i]
-      const rowIndex = start_row + i
+      const rowIndex = start_row + i + 1 // +1 because we skip header row
 
       try {
         console.log(`Processing row ${rowIndex}:`, row)

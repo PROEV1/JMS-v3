@@ -10,12 +10,15 @@ interface GoogleSheetsRequest {
   gsheet_id: string;
   sheet_name?: string;
   preview_rows?: number;
+  start_row?: number;
+  max_rows?: number;
 }
 
 interface GoogleSheetsResponse {
   success: boolean;
   headers?: string[];
   rows?: string[][];
+  total_rows?: number;
   error?: string;
 }
 
@@ -119,7 +122,7 @@ Deno.serve(async (req) => {
       });
     }
     
-    const { gsheet_id, sheet_name = 'Sheet1', preview_rows = 10 } = body;
+    const { gsheet_id, sheet_name = 'Sheet1', preview_rows = 10, start_row = 0, max_rows = null } = body;
 
     if (!gsheet_id) {
       console.log('Missing Google Sheet ID');
@@ -302,20 +305,20 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Fetch sheet data with better error handling and logging
-    let range;
-    // Handle sheet names with spaces properly - use the actual sheet name found
+    // First, get ALL data to determine total rows and implement proper pagination
+    let fullRange;
     if (actualSheetName.includes(' ') || actualSheetName.includes("'")) {
-      range = `'${actualSheetName.replace(/'/g, "''")}'!A1:ZZ${preview_rows + 1}`;
+      fullRange = `'${actualSheetName.replace(/'/g, "''")}'!A:ZZ`;
     } else {
-      range = `${actualSheetName}!A1:ZZ${preview_rows + 1}`;
+      fullRange = `${actualSheetName}!A:ZZ`;
     }
     
     console.log(`Original sheet name: "${sheet_name}"`);
     console.log(`Actual sheet name: "${actualSheetName}"`);
-    console.log(`Constructed range: "${range}"`);
+    console.log(`Constructed range: "${fullRange}"`);
+    console.log(`Pagination: start_row=${start_row}, max_rows=${max_rows}`);
     
-    const sheetsUrl = `https://sheets.googleapis.com/v4/spreadsheets/${gsheet_id}/values/${encodeURIComponent(range)}`;
+    const sheetsUrl = `https://sheets.googleapis.com/v4/spreadsheets/${gsheet_id}/values/${encodeURIComponent(fullRange)}`;
     
     console.log(`Final URL: ${sheetsUrl}`);
     
@@ -349,12 +352,42 @@ Deno.serve(async (req) => {
     }
 
     const values = sheetsData.values || [];
-    console.log('Sheet data fetched successfully, rows:', values.length);
+    console.log('Sheet data fetched successfully, total rows:', values.length);
+    
+    if (values.length === 0) {
+      return new Response(JSON.stringify({
+        success: true,
+        headers: [],
+        rows: [],
+        total_rows: 0
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    
+    const headers = values[0] || [];
+    const dataRows = values.slice(1) || [];
+    const totalDataRows = dataRows.length;
+    
+    // Apply pagination if max_rows is specified
+    let paginatedRows = dataRows;
+    if (max_rows !== null) {
+      const endRow = start_row + max_rows;
+      paginatedRows = dataRows.slice(start_row, endRow);
+      console.log(`Paginated from row ${start_row} to ${endRow}, returning ${paginatedRows.length} rows`);
+    } else {
+      // If no max_rows, still apply start_row offset
+      if (start_row > 0) {
+        paginatedRows = dataRows.slice(start_row);
+        console.log(`Applied start_row offset ${start_row}, returning ${paginatedRows.length} rows`);
+      }
+    }
     
     const response: GoogleSheetsResponse = {
       success: true,
-      headers: values[0] || [],
-      rows: values.slice(1) || []
+      headers: headers,
+      rows: paginatedRows,
+      total_rows: totalDataRows
     };
 
     return new Response(JSON.stringify(response), {
