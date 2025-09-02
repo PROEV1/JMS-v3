@@ -3730,6 +3730,14 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: number
       }
+      cleanup_orphaned_partner_clients: {
+        Args: { p_partner_id?: string }
+        Returns: number
+      }
+      delete_partner_data_safe: {
+        Args: { p_import_run_id?: string; p_partner_id: string }
+        Returns: Json
+      }
       detect_scheduling_conflicts: {
         Args: { p_order_id: string }
         Returns: Json
