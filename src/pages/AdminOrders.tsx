@@ -433,9 +433,11 @@ export default function AdminOrders() {
                           <span className="text-xs text-muted-foreground">Not scheduled</span>
                         )}
                       </TableCell>
-                     <TableCell className="py-4 align-middle">
-                       <span className="text-sm font-semibold text-foreground">£{order.total_amount.toLocaleString()}</span>
-                     </TableCell>
+                      <TableCell className="py-4 align-middle">
+                        <span className="text-sm font-semibold text-foreground">
+                          {order.total_amount !== null ? `£${order.total_amount.toLocaleString()}` : '—'}
+                        </span>
+                      </TableCell>
                      <TableCell className="py-4 align-middle hidden xl:table-cell">
                        <span className="text-xs text-muted-foreground whitespace-nowrap">
                          {format(new Date(order.created_at), 'd MMM yyyy')}

@@ -13,7 +13,7 @@ interface Order {
   order_number: string;
   status: string;
   status_enhanced: string;
-  total_amount: number;
+  total_amount: number | null;
   amount_paid: number;
   created_at: string;
   scheduled_install_date: string | null;
@@ -217,17 +217,19 @@ export default function ClientOrders() {
                       </div>
 
                       <div className="flex items-center gap-4">
-                        <div className="text-right">
-                          <p className="text-xl font-bold text-primary">£{order.total_amount.toLocaleString()}</p>
-                          <p className="text-sm text-muted-foreground">
-                            Paid: £{order.amount_paid.toLocaleString()}
-                          </p>
-                          {order.amount_paid < order.total_amount && (
-                            <p className="text-sm font-medium text-red-600">
-                              Outstanding: £{(order.total_amount - order.amount_paid).toLocaleString()}
-                            </p>
-                          )}
-                        </div>
+                         <div className="text-right">
+                           <p className="text-xl font-bold text-primary">
+                             {order.total_amount !== null ? `£${order.total_amount.toLocaleString()}` : '—'}
+                           </p>
+                           <p className="text-sm text-muted-foreground">
+                             Paid: £{order.amount_paid.toLocaleString()}
+                           </p>
+                           {order.total_amount !== null && order.amount_paid < order.total_amount && (
+                             <p className="text-sm font-medium text-red-600">
+                               Outstanding: £{(order.total_amount - order.amount_paid).toLocaleString()}
+                             </p>
+                           )}
+                         </div>
                         
                         <div className="flex flex-col gap-2">
                           <Button
@@ -239,15 +241,15 @@ export default function ClientOrders() {
                             View Details
                           </Button>
                           
-                          {order.amount_paid < order.total_amount && (
-                            <Button
-                              size="sm"
-                              onClick={() => handlePayOrder(order.id, order.total_amount - order.amount_paid)}
-                              className="bg-green-600 hover:bg-green-700"
-                            >
-                              <CreditCard className="h-4 w-4 mr-2" />
-                              Pay Balance
-                            </Button>
+                           {order.total_amount !== null && order.amount_paid < order.total_amount && (
+                             <Button
+                               size="sm"
+                               onClick={() => handlePayOrder(order.id, order.total_amount - order.amount_paid)}
+                               className="bg-green-600 hover:bg-green-700"
+                             >
+                               <CreditCard className="h-4 w-4 mr-2" />
+                               Pay Balance
+                             </Button>
                           )}
                         </div>
                       </div>
