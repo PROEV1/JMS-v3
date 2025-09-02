@@ -83,6 +83,24 @@ export function OfferExpiredListPage() {
             totalCount={totalCount}
             onPageChange={controls.setPage}
             onPageSizeChange={controls.setPageSize}
+            exportQueryBuilder={async () => {
+              const { data, error } = await supabase
+                .from('orders')
+                .select(`
+                  *,
+                  client:client_id(full_name, email, phone, postcode, address),
+                  engineer:engineer_id(name, email, region),
+                  partner:partner_id(name),
+                  quote:quote_id(quote_number)
+                `)
+                .eq('status_enhanced', 'offer_expired')
+                .eq('scheduling_suppressed', false)
+                .is('scheduled_install_date', null)
+                .order('created_at', { ascending: false });
+              
+              if (error) throw error;
+              return data || [];
+            }}
           />
         </CardContent>
       </Card>

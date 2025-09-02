@@ -105,6 +105,45 @@ export function DateRejectedListPage() {
             totalCount={totalCount}
             onPageChange={controls.setPage}
             onPageSizeChange={controls.setPageSize}
+            exportQueryBuilder={async () => {
+              // Get rejected offers
+              const { data: rejectedOffers, error: rejectedError } = await supabase
+                .from('job_offers')
+                .select('order_id')
+                .eq('status', 'rejected');
+
+              if (rejectedError) throw rejectedError;
+              
+              if (!rejectedOffers?.length) return [];
+
+              // Get active offers to exclude orders that have them
+              const { data: activeOffers } = await supabase
+                .from('job_offers')
+                .select('order_id')
+                .in('status', ['pending', 'accepted'])
+                .gt('expires_at', new Date().toISOString());
+
+              const ordersWithActiveOffers = new Set(activeOffers?.map(offer => offer.order_id) || []);
+              const uniqueRejectedOrderIds = [...new Set(rejectedOffers.map(offer => offer.order_id))]
+                .filter(orderId => !ordersWithActiveOffers.has(orderId));
+
+              if (!uniqueRejectedOrderIds.length) return [];
+
+              const { data, error } = await supabase
+                .from('orders')
+                .select(`
+                  *,
+                  client:client_id(full_name, email, phone, postcode, address),
+                  engineer:engineer_id(name, email, region),
+                  partner:partner_id(name),
+                  quote:quote_id(quote_number)
+                `)
+                .in('id', uniqueRejectedOrderIds)
+                .order('created_at', { ascending: false });
+              
+              if (error) throw error;
+              return data || [];
+            }}
           />
         </CardContent>
       </Card>

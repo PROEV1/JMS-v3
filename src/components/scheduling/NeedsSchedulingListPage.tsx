@@ -226,6 +226,39 @@ export function NeedsSchedulingListPage() {
               console.log('NeedsSchedulingListPage: Manual update requested, refetching...');
               refetchOrders();
             }}
+            exportQueryBuilder={async () => {
+              // Get all active offers to exclude orders with them
+              const { data: activeOffers } = await supabase
+                .from('job_offers')
+                .select('order_id')
+                .eq('status', 'pending')
+                .gt('expires_at', new Date().toISOString());
+
+              const activeOfferOrderIds = activeOffers?.map(offer => offer.order_id) || [];
+
+              let query = supabase
+                .from('orders')
+                .select(`
+                  *,
+                  client:client_id(full_name, email, phone, postcode, address),
+                  engineer:engineer_id(name, email, region),
+                  partner:partner_id(name),
+                  quote:quote_id(quote_number)
+                `)
+                .eq('status_enhanced', 'awaiting_install_booking')
+                .eq('scheduling_suppressed', false)
+                .order('created_at', { ascending: false });
+
+              // Exclude orders with active offers
+              if (activeOfferOrderIds.length > 0) {
+                const safeIds = activeOfferOrderIds.slice(0, 100).map(id => `"${id}"`).join(',');
+                query = query.not('id', 'in', `(${safeIds})`);
+              }
+
+              const { data, error } = await query;
+              if (error) throw error;
+              return data || [];
+            }}
           />
         </CardContent>
       </Card>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,10 +9,11 @@ import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Search, Send, Wrench, User, Calendar as CalendarIcon, MapPin, RotateCcw, XCircle, Calendar, Check, X, Eye, Filter, ArrowUpDown, Clock, Bot, Grid, List, MoreHorizontal } from 'lucide-react';
+import { Search, Send, Wrench, User, Calendar as CalendarIcon, MapPin, RotateCcw, XCircle, Calendar, Check, X, Eye, Filter, ArrowUpDown, Clock, Bot, Grid, List, MoreHorizontal, Download } from 'lucide-react';
 import { Order, Engineer, getOrderEstimatedHours, isDefaultEstimatedHours } from '@/utils/schedulingUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { format } from 'date-fns';
 import { SendOfferModal } from './SendOfferModal';
 import { SmartAssignmentModal } from './SmartAssignmentModal';
 import { AutoScheduleReviewModal } from './AutoScheduleReviewModal';
@@ -34,6 +35,7 @@ interface ScheduleStatusListPageProps {
   totalCount?: number;
   onPageChange?: (page: number) => void;
   onPageSizeChange?: (pageSize: number) => void;
+  exportQueryBuilder?: () => Promise<any[] | null>;
 }
 
 export function ScheduleStatusListPage({ 
@@ -45,14 +47,20 @@ export function ScheduleStatusListPage({
   pagination,
   totalCount,
   onPageChange,
-  onPageSizeChange
+  onPageSizeChange,
+  exportQueryBuilder
 }: ScheduleStatusListPageProps) {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showSendOffer, setShowSendOffer] = useState(false);
   const [showSmartAssign, setShowSmartAssign] = useState(false);
   const [showAutoScheduleModal, setShowAutoScheduleModal] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+
+  // Check if export is enabled via URL parameter
+  const exportEnabled = searchParams.get('enableExport') === '1';
   
   // New state for improved UI  
   const [jobTypeFilter, setJobTypeFilter] = useState<string>('all');
@@ -508,6 +516,84 @@ export function ScheduleStatusListPage({
     }
   };
 
+  // CSV Export functionality
+  const csvEscape = (value: any): string => {
+    if (value == null) return '';
+    const str = String(value);
+    if (str.includes('"') || str.includes(',') || str.includes('\n') || str.includes('\r')) {
+      return `"${str.replace(/"/g, '""')}"`;
+    }
+    return str;
+  };
+
+  const handleExportCSV = async () => {
+    if (isExporting || !exportQueryBuilder) return;
+    
+    setIsExporting(true);
+    try {
+      const exportOrders = await exportQueryBuilder();
+      
+      if (!exportOrders || exportOrders.length === 0) {
+        toast.warning("No orders found to export");
+        return;
+      }
+
+      // Generate CSV
+      const headers = [
+        'Order ID',
+        'Order Number', 
+        'Client Name',
+        'Client Email',
+        'Client Phone',
+        'Status',
+        'Engineer',
+        'Scheduled Date',
+        'Total Amount',
+        'Amount Paid',
+        'Created Date',
+        'Quote Number',
+        'Partner',
+        'Job Address',
+        'Postcode'
+      ];
+
+      const csvContent = [
+        headers.join(','),
+        ...exportOrders.map(order => [
+          csvEscape(order.id),
+          csvEscape(order.order_number),
+          csvEscape(order.client?.full_name),
+          csvEscape(order.client?.email),
+          csvEscape(order.client?.phone),
+          csvEscape(order.status_enhanced || ''),
+          csvEscape(order.engineer?.name),
+          csvEscape(order.scheduled_install_date ? format(new Date(order.scheduled_install_date), 'yyyy-MM-dd') : ''),
+          csvEscape(order.total_amount),
+          csvEscape(order.amount_paid),
+          csvEscape(order.created_at ? format(new Date(order.created_at), 'yyyy-MM-dd HH:mm:ss') : ''),
+          csvEscape(order.quote?.quote_number),
+          csvEscape(order.partner?.name),
+          csvEscape(order.job_address),
+          csvEscape(order.postcode)
+        ].join(','))
+      ].join('\n');
+
+      // Download CSV
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `${title.toLowerCase().replace(/\s+/g, '-')}-export-${format(new Date(), 'yyyy-MM-dd-HHmm')}.csv`;
+      link.click();
+
+      toast.success(`Exported ${exportOrders.length} orders to CSV`);
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error('Failed to export orders');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const handleCancelAndRestart = async (orderId: string) => {
     try {
       // Find and reject the accepted offer
@@ -685,6 +771,20 @@ export function ScheduleStatusListPage({
             >
               <CalendarIcon className="w-4 h-4" />
               Auto-Schedule & Review
+            </Button>
+          )}
+        </div>
+        <div className="flex items-center gap-3">
+          {exportEnabled && exportQueryBuilder && (
+            <Button 
+              onClick={handleExportCSV}
+              disabled={isExporting}
+              variant="outline"
+              size="sm"
+              className="gap-2"
+            >
+              <Download className="h-4 w-4" />
+              {isExporting ? 'Exporting...' : 'Export CSV'}
             </Button>
           )}
         </div>

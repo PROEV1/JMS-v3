@@ -97,6 +97,38 @@ export function ReadyToBookListPage() {
             totalCount={totalCount}
             onPageChange={controls.setPage}
             onPageSizeChange={controls.setPageSize}
+            exportQueryBuilder={async () => {
+              // First get accepted offers
+              const { data: acceptedOffers, error: offersError } = await supabase
+                .from('job_offers')
+                .select('order_id')
+                .eq('status', 'accepted');
+
+              if (offersError) throw offersError;
+              
+              if (!acceptedOffers?.length) return [];
+
+              const uniqueOrderIds = [...new Set(acceptedOffers.map(offer => offer.order_id))];
+              
+              // Fetch orders with accepted offers that haven't been scheduled yet
+              const { data, error } = await supabase
+                .from('orders')
+                .select(`
+                  *,
+                  client:client_id(full_name, email, phone, postcode, address),
+                  engineer:engineer_id(name, email, region),
+                  partner:partner_id(name),
+                  quote:quote_id(quote_number)
+                `)
+                .in('id', uniqueOrderIds)
+                .eq('status_enhanced', 'awaiting_install_booking')
+                .is('scheduled_install_date', null)
+                .eq('scheduling_suppressed', false)
+                .order('created_at', { ascending: false });
+
+              if (error) throw error;
+              return data || [];
+            }}
           />
         </CardContent>
       </Card>
