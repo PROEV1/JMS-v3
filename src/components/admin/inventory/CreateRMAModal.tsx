@@ -125,10 +125,40 @@ export function CreateRMAModal({ open, onOpenChange }: CreateRMAModalProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!rmaNumber || !supplierId || lines.some(line => !line.item_id || !line.qty || !line.reason)) {
+    // Debug logging
+    console.log('Form submission - RMA Number:', rmaNumber);
+    console.log('Form submission - Supplier ID:', supplierId);
+    console.log('Form submission - Reason:', reason);
+    console.log('Form submission - Lines:', lines);
+    
+    // Check each line individually
+    lines.forEach((line, index) => {
+      console.log(`Line ${index}:`, {
+        id: line.id,
+        item_id: line.item_id,
+        qty: line.qty,
+        reason: line.reason,
+        hasAllRequired: !(!line.item_id || !line.qty || !line.reason)
+      });
+    });
+    
+    if (!rmaNumber || !supplierId || !reason || lines.some(line => !line.item_id || !line.qty || !line.reason)) {
+      const missingFields = [];
+      if (!rmaNumber) missingFields.push('RMA Number');
+      if (!supplierId) missingFields.push('Supplier');
+      if (!reason) missingFields.push('Overall Reason');
+      
+      lines.forEach((line, index) => {
+        if (!line.item_id) missingFields.push(`Line ${index + 1}: Item`);
+        if (!line.qty) missingFields.push(`Line ${index + 1}: Quantity`);
+        if (!line.reason) missingFields.push(`Line ${index + 1}: Reason`);
+      });
+      
+      console.log('Missing required fields:', missingFields);
+      
       toast({
         title: 'Error',
-        description: 'Please fill in all required fields',
+        description: `Please fill in all required fields: ${missingFields.join(', ')}`,
         variant: 'destructive',
       });
       return;
