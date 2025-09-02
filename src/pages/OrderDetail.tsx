@@ -346,10 +346,21 @@ export default function OrderDetail() {
         .from('admin_settings')
         .select('setting_value')
         .eq('setting_key', 'payment_config')
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
-      setPaymentConfig(data.setting_value as unknown as PaymentConfig);
+      
+      if (data?.setting_value) {
+        setPaymentConfig(data.setting_value as unknown as PaymentConfig);
+      } else {
+        console.log('No payment config found, using defaults');
+        setPaymentConfig({
+          payment_stage: 'deposit',
+          deposit_type: 'percentage', 
+          deposit_amount: 50,
+          currency: 'GBP'
+        });
+      }
     } catch (error) {
       console.error('Error fetching payment config:', error);
     }
