@@ -68,26 +68,47 @@ serve(async (req) => {
 
     const startTime = performance.now()
 
-    // Build the base query for finding orders
-    let ordersQuery = supabase
-      .from('orders')
-      .select('id, client_id')
+    // Build the base query for finding orders with pagination
+    let allOrders = [];
+    let from = 0;
+    const pageSize = 1000;
+    let hasMore = true;
 
-    if (import_run_id) {
-      // Filter by specific import run
-      ordersQuery = ordersQuery.eq('partner_metadata->>import_run_id', import_run_id)
-    } else {
-      // Filter by partner
-      ordersQuery = ordersQuery
-        .eq('is_partner_job', true)
-        .eq('partner_id', partner_id)
+    while (hasMore) {
+      let ordersQuery = supabase
+        .from('orders')
+        .select('id, client_id')
+        .range(from, from + pageSize - 1);
+
+      if (import_run_id) {
+        // Filter by specific import run
+        ordersQuery = ordersQuery.eq('partner_metadata->>import_run_id', import_run_id)
+      } else {
+        // Filter by partner
+        ordersQuery = ordersQuery
+          .eq('is_partner_job', true)
+          .eq('partner_id', partner_id)
+      }
+
+      const { data: ordersBatch, error: ordersError } = await ordersQuery;
+      
+      if (ordersError) {
+        throw new Error(`Failed to fetch orders: ${ordersError.message}`)
+      }
+
+      if (!ordersBatch || ordersBatch.length === 0) {
+        hasMore = false;
+      } else {
+        allOrders.push(...ordersBatch);
+        from += pageSize;
+        
+        if (ordersBatch.length < pageSize) {
+          hasMore = false;
+        }
+      }
     }
 
-    const { data: orders, error: ordersError } = await ordersQuery
-    
-    if (ordersError) {
-      throw new Error(`Failed to fetch orders: ${ordersError.message}`)
-    }
+    const orders = allOrders;
 
     const orderIds = orders?.map(o => o.id) || []
     const clientIds = orders?.map(o => o.client_id) || []
@@ -97,8 +118,8 @@ serve(async (req) => {
     
     if (partner_id) {
       let allClientsFetched = false;
-      let from = 0;
-      const pageSize = 1000;
+      let clientFrom = 0;
+      const clientPageSize = 1000;
       
       while (!allClientsFetched) {
         const { data: clientBatch, error: clientsError } = await supabase
@@ -106,7 +127,7 @@ serve(async (req) => {
           .select('id, full_name, email, partner_id, is_partner_client')
           .eq('partner_id', partner_id)
           .eq('is_partner_client', true)
-          .range(from, from + pageSize - 1);
+          .range(clientFrom, clientFrom + clientPageSize - 1);
 
         if (clientsError) {
           console.error('Error finding partner clients:', clientsError);
@@ -117,9 +138,9 @@ serve(async (req) => {
           allClientsFetched = true;
         } else {
           allPartnerClients.push(...clientBatch);
-          from += pageSize;
+          clientFrom += clientPageSize;
           
-          if (clientBatch.length < pageSize) {
+          if (clientBatch.length < clientPageSize) {
             allClientsFetched = true;
           }
         }
