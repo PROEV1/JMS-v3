@@ -2,10 +2,40 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.52.1'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+// Enhanced CORS headers for better cross-origin compatibility
+const getCorsHeaders = (origin?: string | null) => {
+  const allowedOrigins = [
+    'http://localhost:5173',
+    'http://localhost:3000', 
+    /^https?:\/\/preview--.*\.lovable\.app$/,
+    /^https?:\/\/.*\.lovable\.dev$/,
+    /^https?:\/\/.*\.lovable\.app$/
+  ];
+
+  let allowOrigin = '*';
+  
+  if (origin) {
+    const isAllowed = allowedOrigins.some(allowed => {
+      if (typeof allowed === 'string') {
+        return allowed === origin;
+      }
+      return allowed.test(origin);
+    });
+    
+    if (isAllowed) {
+      allowOrigin = origin;
+    }
+  }
+
+  return {
+    'Access-Control-Allow-Origin': allowOrigin,
+    'Access-Control-Allow-Methods': 'GET,POST,OPTIONS,PUT,DELETE',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-requested-with',
+    'Access-Control-Max-Age': '86400',
+    'Access-Control-Allow-Credentials': allowOrigin !== '*' ? 'true' : 'false',
+    'Vary': 'Origin'
+  };
+};
 
 interface ImportRow {
   [key: string]: string | null;
@@ -49,6 +79,10 @@ interface PerformanceMetrics {
 }
 
 serve(async (req) => {
+  // Get origin for CORS
+  const origin = req.headers.get('origin');
+  const corsHeaders = getCorsHeaders(origin);
+
   // Initialize performance tracking
   const overallStartTime = performance.now();
   const performanceMetrics: PerformanceMetrics = {
@@ -80,7 +114,10 @@ serve(async (req) => {
   console.log('Headers:', Object.fromEntries(req.headers.entries()));
   
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response('ok', { 
+      status: 200,
+      headers: corsHeaders 
+    });
   }
 
   try {
@@ -475,244 +512,118 @@ serve(async (req) => {
         }
 
         if (!dry_run) {
-          // Find or create client
+          // Find or create client using UPSERT for better concurrency handling
           let client
-          const { data: existingClient } = await supabase
+          const clientData = {
+            full_name: clientName,
+            email: clientEmail.toLowerCase(),
+            phone: normalizedPhone,
+            address: jobAddress,
+            postcode: postcode,
+            is_partner_client: true,
+            partner_id: profile.partner_id
+          }
+
+          const { data: upsertedClient, error: clientUpsertError } = await supabase
             .from('clients')
+            .upsert(clientData, {
+              onConflict: 'email,partner_id', 
+              ignoreDuplicates: false
+            })
             .select('id')
-            .eq('email', clientEmail.toLowerCase())
-            .eq('partner_id', profile.partner_id)
-            .single()
+            .maybeSingle()
           
           performanceMetrics.database_calls.total_count++;
           performanceMetrics.database_calls.client_queries++;
 
-          if (existingClient) {
-            client = existingClient
-            // Update client info
-            await supabase
-              .from('clients')
-              .update({
-                full_name: clientName,
-                phone: normalizedPhone,
-                address: jobAddress,
-                postcode: postcode,
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', existingClient.id)
-            
-            performanceMetrics.database_calls.total_count++;
-            performanceMetrics.database_calls.update_operations++;
-          } else {
-            // Create new client
-            const { data: newClient, error: clientError } = await supabase
-              .from('clients')
-              .insert({
-                full_name: clientName,
-                email: clientEmail.toLowerCase(),
-                phone: normalizedPhone,
-                address: jobAddress,
-                postcode: postcode,
-                is_partner_client: true,
-                partner_id: profile.partner_id
-              })
-              .select('id')
-              .single()
+          if (clientUpsertError) {
+            console.error(`Row ${rowIndex}: Client upsert error:`, clientUpsertError)
+            errors.push({
+              row: rowIndex,
+              message: `Client upsert failed: ${clientUpsertError.message}`,
+              data: { error: clientUpsertError }
+            })
+            results.errors++
+            continue
+          }
+          client = upsertedClient
 
-            performanceMetrics.database_calls.total_count++;
-            performanceMetrics.database_calls.insert_operations++;
-
-            if (clientError) {
-              console.error(`Row ${rowIndex}: Client creation error:`, clientError)
-              errors.push({
-                row: rowIndex,
-                message: `Client creation failed: ${clientError.message}`,
-                data: { error: clientError }
-              })
-              results.errors++
-              continue
-            }
-            client = newClient
+          // Prepare order data for upsert
+          const orderData: any = {
+            client_id: client.id,
+            partner_id: profile.partner_id,
+            partner_external_id: partnerExternalId,
+            is_partner_job: true,
+            job_address: jobAddress,
+            postcode: postcode,
+            partner_status: mappedStatus,
+            total_amount: parsedQuoteAmount,
+            amount_paid: 0,
+            deposit_amount: 0,
+            status: 'awaiting_payment',
+            survey_required: profile.partners?.client_survey_required ?? true,
+            estimated_duration_hours: parsedEstimatedDurationHours,
+            updated_at: new Date().toISOString()
           }
 
-          // Check for existing order
-          const { data: existingOrder } = await supabase
-            .from('orders')
-            .select('id, status_enhanced, total_amount')
-            .eq('partner_id', profile.partner_id)
-            .eq('partner_external_id', partnerExternalId)
-            .single()
+          if (engineerId) {
+            orderData.engineer_id = engineerId
+          }
+
+          if (parsedInstallDate) {
+            orderData.scheduled_install_date = parsedInstallDate
+          }
           
-          performanceMetrics.database_calls.total_count++;
-          performanceMetrics.database_calls.order_queries++;
-
-          if (existingOrder) {
-            // Update existing order
-            const updateData: any = {
-              client_id: client.id,
-              job_address: jobAddress,
-              postcode: postcode,
-              partner_status: mappedStatus,
-              total_amount: parsedQuoteAmount,
-              estimated_duration_hours: parsedEstimatedDurationHours,
-              updated_at: new Date().toISOString()
-            }
-
-            if (engineerId) {
-              updateData.engineer_id = engineerId
-            }
-
-            if (parsedInstallDate) {
-              updateData.scheduled_install_date = parsedInstallDate
-            }
+          // Apply status actions if defined in profile
+          if (partnerStatus) {
+            const statusActions = profile.status_actions || {}
+            const statusAction = statusActions[partnerStatus]
             
-            // Apply status actions if defined in profile
-            if (partnerStatus) {
-              const statusActions = profile.status_actions || {}
-              const statusAction = statusActions[partnerStatus]
-              
-              if (statusAction) {
-                // Apply scheduling suppression based on status actions
-                if (statusAction.actions?.suppress_scheduling) {
-                  updateData.scheduling_suppressed = true
-                  updateData.scheduling_suppressed_reason = statusAction.actions.suppression_reason || 'status_mapping'
-                } else {
-                  updateData.scheduling_suppressed = false
-                  updateData.scheduling_suppressed_reason = null
-                }
-              }
-            }
-
-            const { error: updateError } = await supabase
-              .from('orders')
-              .update(updateData)
-              .eq('id', existingOrder.id)
-
-            performanceMetrics.database_calls.total_count++;
-            performanceMetrics.database_calls.update_operations++;
-
-            if (updateError) {
-              console.error(`Row ${rowIndex}: Order update error:`, updateError)
-              errors.push({
-                row: rowIndex,
-                message: `Order update failed: ${updateError.message}`,
-                data: { error: updateError }
-              })
-              results.errors++
-            } else {
-              console.log(`Row ${rowIndex}: Updated order ${existingOrder.id}`)
-              results.updated++
-              details.updated.push({
-                row: rowIndex,
-                order_id: existingOrder.id,
-                partner_external_id: partnerExternalId
-              })
-            }
-          } else {
-            // Create new order (DO NOT include order_number - let DB generate it)
-            const orderData: any = {
-              client_id: client.id,
-              partner_id: profile.partner_id,
-              partner_external_id: partnerExternalId,
-              is_partner_job: true,
-              job_address: jobAddress,
-              postcode: postcode,
-              partner_status: mappedStatus,
-              total_amount: parsedQuoteAmount,
-              amount_paid: 0,
-              deposit_amount: 0,
-              status: 'awaiting_payment',
-              survey_required: profile.partners?.client_survey_required ?? true,
-              estimated_duration_hours: parsedEstimatedDurationHours
-            }
-
-            if (engineerId) {
-              orderData.engineer_id = engineerId
-            }
-
-            if (parsedInstallDate) {
-              orderData.scheduled_install_date = parsedInstallDate
-            }
-            
-            // Apply status actions if defined in profile
-            if (partnerStatus) {
-              const statusActions = profile.status_actions || {}
-              const statusAction = statusActions[partnerStatus]
-              
-              if (statusAction) {
-                // Apply scheduling suppression based on status actions
-                if (statusAction.actions?.suppress_scheduling) {
-                  orderData.scheduling_suppressed = true
-                  orderData.scheduling_suppressed_reason = statusAction.actions.suppression_reason || 'status_mapping'
-                } else {
-                  orderData.scheduling_suppressed = false
-                  orderData.scheduling_suppressed_reason = null
-                }
-              }
-            }
-
-            console.log(`Row ${rowIndex}: Creating order with data:`, orderData)
-
-            // Try creating order with enhanced retry logic for duplicate order_number
-            let newOrder = null
-            let orderError = null
-            let retryCount = 0
-            const maxRetries = 5 // Increased from 1 to 5
-
-            while (retryCount <= maxRetries && !newOrder) {
-              const { data: orderResult, error: currentOrderError } = await supabase
-                .from('orders')
-                .insert(orderData)
-                .select('id, order_number')
-                .single()
-
-              performanceMetrics.database_calls.total_count++;
-              performanceMetrics.database_calls.insert_operations++;
-
-              if (currentOrderError) {
-                // Check if it's a duplicate order_number error
-                if (currentOrderError.code === '23505' && currentOrderError.message.includes('orders_order_number_key')) {
-                  console.log(`Row ${rowIndex}: Duplicate order_number collision (attempt ${retryCount + 1}), retrying...`)
-                  if (retryCount < maxRetries) {
-                    // Exponential backoff with jitter
-                    const baseDelay = 100
-                    const jitter = Math.random() * 200
-                    const delay = baseDelay * Math.pow(1.5, retryCount) + jitter
-                    await new Promise(resolve => setTimeout(resolve, delay))
-                    retryCount++
-                    continue
-                  } else {
-                    orderError = currentOrderError
-                    break
-                  }
-                } else {
-                  orderError = currentOrderError
-                  break
-                }
+            if (statusAction) {
+              // Apply scheduling suppression based on status actions
+              if (statusAction.actions?.suppress_scheduling) {
+                orderData.scheduling_suppressed = true
+                orderData.scheduling_suppressed_reason = statusAction.actions.suppression_reason || 'status_mapping'
               } else {
-                newOrder = orderResult
+                orderData.scheduling_suppressed = false
+                orderData.scheduling_suppressed_reason = null
               }
             }
+          }
 
-            if (orderError) {
-              console.error(`Row ${rowIndex}: Order creation error (partner_external_id: ${partnerExternalId}):`, orderError)
-              errors.push({
-                row: rowIndex,
-                partner_external_id: partnerExternalId,
-                message: `Upsert operation failed: ${orderError.message}`,
-                data: { error: orderError }
-              })
-              results.errors++
-            } else {
-              console.log(`Row ${rowIndex}: Created order ${newOrder.id} with number ${newOrder.order_number}`)
-              results.inserted++
-              details.inserted.push({
-                row: rowIndex,
-                order_id: newOrder.id,
-                order_number: newOrder.order_number,
-                partner_external_id: partnerExternalId
-              })
-            }
+          console.log(`Row ${rowIndex}: Upserting order with data:`, orderData)
+
+          // Use the unique index for true upsert behavior
+          const { data: orderResult, error: orderError } = await supabase
+            .from('orders')
+            .upsert(orderData, {
+              onConflict: 'partner_id,partner_external_id',
+              ignoreDuplicates: false
+            })
+            .select('id, order_number')
+            .maybeSingle()
+
+          performanceMetrics.database_calls.total_count++;
+          performanceMetrics.database_calls.insert_operations++;
+
+          if (orderError) {
+            console.error(`Row ${rowIndex}: Order upsert error (partner_external_id: ${partnerExternalId}):`, orderError)
+            errors.push({
+              row: rowIndex,
+              partner_external_id: partnerExternalId,
+              message: `Order upsert failed: ${orderError.message}`,
+              data: { error: orderError }
+            })
+            results.errors++
+          } else if (orderResult) {
+            console.log(`Row ${rowIndex}: Successfully processed order ${orderResult.id} with number ${orderResult.order_number}`)
+            results.inserted++
+            details.inserted.push({
+              row: rowIndex,
+              order_id: orderResult.id,
+              order_number: orderResult.order_number,
+              partner_external_id: partnerExternalId
+            })
           }
         } else {
           // Dry run - just count as inserted for simulation

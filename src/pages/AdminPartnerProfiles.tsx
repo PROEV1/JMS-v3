@@ -446,40 +446,71 @@ export default function AdminPartnerProfiles() {
       console.log('DryRun:', dryRun);
       console.log('Chunk:', startRow !== undefined ? `${startRow}-${(startRow || 0) + (maxRows || 150)}` : 'full');
 
-      const { data, error } = await supabase.functions.invoke('partner-import', {
-        body
-      });
+      // Retry logic with exponential backoff for CORS/network issues
+      let lastError;
+      const maxRetries = 3;
+      
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          const { data, error } = await supabase.functions.invoke('partner-import', {
+            body
+          });
 
-      console.log('=== FUNCTION RESPONSE ===');
-      console.log('Response data:', data);
-      console.log('Response error:', error);
+          console.log('=== FUNCTION RESPONSE ===');
+          console.log('Response data:', data);
+          console.log('Response error:', error);
 
-      if (error) {
-        console.error('Supabase function error:', error);
-        throw error;
-      }
+          if (error) {
+            console.error('Supabase function error:', error);
+            
+            // Check if it's a CORS or network error that we should retry
+            if (attempt < maxRetries && (
+              error.message?.includes('CORS') ||
+              error.message?.includes('Failed to send') ||
+              error.message?.includes('fetch')
+            )) {
+              console.log(`Attempt ${attempt} failed with recoverable error, retrying in ${attempt * 1000}ms...`);
+              await new Promise(resolve => setTimeout(resolve, attempt * 1000));
+              lastError = error;
+              continue;
+            }
+            
+            throw error;
+          }
 
-      // Only show toast for single imports (not chunks)
-      if (startRow === undefined && data.success) {
-        toast({ 
-          title: dryRun ? 'Dry run completed' : 'Import completed',
-          description: `Processed ${data.summary.processed} rows. ${data.summary.inserted_count} inserted, ${data.summary.updated_count} updated, ${data.summary.skipped_count} skipped. ${data.summary.errors.length} errors.`
-        });
-        
-        // Show performance metrics if available
-        if (data.performance_metrics) {
-          setPerformanceMetrics(data.performance_metrics);
-          setShowPerformanceDialog(true);
+          // Success case - handle response
+          if (startRow === undefined && data.success) {
+            toast({ 
+              title: dryRun ? 'Dry run completed' : 'Import completed',
+              description: `Processed ${data.summary.processed} rows. ${data.summary.inserted_count} inserted, ${data.summary.updated_count} updated, ${data.summary.skipped_count} skipped. ${data.summary.errors.length} errors.`
+            });
+            
+            // Show performance metrics if available
+            if (data.performance_metrics) {
+              setPerformanceMetrics(data.performance_metrics);
+              setShowPerformanceDialog(true);
+            }
+          } else if (startRow === undefined && !data.success) {
+            toast({
+              title: 'Import failed',
+              description: data.unmapped_engineers ? `${data.unmapped_engineers.length} engineers need to be mapped` : 'Unknown error',
+              variant: 'destructive'
+            });
+          }
+
+          return data;
+          
+        } catch (error) {
+          lastError = error;
+          if (attempt < maxRetries) {
+            console.log(`Attempt ${attempt} failed, retrying in ${attempt * 1000}ms...`);
+            await new Promise(resolve => setTimeout(resolve, attempt * 1000));
+          }
         }
-      } else if (startRow === undefined && !data.success) {
-        toast({
-          title: 'Import failed',
-          description: data.unmapped_engineers ? `${data.unmapped_engineers.length} engineers need to be mapped` : 'Unknown error',
-          variant: 'destructive'
-        });
       }
-
-      return data; // Return the result for the modal to display
+      
+      // If all retries failed, throw the last error
+      throw lastError;
     } catch (error: any) {
       // Only show error toast for single imports (not chunks)
       if (startRow === undefined) {
