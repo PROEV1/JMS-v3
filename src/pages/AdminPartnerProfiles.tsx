@@ -18,6 +18,7 @@ import ImportRunModal from '@/components/admin/ImportRunModal';
 import { DeletePartnerJobsModal } from '@/components/admin/DeletePartnerJobsModal';
 import { ImportProfileActions } from '@/components/admin/ImportProfileActions';
 import { TestPartnerImport } from '@/components/TestPartnerImport';
+import { PartnerImportAuditModal } from '@/components/admin/PartnerImportAuditModal';
 
 interface ImportProfile {
   id: string;
@@ -190,6 +191,7 @@ export default function AdminPartnerProfiles() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showAuditDialog, setShowAuditDialog] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -597,6 +599,14 @@ export default function AdminPartnerProfiles() {
                 <Button
                   variant="outline"
                   size="sm"
+                  onClick={() => setShowAuditDialog(profile.id)}
+                >
+                  <FileSpreadsheet className="h-4 w-4 mr-1" />
+                  Audit & Reconcile
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => setShowImportDialog(profile.id)}
                 >
                   <Upload className="h-4 w-4 mr-1" />
@@ -629,6 +639,16 @@ export default function AdminPartnerProfiles() {
           </Card>
         ))}
       </div>
+
+      {/* Import Audit Modal */}
+      {showAuditDialog && (
+        <PartnerImportAuditModal
+          isOpen={!!showAuditDialog}
+          onClose={() => setShowAuditDialog(null)}
+          profileId={showAuditDialog}
+          profileName={profiles?.find(p => p.id === showAuditDialog)?.name || 'Unknown Profile'}
+        />
+      )}
 
       {/* Import Run Modal */}
       {showImportDialog && (
