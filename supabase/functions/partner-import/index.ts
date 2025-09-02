@@ -43,7 +43,8 @@ serve(async (req) => {
       dry_run = false, 
       max_rows = null,
       start_row = 0,
-      chunk_size = null
+      chunk_size = null,
+      job_ids_filter = null
     } = body
 
     // Use max_rows if provided, otherwise fall back to chunk_size, otherwise default to 200
@@ -170,6 +171,22 @@ serve(async (req) => {
     const columnMappings = profile.column_mappings || {}
     console.log('Column mappings:', columnMappings)
 
+    // Apply job_ids filter if provided
+    let filteredData = rawData
+    if (job_ids_filter && Array.isArray(job_ids_filter) && job_ids_filter.length > 0) {
+      console.log(`Filtering data for ${job_ids_filter.length} specific job IDs:`, job_ids_filter)
+      const jobIdColumn = columnMappings.partner_external_id
+      if (jobIdColumn) {
+        filteredData = rawData.filter(row => {
+          const jobId = row[jobIdColumn] || null
+          return jobId && job_ids_filter.includes(jobId)
+        })
+        console.log(`Filtered from ${rawData.length} to ${filteredData.length} rows`)
+      } else {
+        console.warn('job_ids_filter provided but no partner_external_id column mapping found')
+      }
+    }
+
     // Get engineer mappings
     const { data: engineerMappings } = await supabase
       .from('partner_engineer_mappings')
@@ -221,8 +238,8 @@ serve(async (req) => {
 
     console.log('Starting data processing...')
 
-    for (let i = 0; i < rawData.length; i++) {
-      const row = rawData[i]
+    for (let i = 0; i < filteredData.length; i++) {
+      const row = filteredData[i]
       const rowIndex = start_row + i + 1 // +1 because we skip header row
 
       try {
@@ -490,16 +507,46 @@ serve(async (req) => {
 
             console.log(`Row ${rowIndex}: Creating order with data:`, orderData)
 
-            const { data: newOrder, error: orderError } = await supabase
-              .from('orders')
-              .insert(orderData)
-              .select('id, order_number')
-              .single()
+            // Try creating order with retry logic for duplicate order_number
+            let newOrder = null
+            let orderError = null
+            let retryCount = 0
+            const maxRetries = 1
+
+            while (retryCount <= maxRetries && !newOrder) {
+              const { data: orderResult, error: currentOrderError } = await supabase
+                .from('orders')
+                .insert(orderData)
+                .select('id, order_number')
+                .single()
+
+              if (currentOrderError) {
+                // Check if it's a duplicate order_number error
+                if (currentOrderError.code === '23505' && currentOrderError.message.includes('orders_order_number_key')) {
+                  console.log(`Row ${rowIndex}: Duplicate order_number collision (attempt ${retryCount + 1}), retrying...`)
+                  if (retryCount < maxRetries) {
+                    // Small delay before retry
+                    await new Promise(resolve => setTimeout(resolve, 100))
+                    retryCount++
+                    continue
+                  } else {
+                    orderError = currentOrderError
+                    break
+                  }
+                } else {
+                  orderError = currentOrderError
+                  break
+                }
+              } else {
+                newOrder = orderResult
+              }
+            }
 
             if (orderError) {
-              console.error(`Row ${rowIndex}: Order creation error:`, orderError)
+              console.error(`Row ${rowIndex}: Order creation error (partner_external_id: ${partnerExternalId}):`, orderError)
               errors.push({
                 row: rowIndex,
+                partner_external_id: partnerExternalId,
                 message: `Upsert operation failed: ${orderError.message}`,
                 data: { error: orderError }
               })
@@ -548,18 +595,19 @@ serve(async (req) => {
     const runId = `import-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`
 
     // Determine if there are more rows to process
-    const hasMore = rawData.length === actualChunkSize
+    const hasMore = filteredData.length === actualChunkSize
     const nextStartRow = hasMore ? start_row + actualChunkSize : null
 
     const response = {
       success: true,
       run_id: runId,
       dry_run,
+      job_ids_filter,
       chunk_info: {
         start_row,
-        end_row: start_row + rawData.length - 1,
-        processed_count: rawData.length,
-        total_rows: sheetsData.total_rows || rawData.length,
+        end_row: start_row + filteredData.length - 1,
+        processed_count: filteredData.length,
+        total_rows: sheetsData.total_rows || filteredData.length,
         has_more: hasMore,
         next_start_row: nextStartRow,
         chunk_size: actualChunkSize
@@ -573,7 +621,7 @@ serve(async (req) => {
         errors: results.errors
       },
       summary: {
-        processed: rawData.length,
+        processed: filteredData.length,
         inserted_count: results.inserted,
         updated_count: results.updated,
         skipped_count: results.skipped,
@@ -593,7 +641,7 @@ serve(async (req) => {
           p_partner_id: profile.partner_id,
           p_profile_id: profile.id,
           p_dry_run: dry_run,
-          p_total_rows: rawData.length,
+          p_total_rows: filteredData.length,
           p_inserted_count: results.inserted,
           p_updated_count: results.updated,
           p_skipped_count: results.skipped,

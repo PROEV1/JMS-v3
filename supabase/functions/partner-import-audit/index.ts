@@ -72,10 +72,12 @@ serve(async (req: Request): Promise<Response> => {
 
     console.log('Profile found:', profile.name);
 
-    // Fetch Google Sheets data
+    // Fetch Google Sheets data using correct API format
     const { data: sheetsData, error: sheetsError } = await supabase.functions.invoke('google-sheets-preview', {
       body: {
-        sheet_url: profile.partners.google_sheet_url,
+        gsheet_id: profile.gsheet_id,
+        sheet_name: profile.gsheet_sheet_name,
+        start_row: 0,
         max_rows: 5000 // Get more data for audit
       }
     });
@@ -91,13 +93,13 @@ serve(async (req: Request): Promise<Response> => {
       });
     }
 
-    const sheetRows = sheetsData.data?.data || [];
-    const headers = sheetsData.data?.headers || [];
+    const sheetRows = sheetsData.rows || [];
+    const headers = sheetsData.headers || [];
     console.log('Sheet rows fetched:', sheetRows.length);
 
     // Get column mappings
     const columnMappings = profile.column_mappings || {};
-    const jobIdColumn = columnMappings.job_id;
+    const jobIdColumn = columnMappings.partner_external_id;
     const clientNameColumn = columnMappings.client_name;
     const clientEmailColumn = columnMappings.client_email;
 
@@ -214,7 +216,7 @@ serve(async (req: Request): Promise<Response> => {
     }
 
     if (missingJobIds.length > 0) {
-      recommendations.push(`${missingJobIds.length} Job IDs from sheet are not in database. Consider running import for missing records only.`);
+      recommendations.push(`${missingJobIds.length} Job IDs from sheet are missing from database. These may have failed to import due to errors.`);
     }
 
     const auditResults: AuditResults = {
