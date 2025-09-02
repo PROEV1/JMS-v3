@@ -104,10 +104,12 @@ serve(async (req) => {
 
     // Get Google Sheets data
     console.log('Fetching Google Sheets data...')
+    console.log('Profile gsheet_id:', profile.gsheet_id)
+    console.log('Profile gsheet_sheet_name:', profile.gsheet_sheet_name)
     const { data: sheetsData, error: sheetsError } = await supabase.functions.invoke('google-sheets-preview', {
       body: {
-        spreadsheet_id: profile.spreadsheet_id,
-        sheet_name: profile.sheet_name,
+        gsheet_id: profile.gsheet_id,
+        sheet_name: profile.gsheet_sheet_name,
         start_row: start_row,
         max_rows: chunk_size
       }
