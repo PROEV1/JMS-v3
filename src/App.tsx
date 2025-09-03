@@ -7,6 +7,7 @@ import Dashboard from '@/pages/Dashboard';
 import AdminQuotes from '@/pages/AdminQuotes';
 import AdminQuoteCreate from '@/pages/AdminQuoteCreate';
 import AdminQuoteDetail from '@/pages/AdminQuoteDetail';
+import AdminQuoteEdit from '@/pages/AdminQuoteEdit';
 import AdminOrders from '@/pages/AdminOrders';
 import OrderDetail from '@/pages/OrderDetail';
 import AdminClients from '@/pages/AdminClients';
@@ -62,6 +63,7 @@ function App() {
         <Route path="/admin" element={<ProtectedRoute><Layout><Dashboard /></Layout></ProtectedRoute>} />
         <Route path="/admin/quotes" element={<ProtectedRoute><Layout><AdminQuotes /></Layout></ProtectedRoute>} />
         <Route path="/admin/quotes/create" element={<ProtectedRoute><Layout><AdminQuoteCreate /></Layout></ProtectedRoute>} />
+        <Route path="/admin/quotes/:id/edit" element={<ProtectedRoute><Layout><AdminQuoteEdit /></Layout></ProtectedRoute>} />
         <Route path="/admin/quotes/:id" element={<ProtectedRoute><Layout><AdminQuoteDetail /></Layout></ProtectedRoute>} />
         <Route path="/admin/orders" element={<ProtectedRoute><Layout><AdminOrders /></Layout></ProtectedRoute>} />
         <Route path="/admin/orders/:id" element={<ProtectedRoute><Layout><OrderDetail /></Layout></ProtectedRoute>} />
