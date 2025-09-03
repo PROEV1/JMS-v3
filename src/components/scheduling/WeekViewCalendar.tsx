@@ -129,12 +129,20 @@ export function WeekViewCalendar({
     onDateChange(newWeekStart);
   };
 
+  // Local date formatter to avoid timezone issues
+  const toYMDLocal = (d: Date): string => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${dd}`;
+  };
+
   const getOrdersForEngineerAndDate = (engineerId: string, date: Date): Order[] => {
-    const dateString = date.toISOString().split('T')[0];
+    const dateString = toYMDLocal(date);
     const filteredOrders = orders.filter(order => 
       order.engineer_id === engineerId &&
       order.scheduled_install_date &&
-      new Date(order.scheduled_install_date).toISOString().split('T')[0] === dateString
+      order.scheduled_install_date.slice(0, 10) === dateString
     );
     console.log(`WeekViewCalendar: Engineer ${engineerId} on ${dateString}: ${filteredOrders.length} orders`, {
       totalOrders: orders.length,
@@ -182,12 +190,21 @@ export function WeekViewCalendar({
   const getOfferHoldsForEngineerAndDate = (engineerId: string, date: Date) => {
     if (!showOfferHolds) return [];
     
-    const dateString = date.toISOString().split('T')[0];
-    return jobOffers?.filter(offer => 
+    const dateString = toYMDLocal(date);
+    const holds = jobOffers?.filter(offer => 
       offer.engineer_id === engineerId &&
       offer.offered_date &&
-      new Date(offer.offered_date).toISOString().split('T')[0] === dateString
+      offer.offered_date.slice(0, 10) === dateString
     ) || [];
+    
+    console.log(`WeekViewCalendar: Engineer ${engineerId} offer holds on ${dateString}: ${holds.length}`, holds.map(h => ({
+      id: h.id,
+      status: h.status,
+      order_number: h.order?.order_number,
+      offered_date: h.offered_date
+    })));
+    
+    return holds;
   };
 
   return (

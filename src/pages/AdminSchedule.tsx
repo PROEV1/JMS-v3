@@ -36,7 +36,8 @@ export default function AdminSchedule() {
             region
           )
         `)
-        .or(`scheduled_install_date.not.is.null,and(status_enhanced.in.(scheduled,in_progress),scheduled_install_date.not.is.null),partner_status.eq.INSTALL_DATE_CONFIRMED`);
+        .not('engineer_id', 'is', null)
+        .not('scheduled_install_date', 'is', null);
       
       if (error) throw error;
       console.log(`AdminSchedule: Found ${data?.length || 0} calendar orders`);
