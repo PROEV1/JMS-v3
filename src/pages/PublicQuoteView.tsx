@@ -62,7 +62,7 @@ interface ProductCompatibility {
 }
 
 export default function PublicQuoteView() {
-  const { shareToken } = useParams<{ shareToken: string }>();
+  const { token } = useParams<{ token: string }>();
   const { toast } = useToast();
   const [quote, setQuote] = useState<Quote | null>(null);
   const [quoteItems, setQuoteItems] = useState<QuoteItem[]>([]);
@@ -70,13 +70,13 @@ export default function PublicQuoteView() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (shareToken) {
+    if (token) {
       fetchQuote();
     } else {
       // No token provided, show landing page instead
       setLoading(false);
     }
-  }, [shareToken]);
+  }, [token]);
 
   const fetchQuote = async () => {
     try {
@@ -87,7 +87,7 @@ export default function PublicQuoteView() {
           *,
           client:clients(id, full_name, email)
         `)
-        .eq('share_token', shareToken)
+        .eq('share_token', token)
         .eq('is_shareable', true)
         .single();
 
@@ -240,7 +240,7 @@ export default function PublicQuoteView() {
     );
   }
 
-  if (!shareToken) {
+  if (!token) {
     // Show landing page when no token is provided
     return (
       <div className="min-h-screen bg-background">
