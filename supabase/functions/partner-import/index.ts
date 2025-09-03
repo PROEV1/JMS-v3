@@ -512,41 +512,34 @@ serve(async (req) => {
         }
 
         if (!dry_run) {
-          // Find or create client using UPSERT for better concurrency handling
+          // Find or create client using safe database function
           let client
-          const clientData = {
-            full_name: clientName,
-            email: clientEmail.toLowerCase(),
-            phone: normalizedPhone,
-            address: jobAddress,
-            postcode: postcode,
-            is_partner_client: true,
-            partner_id: profile.partner_id
-          }
-
-          const { data: upsertedClient, error: clientUpsertError } = await supabase
-            .from('clients')
-            .upsert(clientData, {
-              onConflict: 'email,partner_id', 
-              ignoreDuplicates: false
+          
+          const { data: clientId, error: clientUpsertError } = await supabase
+            .rpc('upsert_client_for_partner', {
+              p_full_name: clientName,
+              p_email: clientEmail.toLowerCase(),
+              p_phone: normalizedPhone,
+              p_address: jobAddress,
+              p_postcode: postcode,
+              p_partner_id: profile.partner_id
             })
-            .select('id')
-            .maybeSingle()
           
           performanceMetrics.database_calls.total_count++;
           performanceMetrics.database_calls.client_queries++;
 
-          if (clientUpsertError) {
+          if (clientUpsertError || !clientId) {
             console.error(`Row ${rowIndex}: Client upsert error:`, clientUpsertError)
             errors.push({
               row: rowIndex,
-              message: `Client upsert failed: ${clientUpsertError.message}`,
+              message: `Client upsert failed: ${clientUpsertError?.message || 'Unknown error'}`,
               data: { error: clientUpsertError }
             })
             results.errors++
             continue
           }
-          client = upsertedClient
+          
+          client = { id: clientId }
 
           // Prepare order data for upsert
           const orderData: any = {

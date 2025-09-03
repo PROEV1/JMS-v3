@@ -3935,6 +3935,17 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      upsert_client_for_partner: {
+        Args: {
+          p_address: string
+          p_email: string
+          p_full_name: string
+          p_partner_id: string
+          p_phone: string
+          p_postcode: string
+        }
+        Returns: string
+      }
       user_can_view_client: {
         Args: { client_uuid: string }
         Returns: boolean
