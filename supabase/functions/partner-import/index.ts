@@ -314,21 +314,16 @@ serve(async (req) => {
     // STAGE 3: Get engineer and status mappings
     const mappingsStartTime = performance.now();
     
-    // Get engineer mappings
-    const { data: engineerMappings } = await supabase
-      .from('partner_engineer_mappings')
-      .select('partner_engineer_identifier, engineer_id, engineers(name)')
-      .eq('partner_id', profile.partner_id)
-    
-    performanceMetrics.database_calls.total_count++;
-
+    // Get engineer mappings from profile's engineer_mapping_rules
     const engineerMap = new Map()
-    if (engineerMappings) {
-      engineerMappings.forEach(mapping => {
-        engineerMap.set(mapping.partner_engineer_identifier, mapping.engineer_id)
+    if (profile.engineer_mapping_rules && Array.isArray(profile.engineer_mapping_rules)) {
+      profile.engineer_mapping_rules.forEach(mapping => {
+        if (mapping.partner_identifier && mapping.engineer_id) {
+          engineerMap.set(mapping.partner_identifier, mapping.engineer_id)
+        }
       })
     }
-    console.log(`Loaded ${engineerMap.size} engineer mappings`)
+    console.log(`Loaded ${engineerMap.size} engineer mappings from profile`)
 
     // Get status mappings
     const { data: statusMappings } = await supabase
@@ -393,7 +388,8 @@ serve(async (req) => {
         const partnerExternalId = row[columnMappings.partner_external_id] || null
         const partnerStatus = row[columnMappings.partner_status] || null
         const engineerIdentifier = row[columnMappings.engineer_identifier] || null
-        const installDate = row[columnMappings.install_date] || null
+        // Use scheduled_date instead of install_date to match column mappings
+        const installDate = row[columnMappings.scheduled_date] || row[columnMappings.install_date] || null
         const quoteAmount = row[columnMappings.quote_amount] || null
         const estimatedDurationHours = row[columnMappings.estimated_duration_hours] || null
         // Support both 'job_type' and 'type' column mappings
@@ -474,7 +470,7 @@ serve(async (req) => {
           mappedStatus = statusMap.get(partnerStatus) || partnerStatus
         }
 
-        // Parse install date
+        // Parse install date - handle noon UTC to avoid timezone shifts
         let parsedInstallDate: string | null = null
         if (installDate && installDate !== 'TBC' && installDate !== '') {
           try {
@@ -484,17 +480,25 @@ serve(async (req) => {
             if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(installDate)) {
               // DD/MM/YYYY or D/M/YYYY format
               const [day, month, year] = installDate.split('/')
-              dateObj = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+              dateObj = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), 12, 0, 0) // noon UTC
             } else if (/^\d{4}-\d{2}-\d{2}$/.test(installDate)) {
-              // YYYY-MM-DD format
-              dateObj = new Date(installDate)
+              // YYYY-MM-DD format - add noon UTC
+              dateObj = new Date(installDate + 'T12:00:00.000Z')
+            } else if (/^\d{1,2}\/\d{1,2}\/\d{2}$/.test(installDate)) {
+              // DD/MM/YY format (assume 20XX)
+              const [day, month, year] = installDate.split('/')
+              const fullYear = parseInt(year) < 50 ? 2000 + parseInt(year) : 1900 + parseInt(year)
+              dateObj = new Date(fullYear, parseInt(month) - 1, parseInt(day), 12, 0, 0) // noon UTC
             }
             
             if (dateObj && !isNaN(dateObj.getTime())) {
-              parsedInstallDate = dateObj.toISOString().split('T')[0]
+              parsedInstallDate = dateObj.toISOString()
+              console.log(`Row ${rowIndex}: Parsed date '${installDate}' to '${parsedInstallDate}'`)
+            } else {
+              console.log(`Row ${rowIndex}: Could not parse date: ${installDate}`)
             }
           } catch (e) {
-            console.log(`Row ${rowIndex}: Invalid date format: ${installDate}`)
+            console.log(`Row ${rowIndex}: Invalid date format: ${installDate}`, e)
           }
         }
 
@@ -625,7 +629,12 @@ serve(async (req) => {
 
           if (parsedInstallDate) {
             orderData.scheduled_install_date = parsedInstallDate
+            console.log(`Row ${rowIndex}: Setting scheduled_install_date to ${parsedInstallDate}`)
           }
+          
+          // Log engineer and date assignment for debugging
+          console.log(`Row ${rowIndex}: Engineer mapping - identifier: '${engineerIdentifier}' -> engineerId: '${engineerId}'`)
+          console.log(`Row ${rowIndex}: Date parsing - original: '${installDate}' -> parsed: '${parsedInstallDate}'`)
           
           // Apply status actions if defined in profile
           if (partnerStatus) {
