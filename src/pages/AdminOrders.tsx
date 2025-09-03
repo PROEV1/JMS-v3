@@ -238,9 +238,6 @@ export default function AdminOrders() {
     
     setIsExporting(true);
     try {
-      // Build query without pagination for export
-      const exportQuery = buildSearchQuery(false, false);
-      
       // Fetch data in batches (max 10,000 total)
       const batchSize = 1000;
       const maxRecords = 10000;
@@ -248,8 +245,72 @@ export default function AdminOrders() {
       let offset = 0;
 
       while (offset < maxRecords) {
-        const { data: batch, error } = await exportQuery
+        // Build query for this batch
+        const searchPattern = debouncedSearchTerm ? `%${debouncedSearchTerm}%` : null;
+        let batchQuery = supabase
+          .from('orders')
+          .select(`
+            *,
+            clients!orders_client_id_fkey(
+              id,
+              full_name,
+              email,
+              phone
+            ),
+            quotes!orders_quote_id_fkey(
+              id,
+              quote_number
+            ),
+            engineers!orders_engineer_id_fkey(
+              id,
+              name
+            ),
+            partners!orders_partner_id_fkey(
+              name
+            )
+          `)
+          .order('created_at', { ascending: false })
           .range(offset, offset + batchSize - 1);
+
+        // Apply search filters if needed
+        if (searchPattern) {
+          // Find matching client and quote IDs for this search
+          const [matchingClients, matchingQuotes] = await Promise.all([
+            supabase.from('clients').select('id')
+              .or(`full_name.ilike.${searchPattern},email.ilike.${searchPattern},phone.ilike.${searchPattern}`),
+            supabase.from('quotes').select('id')
+              .ilike('quote_number', searchPattern)
+          ]);
+          
+          const clientIds = matchingClients.data?.map(c => c.id) || [];
+          const quoteIds = matchingQuotes.data?.map(q => q.id) || [];
+
+          const searchConditions = [
+            `order_number.ilike.${searchPattern}`,
+            `partner_external_id.ilike.${searchPattern}`,
+            `job_address.ilike.${searchPattern}`,
+            `postcode.ilike.${searchPattern}`
+          ];
+
+          if (clientIds.length > 0) {
+            searchConditions.push(`client_id.in.(${clientIds.join(',')})`);
+          }
+          if (quoteIds.length > 0) {
+            searchConditions.push(`quote_id.in.(${quoteIds.join(',')})`);
+          }
+
+          batchQuery = batchQuery.or(searchConditions.join(','));
+        }
+
+        // Apply other filters
+        if (statusFilter !== 'all') {
+          batchQuery = batchQuery.eq('status_enhanced', statusFilter as OrderStatusEnhanced);
+        }
+        if (engineerFilter !== 'all') {
+          batchQuery = batchQuery.eq('engineer_id', engineerFilter);
+        }
+
+        const { data: batch, error } = await batchQuery;
 
         if (error) throw error;
         if (!batch || batch.length === 0) break;
