@@ -109,17 +109,8 @@ export default function AdminOrders() {
       // Apply search filter using advanced text search
       if (debouncedSearchTerm) {
         const searchPattern = `%${debouncedSearchTerm}%`;
-        query = query.or(`
-          order_number.ilike.${searchPattern},
-          partner_external_id.ilike.${searchPattern},
-          job_address.ilike.${searchPattern},
-          postcode.ilike.${searchPattern},
-          clients.full_name.ilike.${searchPattern},
-          clients.email.ilike.${searchPattern},
-          clients.phone.ilike.${searchPattern},
-          quotes.quote_number.ilike.${searchPattern},
-          partners.name.ilike.${searchPattern}
-        `);
+        // Only search on direct order columns to avoid 400 errors on related table filters
+        query = query.or(`order_number.ilike.${searchPattern},partner_external_id.ilike.${searchPattern},job_address.ilike.${searchPattern},postcode.ilike.${searchPattern}`);
       }
 
       // Apply other filters

@@ -78,7 +78,7 @@ export default function Dashboard() {
         .from('clients')
         .select('id, full_name, email')
         .eq('user_id', user?.id)
-        .single();
+        .maybeSingle();
 
       setClient(clientData);
 
