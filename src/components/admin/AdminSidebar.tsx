@@ -61,7 +61,7 @@ const sidebarItems = [
   {
     title: "Main",
     items: [
-      { name: "Dashboard", href: "/admin", icon: LayoutDashboard, permission: null },
+      { name: "Ops Command Centre", href: "/admin", icon: LayoutDashboard, permission: null },
     ]
   },
   {

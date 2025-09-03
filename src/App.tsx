@@ -3,7 +3,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from '@/components/ui/toaster';
 import { RootRedirect } from '@/components/RootRedirect';
-import Dashboard from '@/pages/Dashboard';
+import OpsCommandCentre from '@/pages/OpsCommandCentre';
 import AdminQuotes from '@/pages/AdminQuotes';
 import AdminQuoteCreate from '@/pages/AdminQuoteCreate';
 import AdminQuoteDetail from '@/pages/AdminQuoteDetail';
@@ -72,7 +72,7 @@ function App() {
         <Route path="/client/profile" element={<ProtectedRoute><Layout><ClientProfilePage /></Layout></ProtectedRoute>} />
         
         {/* Admin Routes */}
-        <Route path="/admin" element={<ProtectedRoute><Layout><Dashboard /></Layout></ProtectedRoute>} />
+        <Route path="/admin" element={<ProtectedRoute><Layout><OpsCommandCentre /></Layout></ProtectedRoute>} />
         <Route path="/admin/quotes" element={<ProtectedRoute><Layout><AdminQuotes /></Layout></ProtectedRoute>} />
         <Route path="/admin/quotes/create" element={<ProtectedRoute><Layout><AdminQuoteCreate /></Layout></ProtectedRoute>} />
         <Route path="/admin/quotes/:id/edit" element={<ProtectedRoute><Layout><AdminQuoteEdit /></Layout></ProtectedRoute>} />
