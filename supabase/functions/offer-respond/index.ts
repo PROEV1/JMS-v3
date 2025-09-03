@@ -125,6 +125,38 @@ serve(async (req: Request) => {
     const responseTime = now.toISOString();
 
     if (response === 'accept') {
+      // Re-check capacity before accepting (including subcontractor limits)
+      const offeredDateOnly = new Date(jobOffer.offered_date).toISOString().split('T')[0];
+      
+      // Get current workload
+      const { data: currentWorkload } = await supabase
+        .rpc('get_engineer_daily_workload_with_holds', {
+          p_engineer_id: jobOffer.engineer_id,
+          p_date: offeredDateOnly
+        });
+
+      // Get engineer-specific job limit
+      let maxJobsPerDay: number;
+      if (jobOffer.engineer.is_subcontractor) {
+        maxJobsPerDay = jobOffer.engineer.max_installs_per_day || 5;
+      } else {
+        const { data: adminSettings } = await supabase
+          .from('admin_settings')
+          .select('setting_value')
+          .eq('setting_key', 'scheduling_config')
+          .single();
+        
+        maxJobsPerDay = jobOffer.engineer.max_installs_per_day || adminSettings?.setting_value?.max_jobs_per_day || 3;
+      }
+
+      // Check if accepting would exceed capacity
+      if ((currentWorkload || 0) + 1 > maxJobsPerDay) {
+        return json({ 
+          ok: false, 
+          error: `Engineer is now at capacity (${currentWorkload}/${maxJobsPerDay} jobs). Please try scheduling for a different date.` 
+        }, 409, requestId);
+      }
+
       // Accept the offer
       const { error: updateOfferError } = await supabase
         .from('job_offers')

@@ -240,6 +240,9 @@ export function AdminScheduleCalendar() {
           email: engineer.email,
           starting_postcode: engineer.starting_postcode || null,
           availability: engineer.availability,
+          max_installs_per_day: (engineer as any).max_installs_per_day || 3,
+          is_subcontractor: (engineer as any).is_subcontractor || false,
+          ignore_working_hours: (engineer as any).ignore_working_hours || false,
           service_areas: [],
           working_hours: [
             { day_of_week: 1, start_time: '08:00', end_time: '17:00', is_available: true },

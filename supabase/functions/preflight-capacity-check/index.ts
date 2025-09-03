@@ -68,7 +68,7 @@ serve(async (req: Request) => {
       throw new Error('Order not found');
     }
 
-    // Get engineer details
+    // Get engineer details with subcontractor fields
     const { data: engineer, error: engineerError } = await supabase
       .from('engineers')
       .select(`
@@ -102,22 +102,28 @@ serve(async (req: Request) => {
       });
     }
 
-    // Check engineer availability on offered date
+    // Check engineer availability on offered date (unless ignore_working_hours for subcontractors)
     const offerDate = new Date(offered_date);
     const dayOfWeek = offerDate.getDay();
     
-    const workingHour = engineer.engineer_availability?.find(
-      (wh: any) => wh.day_of_week === dayOfWeek && wh.is_available
-    );
+    let workingHour = null;
+    if (!engineer.ignore_working_hours) {
+      workingHour = engineer.engineer_availability?.find(
+        (wh: any) => wh.day_of_week === dayOfWeek && wh.is_available
+      );
 
-    if (!workingHour) {
-      return new Response(JSON.stringify({
-        canFit: false,
-        reason: 'Engineer not available on this day of the week'
-      }), {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      if (!workingHour) {
+        return new Response(JSON.stringify({
+          canFit: false,
+          reason: 'Engineer not available on this day of the week'
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    } else {
+      // For subcontractors ignoring working hours, use 24-hour availability
+      workingHour = { start_time: '00:00', end_time: '23:59' };
     }
 
     // Check engineer's daily capacity including existing offers and virtual orders
@@ -141,10 +147,15 @@ serve(async (req: Request) => {
       });
     }
 
-    // Calculate work day duration
-    const startTime = workingHour.start_time.split(':').map(Number);
-    const endTime = workingHour.end_time.split(':').map(Number);
-    const workDayMinutes = (endTime[0] * 60 + endTime[1]) - (startTime[0] * 60 + startTime[1]);
+    // Calculate work day duration - extend for subcontractors with ignore_working_hours
+    let workDayMinutes: number;
+    if (engineer.ignore_working_hours && engineer.is_subcontractor) {
+      workDayMinutes = 24 * 60; // 24 hours
+    } else {
+      const startTime = workingHour.start_time.split(':').map(Number);
+      const endTime = workingHour.end_time.split(':').map(Number);
+      workDayMinutes = (endTime[0] * 60 + endTime[1]) - (startTime[0] * 60 + startTime[1]);
+    }
     
     // Add estimated duration for this new job
     const jobDurationMinutes = (order.estimated_duration_hours || 3) * 60;
@@ -200,14 +211,19 @@ serve(async (req: Request) => {
     const virtualJobCount = virtual_orders ? virtual_orders.length : 0;
     const totalJobs = (currentWorkload || 0) + 1 + virtualJobCount;
 
-    // Get admin settings for max jobs per day (default to 3 if not found)
-    const { data: adminSettings } = await supabase
-      .from('admin_settings')
-      .select('setting_value')
-      .eq('setting_key', 'scheduling_config')
-      .single();
-
-    const maxJobsPerDay = adminSettings?.setting_value?.max_jobs_per_day || 3;
+    // Get engineer-specific job limit or use admin settings
+    let maxJobsPerDay: number;
+    if (engineer.is_subcontractor) {
+      maxJobsPerDay = engineer.max_installs_per_day || 5; // Default 5 for subcontractors
+    } else {
+      const { data: adminSettings } = await supabase
+        .from('admin_settings')
+        .select('setting_value')
+        .eq('setting_key', 'scheduling_config')
+        .single();
+      
+      maxJobsPerDay = engineer.max_installs_per_day || adminSettings?.setting_value?.max_jobs_per_day || 3;
+    }
 
     if (totalJobs > maxJobsPerDay) {
       return new Response(JSON.stringify({

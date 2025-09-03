@@ -37,10 +37,15 @@ export async function calculateDayFit(
       };
     }
 
-    // Calculate work day duration
-    const startTimeMinutes = parseTime(workingHour.start_time);
-    const endTimeMinutes = parseTime(workingHour.end_time);
-    const workDayMinutes = (endTimeMinutes - startTimeMinutes) + lenienceMinutes;
+    // Calculate work day duration - use 24 hours for subcontractors with ignore_working_hours
+    let workDayMinutes: number;
+    if (engineer.ignore_working_hours && engineer.is_subcontractor) {
+      workDayMinutes = 24 * 60; // 24 hours for subcontractors ignoring working hours
+    } else {
+      const startTimeMinutes = parseTime(workingHour.start_time);
+      const endTimeMinutes = parseTime(workingHour.end_time);
+      workDayMinutes = (endTimeMinutes - startTimeMinutes) + lenienceMinutes;
+    }
 
   // Get existing orders for this engineer on this date
   const dateStr = date.toISOString().split('T')[0];
@@ -337,6 +342,11 @@ export async function wouldExceedCapacity(
  * Calculate working day duration and remaining minutes for quick pre-filtering
  */
 export function getWorkingDayInfo(engineer: EngineerSettings, date: Date): { workDayMinutes: number; hasWorkingHours: boolean } {
+  // Subcontractors with ignore_working_hours can work 24 hours
+  if (engineer.ignore_working_hours && engineer.is_subcontractor) {
+    return { workDayMinutes: 24 * 60, hasWorkingHours: true };
+  }
+
   const dayOfWeek = date.getDay();
   const workingHour = engineer.working_hours.find(wh => wh.day_of_week === dayOfWeek);
   

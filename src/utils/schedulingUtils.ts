@@ -87,6 +87,9 @@ export interface EngineerSettings {
   email: string;
   starting_postcode: string | null;
   availability: boolean;
+  max_installs_per_day: number;
+  is_subcontractor: boolean;
+  ignore_working_hours: boolean;
   service_areas: Array<{
     postcode_area: string;
     max_travel_minutes: number;
@@ -1493,9 +1496,12 @@ export async function getEngineerSettings(engineerId: string): Promise<EngineerS
       email: engineer.email,
       starting_postcode: engineer.starting_postcode,
       availability: engineer.availability,
+      max_installs_per_day: engineer.max_installs_per_day || 3,
+      is_subcontractor: engineer.is_subcontractor || false,
+      ignore_working_hours: engineer.ignore_working_hours || false,
       service_areas: serviceAreas || [],
       working_hours: workingHours || [],
-      time_off: timeOff || [],
+      time_off: timeOff || []
     };
   } catch (error) {
     console.error('Error fetching engineer settings:', error);
@@ -1513,7 +1519,7 @@ export async function getAllEngineersForSchedulingFast(): Promise<EngineerSettin
     // 1. Get all available engineers in one query
     const { data: engineers, error: engineersError } = await supabase
       .from('engineers')
-      .select('id, name, email, starting_postcode, availability')
+      .select('id, name, email, starting_postcode, availability, max_installs_per_day, is_subcontractor, ignore_working_hours')
       .eq('availability', true);
 
     if (engineersError) throw engineersError;
@@ -1556,6 +1562,9 @@ export async function getAllEngineersForSchedulingFast(): Promise<EngineerSettin
       email: engineer.email,
       starting_postcode: engineer.starting_postcode,
       availability: engineer.availability,
+      max_installs_per_day: engineer.max_installs_per_day || 3,
+      is_subcontractor: engineer.is_subcontractor || false,
+      ignore_working_hours: engineer.ignore_working_hours || false,
       service_areas: serviceAreas?.filter(sa => sa.engineer_id === engineer.id) || [],
       working_hours: workingHours?.filter(wh => wh.engineer_id === engineer.id) || [],
       time_off: timeOff?.filter(to => to.engineer_id === engineer.id) || [],
@@ -1615,8 +1624,8 @@ export async function getEngineerSlotPool(
   const slots: EngineerSlot[] = [];
   const checkDate = new Date(startDate);
   
-  // Get engineer's daily limit - use engineer.max_installs_per_day if available, otherwise fallback to global setting
-  const engineerMaxJobs = (engineer as any).max_installs_per_day || settings.max_jobs_per_day;
+  // Get engineer's daily limit - use per-engineer setting or fallback to global
+  const engineerMaxJobs = getEngineerMaxJobs(engineer, settings);
   
   for (let day = 0; day < horizonDays; day++) {
     // Check if engineer is available on this date
@@ -1682,11 +1691,13 @@ export function isEngineerAvailableOnDate(
 
   if (isOnTimeOff) return false;
 
-  // Check working hours for the day of week
-  const dayOfWeek = date.getDay();
-  const workingHour = engineer.working_hours.find(wh => wh.day_of_week === dayOfWeek);
-  
-  if (!workingHour || !workingHour.is_available) return false;
+  // Check working hours for the day of week (unless ignore_working_hours is true for subcontractors)
+  if (!engineer.ignore_working_hours) {
+    const dayOfWeek = date.getDay();
+    const workingHour = engineer.working_hours.find(wh => wh.day_of_week === dayOfWeek);
+    
+    if (!workingHour || !workingHour.is_available) return false;
+  }
 
   return true;
 }
@@ -1832,6 +1843,21 @@ export function validateEngineerSetup(engineer: EngineerSettings): { isComplete:
     isComplete: missingItems.length === 0,
     missingItems
   };
+}
+
+export const parseTime = (timeStr: string): number => {
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  return hours * 60 + minutes;
+};
+
+/**
+ * Get the maximum jobs per day for an engineer
+ */
+export function getEngineerMaxJobs(engineer: EngineerSettings, settings: any): number {
+  if (engineer.is_subcontractor) {
+    return engineer.max_installs_per_day || settings.default_subcontractor_job_limit || 5;
+  }
+  return engineer.max_installs_per_day || settings.max_jobs_per_day || 3;
 }
 
 // Debug: File structure validation
