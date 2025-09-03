@@ -136,7 +136,16 @@ export function WeekViewCalendar({
       order.scheduled_install_date &&
       new Date(order.scheduled_install_date).toISOString().split('T')[0] === dateString
     );
-    console.log(`WeekViewCalendar: Engineer ${engineerId} on ${dateString}: ${filteredOrders.length} orders`);
+    console.log(`WeekViewCalendar: Engineer ${engineerId} on ${dateString}: ${filteredOrders.length} orders`, {
+      totalOrders: orders.length,
+      engineerName: engineers.find(e => e.id === engineerId)?.name,
+      filteredOrders: filteredOrders.map(o => ({
+        id: o.id,
+        order_number: o.order_number,
+        scheduled_date: o.scheduled_install_date,
+        status: o.status_enhanced
+      }))
+    });
     return filteredOrders;
   };
 

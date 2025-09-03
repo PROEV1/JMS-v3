@@ -23,24 +23,39 @@ export default function AdminSchedule() {
         .from('orders')
         .select(`
           *,
-          clients!orders_client_id_fkey(
+          client:clients!orders_client_id_fkey(
             id,
             full_name,
             email,
             phone
           ),
-          engineers!orders_engineer_id_fkey(
+          engineer:engineers!orders_engineer_id_fkey(
             id,
             name,
+            email,
             region
           )
         `)
-        .not('scheduled_install_date', 'is', null);
+        .or(`scheduled_install_date.not.is.null,and(status_enhanced.in.(scheduled,in_progress),scheduled_install_date.not.is.null),partner_status.eq.INSTALL_DATE_CONFIRMED`);
       
       if (error) throw error;
-      console.log(`AdminSchedule: Found ${data?.length || 0} scheduled orders`);
+      console.log(`AdminSchedule: Found ${data?.length || 0} calendar orders`);
+      console.log('AdminSchedule: Orders breakdown:', {
+        withScheduledDate: data?.filter(o => o.scheduled_install_date).length || 0,
+        statusScheduled: data?.filter(o => o.status_enhanced === 'scheduled').length || 0,
+        statusInProgress: data?.filter(o => o.status_enhanced === 'in_progress').length || 0,
+        partnerConfirmed: data?.filter(o => o.partner_status === 'INSTALL_DATE_CONFIRMED').length || 0
+      });
       if (data && data.length > 0) {
-        console.log('AdminSchedule: Sample order:', data[0]);
+        console.log('AdminSchedule: Sample order:', {
+          id: data[0].id,
+          order_number: data[0].order_number,
+          status_enhanced: data[0].status_enhanced,
+          partner_status: data[0].partner_status,
+          scheduled_install_date: data[0].scheduled_install_date,
+          client: data[0].client?.full_name,
+          engineer: data[0].engineer?.name
+        });
       }
       return data || [];
     }
