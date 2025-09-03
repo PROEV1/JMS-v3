@@ -3,16 +3,18 @@ import { supabase } from '@/integrations/supabase/client';
 
 export interface BucketCounts {
   jobs: {
-    awaitingSurvey: number;
-    surveyReview: number;
-    awaitingScheduling: number;
+    needsScheduling: number;
+    dateOffered: number;
+    readyToBook: number;
     scheduled: number;
     inProgress: number;
-    qaPending: number;
+    completionPending: number;
     completed: number;
+    onHold: number;
+    cancelled: number;
   };
   surveys: {
-    awaitingClient: number;
+    awaitingSubmission: number;
     awaitingReview: number;
     reworkRequested: number;
     approved: number;
@@ -20,6 +22,8 @@ export interface BucketCounts {
   qa: {
     pending: number;
     inReview: number;
+    passed: number;
+    failed: number;
     escalated: number;
   };
   payments: {
@@ -32,16 +36,18 @@ export interface BucketCounts {
 export function useOpsBuckets() {
   const [buckets, setBuckets] = useState<BucketCounts>({
     jobs: {
-      awaitingSurvey: 0,
-      surveyReview: 0,
-      awaitingScheduling: 0,
+      needsScheduling: 0,
+      dateOffered: 0,
+      readyToBook: 0,
       scheduled: 0,
       inProgress: 0,
-      qaPending: 0,
+      completionPending: 0,
       completed: 0,
+      onHold: 0,
+      cancelled: 0,
     },
     surveys: {
-      awaitingClient: 0,
+      awaitingSubmission: 0,
       awaitingReview: 0,
       reworkRequested: 0,
       approved: 0,
@@ -49,6 +55,8 @@ export function useOpsBuckets() {
     qa: {
       pending: 0,
       inReview: 0,
+      passed: 0,
+      failed: 0,
       escalated: 0,
     },
     payments: {
@@ -63,75 +71,129 @@ export function useOpsBuckets() {
     try {
       setLoading(true);
 
-      // Fetch job pipeline counts
-      const [
-        awaitingSurveyResult,
-        surveyReviewResult,
-        awaitingSchedulingResult,
-        scheduledResult,
-        inProgressResult,
-        qaPendingResult,
-        completedResult,
-      ] = await Promise.all([
-        supabase.from('orders').select('*', { count: 'exact', head: true }).eq('status_enhanced', 'awaiting_survey_submission'),
-        supabase.from('orders').select('*', { count: 'exact', head: true }).eq('status_enhanced', 'awaiting_survey_review'),
-        supabase.from('orders').select('*', { count: 'exact', head: true }).in('status_enhanced', ['awaiting_install_booking', 'needs_scheduling']),
-        supabase.from('orders').select('*', { count: 'exact', head: true }).eq('status_enhanced', 'scheduled'),
-        supabase.from('orders').select('*', { count: 'exact', head: true }).eq('status_enhanced', 'in_progress'),
-        supabase.from('orders').select('*', { count: 'exact', head: true }).eq('status_enhanced', 'install_completed_pending_qa'),
-        supabase.from('orders').select('*', { count: 'exact', head: true }).eq('status_enhanced', 'completed'),
-      ]);
+      // Fetch orders with payment details for enhanced payment logic
+      const { data: ordersResult } = await supabase
+        .from('orders')
+        .select('status_enhanced, deposit_amount, amount_paid, total_amount');
 
-      // Fetch survey counts
-      const [
-        surveysAwaitingClientResult,
-        surveysAwaitingReviewResult,
-        surveysReworkResult,
-        surveysApprovedResult,
-      ] = await Promise.all([
-        supabase.from('client_surveys').select('*', { count: 'exact', head: true }).eq('status', 'draft'),
-        supabase.from('client_surveys').select('*', { count: 'exact', head: true }).in('status', ['submitted', 'under_review', 'resubmitted']),
-        supabase.from('client_surveys').select('*', { count: 'exact', head: true }).eq('status', 'rework_requested'),
-        supabase.from('client_surveys').select('*', { count: 'exact', head: true }).eq('status', 'approved'),
-      ]);
+      // Fetch surveys
+      const { data: surveysResult } = await supabase
+        .from('client_surveys')
+        .select('status');
 
-      // Fetch payment counts
-      const [
-        depositDueResult,
-        balanceDueResult,
-        paidResult,
-      ] = await Promise.all([
-        supabase.from('orders').select('*', { count: 'exact', head: true }).eq('status_enhanced', 'awaiting_payment'),
-        supabase.from('order_payments').select('*', { count: 'exact', head: true }).eq('payment_type', 'balance').eq('status', 'pending'),
-        supabase.from('order_payments').select('*', { count: 'exact', head: true }).eq('status', 'completed'),
-      ]);
+      const orders = ordersResult || [];
+      const surveys = surveysResult || [];
+
+      // Enhanced job counts mapping
+      const jobCounts = orders.reduce((acc, order) => {
+        const status = order.status_enhanced;
+        switch (status) {
+          case 'awaiting_install_booking':
+          case 'needs_scheduling':
+            acc.needsScheduling++;
+            break;
+          case 'date_offered':
+            acc.dateOffered++;
+            break;
+          case 'date_accepted':
+            acc.readyToBook++;
+            break;
+          case 'scheduled':
+            acc.scheduled++;
+            break;
+          case 'in_progress':
+            acc.inProgress++;
+            break;
+          case 'install_completed_pending_qa':
+            acc.completionPending++;
+            break;
+          case 'completed':
+            acc.completed++;
+            break;
+          case 'on_hold_parts_docs':
+            acc.onHold++;
+            break;
+          case 'cancelled':
+            acc.cancelled++;
+            break;
+        }
+        return acc;
+      }, {
+        needsScheduling: 0,
+        dateOffered: 0,
+        readyToBook: 0,
+        scheduled: 0,
+        inProgress: 0,
+        completionPending: 0,
+        completed: 0,
+        onHold: 0,
+        cancelled: 0
+      });
+
+      // Enhanced survey counts
+      const surveyCounts = surveys.reduce((acc, survey) => {
+        const status = survey.status;
+        switch (status) {
+          case 'draft':
+            acc.awaitingSubmission++;
+            break;
+          case 'submitted':
+          case 'under_review':
+          case 'resubmitted':
+            acc.awaitingReview++;
+            break;
+          case 'rework_requested':
+            acc.reworkRequested++;
+            break;
+          case 'approved':
+            acc.approved++;
+            break;
+        }
+        return acc;
+      }, {
+        awaitingSubmission: 0,
+        awaitingReview: 0,
+        reworkRequested: 0,
+        approved: 0
+      });
+
+      // Enhanced payment counts with deposit vs balance logic
+      const paymentCounts = orders.reduce((acc, order) => {
+        const depositAmount = order.deposit_amount || 0;
+        const amountPaid = order.amount_paid || 0;
+        const totalAmount = order.total_amount || 0;
+        
+        if (order.status_enhanced === 'awaiting_payment') {
+          if (amountPaid < depositAmount) {
+            acc.depositDue++;
+          } else if (amountPaid < totalAmount) {
+            acc.balanceDue++;
+          }
+        } else if (amountPaid >= totalAmount && totalAmount > 0) {
+          acc.paid++;
+        }
+        
+        return acc;
+      }, {
+        depositDue: 0,
+        balanceDue: 0,
+        paid: 0
+      });
+
+      // Enhanced QA counts
+      const qaCounts = {
+        pending: jobCounts.completionPending,
+        inReview: 0, // To be implemented with QA workflow
+        passed: jobCounts.completed,
+        failed: 0, // To be implemented with QA workflow  
+        escalated: 0 // To be implemented with escalation tracking
+      };
 
       setBuckets({
-        jobs: {
-          awaitingSurvey: awaitingSurveyResult.count || 0,
-          surveyReview: surveyReviewResult.count || 0,
-          awaitingScheduling: awaitingSchedulingResult.count || 0,
-          scheduled: scheduledResult.count || 0,
-          inProgress: inProgressResult.count || 0,
-          qaPending: qaPendingResult.count || 0,
-          completed: completedResult.count || 0,
-        },
-        surveys: {
-          awaitingClient: surveysAwaitingClientResult.count || 0,
-          awaitingReview: surveysAwaitingReviewResult.count || 0,
-          reworkRequested: surveysReworkResult.count || 0,
-          approved: surveysApprovedResult.count || 0,
-        },
-        qa: {
-          pending: qaPendingResult.count || 0,
-          inReview: 0, // Placeholder - would need QA status tracking
-          escalated: 0, // Placeholder - would need QA escalation tracking
-        },
-        payments: {
-          depositDue: depositDueResult.count || 0,
-          balanceDue: balanceDueResult.count || 0,
-          paid: paidResult.count || 0,
-        },
+        jobs: jobCounts,
+        surveys: surveyCounts,
+        qa: qaCounts,
+        payments: paymentCounts
       });
     } catch (error) {
       console.error('Error fetching bucket counts:', error);

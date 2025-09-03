@@ -58,11 +58,11 @@ export function useOpsKpis() {
           .select('*', { count: 'exact', head: true })
           .in('status', ['submitted', 'under_review', 'resubmitted']),
 
-        // Jobs awaiting scheduling
+        // Jobs awaiting scheduling - expanded criteria
         supabase
           .from('orders')
           .select('*', { count: 'exact', head: true })
-          .in('status_enhanced', ['awaiting_install_booking', 'needs_scheduling'])
+          .in('status_enhanced', ['awaiting_install_booking', 'needs_scheduling', 'date_rejected', 'offer_expired'])
           .eq('scheduling_suppressed', false),
 
         // Jobs scheduled this week
@@ -79,13 +79,13 @@ export function useOpsKpis() {
           .select('*', { count: 'exact', head: true })
           .gte('scheduled_install_date', new Date().toISOString().split('T')[0])
           .lte('scheduled_install_date', new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0])
-          .is('agreement_signed_at', null),
+          .neq('status_enhanced', 'completed'),
 
-        // Payments overdue (pending over 7 days)
+        // Payments overdue - use orders in awaiting_payment status older than 7 days
         supabase
-          .from('order_payments')
+          .from('orders')
           .select('*', { count: 'exact', head: true })
-          .eq('status', 'pending')
+          .eq('status_enhanced', 'awaiting_payment')
           .lt('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()),
 
         // QA backlog (completed pending QA)

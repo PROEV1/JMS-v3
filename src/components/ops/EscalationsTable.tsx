@@ -158,7 +158,7 @@ export function EscalationsTable() {
           break;
 
         case 'schedule_booking':
-          navigate(`/admin/schedule?orderId=${item.orderId}`);
+          navigate(`/admin/schedule/status/needs-scheduling?orderId=${item.orderId}`);
           break;
 
         case 'payment_followup':
