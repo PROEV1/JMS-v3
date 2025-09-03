@@ -47,7 +47,6 @@ export function SchedulingHub({}: SchedulingHubProps) {
           client:clients(full_name, email, postcode),
           engineer:engineers(name, email)
         `)
-        .eq('job_type', 'installation')
         .not('scheduled_install_date', 'is', null)
         .order('scheduled_install_date', { ascending: true });
 

@@ -92,7 +92,6 @@ export function WeeklyCapacityView() {
             const { data: scheduledJobs } = await supabase
               .from('orders')
               .select('id')
-              .eq('job_type', 'installation')
               .eq('engineer_id', engineer.id)
               .gte('scheduled_install_date', dateStr)
               .lt('scheduled_install_date', format(addDays(targetDate, 1), 'yyyy-MM-dd'))
@@ -108,11 +107,10 @@ export function WeeklyCapacityView() {
           }
         }
 
-        // Fetch scheduled installations for this day
+        // Fetch scheduled jobs for this day
         const { data: scheduledOrders, error: ordersError } = await supabase
           .from('orders')
           .select('id')
-          .eq('job_type', 'installation')
           .gte('scheduled_install_date', dateStr)
           .lt('scheduled_install_date', format(addDays(targetDate, 1), 'yyyy-MM-dd'))
           .not('status_enhanced', 'in', '(completed)');
