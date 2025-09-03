@@ -20,6 +20,7 @@ import { ImportProfileActions } from '@/components/admin/ImportProfileActions';
 import { TestPartnerImport } from '@/components/TestPartnerImport';
 import { PartnerImportAuditModal } from '@/components/admin/PartnerImportAuditModal';
 import ImportHistoryModal from '@/components/admin/ImportHistoryModal';
+import JobDurationDefaultsEditor from '@/components/admin/JobDurationDefaultsEditor';
 
 interface ImportProfile {
   id: string;
@@ -33,6 +34,7 @@ interface ImportProfile {
   engineer_mapping_rules: Array<any>;
   status_override_rules: Record<string, boolean>;
   status_actions: Record<string, any>;
+  job_duration_defaults: Record<string, number>;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -245,6 +247,7 @@ export default function AdminPartnerProfiles() {
     status_override_rules: {} as Record<string, boolean>,
     status_actions: {} as Record<string, any>,
     engineer_mappings: {} as Record<string, string>,
+    job_duration_defaults: { installation: 3, assessment: 0.5, service_call: 1 } as Record<string, number>,
     is_active: true
   });
 
@@ -300,6 +303,7 @@ export default function AdminPartnerProfiles() {
           engineer_mapping_rules: engineerMappingRules,
           status_override_rules: data.status_override_rules,
           status_actions: data.status_actions,
+          job_duration_defaults: data.job_duration_defaults,
           is_active: data.is_active
         }]);
       
@@ -342,6 +346,7 @@ export default function AdminPartnerProfiles() {
           engineer_mapping_rules: engineerMappingRules,
           status_override_rules: data.status_override_rules,
           status_actions: data.status_actions,
+          job_duration_defaults: data.job_duration_defaults,
           is_active: data.is_active
         })
         .eq('id', editingProfile.id);
@@ -372,6 +377,7 @@ export default function AdminPartnerProfiles() {
       status_override_rules: {},
       status_actions: {} as Record<string, any>,
       engineer_mappings: {},
+      job_duration_defaults: { installation: 3, assessment: 0.5, service_call: 1 },
       is_active: true
     });
     setEditingProfile(null);
@@ -404,6 +410,7 @@ export default function AdminPartnerProfiles() {
       status_override_rules: profile.status_override_rules,
       status_actions: normalizedStatusActions as Record<string, any>,
       engineer_mappings: engineerMappings,
+      job_duration_defaults: profile.job_duration_defaults || { installation: 3, assessment: 0.5, service_call: 1 },
       is_active: profile.is_active
     });
     setShowCreateDialog(true);
@@ -666,6 +673,22 @@ export default function AdminPartnerProfiles() {
 
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">Job Duration Defaults</h3>
+                </div>
+                <div className="text-sm text-muted-foreground space-y-1 p-4 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-800">
+                  <p><strong>Set default durations (in hours) for job types:</strong></p>
+                  <p>• Keys are normalized: "Service Call" becomes "service_call", "Installation - Standard" becomes "installationstandard"</p>
+                  <p>• If no duration is provided in import data, these defaults will be used</p>
+                  <p>• Leave empty to use system fallback (3 hours)</p>
+                </div>
+                <JobDurationDefaultsEditor
+                  defaults={formData.job_duration_defaults}
+                  onUpdate={(defaults) => setFormData({ ...formData, job_duration_defaults: defaults })}
+                />
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold">Partner Status Mappings</h3>
                 </div>
                 <div className="text-sm text-muted-foreground space-y-1 p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
@@ -787,6 +810,7 @@ export default function AdminPartnerProfiles() {
                 <p>Status mappings: {Object.keys(profile.status_mappings || {}).length} configured</p>
                 <p>Bucket mappings: {Object.keys(profile.status_actions || {}).length} configured</p>
                 <p>Column mappings: {Object.keys(profile.column_mappings || {}).length} configured</p>
+                <p>Job duration defaults: {Object.keys(profile.job_duration_defaults || {}).length} configured</p>
                 <p>Override rules: {Object.keys(profile.status_override_rules || {}).length} configured</p>
               </div>
             </CardContent>

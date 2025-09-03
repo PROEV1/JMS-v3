@@ -208,6 +208,13 @@ serve(async (req) => {
       ...(job_duration_defaults || {})
     };
     
+    // Create normalized defaults map for lookup
+    const normalizedDefaults = new Map();
+    Object.entries(mergedDefaults).forEach(([key, value]) => {
+      const normalizedKey = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+      normalizedDefaults.set(normalizedKey, value);
+    });
+    
     console.log('Job duration defaults:', mergedDefaults)
 
     if (!profile.partners?.is_active) {
@@ -389,7 +396,8 @@ serve(async (req) => {
         const installDate = row[columnMappings.install_date] || null
         const quoteAmount = row[columnMappings.quote_amount] || null
         const estimatedDurationHours = row[columnMappings.estimated_duration_hours] || null
-        const jobType = row[columnMappings.job_type] || null
+        // Support both 'job_type' and 'type' column mappings
+        const jobType = row[columnMappings.job_type] || row[columnMappings.type] || null
 
         // Skip if no external ID
         if (!partnerExternalId) {
@@ -532,8 +540,8 @@ serve(async (req) => {
         } else {
           // No duration provided, use job type based defaults
           if (jobType) {
-            const normalizedJobType = jobType.toLowerCase().replace(/[^a-z]/g, '');
-            const defaultDuration = mergedDefaults[normalizedJobType];
+            const normalizedJobType = jobType.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const defaultDuration = normalizedDefaults.get(normalizedJobType);
             
             if (defaultDuration !== undefined) {
               parsedEstimatedDurationHours = defaultDuration;
