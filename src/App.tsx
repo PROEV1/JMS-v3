@@ -36,10 +36,12 @@ import Layout from '@/components/Layout';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import ClientDashboard from '@/pages/ClientDashboard';
 import ClientQuotes from '@/pages/ClientQuotes';
+import ClientQuoteDetail from '@/pages/ClientQuoteDetail';
 import ClientOrders from '@/pages/ClientOrders';
 import ClientMessages from '@/pages/ClientMessages';
 import ClientPayments from '@/pages/ClientPayments';
 import ClientProfilePage from '@/pages/ClientProfilePage';
+import EnhancedClientOrderView from '@/pages/EnhancedClientOrderView';
 
 function App() {
   return (
@@ -54,7 +56,9 @@ function App() {
         {/* Client Routes */}
         <Route path="/client" element={<ProtectedRoute><Layout><ClientDashboard /></Layout></ProtectedRoute>} />
         <Route path="/client/quotes" element={<ProtectedRoute><Layout><ClientQuotes /></Layout></ProtectedRoute>} />
+        <Route path="/client/quotes/:id" element={<ProtectedRoute><Layout><ClientQuoteDetail /></Layout></ProtectedRoute>} />
         <Route path="/client/orders" element={<ProtectedRoute><Layout><ClientOrders /></Layout></ProtectedRoute>} />
+        <Route path="/client/orders/:id" element={<ProtectedRoute><Layout><EnhancedClientOrderView /></Layout></ProtectedRoute>} />
         <Route path="/client/messages" element={<ProtectedRoute><Layout><ClientMessages /></Layout></ProtectedRoute>} />
         <Route path="/client/payments" element={<ProtectedRoute><Layout><ClientPayments /></Layout></ProtectedRoute>} />
         <Route path="/client/profile" element={<ProtectedRoute><Layout><ClientProfilePage /></Layout></ProtectedRoute>} />
