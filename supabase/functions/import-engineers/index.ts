@@ -258,8 +258,62 @@ Deno.serve(async (req) => {
                   await supabaseAdmin.auth.admin.deleteUser(newUser.user!.id);
                   console.log(`Deleted orphaned user for ${email}, using existing profile`);
                   
-                  profile = existingProfile;
-                  result.summary.created_users--; // Adjust count
+                  // Check if the existing profile's user_id actually exists in auth.users
+                  const { data: existingUser, error: userCheckError } = await supabaseAdmin.auth.admin.getUserById(existingProfile.user_id);
+                  
+                  if (userCheckError || !existingUser) {
+                    console.log(`Existing profile user_id doesn't exist in auth.users, creating new user for ${email}`);
+                    
+                    // Create a new user for this profile
+                    const { data: replacementUser, error: replacementUserError } = await supabaseAdmin.auth.admin.createUser({
+                      email: email,
+                      email_confirm: true,
+                      user_metadata: {
+                        full_name: row.full_name || email.split('@')[0]
+                      }
+                    });
+
+                    if (replacementUserError) {
+                      console.error('Error creating replacement user:', replacementUserError);
+                      result.summary.errors.push({ 
+                        row: rowNumber, 
+                        error: `Failed to create replacement user: ${replacementUserError.message}`,
+                        email 
+                      });
+                      continue;
+                    }
+
+                    // Update the existing profile to point to the new user
+                    const { error: profileUpdateError } = await supabaseAdmin
+                      .from('profiles')
+                      .update({ user_id: replacementUser.user!.id })
+                      .eq('user_id', existingProfile.user_id);
+
+                    if (profileUpdateError) {
+                      console.error('Error updating profile with new user_id:', profileUpdateError);
+                      await supabaseAdmin.auth.admin.deleteUser(replacementUser.user!.id);
+                      result.summary.errors.push({ 
+                        row: rowNumber, 
+                        error: 'Failed to update profile with new user_id',
+                        email 
+                      });
+                      continue;
+                    }
+
+                    profile = {
+                      user_id: replacementUser.user!.id,
+                      email: email,
+                      full_name: row.full_name || email.split('@')[0],
+                      role: existingProfile.role,
+                      status: 'active'
+                    };
+                    
+                    console.log(`Fixed orphaned profile and created new user for: ${email}`);
+                  } else {
+                    profile = existingProfile;
+                  }
+                  
+                  result.summary.created_users--; // Adjust count since we deleted the user
                 } else {
                   result.summary.errors.push({ 
                     row: rowNumber, 
@@ -276,15 +330,15 @@ Deno.serve(async (req) => {
                 });
                 continue;
               }
+            } else {
+              profile = {
+                user_id: newUser.user!.id,
+                email: email,
+                full_name: row.full_name || email.split('@')[0],
+                role: 'engineer',
+                status: 'active'
+              };
             }
-
-            profile = {
-              user_id: newUser.user!.id,
-              email: email,
-              full_name: row.full_name || email.split('@')[0],
-              role: 'engineer',
-              status: 'active'
-            };
 
             console.log(`Created user and profile for: ${email}`);
           } catch (userCreationError) {
