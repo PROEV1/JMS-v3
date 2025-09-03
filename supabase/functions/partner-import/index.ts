@@ -586,41 +586,44 @@ serve(async (req) => {
 
           console.log(`Row ${rowIndex}: Processing order with partner_external_id: ${partnerExternalId}`)
 
-          // First check if order already exists
+          // Check if order exists first (for tracking insert vs update)
           const { data: existingOrder } = await supabase
             .from('orders')
-            .select('id, order_number')
+            .select('id')
             .eq('partner_id', profile.partner_id)
             .eq('partner_external_id', partnerExternalId)
             .maybeSingle()
 
+          const isUpdate = !!existingOrder
+
+          // Use proper upsert with the unique constraint
+          const { data: orderResult, error: orderError } = await supabase
+            .from('orders')
+            .upsert(orderData, {
+              onConflict: 'partner_id,partner_external_id',
+              ignoreDuplicates: false
+            })
+            .select('id, order_number')
+            .single()
+
           performanceMetrics.database_calls.total_count++;
-          performanceMetrics.database_calls.order_queries++;
-
-          let orderResult;
-          if (existingOrder) {
-            // Update existing order
-            const { data: updatedOrder, error: updateError } = await supabase
-              .from('orders')
-              .update(orderData)
-              .eq('id', existingOrder.id)
-              .select('id, order_number')
-              .single()
-
-            performanceMetrics.database_calls.total_count++;
+          if (isUpdate) {
             performanceMetrics.database_calls.update_operations++;
+          } else {
+            performanceMetrics.database_calls.insert_operations++;
+          }
 
-            if (updateError) {
-              console.error(`Row ${rowIndex}: Order update error (partner_external_id: ${partnerExternalId}):`, updateError)
-              errors.push({
-                row: rowIndex,
-                partner_external_id: partnerExternalId,
-                message: `Order update failed: ${updateError.message}`,
-                data: { error: updateError }
-              })
-              results.errors++
-            } else {
-              orderResult = updatedOrder
+          if (orderError) {
+            console.error(`Row ${rowIndex}: Order upsert error (partner_external_id: ${partnerExternalId}):`, orderError)
+            errors.push({
+              row: rowIndex,
+              partner_external_id: partnerExternalId,
+              message: `Order upsert failed: ${orderError.message}`,
+              data: { error: orderError }
+            })
+            results.errors++
+          } else {
+            if (isUpdate) {
               results.updated++
               details.updated.push({
                 row: rowIndex,
@@ -629,29 +632,7 @@ serve(async (req) => {
                 partner_external_id: partnerExternalId
               })
               console.log(`Row ${rowIndex}: Successfully updated order ${orderResult.id} with number ${orderResult.order_number}`)
-            }
-          } else {
-            // Insert new order - let trigger generate order_number
-            const { data: newOrder, error: insertError } = await supabase
-              .from('orders')
-              .insert(orderData)
-              .select('id, order_number')
-              .single()
-
-            performanceMetrics.database_calls.total_count++;
-            performanceMetrics.database_calls.insert_operations++;
-
-            if (insertError) {
-              console.error(`Row ${rowIndex}: Order insert error (partner_external_id: ${partnerExternalId}):`, insertError)
-              errors.push({
-                row: rowIndex,
-                partner_external_id: partnerExternalId,
-                message: `Order insert failed: ${insertError.message}`,
-                data: { error: insertError }
-              })
-              results.errors++
             } else {
-              orderResult = newOrder
               results.inserted++
               details.inserted.push({
                 row: rowIndex,
