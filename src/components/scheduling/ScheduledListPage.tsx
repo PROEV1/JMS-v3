@@ -67,7 +67,11 @@ export function ScheduledListPage() {
         query = query.range(pagination.offset, pagination.offset + pagination.pageSize - 1);
       }
 
-      return query;
+      // Execute the query and return the result
+      const { data, error, count } = await query;
+      if (error) throw error;
+      
+      return { data: data || [], count: count || 0 };
     };
   }, [debouncedSearchTerm, pagination.offset, pagination.pageSize]);
 
@@ -75,13 +79,10 @@ export function ScheduledListPage() {
     queryKey: ['orders', 'scheduled', pagination.page, pagination.pageSize, debouncedSearchTerm],
     queryFn: async () => {
       try {
-        const query = await buildSearchQuery(true, true);
-        const { data, error, count } = await query;
-        
-        if (error) throw error;
+        const result = await buildSearchQuery(true, true);
 
         // Transform data
-        const transformedData = data?.map(order => ({
+        const transformedData = result.data?.map(order => ({
           ...order,
           client: order.client || null,
           quote: order.quote || null,
@@ -89,7 +90,7 @@ export function ScheduledListPage() {
           partner: order.partner || null
         })) || [];
 
-        return { data: transformedData, count: count || 0 };
+        return { data: transformedData, count: result.count || 0 };
       } catch (error) {
         console.error('Orders query error:', error);
         throw error;
@@ -124,10 +125,8 @@ export function ScheduledListPage() {
   }
 
   const handleExportQuery = async () => {
-    const query = await buildSearchQuery(false, false);
-    const { data, error } = await query;
-    if (error) throw error;
-    return data || [];
+    const result = await buildSearchQuery(false, false);
+    return result.data || [];
   };
 
   return (

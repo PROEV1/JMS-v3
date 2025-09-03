@@ -66,7 +66,11 @@ export function CompletionPendingListPage() {
         query = query.range(pagination.offset, pagination.offset + pagination.pageSize - 1);
       }
 
-      return query;
+      // Execute the query and return the result
+      const { data, error, count } = await query;
+      if (error) throw error;
+      
+      return { data: data || [], count: count || 0 };
     };
   }, [debouncedSearchTerm, pagination.offset, pagination.pageSize]);
 
@@ -74,10 +78,7 @@ export function CompletionPendingListPage() {
     queryKey: ['orders', 'completion-pending', pagination.page, pagination.pageSize, debouncedSearchTerm],
     queryFn: async () => {
       try {
-        const query = await buildSearchQuery(true, true);
-        const result = await query;
-        
-        if (result.error) throw result.error;
+        const result = await buildSearchQuery(true, true);
 
         // Transform data
         const transformedData = result.data?.map(order => ({
@@ -146,9 +147,7 @@ export function CompletionPendingListPage() {
             searchTerm={searchTerm}
             onSearchChange={setSearchTerm}
             exportQueryBuilder={async () => {
-              const query = await buildSearchQuery(false, false);
-              const result = await query;
-              if (result.error) throw result.error;
+              const result = await buildSearchQuery(false, false);
               return result.data || [];
             }}
           />

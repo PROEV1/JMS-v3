@@ -95,7 +95,11 @@ export function NeedsSchedulingListPage() {
         query = query.range(pagination.offset, pagination.offset + pagination.pageSize - 1);
       }
 
-      return query;
+      // Execute the query and return the result
+      const { data, error, count } = await query;
+      if (error) throw error;
+      
+      return { data: data || [], count: count || 0 };
     };
   }, [debouncedSearchTerm, pagination.offset, pagination.pageSize]);
   
@@ -103,20 +107,12 @@ export function NeedsSchedulingListPage() {
     queryKey: ['orders', 'needs-scheduling', pagination.page, pagination.pageSize, debouncedSearchTerm],
     queryFn: async () => {
       try {
-        const query = await buildSearchQuery(true, true);
-        const { data: ordersData, error: ordersError, count: totalCount } = await query;
+        const result = await buildSearchQuery(true, true);
         
-        if (ordersError) {
-          console.error('NeedsSchedulingListPage: Error fetching orders:', ordersError);
-          throw ordersError;
-        }
-        
-        console.log('NeedsSchedulingListPage: Got orders:', ordersData?.length);
-        
-        if (!ordersData?.length) return { data: [], count: totalCount || 0, unassignedCount: 0, assignedCount: 0 };
+        if (!result.data?.length) return { data: [], count: result.count || 0, unassignedCount: 0, assignedCount: 0 };
         
         // Transform data
-        const transformedData = ordersData?.map(order => ({
+        const transformedData = result.data?.map(order => ({
           ...order,
           client: order.client || null,
           quote: order.quote || null,
@@ -130,7 +126,7 @@ export function NeedsSchedulingListPage() {
         
         return { 
           data: transformedData, 
-          count: totalCount || 0,
+          count: result.count || 0,
           unassignedCount,
           assignedCount
         };
@@ -286,10 +282,8 @@ export function NeedsSchedulingListPage() {
               refetchOrders();
             }}
             exportQueryBuilder={async () => {
-              const query = await buildSearchQuery(false, false);
-              const { data, error } = await query;
-              if (error) throw error;
-              return data || [];
+              const result = await buildSearchQuery(false, false);
+              return result.data || [];
             }}
           />
         </CardContent>
