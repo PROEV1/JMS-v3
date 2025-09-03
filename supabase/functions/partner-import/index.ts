@@ -599,6 +599,7 @@ serve(async (req) => {
             status: 'awaiting_payment',
             survey_required: profile.partners?.client_survey_required ?? true,
             estimated_duration_hours: parsedEstimatedDurationHours,
+            job_type: mappedJobType,
             updated_at: new Date().toISOString()
           }
 
