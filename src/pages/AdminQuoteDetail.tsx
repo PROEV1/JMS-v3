@@ -47,7 +47,7 @@ export default function AdminQuoteDetail() {
   const { toast } = useToast();
 
   useEffect(() => {
-    if (!quoteId) {
+    if (!quoteId || quoteId === 'create') {
       navigate('/admin/quotes');
       return;
     }
