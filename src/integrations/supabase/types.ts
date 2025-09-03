@@ -2106,6 +2106,7 @@ export type Database = {
           gsheet_sheet_name: string | null
           id: string
           is_active: boolean
+          job_duration_defaults: Json
           name: string
           partner_id: string
           source_type: string
@@ -2123,6 +2124,7 @@ export type Database = {
           gsheet_sheet_name?: string | null
           id?: string
           is_active?: boolean
+          job_duration_defaults?: Json
           name: string
           partner_id: string
           source_type: string
@@ -2140,6 +2142,7 @@ export type Database = {
           gsheet_sheet_name?: string | null
           id?: string
           is_active?: boolean
+          job_duration_defaults?: Json
           name?: string
           partner_id?: string
           source_type?: string

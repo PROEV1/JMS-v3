@@ -136,7 +136,8 @@ serve(async (req) => {
       start_row = 0,
       chunk_size = null,
       job_ids_filter = null,
-      benchmark_mode = false
+      benchmark_mode = false,
+      job_duration_defaults = null
     } = body
 
     // Use max_rows if provided, otherwise fall back to chunk_size, otherwise default to 200
@@ -192,6 +193,22 @@ serve(async (req) => {
 
     console.log('Found profile:', profile.name)
     console.log('Partner:', profile.partners?.name)
+
+    // Merge job duration defaults: request body overrides profile, profile overrides fallback
+    const fallbackDefaults = {
+      installation: 3,
+      assessment: 0.5,
+      service_call: 1
+    };
+    
+    const profileDefaults = profile.job_duration_defaults || {};
+    const mergedDefaults = {
+      ...fallbackDefaults,
+      ...profileDefaults,
+      ...(job_duration_defaults || {})
+    };
+    
+    console.log('Job duration defaults:', mergedDefaults)
 
     if (!profile.partners?.is_active) {
       return new Response(JSON.stringify({ 
@@ -372,6 +389,7 @@ serve(async (req) => {
         const installDate = row[columnMappings.install_date] || null
         const quoteAmount = row[columnMappings.quote_amount] || null
         const estimatedDurationHours = row[columnMappings.estimated_duration_hours] || null
+        const jobType = row[columnMappings.job_type] || null
 
         // Skip if no external ID
         if (!partnerExternalId) {
@@ -495,19 +513,36 @@ serve(async (req) => {
           })
         }
 
-        // Parse estimated duration hours - default to 3 if not provided or invalid
-        let parsedEstimatedDurationHours = 3 // Default value
+        // Parse estimated duration hours with job type based defaults
+        let parsedEstimatedDurationHours = 3; // Fallback default
+        
         if (estimatedDurationHours && estimatedDurationHours !== '' && estimatedDurationHours !== 'NaN') {
-          const numDuration = parseFloat(String(estimatedDurationHours).replace(/[^0-9.-]/g, ''))
-          if (!isNaN(numDuration) && numDuration >= 1 && numDuration <= 12) {
-            parsedEstimatedDurationHours = Math.round(numDuration)
+          // Use provided duration if valid
+          const numDuration = parseFloat(String(estimatedDurationHours).replace(/[^0-9.-]/g, ''));
+          if (!isNaN(numDuration) && numDuration > 0 && numDuration <= 12) {
+            parsedEstimatedDurationHours = numDuration;
           } else {
             warnings.push({
               row: rowIndex,
               column: 'estimated_duration_hours',
-              message: `Invalid duration '${estimatedDurationHours}' - using default 3 hours`,
+              message: `Invalid duration '${estimatedDurationHours}' - using job type default`,
               data: { original_duration: estimatedDurationHours }
-            })
+            });
+          }
+        } else {
+          // No duration provided, use job type based defaults
+          if (jobType) {
+            const normalizedJobType = jobType.toLowerCase().replace(/[^a-z]/g, '');
+            const defaultDuration = mergedDefaults[normalizedJobType];
+            
+            if (defaultDuration !== undefined) {
+              parsedEstimatedDurationHours = defaultDuration;
+              console.log(`Row ${rowIndex}: Using ${defaultDuration}h default for job type '${jobType}'`);
+            } else {
+              console.log(`Row ${rowIndex}: No default found for job type '${jobType}', using fallback 3h`);
+            }
+          } else {
+            console.log(`Row ${rowIndex}: No job type specified, using fallback 3h`);
           }
         }
 
