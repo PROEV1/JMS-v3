@@ -359,8 +359,8 @@ export function WeekViewCalendar({
                              </div>
                            ))}
                            
-                           {/* Scheduled Orders */}
-                           {dayOrders.slice(0, 3).map((order) => (
+                            {/* Scheduled Orders */}
+                            {dayOrders.map((order) => (
                              <div
                                key={order.id}
                                className="bg-white border border-border rounded-md p-2 cursor-pointer hover:shadow-md transition-all duration-200 hover:border-primary/40 min-h-[60px] flex flex-col justify-between"
@@ -400,12 +400,6 @@ export function WeekViewCalendar({
                                </div>
                              </div>
                            ))}
-                           
-                           {dayOrders.length > 3 && (
-                             <div className="text-xs text-muted-foreground text-center py-1">
-                               +{dayOrders.length - 3} more
-                             </div>
-                           )}
 
                            {(isOverloaded || isOverCapacity) && (
                              <div className="flex items-center justify-center mt-1">
