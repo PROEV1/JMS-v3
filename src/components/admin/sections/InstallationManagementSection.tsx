@@ -96,11 +96,22 @@ Order: ${order.order_number}`;
     if (!acceptedOffer) return;
     
     try {
+      // Normalize the offered_date to noon UTC to avoid timezone issues
+      const originalDate = acceptedOffer.offered_date.slice(0, 10); // Get YYYY-MM-DD
+      const utcDate = new Date(originalDate + 'T12:00:00.000Z');
+      
+      console.log('InstallationManagementSection: Scheduling with accepted date as noon UTC:', {
+        originalOfferedDate: acceptedOffer.offered_date,
+        normalizedDate: originalDate,
+        utcDate: utcDate.toISOString(),
+        localDisplay: utcDate.toLocaleDateString()
+      });
+      
       const { error } = await supabase
         .from('orders')
         .update({
           engineer_id: acceptedOffer.engineer_id,
-          scheduled_install_date: acceptedOffer.offered_date,
+          scheduled_install_date: utcDate.toISOString(),
           time_window: acceptedOffer.time_window
         })
         .eq('id', order.id);

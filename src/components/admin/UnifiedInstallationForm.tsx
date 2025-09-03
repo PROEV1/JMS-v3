@@ -200,7 +200,14 @@ export function UnifiedInstallationForm({
       }
       
       if (formData.scheduled_install_date) {
-        updateData.scheduled_install_date = new Date(formData.scheduled_install_date).toISOString();
+        // Save date as noon UTC to avoid timezone shifts
+        const utcDate = new Date(formData.scheduled_install_date + 'T12:00:00.000Z');
+        updateData.scheduled_install_date = utcDate.toISOString();
+        console.log('UnifiedInstallationForm: Saving date as noon UTC:', {
+          originalDate: formData.scheduled_install_date,
+          utcDate: utcDate.toISOString(),
+          localDisplay: utcDate.toLocaleDateString()
+        });
       } else {
         updateData.scheduled_install_date = null;
       }
