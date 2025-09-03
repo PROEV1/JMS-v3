@@ -82,7 +82,11 @@ export function ReadyToBookListPage() {
         query = query.range(pagination.offset, pagination.offset + pagination.pageSize - 1);
       }
 
-      return query;
+      // Execute the query and return the result
+      const { data, error, count } = await query;
+      if (error) throw error;
+      
+      return { data: data || [], count: count || 0 };
     };
   }, [debouncedSearchTerm, pagination.offset, pagination.pageSize]);
 
@@ -90,11 +94,8 @@ export function ReadyToBookListPage() {
     queryKey: ['orders', 'ready-to-book', pagination.page, pagination.pageSize, debouncedSearchTerm],
     queryFn: async () => {
       try {
-        const query = await buildSearchQuery(true, true);
-        const result = await query;
+        const result = await buildSearchQuery(true, true);
         
-        if (result.error) throw result.error;
-
         // Transform data
         const transformedData = result.data?.map(order => ({
           ...order,
@@ -162,9 +163,7 @@ export function ReadyToBookListPage() {
             searchTerm={searchTerm}
             onSearchChange={setSearchTerm}
             exportQueryBuilder={async () => {
-              const query = await buildSearchQuery(false, false);
-              const result = await query;
-              if (result.error) throw result.error;
+              const result = await buildSearchQuery(false, false);
               return result.data || [];
             }}
           />
