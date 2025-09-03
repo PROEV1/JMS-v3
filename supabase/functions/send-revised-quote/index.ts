@@ -5,7 +5,7 @@ import { Resend } from "npm:resend@2.0.0";
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const resendApiKey = Deno.env.get('RESEND_API_KEY')!;
+const resendApiKey = Deno.env.get('RESEND_API_KEY'); // Optional - graceful degradation
 
 interface SendRevisedQuoteRequest {
   quoteId: string;
@@ -91,23 +91,30 @@ serve(async (req: Request) => {
     const previousTotal = previousSnapshot?.quote_data?.total_cost || 0;
     const totalDifference = currentTotal - previousTotal;
 
-    // Create quote snapshot
-    const { error: snapshotError } = await supabase
-      .from('order_quote_snapshots')
-      .insert({
-        order_id: quote.order?.id,
-        quote_id: quote.id,
-        quote_data: {
-          ...quote,
-          quote_items: quote.quote_items
-        },
-        snapshot_type: 'revision',
-        revision_reason: revisionReason,
-        created_by: quote.client.user_id
-      });
+    // Create quote snapshot (only if order exists)
+    let snapshotCreated = false;
+    if (quote.order?.id) {
+      const { error: snapshotError } = await supabase
+        .from('order_quote_snapshots')
+        .insert({
+          order_id: quote.order.id,
+          quote_id: quote.id,
+          quote_data: {
+            ...quote,
+            quote_items: quote.quote_items
+          },
+          snapshot_type: 'revision',
+          revision_reason: revisionReason,
+          created_by: quote.client.user_id
+        });
 
-    if (snapshotError) {
-      console.error('Snapshot creation error:', snapshotError);
+      if (snapshotError) {
+        console.error('Snapshot creation error:', snapshotError);
+      } else {
+        snapshotCreated = true;
+      }
+    } else {
+      console.log('No order linked to quote, skipping snapshot creation');
     }
 
     // Update quote status to 'sent'
@@ -125,9 +132,6 @@ serve(async (req: Request) => {
 
     // Generate portal link
     const portalUrl = `https://qvppvstgconmzzjsryna.lovable.app/client/quotes/${quoteId}`;
-
-    // Initialize Resend
-    const resend = new Resend(resendApiKey);
 
     // Format currency
     const formatCurrency = (amount: number) => {
@@ -206,31 +210,53 @@ serve(async (req: Request) => {
       </html>
     `;
 
-    // Send email
-    const emailResult = await resend.emails.send({
-      from: 'ProEV <quotes@proev.co.uk>',
-      to: [quote.client.email],
-      subject: `Revised Quote Available - ${quote.quote_number}`,
-      html: emailHtml,
-    });
+    // Try to send email (graceful degradation if Resend not configured)
+    let emailSent = false;
+    let emailError = null;
+    let emailId = null;
 
-    if (emailResult.error) {
-      console.error('Email send error:', emailResult.error);
-      return new Response(JSON.stringify({ 
-        error: 'Failed to send email',
-        details: emailResult.error 
-      }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+    if (resendApiKey) {
+      try {
+        // Initialize Resend
+        const resend = new Resend(resendApiKey);
+
+        // Send email
+        const emailResult = await resend.emails.send({
+          from: 'ProEV <quotes@proev.co.uk>',
+          to: [quote.client.email],
+          subject: `Revised Quote Available - ${quote.quote_number}`,
+          html: emailHtml,
+        });
+
+        if (emailResult.error) {
+          console.error('Email send error:', emailResult.error);
+          emailError = emailResult.error;
+        } else {
+          console.log('Revised quote email sent successfully:', emailResult);
+          emailSent = true;
+          emailId = emailResult.data?.id;
+        }
+      } catch (error: any) {
+        console.error('Email sending failed:', error);
+        emailError = error.message;
+      }
+    } else {
+      console.log('RESEND_API_KEY not configured, skipping email send');
+      emailError = 'RESEND_API_KEY not configured';
     }
 
-    console.log('Revised quote email sent successfully:', emailResult);
-
+    // Always return success - quote status updated regardless of email
     return new Response(JSON.stringify({ 
       success: true,
-      emailId: emailResult.data?.id,
-      portalUrl 
+      quoteUpdated: !updateError,
+      emailSent,
+      emailError: emailError || undefined,
+      emailId,
+      snapshotCreated,
+      portalUrl,
+      message: emailSent ? 
+        'Quote sent successfully and email delivered' : 
+        'Quote marked as sent (email delivery failed but quote status updated)'
     }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
