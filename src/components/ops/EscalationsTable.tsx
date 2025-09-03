@@ -33,33 +33,74 @@ export function EscalationsTable() {
     try {
       setLoading(true);
 
-      // Fetch overdue items from various sources
+      // Fetch overdue items using separate queries for better reliability
       const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
       const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
-      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const today = new Date().toISOString().split('T')[0];
 
-      // Fetch orders with various overdue conditions
-      const { data: orders, error } = await supabase
-        .from('orders')
-        .select(`
-          id,
-          order_number,
-          status_enhanced,
-          created_at,
-          scheduled_install_date,
-          agreement_signed_at,
-          clients!inner(full_name, email)
-        `)
-        .or(`
-          and(status_enhanced.eq.awaiting_survey_submission,created_at.lt.${threeDaysAgo.toISOString()}),
-          and(status_enhanced.eq.awaiting_install_booking,created_at.lt.${sevenDaysAgo.toISOString()}),
-          and(status_enhanced.eq.awaiting_payment,created_at.lt.${sevenDaysAgo.toISOString()}),
-          and(status_enhanced.eq.scheduled,scheduled_install_date.lt.${new Date().toISOString().split('T')[0]})
-        `);
+      // Fetch different types of overdue orders separately
+      const [
+        surveyOverdueResult,
+        schedulingOverdueResult,
+        paymentOverdueResult,
+        overdueInstallsResult
+      ] = await Promise.all([
+        // Surveys overdue (3+ days)
+        supabase
+          .from('orders')
+          .select(`
+            id, order_number, status_enhanced, created_at, scheduled_install_date, agreement_signed_at,
+            clients!inner(full_name, email)
+          `)
+          .eq('status_enhanced', 'awaiting_survey_submission')
+          .lt('created_at', threeDaysAgo.toISOString()),
 
-      if (error) throw error;
+        // Scheduling overdue (7+ days)
+        supabase
+          .from('orders')
+          .select(`
+            id, order_number, status_enhanced, created_at, scheduled_install_date, agreement_signed_at,
+            clients!inner(full_name, email)
+          `)
+          .eq('status_enhanced', 'awaiting_install_booking')
+          .lt('created_at', sevenDaysAgo.toISOString()),
 
-      const escalationItems: EscalationItem[] = (orders || []).map((order) => {
+        // Payment overdue (7+ days)
+        supabase
+          .from('orders')
+          .select(`
+            id, order_number, status_enhanced, created_at, scheduled_install_date, agreement_signed_at,
+            clients!inner(full_name, email)
+          `)
+          .eq('status_enhanced', 'awaiting_payment')
+          .lt('created_at', sevenDaysAgo.toISOString()),
+
+        // Overdue installs (scheduled but date passed)
+        supabase
+          .from('orders')
+          .select(`
+            id, order_number, status_enhanced, created_at, scheduled_install_date, agreement_signed_at,
+            clients!inner(full_name, email)
+          `)
+          .eq('status_enhanced', 'scheduled')
+          .lt('scheduled_install_date', today)
+      ]);
+
+      // Check for errors
+      if (surveyOverdueResult.error) throw surveyOverdueResult.error;
+      if (schedulingOverdueResult.error) throw schedulingOverdueResult.error;
+      if (paymentOverdueResult.error) throw paymentOverdueResult.error;
+      if (overdueInstallsResult.error) throw overdueInstallsResult.error;
+
+      // Combine all overdue orders
+      const allOverdueOrders = [
+        ...(surveyOverdueResult.data || []),
+        ...(schedulingOverdueResult.data || []),
+        ...(paymentOverdueResult.data || []),
+        ...(overdueInstallsResult.data || [])
+      ];
+
+      const escalationItems: EscalationItem[] = allOverdueOrders.map((order) => {
         const createdAt = new Date(order.created_at);
         const hoursOverdue = Math.floor((Date.now() - createdAt.getTime()) / (1000 * 60 * 60));
         
@@ -92,13 +133,11 @@ export function EscalationsTable() {
             actionType = 'payment_followup';
             break;
           case 'scheduled':
-            if (order.scheduled_install_date && new Date(order.scheduled_install_date) < new Date()) {
-              status = 'Overdue Install';
-              slaTarget = 'Same day';
-              responsible = 'Ops';
-              quickAction = 'Contact Engineer';
-              actionType = 'general';
-            }
+            status = 'Overdue Install';
+            slaTarget = 'Same day';
+            responsible = 'Ops';
+            quickAction = 'Contact Engineer';
+            actionType = 'general';
             break;
           default:
             return null;
