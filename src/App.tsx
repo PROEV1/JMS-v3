@@ -24,6 +24,9 @@ import AdminChargers from '@/pages/AdminChargers';
 import AdminPartners from '@/pages/AdminPartners';
 import AdminPartnerProfiles from '@/pages/AdminPartnerProfiles';
 import AdminPartnerUsers from '@/pages/AdminPartnerUsers';
+import SurveyPage from '@/pages/SurveyPage';
+import SurveySuccess from '@/pages/SurveySuccess';
+import SurveyReadOnlyView from '@/pages/SurveyReadOnlyView';
 import PublicQuoteView from '@/pages/PublicQuoteView';
 import AdminSchedule from '@/pages/AdminSchedule';
 import AdminScheduleStatus from '@/pages/AdminScheduleStatus';
@@ -52,6 +55,11 @@ function App() {
         <Route path="/login" element={<Auth />} />
         <Route path="/auth" element={<Auth />} />
         <Route path="/quote/:token" element={<PublicQuoteView />} />
+        
+        {/* Survey Routes - Public access with token validation */}
+        <Route path="/survey/:orderId" element={<SurveyPage />} />
+        <Route path="/survey/:orderId/success" element={<SurveySuccess />} />
+        <Route path="/survey-view/:orderId" element={<SurveyReadOnlyView />} />
         
         {/* Client Routes */}
         <Route path="/client" element={<ProtectedRoute><Layout><ClientDashboard /></Layout></ProtectedRoute>} />
