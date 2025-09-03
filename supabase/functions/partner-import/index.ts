@@ -554,6 +554,22 @@ serve(async (req) => {
           }
         }
 
+        // Map job type to normalized values
+        let mappedJobType = 'installation'; // Default
+        if (jobType) {
+          const normalizedType = jobType.toLowerCase().replace(/[^a-z0-9]/g, '');
+          
+          if (['servicecall', 'maintenancevisit', 'warrantyvisit'].includes(normalizedType)) {
+            mappedJobType = 'service_call';
+          } else if (['assessment', 'survey', 'sitevisit', 'inperson'].includes(normalizedType)) {
+            mappedJobType = 'assessment';
+          } else {
+            mappedJobType = 'installation';
+          }
+          
+          console.log(`Row ${rowIndex}: Mapped job type '${jobType}' to '${mappedJobType}'`);
+        }
+
         if (!dry_run) {
           // Find or create client using safe database function
           let client
