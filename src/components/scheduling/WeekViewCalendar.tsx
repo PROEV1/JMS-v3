@@ -130,11 +130,14 @@ export function WeekViewCalendar({
   };
 
   const getOrdersForEngineerAndDate = (engineerId: string, date: Date): Order[] => {
-    return orders.filter(order => 
+    const dateString = date.toISOString().split('T')[0];
+    const filteredOrders = orders.filter(order => 
       order.engineer_id === engineerId &&
       order.scheduled_install_date &&
-      new Date(order.scheduled_install_date).toDateString() === date.toDateString()
+      new Date(order.scheduled_install_date).toISOString().split('T')[0] === dateString
     );
+    console.log(`WeekViewCalendar: Engineer ${engineerId} on ${dateString}: ${filteredOrders.length} orders`);
+    return filteredOrders;
   };
 
   const getEngineerWorkload = (engineerId: string, date: Date): number => {
@@ -170,10 +173,11 @@ export function WeekViewCalendar({
   const getOfferHoldsForEngineerAndDate = (engineerId: string, date: Date) => {
     if (!showOfferHolds) return [];
     
+    const dateString = date.toISOString().split('T')[0];
     return jobOffers?.filter(offer => 
       offer.engineer_id === engineerId &&
       offer.offered_date &&
-      new Date(offer.offered_date).toDateString() === date.toDateString()
+      new Date(offer.offered_date).toISOString().split('T')[0] === dateString
     ) || [];
   };
 

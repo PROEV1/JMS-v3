@@ -21,10 +21,27 @@ export default function AdminSchedule() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('orders')
-        .select('*')
-        .eq('status_enhanced', 'scheduled');
+        .select(`
+          *,
+          clients!orders_client_id_fkey(
+            id,
+            full_name,
+            email,
+            phone
+          ),
+          engineers!orders_engineer_id_fkey(
+            id,
+            name,
+            region
+          )
+        `)
+        .not('scheduled_install_date', 'is', null);
       
       if (error) throw error;
+      console.log(`AdminSchedule: Found ${data?.length || 0} scheduled orders`);
+      if (data && data.length > 0) {
+        console.log('AdminSchedule: Sample order:', data[0]);
+      }
       return data || [];
     }
   });
