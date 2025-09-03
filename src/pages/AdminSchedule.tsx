@@ -34,7 +34,9 @@ export default function AdminSchedule() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('engineers')
-        .select('*');
+        .select('*')
+        .eq('is_active', true)
+        .order('name');
       
       if (error) throw error;
       return data || [];
