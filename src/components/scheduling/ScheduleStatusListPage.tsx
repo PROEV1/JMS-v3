@@ -37,6 +37,8 @@ interface ScheduleStatusListPageProps {
   onPageChange?: (page: number) => void;
   onPageSizeChange?: (pageSize: number) => void;
   exportQueryBuilder?: () => Promise<any[] | null>;
+  searchTerm?: string;
+  onSearchChange?: (searchTerm: string) => void;
 }
 
 export function ScheduleStatusListPage({ 
@@ -49,16 +51,26 @@ export function ScheduleStatusListPage({
   totalCount,
   onPageChange,
   onPageSizeChange,
-  exportQueryBuilder
+  exportQueryBuilder,
+  searchTerm: externalSearchTerm,
+  onSearchChange
 }: ScheduleStatusListPageProps) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState(externalSearchTerm || '');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showSendOffer, setShowSendOffer] = useState(false);
   const [showSmartAssign, setShowSmartAssign] = useState(false);
   const [showAutoScheduleModal, setShowAutoScheduleModal] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+
+  // Handle search term changes
+  const handleSearchChange = (value: string) => {
+    setSearchTerm(value);
+    if (onSearchChange) {
+      onSearchChange(value);
+    }
+  };
 
   // Check if export is enabled via URL parameter
   const exportEnabled = searchParams.get('enableExport') === '1';
@@ -96,10 +108,13 @@ export function ScheduleStatusListPage({
         return false;
       }
       
-      // Text search with null safety
+      // Text search with null safety - now includes phone numbers
       const matchesSearch = (order.order_number || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (order.client?.full_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (order.client?.email || '').toLowerCase().includes(searchTerm.toLowerCase());
+        (order.client?.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (order.client?.phone || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (order.partner_external_url || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (order.postcode || '').toLowerCase().includes(searchTerm.toLowerCase());
       
       // Job type filter
       const matchesJobType = jobTypeFilter === 'all' || order.job_type === jobTypeFilter;
@@ -799,9 +814,9 @@ export function ScheduleStatusListPage({
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
               <Input
-                placeholder="Search by order number, client name, or email..."
+                placeholder="Search by order number, client name, email, or phone..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => handleSearchChange(e.target.value)}
                 className="pl-10 h-10 text-sm"
               />
             </div>

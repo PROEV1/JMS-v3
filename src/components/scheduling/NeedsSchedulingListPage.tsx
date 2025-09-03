@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { ScheduleStatusNavigation } from './ScheduleStatusNavigation';
@@ -10,19 +10,22 @@ import { Calendar, Users, UserCheck } from 'lucide-react';
 import { useServerPagination } from '@/hooks/useServerPagination';
 import { keepPreviousData } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
+import { useDebounce } from '@/hooks/useDebounce';
 
 export function NeedsSchedulingListPage() {
   console.log('NeedsSchedulingListPage: Starting component render');
   const queryClient = useQueryClient();
   const { pagination, controls } = useServerPagination();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
   
   // Always include assigned engineers - no toggle needed
-  
-  const { data: ordersResponse = { data: [], count: 0, unassignedCount: 0, assignedCount: 0 }, isLoading: ordersLoading, error: ordersError, refetch: refetchOrders } = useQuery({
-    queryKey: ['orders', 'needs-scheduling', pagination.page, pagination.pageSize],
-    queryFn: async () => {
-      console.log('NeedsSchedulingListPage: Fetching orders...');
+
+  // Build search query with enhanced search across related tables
+  const buildSearchQuery = useMemo(() => {
+    return async (withPagination = true, withCount = true) => {
+      console.log('NeedsSchedulingListPage: Building search query...');
       
       // First get all active offers to exclude orders with them
       const { data: activeOffers } = await supabase
@@ -40,8 +43,9 @@ export function NeedsSchedulingListPage() {
           *,
           client:client_id(full_name, email, phone, postcode, address),
           engineer:engineer_id(name, email, region),
-          partner:partner_id(name)
-        `, { count: 'exact' })
+          partner:partner_id(name),
+          quote:quote_id(quote_number)
+        `, withCount ? { count: 'exact' } : {})
         .eq('status_enhanced', 'awaiting_install_booking')
         .eq('scheduling_suppressed', false)
         .order('created_at', { ascending: false });
@@ -54,33 +58,86 @@ export function NeedsSchedulingListPage() {
         }
       }
 
-      // Get total count first
-      const { count: totalCount } = await query;
+      // Apply search filter across all relevant tables
+      if (debouncedSearchTerm) {
+        const searchPattern = `%${debouncedSearchTerm}%`;
+        
+        // Find matching client and quote IDs for this search
+        const [matchingClients, matchingQuotes] = await Promise.all([
+          supabase.from('clients').select('id')
+            .or(`full_name.ilike.${searchPattern},email.ilike.${searchPattern},phone.ilike.${searchPattern}`),
+          supabase.from('quotes').select('id')
+            .ilike('quote_number', searchPattern)
+        ]);
+        
+        const clientIds = matchingClients.data?.map(c => c.id) || [];
+        const quoteIds = matchingQuotes.data?.map(q => q.id) || [];
 
-      // Apply pagination
-      query = query.range(pagination.offset, pagination.offset + pagination.pageSize - 1);
+        const searchConditions = [
+          `order_number.ilike.${searchPattern}`,
+          `partner_external_url.ilike.${searchPattern}`,
+          `job_address.ilike.${searchPattern}`,
+          `postcode.ilike.${searchPattern}`
+        ];
 
-      const { data: ordersData, error: ordersError } = await query;
+        if (clientIds.length > 0) {
+          searchConditions.push(`client_id.in.(${clientIds.join(',')})`);
+        }
+        if (quoteIds.length > 0) {
+          searchConditions.push(`quote_id.in.(${quoteIds.join(',')})`);
+        }
 
-      if (ordersError) {
-        console.error('NeedsSchedulingListPage: Error fetching orders:', ordersError);
-        throw ordersError;
+        query = query.or(searchConditions.join(','));
       }
-      
-      console.log('NeedsSchedulingListPage: Got orders:', ordersData?.length);
-      
-      if (!ordersData?.length) return { data: [], count: totalCount || 0, unassignedCount: 0, assignedCount: 0 };
-      
-      // Get counts for assigned vs unassigned from the paginated results
-      const unassignedCount = ordersData.filter(order => !order.engineer_id).length;
-      const assignedCount = ordersData.filter(order => order.engineer_id).length;
-      
-      return { 
-        data: ordersData, 
-        count: totalCount || 0,
-        unassignedCount,
-        assignedCount
-      };
+
+      // Apply pagination if requested
+      if (withPagination) {
+        query = query.range(pagination.offset, pagination.offset + pagination.pageSize - 1);
+      }
+
+      return query;
+    };
+  }, [debouncedSearchTerm, pagination.offset, pagination.pageSize]);
+  
+  const { data: ordersResponse = { data: [], count: 0, unassignedCount: 0, assignedCount: 0 }, isLoading: ordersLoading, error: ordersError, refetch: refetchOrders } = useQuery({
+    queryKey: ['orders', 'needs-scheduling', pagination.page, pagination.pageSize, debouncedSearchTerm],
+    queryFn: async () => {
+      try {
+        const query = await buildSearchQuery(true, true);
+        const { data: ordersData, error: ordersError, count: totalCount } = await query;
+        
+        if (ordersError) {
+          console.error('NeedsSchedulingListPage: Error fetching orders:', ordersError);
+          throw ordersError;
+        }
+        
+        console.log('NeedsSchedulingListPage: Got orders:', ordersData?.length);
+        
+        if (!ordersData?.length) return { data: [], count: totalCount || 0, unassignedCount: 0, assignedCount: 0 };
+        
+        // Transform data
+        const transformedData = ordersData?.map(order => ({
+          ...order,
+          client: order.client || null,
+          quote: order.quote || null,
+          engineer: order.engineer || null,
+          partner: order.partner || null
+        })) || [];
+        
+        // Get counts for assigned vs unassigned from the paginated results
+        const unassignedCount = transformedData.filter(order => !order.engineer_id).length;
+        const assignedCount = transformedData.filter(order => order.engineer_id).length;
+        
+        return { 
+          data: transformedData, 
+          count: totalCount || 0,
+          unassignedCount,
+          assignedCount
+        };
+      } catch (error) {
+        console.error('NeedsSchedulingListPage query error:', error);
+        throw error;
+      }
     },
     placeholderData: keepPreviousData,
   });
@@ -222,39 +279,14 @@ export function NeedsSchedulingListPage() {
             totalCount={totalCount}
             onPageChange={controls.setPage}
             onPageSizeChange={controls.setPageSize}
+            searchTerm={searchTerm}
+            onSearchChange={setSearchTerm}
             onUpdate={() => {
               console.log('NeedsSchedulingListPage: Manual update requested, refetching...');
               refetchOrders();
             }}
             exportQueryBuilder={async () => {
-              // Get all active offers to exclude orders with them
-              const { data: activeOffers } = await supabase
-                .from('job_offers')
-                .select('order_id')
-                .eq('status', 'pending')
-                .gt('expires_at', new Date().toISOString());
-
-              const activeOfferOrderIds = activeOffers?.map(offer => offer.order_id) || [];
-
-              let query = supabase
-                .from('orders')
-                .select(`
-                  *,
-                  client:client_id(full_name, email, phone, postcode, address),
-                  engineer:engineer_id(name, email, region),
-                  partner:partner_id(name),
-                  quote:quote_id(quote_number)
-                `)
-                .eq('status_enhanced', 'awaiting_install_booking')
-                .eq('scheduling_suppressed', false)
-                .order('created_at', { ascending: false });
-
-              // Exclude orders with active offers
-              if (activeOfferOrderIds.length > 0) {
-                const safeIds = activeOfferOrderIds.slice(0, 100).map(id => `"${id}"`).join(',');
-                query = query.not('id', 'in', `(${safeIds})`);
-              }
-
+              const query = await buildSearchQuery(false, false);
               const { data, error } = await query;
               if (error) throw error;
               return data || [];
