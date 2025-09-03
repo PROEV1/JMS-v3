@@ -33,6 +33,12 @@ import AdminPartnerQuotes from '@/pages/AdminPartnerQuotes';
 import Auth from '@/pages/Auth';
 import Layout from '@/components/Layout';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
+import ClientDashboard from '@/pages/ClientDashboard';
+import ClientQuotes from '@/pages/ClientQuotes';
+import ClientOrders from '@/pages/ClientOrders';
+import ClientMessages from '@/pages/ClientMessages';
+import ClientPayments from '@/pages/ClientPayments';
+import ClientProfilePage from '@/pages/ClientProfilePage';
 
 function App() {
   return (
@@ -43,6 +49,16 @@ function App() {
         <Route path="/login" element={<Auth />} />
         <Route path="/auth" element={<Auth />} />
         <Route path="/quote/:token" element={<PublicQuoteView />} />
+        
+        {/* Client Routes */}
+        <Route path="/client" element={<ProtectedRoute><Layout><ClientDashboard /></Layout></ProtectedRoute>} />
+        <Route path="/client/quotes" element={<ProtectedRoute><Layout><ClientQuotes /></Layout></ProtectedRoute>} />
+        <Route path="/client/orders" element={<ProtectedRoute><Layout><ClientOrders /></Layout></ProtectedRoute>} />
+        <Route path="/client/messages" element={<ProtectedRoute><Layout><ClientMessages /></Layout></ProtectedRoute>} />
+        <Route path="/client/payments" element={<ProtectedRoute><Layout><ClientPayments /></Layout></ProtectedRoute>} />
+        <Route path="/client/profile" element={<ProtectedRoute><Layout><ClientProfilePage /></Layout></ProtectedRoute>} />
+        
+        {/* Admin Routes */}
         <Route path="/admin" element={<ProtectedRoute><Layout><Dashboard /></Layout></ProtectedRoute>} />
         <Route path="/admin/quotes" element={<ProtectedRoute><Layout><AdminQuotes /></Layout></ProtectedRoute>} />
         <Route path="/admin/quotes/create" element={<ProtectedRoute><Layout><AdminQuoteCreate /></Layout></ProtectedRoute>} />
