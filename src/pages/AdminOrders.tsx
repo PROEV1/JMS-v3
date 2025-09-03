@@ -81,7 +81,7 @@ export default function AdminOrders() {
 
   // Optimized search function that uses a single query with proper joins
   const buildSearchQuery = useMemo(() => {
-    return (withPagination = true, withCount = true) => {
+    return async (withPagination = true, withCount = true) => {
       let query = supabase
         .from('orders')
         .select(`
@@ -106,11 +106,36 @@ export default function AdminOrders() {
         `, withCount ? { count: 'exact' } : {})
         .order('created_at', { ascending: false });
 
-      // Apply search filter using advanced text search
+      // Apply search filter across all relevant tables
       if (debouncedSearchTerm) {
         const searchPattern = `%${debouncedSearchTerm}%`;
-        // Only search on direct order columns to avoid 400 errors on related table filters
-        query = query.or(`order_number.ilike.${searchPattern},partner_external_id.ilike.${searchPattern},job_address.ilike.${searchPattern},postcode.ilike.${searchPattern}`);
+        
+        // Find matching client and quote IDs for this search
+        const [matchingClients, matchingQuotes] = await Promise.all([
+          supabase.from('clients').select('id')
+            .or(`full_name.ilike.${searchPattern},email.ilike.${searchPattern},phone.ilike.${searchPattern}`),
+          supabase.from('quotes').select('id')
+            .ilike('quote_number', searchPattern)
+        ]);
+        
+        const clientIds = matchingClients.data?.map(c => c.id) || [];
+        const quoteIds = matchingQuotes.data?.map(q => q.id) || [];
+
+        const searchConditions = [
+          `order_number.ilike.${searchPattern}`,
+          `partner_external_id.ilike.${searchPattern}`,
+          `job_address.ilike.${searchPattern}`,
+          `postcode.ilike.${searchPattern}`
+        ];
+
+        if (clientIds.length > 0) {
+          searchConditions.push(`client_id.in.(${clientIds.join(',')})`);
+        }
+        if (quoteIds.length > 0) {
+          searchConditions.push(`quote_id.in.(${quoteIds.join(',')})`);
+        }
+
+        query = query.or(searchConditions.join(','));
       }
 
       // Apply other filters
@@ -135,7 +160,7 @@ export default function AdminOrders() {
     queryKey: ['admin-orders', pagination.page, pagination.pageSize, debouncedSearchTerm, statusFilter, engineerFilter],
     queryFn: async () => {
       try {
-        const query = buildSearchQuery(true, true);
+        const query = await buildSearchQuery(true, true);
         const { data, error, count } = await query;
         
         if (error) throw error;
