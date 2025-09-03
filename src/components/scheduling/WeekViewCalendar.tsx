@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Order, Engineer, getStatusColor, getOrderEstimatedHours } from '@/utils/schedulingUtils';
+import { getJobTypeLabel } from '@/utils/jobTypeUtils';
 import { ChevronLeft, ChevronRight, User, AlertTriangle, Clock, MapPin, Eye, EyeOff } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -370,10 +371,10 @@ export function WeekViewCalendar({
                                }}
                                onClick={() => navigate(`/orders/${order.id}`)}
                              >
-                               <div className="space-y-1">
-                                 <div className="flex items-center gap-1 text-xs font-medium text-primary">
-                                   <span>Install</span>
-                                 </div>
+                                <div className="space-y-1">
+                                  <div className="flex items-center gap-1 text-xs font-medium text-primary">
+                                    <span>{getJobTypeLabel(order.job_type)}</span>
+                                  </div>
                                  
                                  {order.postcode && (
                                    <div className="flex items-center gap-1 text-xs font-semibold">
