@@ -47,7 +47,9 @@ export default function AdminQuoteDetail() {
   const { toast } = useToast();
 
   useEffect(() => {
+    console.log('AdminQuoteDetail: quoteId =', quoteId);
     if (!quoteId || quoteId === 'create') {
+      console.log('AdminQuoteDetail: Redirecting due to invalid quoteId');
       navigate('/admin/quotes');
       return;
     }
