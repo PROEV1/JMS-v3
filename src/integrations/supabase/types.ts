@@ -482,6 +482,38 @@ export type Database = {
           },
         ]
       }
+      engineer_capacity_audit: {
+        Row: {
+          changed_by: string | null
+          changes: Json
+          created_at: string
+          engineer_id: string
+          id: string
+        }
+        Insert: {
+          changed_by?: string | null
+          changes: Json
+          created_at?: string
+          engineer_id: string
+          id?: string
+        }
+        Update: {
+          changed_by?: string | null
+          changes?: Json
+          created_at?: string
+          engineer_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "engineer_capacity_audit_engineer_id_fkey"
+            columns: ["engineer_id"]
+            isOneToOne: false
+            referencedRelation: "engineers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       engineer_materials_used: {
         Row: {
           created_at: string
@@ -714,7 +746,9 @@ export type Database = {
           created_at: string
           email: string
           id: string
+          ignore_working_hours: boolean
           is_active: boolean | null
+          is_subcontractor: boolean
           max_installs_per_day: number
           name: string
           region: string | null
@@ -727,7 +761,9 @@ export type Database = {
           created_at?: string
           email: string
           id?: string
+          ignore_working_hours?: boolean
           is_active?: boolean | null
+          is_subcontractor?: boolean
           max_installs_per_day?: number
           name: string
           region?: string | null
@@ -740,7 +776,9 @@ export type Database = {
           created_at?: string
           email?: string
           id?: string
+          ignore_working_hours?: boolean
           is_active?: boolean | null
+          is_subcontractor?: boolean
           max_installs_per_day?: number
           name?: string
           region?: string | null

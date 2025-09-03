@@ -190,6 +190,7 @@ export function EngineerCsvImport({ open, onOpenChange, onImportComplete }: Engi
                 <ul className="list-disc list-inside space-y-1 text-sm">
                   <li><strong>Required:</strong> email, full_name</li>
                   <li><strong>Optional:</strong> region, starting_postcode, availability, service_areas, max_travel_minutes</li>
+                  <li><strong>Subcontractor fields:</strong> is_subcontractor, ignore_working_hours, max_installs_per_day</li>
                   <li><strong>Daily schedule:</strong> mon_available, mon_start, mon_end (repeat for tue, wed, thu, fri, sat, sun)</li>
                   <li><strong>Availability values:</strong> TRUE/FALSE, 1/0, yes/no</li>
                   <li><strong>Time format:</strong> HH:MM (e.g., 08:00, 17:30)</li>
