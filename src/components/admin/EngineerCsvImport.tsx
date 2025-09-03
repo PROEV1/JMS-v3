@@ -45,11 +45,11 @@ export function EngineerCsvImport({ open, onOpenChange, onImportComplete }: Engi
         skipEmptyLines: true,
         transform: (value, field) => {
           // Normalize boolean values
-          if (typeof field === 'string' && field.includes('available')) {
+          if (typeof field === 'string' && (field.includes('available') || field === 'is_subcontractor' || field === 'ignore_working_hours')) {
             return value.toLowerCase() === 'true' || value === '1' || value.toLowerCase() === 'yes';
           }
           // Normalize numbers
-          if (field === 'max_travel_minutes') {
+          if (field === 'max_travel_minutes' || field === 'max_installs_per_day') {
             const num = parseInt(value, 10);
             return isNaN(num) ? undefined : num;
           }
@@ -194,7 +194,7 @@ export function EngineerCsvImport({ open, onOpenChange, onImportComplete }: Engi
                   <li><strong>Daily schedule:</strong> mon_available, mon_start, mon_end (repeat for tue, wed, thu, fri, sat, sun)</li>
                   <li><strong>Availability values:</strong> TRUE/FALSE, 1/0, yes/no</li>
                   <li><strong>Time format:</strong> HH:MM (e.g., 08:00, 17:30)</li>
-                  <li><strong>Service areas:</strong> Pipe-separated (e.g., "SW1|E1|N1")</li>
+                  <li><strong>Service areas:</strong> Pipe or comma-separated (e.g., "SW1|E1|N1" or "SW1, E1, N1")</li>
                 </ul>
                 <p className="text-sm text-muted-foreground mt-2">
                   <a href="/engineer_import_template.csv" download className="text-blue-600 hover:underline">

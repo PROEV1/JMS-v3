@@ -33,8 +33,11 @@ interface EngineerRow {
   sun_available?: boolean;
   sun_start?: string;
   sun_end?: string;
-  service_areas?: string; // pipe-separated: "SW1|E1|N1"
+  service_areas?: string; // pipe or comma-separated: "SW1|E1|N1" or "SW1, E1, N1"
   max_travel_minutes?: number;
+  is_subcontractor?: boolean;
+  ignore_working_hours?: boolean;
+  max_installs_per_day?: number;
 }
 
 interface ImportRequest {
@@ -351,7 +354,10 @@ Deno.serve(async (req) => {
               region: row.region?.trim() || null,
               availability: row.availability ?? true,
               starting_postcode: row.starting_postcode?.trim() || null,
-              user_id: profile?.user_id || engineer.user_id
+              user_id: profile?.user_id || engineer.user_id,
+              is_subcontractor: row.is_subcontractor ?? false,
+              ignore_working_hours: row.ignore_working_hours ?? false,
+              max_installs_per_day: row.max_installs_per_day ?? 2
             })
             .eq('id', engineer.id);
 
@@ -377,7 +383,10 @@ Deno.serve(async (req) => {
               region: row.region?.trim() || null,
               availability: row.availability ?? true,
               starting_postcode: row.starting_postcode?.trim() || null,
-              user_id: profile?.user_id || null
+              user_id: profile?.user_id || null,
+              is_subcontractor: row.is_subcontractor ?? false,
+              ignore_working_hours: row.ignore_working_hours ?? false,
+              max_installs_per_day: row.max_installs_per_day ?? 2
             })
             .select('id')
             .single();
@@ -479,7 +488,9 @@ Deno.serve(async (req) => {
         
         // First, try to process explicit service_areas column
         if (row.service_areas?.trim()) {
-          const areas = row.service_areas.split('|')
+          // Handle both pipe-separated and comma-separated values
+          const separator = row.service_areas.includes('|') ? '|' : ',';
+          const areas = row.service_areas.split(separator)
             .map(area => area.trim().toUpperCase())
             .filter(area => area.length > 0);
 
