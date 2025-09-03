@@ -56,7 +56,6 @@ export function SubcontractorSettingsPanel({ onSettingsChange }: SubcontractorSe
   };
 
   const saveSettings = async () => {
-    console.log('Attempting to save subcontractor settings:', settings);
     setSaving(true);
     try {
       const { error } = await supabase
@@ -66,7 +65,6 @@ export function SubcontractorSettingsPanel({ onSettingsChange }: SubcontractorSe
           setting_value: settings as any,
         });
 
-      console.log('Save result - error:', error);
       if (error) throw error;
 
       toast({
