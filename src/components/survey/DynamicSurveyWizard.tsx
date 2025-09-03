@@ -7,6 +7,7 @@ import { SurveyFormSchema, SurveyStep } from '@/types/survey-forms';
 import { DynamicSurveyField } from './DynamicSurveyField';
 import { DualBrandHeader } from './DualBrandHeader';
 import { SurveyStepHeader } from './SurveyStepHeader';
+import { SurveyFooter } from './SurveyFooter';
 import { useSurveyValidation } from '@/hooks/useSurveyValidation';
 import { useToast } from '@/hooks/use-toast';
 
@@ -135,14 +136,12 @@ export function DynamicSurveyWizard({
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Dual Brand Header */}
-      {schema.designSettings.useDualBrand && partnerBrand && (
-        <DualBrandHeader partnerBrand={{ 
-          name: partnerBrand.name, 
-          logo_url: partnerBrand.logo_url || '', 
-          hex: '#0EA5E9' 
-        }} />
-      )}
+      {/* Dual Brand Header - Always show */}
+      <DualBrandHeader partnerBrand={partnerBrand ? { 
+        name: partnerBrand.name, 
+        logo_url: partnerBrand.logo_url || '', 
+        hex: '#0EA5E9' 
+      } : undefined} />
 
       <div className="max-w-2xl mx-auto px-4 py-8">
         {/* Step Header */}
@@ -248,6 +247,9 @@ export function DynamicSurveyWizard({
           </div>
         </div>
       </div>
+      
+      {/* Survey Footer */}
+      <SurveyFooter />
     </div>
   );
 }

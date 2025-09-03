@@ -5,6 +5,7 @@ import { CheckCircle, Clock, ArrowRight } from 'lucide-react';
 import { DualBrandHeader } from '@/components/survey/DualBrandHeader';
 import { Button } from '@/components/ui/button';
 import { useUserRole } from '@/hooks/useUserRole';
+import { useAuth } from '@/hooks/useAuth';
 
 interface SurveySuccessProps {
   orderNumber?: string;
@@ -20,6 +21,7 @@ export default function SurveySuccess() {
   const { orderId } = useParams();
   const navigate = useNavigate();
   const { role } = useUserRole();
+  const { user } = useAuth();
   const { orderNumber, partnerBrand } = location.state || {};
 
   const getReturnUrl = () => {
@@ -32,13 +34,26 @@ export default function SurveySuccess() {
     return '/client/orders';
   };
 
+  const handleReturnToPortal = () => {
+    const targetUrl = getReturnUrl();
+    
+    if (!user) {
+      // User is not authenticated, set redirect path and go to auth
+      sessionStorage.setItem('authRedirectPath', targetUrl);
+      navigate('/auth');
+    } else {
+      // User is authenticated, go directly to target
+      navigate(targetUrl);
+    }
+  };
+
   useEffect(() => {
     const timer = setTimeout(() => {
-      navigate(getReturnUrl());
+      handleReturnToPortal();
     }, 3000);
 
     return () => clearTimeout(timer);
-  }, [navigate, role, orderId]);
+  }, [navigate, role, orderId, user]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -111,7 +126,7 @@ export default function SurveySuccess() {
 
             <div className="space-y-4">
               <Button
-                onClick={() => navigate(getReturnUrl())}
+                onClick={handleReturnToPortal}
                 className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
               >
                 Return to your portal
