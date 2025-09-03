@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Order, Engineer, getStatusColor, getOrderEstimatedHours, isDefaultEstimatedHours } from '@/utils/schedulingUtils';
 import { getLocationDisplayText } from '@/utils/postcodeUtils';
+import { getJobTypeLabel } from '@/utils/jobTypeUtils';
 import { MapPin, User, Calendar, Clock, Eye, Package, CalendarDays, Users } from 'lucide-react';
 
 interface JobCardProps {
@@ -174,11 +175,9 @@ export function JobCard({
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap mb-1">
                   <h4 className="font-medium text-sm">{order.order_number}</h4>
-                  {order.job_type && (
-                    <Badge variant="secondary" className="text-xs bg-purple-100 text-purple-700">
-                      {order.job_type.charAt(0).toUpperCase() + order.job_type.slice(1).replace('_', ' ')}
-                    </Badge>
-                  )}
+                   <Badge variant="secondary" className="text-xs bg-purple-100 text-purple-700">
+                     {getJobTypeLabel(order.job_type)}
+                   </Badge>
                 </div>
                 <p className="text-xs text-muted-foreground truncate">
                   {order.client?.full_name}

@@ -7,6 +7,7 @@ import { PartnerJobBadge } from '@/components/admin/PartnerJobBadge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Database } from '@/integrations/supabase/types';
 import { getOrderEstimatedMinutes, isDefaultEstimatedHours } from '@/utils/schedulingUtils';
+import { getJobTypeLabel } from '@/utils/jobTypeUtils';
 
 type Order = Database['public']['Tables']['orders']['Row'] & {
   clients?: { name?: string; full_name?: string; email: string; phone: string; };
@@ -97,11 +98,9 @@ export function EnhancedJobCard({ order, onAssignEngineer, onUnassign, onSchedul
           <div className="space-y-1">
             <CardTitle className="text-base flex items-center gap-2 flex-wrap">
               {order.order_number}
-              {order.job_type && (
-                <Badge variant="secondary" className="text-xs">
-                  {order.job_type.charAt(0).toUpperCase() + order.job_type.slice(1).replace('_', ' ')}
-                </Badge>
-              )}
+               <Badge variant="secondary" className="text-xs">
+                 {getJobTypeLabel(order.job_type)}
+               </Badge>
               <PartnerJobBadge
                 isPartnerJob={order.is_partner_job}
                 partnerName={order.partners?.name}

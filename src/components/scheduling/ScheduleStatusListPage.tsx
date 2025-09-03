@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Search, Send, Wrench, User, Calendar as CalendarIcon, MapPin, RotateCcw, XCircle, Calendar, Check, X, Eye, Filter, ArrowUpDown, Clock, Bot, Grid, List, MoreHorizontal, Download } from 'lucide-react';
 import { Order, Engineer, getOrderEstimatedHours, isDefaultEstimatedHours } from '@/utils/schedulingUtils';
+import { getJobTypeLabel } from '@/utils/jobTypeUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -916,7 +917,7 @@ export function ScheduleStatusListPage({
                       <div className="col-span-2">
                         <div className="space-y-1">
                           <span className="text-sm font-bold text-foreground capitalize">
-                            {order.job_type?.replace('_', ' ') || 'Installation'}
+                            {getJobTypeLabel(order.job_type)}
                           </span>
                           <div className="text-xs text-muted-foreground">
                             {order.order_number}
@@ -1172,7 +1173,7 @@ export function ScheduleStatusListPage({
                       <div className="flex items-center justify-between">
                         <div className="space-y-1">
                           <span className="text-sm font-bold text-foreground capitalize">
-                            {order.job_type?.replace('_', ' ') || 'Installation'}
+                            {getJobTypeLabel(order.job_type)}
                           </span>
                           <div className="text-xs text-muted-foreground">
                             {order.order_number}
