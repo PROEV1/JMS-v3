@@ -65,6 +65,17 @@ export const useAmendPurchaseOrder = () => {
 
   return useMutation({
     mutationFn: async ({ purchaseOrderId, items, amendmentReason, engineerId }: AmendPurchaseOrderData) => {
+      console.log('Starting PO amendment for:', purchaseOrderId);
+      console.log('Items to amend:', items);
+      
+      // Check authentication first
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        console.error('Authentication error:', authError);
+        throw new Error('User not authenticated');
+      }
+      console.log('Authenticated user:', user.id);
+      
       // Get current PO details
       const { data: currentPO, error: fetchError } = await supabase
         .from('purchase_orders')
@@ -75,7 +86,11 @@ export const useAmendPurchaseOrder = () => {
         .eq('id', purchaseOrderId)
         .single();
 
-      if (fetchError) throw fetchError;
+      if (fetchError) {
+        console.error('Error fetching PO:', fetchError);
+        throw fetchError;
+      }
+      console.log('Current PO:', currentPO);
 
       // Update PO with amendment notes
       const amendmentNote = `\n\n=== AMENDMENT ===\nReason: ${amendmentReason}\nAmended by Engineer: ${engineerId}\nAmended at: ${new Date().toISOString()}\n`;
@@ -91,7 +106,10 @@ export const useAmendPurchaseOrder = () => {
         })
         .eq('id', purchaseOrderId);
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error('Error updating PO:', updateError);
+        throw updateError;
+      }
 
       // Delete existing lines
       const { error: deleteError } = await supabase
@@ -99,7 +117,10 @@ export const useAmendPurchaseOrder = () => {
         .delete()
         .eq('purchase_order_id', purchaseOrderId);
 
-      if (deleteError) throw deleteError;
+      if (deleteError) {
+        console.error('Error deleting PO lines:', deleteError);
+        throw deleteError;
+      }
 
       // Insert new/amended lines
       const newLines = items.map((item, index) => ({
@@ -110,12 +131,18 @@ export const useAmendPurchaseOrder = () => {
         received_quantity: 0 // Default to 0 for new lines
       }));
 
+      console.log('Inserting new lines:', newLines);
+
       const { error: insertError } = await supabase
         .from('purchase_order_lines')
         .insert(newLines);
 
-      if (insertError) throw insertError;
+      if (insertError) {
+        console.error('Error inserting PO lines:', insertError);
+        throw insertError;
+      }
 
+      console.log('Amendment completed successfully');
       return { purchaseOrderId, amendedLines: newLines.length };
     },
     onSuccess: (data) => {
