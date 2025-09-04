@@ -146,15 +146,12 @@ export const useAmendPurchaseOrder = () => {
           unitCost = inventoryItem?.default_cost || 0;
         }
 
-        const lineTotal = item.quantity * unitCost;
-
         return {
           purchase_order_id: purchaseOrderId,
           item_id: item.item_id,
           quantity: item.quantity,
           unit_cost: unitCost,
-          line_total: lineTotal,
-          received_quantity: 0
+          received_quantity: 0 // line_total is auto-calculated by database
         };
       }));
 
@@ -234,8 +231,8 @@ export const useAmendPurchaseOrder = () => {
         }
       }
 
-      // Calculate total amendment value for display
-      const totalValue = newLines.reduce((sum, line) => sum + (line.line_total || 0), 0);
+      // Calculate total amendment value for display (manually since line_total is auto-calculated)
+      const totalValue = newLines.reduce((sum, line) => sum + (line.quantity * line.unit_cost), 0);
 
       console.log('Amendment completed successfully');
       return { 
