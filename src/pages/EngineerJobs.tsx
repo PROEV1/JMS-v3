@@ -176,7 +176,10 @@ export default function EngineerJobs() {
 
   // Group jobs by enhanced status
   const groupedJobs = {
-    scheduled: allJobs?.filter(job => job.status_enhanced === 'scheduled') || [],
+    scheduled: allJobs?.filter(job => 
+      job.status_enhanced === 'scheduled' || 
+      (job.scheduled_install_date && !job.engineer_signed_off_at)
+    ) || [],
     in_progress: allJobs?.filter(job => job.status_enhanced === 'in_progress') || [],
     completed: allJobs?.filter(job => 
       job.status_enhanced === 'completed' || 
