@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { CalendarDays, MapPin, User, Phone, Mail, Package, CreditCard, CheckCircle, Clock, FileText, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
 import type { Database } from '@/integrations/supabase/types';
+import { AgreementSigningModal } from '@/components/AgreementSigningModal';
 
 type OrderStatusEnhanced = Database['public']['Enums']['order_status_enhanced'];
 
@@ -59,6 +60,7 @@ export default function EnhancedClientOrderView() {
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [processingPayment, setProcessingPayment] = useState(false);
+  const [agreementModalOpen, setAgreementModalOpen] = useState(false);
 
   useEffect(() => {
     if (orderId) {
@@ -331,6 +333,10 @@ export default function EnhancedClientOrderView() {
     }
   };
 
+  const handleAgreementSigned = async () => {
+    await fetchOrder();
+  };
+
   const renderStepContent = () => {
     const currentStep = getCurrentStep();
     const status = order?.status_enhanced;
@@ -418,6 +424,31 @@ export default function EnhancedClientOrderView() {
               : `Pay Balance Now (£${outstandingAmount.toFixed(2)})`
             }
           </Button>
+        </div>
+      );
+    }
+    
+    if (currentStep.step === 3) {
+      return (
+        <div className="space-y-6">
+          <div className="bg-orange-50 border border-orange-200 rounded-lg p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-8 h-8 bg-orange-500 text-white rounded-full flex items-center justify-center font-bold">
+                3
+              </div>
+              <div>
+                <h3 className="font-semibold text-orange-700">Sign Agreement</h3>
+                <p className="text-sm text-orange-600">Sign to lock in your booking</p>
+              </div>
+            </div>
+            <Button 
+              onClick={() => setAgreementModalOpen(true)} 
+              className="bg-orange-500 hover:bg-orange-600"
+            >
+              <FileText className="mr-2 h-4 w-4" />
+              View & Sign Agreement
+            </Button>
+          </div>
         </div>
       );
     }
@@ -667,6 +698,14 @@ export default function EnhancedClientOrderView() {
           )}
         </div>
       </div>
+
+      {/* Agreement Signing Modal */}
+      <AgreementSigningModal
+        isOpen={agreementModalOpen}
+        onClose={() => setAgreementModalOpen(false)}
+        order={order}
+        onAgreementSigned={handleAgreementSigned}
+      />
     </div>
   );
 }
