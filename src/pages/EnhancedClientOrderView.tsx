@@ -218,7 +218,7 @@ export default function EnhancedClientOrderView() {
     }
     
     if (['awaiting_install_booking', 'date_offered', 'date_accepted', 'date_rejected', 'offer_expired'].includes(status)) {
-      return { step: 4, title: 'Submit Install Preferences', description: 'Choose your preferred install date' };
+      return { step: 4, title: 'Awaiting Scheduling', description: 'We will be in touch within 24 hours' };
     }
     
     if (status === 'scheduled') {
@@ -258,9 +258,9 @@ export default function EnhancedClientOrderView() {
       },
       {
         number: 4,
-        title: 'Submit Install Preferences',
-        description: 'Choose your preferred install date',
-        icon: Calendar,
+        title: 'Awaiting Scheduling',
+        description: 'We will be in touch within 24 hours',
+        icon: Clock,
         completed: currentStep > 4,
         active: currentStep === 4
       },
@@ -448,6 +448,28 @@ export default function EnhancedClientOrderView() {
               <FileText className="mr-2 h-4 w-4" />
               View & Sign Agreement
             </Button>
+          </div>
+        </div>
+      );
+    }
+    
+    if (currentStep.step === 4) {
+      return (
+        <div className="space-y-6">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center">
+                <Clock className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-blue-700">Awaiting Scheduling</h3>
+                <p className="text-sm text-blue-600">We will be in touch within 24 hours</p>
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Our scheduling team will contact you within 24 hours to arrange your installation date. 
+              We'll work with your preferred times to find the best slot.
+            </p>
           </div>
         </div>
       );
