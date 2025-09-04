@@ -107,7 +107,6 @@ export const useAmendPurchaseOrder = () => {
         item_id: item.item_id,
         quantity: item.quantity,
         unit_cost: 0, // Will be filled by admin
-        line_number: index + 1,
         notes: item.notes || 'Amended by engineer'
       }));
 
