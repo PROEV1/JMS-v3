@@ -45,6 +45,7 @@ import ClientMessages from '@/pages/ClientMessages';
 import ClientPayments from '@/pages/ClientPayments';
 import ClientProfilePage from '@/pages/ClientProfilePage';
 import EnhancedClientOrderView from '@/pages/EnhancedClientOrderView';
+import ClientOfferViewPublic from '@/pages/ClientOfferViewPublic';
 
 function App() {
   return (
@@ -55,6 +56,7 @@ function App() {
         <Route path="/login" element={<Auth />} />
         <Route path="/auth" element={<Auth />} />
         <Route path="/quote/:token" element={<PublicQuoteView />} />
+        <Route path="/offers/:token" element={<ClientOfferViewPublic />} />
         
         {/* Survey Routes - Public access with token validation */}
         <Route path="/survey/:orderId" element={<SurveyPage />} />

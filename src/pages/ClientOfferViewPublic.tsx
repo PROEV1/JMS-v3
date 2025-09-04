@@ -54,10 +54,14 @@ export default function ClientOfferViewPublic() {
     const fetchOffer = async () => {
       if (!token) return;
 
+      console.log('Fetching offer with token:', token);
+
       try {
         const { data, error } = await supabase.functions.invoke('offer-lookup', {
           body: { token }
         });
+
+        console.log('Offer lookup response:', { data, error });
 
         if (error || !data || data?.error) {
           setError(data?.error || 'Failed to load offer details');
@@ -66,6 +70,7 @@ export default function ClientOfferViewPublic() {
           }
         } else if (data?.data) {
           setOffer(data.data);
+          console.log('Offer loaded successfully:', data.data);
         } else {
           setError('Invalid offer data received');
         }
