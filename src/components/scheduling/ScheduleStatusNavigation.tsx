@@ -4,6 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Clock, Calendar, CheckCircle, XCircle, AlertTriangle, Package, Ban, FileCheck, Trophy, Eye } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
+import { buildSafeUuidInClause } from '@/utils/schedulingUtils';
 
 interface ScheduleStatusNavigationProps {
   currentStatus?: string;
@@ -235,7 +236,10 @@ export function ScheduleStatusNavigation({ currentStatus }: ScheduleStatusNaviga
 
         // Exclude orders with active offers
         if (activeOfferOrderIds.length > 0) {
-          query = query.not('id', 'in', `(${activeOfferOrderIds.map(id => `'${id}'`).join(',')})`);
+          const safeIdList = buildSafeUuidInClause(activeOfferOrderIds);
+          if (safeIdList) {
+            query = query.not('id', 'in', safeIdList);
+          }
         }
 
         const { count } = await query;
@@ -250,15 +254,20 @@ export function ScheduleStatusNavigation({ currentStatus }: ScheduleStatusNaviga
           .eq('status', 'accepted');
         
         if (acceptedOffers?.length) {
-          const { count: ordersWithAcceptedOffersCount } = await supabase
-            .from('orders')
-            .select('*', { count: 'exact', head: true })
-            .eq('status_enhanced', 'awaiting_install_booking')
-            .is('scheduled_install_date', null)
-            .eq('scheduling_suppressed', false)
-            .in('id', acceptedOffers.map(offer => offer.order_id));
+          const acceptedOfferIds = acceptedOffers.map(offer => offer.order_id);
+          const safeAcceptedIds = buildSafeUuidInClause(acceptedOfferIds);
           
-          readyToBookCount = ordersWithAcceptedOffersCount || 0;
+          if (safeAcceptedIds) {
+            const { count: ordersWithAcceptedOffersCount } = await supabase
+              .from('orders')
+              .select('*', { count: 'exact', head: true })
+              .eq('status_enhanced', 'awaiting_install_booking')
+              .is('scheduled_install_date', null)
+              .eq('scheduling_suppressed', false)
+              .in('id', acceptedOfferIds);
+            
+            readyToBookCount = ordersWithAcceptedOffersCount || 0;
+          }
         }
 
         setCounts({
