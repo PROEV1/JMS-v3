@@ -46,6 +46,14 @@ import ClientPayments from '@/pages/ClientPayments';
 import ClientProfilePage from '@/pages/ClientProfilePage';
 import EnhancedClientOrderView from '@/pages/EnhancedClientOrderView';
 import ClientOfferViewPublic from '@/pages/ClientOfferViewPublic';
+import EngineerDashboard from '@/pages/EngineerDashboard';
+import EngineerJobs from '@/pages/EngineerJobs';
+import EngineerJobDetail from '@/pages/EngineerJobDetail';
+import EngineerChargers from '@/pages/EngineerChargers';
+import EngineerVanStock from '@/pages/EngineerVanStock';
+import EngineerStockRequests from '@/pages/EngineerStockRequests';
+import EngineerScan from '@/pages/EngineerScan';
+import PartnerPortal from '@/pages/PartnerPortal';
 
 function App() {
   return (
@@ -72,6 +80,20 @@ function App() {
         <Route path="/client/messages" element={<ProtectedRoute><Layout><ClientMessages /></Layout></ProtectedRoute>} />
         <Route path="/client/payments" element={<ProtectedRoute><Layout><ClientPayments /></Layout></ProtectedRoute>} />
         <Route path="/client/profile" element={<ProtectedRoute><Layout><ClientProfilePage /></Layout></ProtectedRoute>} />
+        
+        {/* Engineer Routes */}
+        <Route path="/engineer" element={<ProtectedRoute><Layout><EngineerDashboard /></Layout></ProtectedRoute>} />
+        <Route path="/engineer/jobs" element={<ProtectedRoute><Layout><EngineerJobs /></Layout></ProtectedRoute>} />
+        <Route path="/engineer/jobs/:id" element={<ProtectedRoute><Layout><EngineerJobDetail /></Layout></ProtectedRoute>} />
+        <Route path="/engineer/chargers" element={<ProtectedRoute><Layout><EngineerChargers /></Layout></ProtectedRoute>} />
+        <Route path="/engineer/van-stock" element={<ProtectedRoute><Layout><EngineerVanStock /></Layout></ProtectedRoute>} />
+        <Route path="/engineer/stock-requests" element={<ProtectedRoute><Layout><EngineerStockRequests /></Layout></ProtectedRoute>} />
+        <Route path="/engineer/scan" element={<ProtectedRoute><Layout><EngineerScan /></Layout></ProtectedRoute>} />
+        <Route path="/engineer/availability" element={<ProtectedRoute><Layout><EngineerAvailability /></Layout></ProtectedRoute>} />
+        <Route path="/engineer/profile" element={<ProtectedRoute><Layout><EngineerProfile /></Layout></ProtectedRoute>} />
+        
+        {/* Partner Routes */}
+        <Route path="/partner" element={<ProtectedRoute><Layout><PartnerPortal /></Layout></ProtectedRoute>} />
         
         {/* Admin Routes */}
         <Route path="/admin" element={<ProtectedRoute><Layout><OpsCommandCentre /></Layout></ProtectedRoute>} />
