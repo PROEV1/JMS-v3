@@ -106,7 +106,8 @@ export const useAmendPurchaseOrder = () => {
         purchase_order_id: purchaseOrderId,
         item_id: item.item_id,
         quantity: item.quantity,
-        unit_cost: 0 // Will be filled by admin
+        unit_cost: 0, // Will be filled by admin
+        received_quantity: 0 // Default to 0 for new lines
       }));
 
       const { error: insertError } = await supabase
