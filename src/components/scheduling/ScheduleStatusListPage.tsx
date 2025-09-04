@@ -63,6 +63,7 @@ export function ScheduleStatusListPage({
   const [showSmartAssign, setShowSmartAssign] = useState(false);
   const [showAutoScheduleModal, setShowAutoScheduleModal] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isScheduling, setIsScheduling] = useState<string | null>(null); // Track which order is being scheduled
 
   // Handle search term changes
   const handleSearchChange = (value: string) => {
@@ -350,6 +351,9 @@ export function ScheduleStatusListPage({
       toast.success('Offer resent successfully');
       refetchOffers();
       if (onUpdate) onUpdate();
+      
+      // Dispatch refresh event to update status counts and other components
+      window.dispatchEvent(new CustomEvent('scheduling:refresh'));
     } catch (error) {
       toast.error('Failed to resend offer');
     }
@@ -364,6 +368,9 @@ export function ScheduleStatusListPage({
       toast.success('Offer released successfully');
       refetchOffers();
       if (onUpdate) onUpdate();
+      
+      // Dispatch refresh event to update status counts and other components
+      window.dispatchEvent(new CustomEvent('scheduling:refresh'));
     } catch (error) {
       toast.error('Failed to release offer');
     }
@@ -419,6 +426,9 @@ export function ScheduleStatusListPage({
       toast.success('Offer accepted - job moved to Ready to Book');
       refetchOffers();
       if (onUpdate) onUpdate();
+      
+      // Dispatch refresh event to update status counts and other components
+      window.dispatchEvent(new CustomEvent('scheduling:refresh'));
     } catch (error) {
       console.error('Failed to accept offer:', error);
       toast.error('Failed to accept offer');
@@ -459,6 +469,9 @@ export function ScheduleStatusListPage({
       toast.success('Offer rejected');
       refetchOffers();
       if (onUpdate) onUpdate();
+      
+      // Dispatch refresh event to update status counts and other components
+      window.dispatchEvent(new CustomEvent('scheduling:refresh'));
     } catch (error) {
       console.error('Failed to reject offer:', error);
       toast.error('Failed to reject offer');
@@ -467,6 +480,8 @@ export function ScheduleStatusListPage({
 
   const handleConfirmAndSchedule = async (orderId: string) => {
     console.log('Confirming and scheduling order:', orderId);
+    
+    setIsScheduling(orderId); // Set loading state
     
     try {
       // Get the accepted offer for this order
@@ -512,23 +527,30 @@ export function ScheduleStatusListPage({
       refetchOffers();
       if (onUpdate) onUpdate();
 
+      // Dispatch refresh event to update status counts and other components
+      window.dispatchEvent(new CustomEvent('scheduling:refresh'));
+
       // Send confirmation emails in background (non-blocking)
-      supabase.functions.invoke('send-order-status-email', {
-        body: {
-          order_id: orderId,
-          status: 'scheduled',
-          recipient_type: 'both'
-        }
-      }).then(() => {
-        console.log('Confirmation emails sent successfully');
-      }).catch((emailError) => {
-        console.error('Failed to send confirmation emails (non-critical):', emailError);
-        // Don't show error toast for email failures as the main action succeeded
-      });
+      setTimeout(() => {
+        supabase.functions.invoke('send-order-status-email', {
+          body: {
+            order_id: orderId,
+            status: 'scheduled',
+            recipient_type: 'both'
+          }
+        }).then(() => {
+          console.log('Confirmation emails sent successfully');
+        }).catch((emailError) => {
+          console.error('Failed to send confirmation emails (non-critical):', emailError);
+          // Don't show error toast for email failures as the main action succeeded
+        });
+      }, 100); // Delay email sending to make UI response faster
 
     } catch (error) {
       console.error('Failed to confirm and schedule:', error);
       toast.error('Failed to confirm and schedule installation');
+    } finally {
+      setIsScheduling(null); // Clear loading state
     }
   };
 
@@ -1031,14 +1053,14 @@ export function ScheduleStatusListPage({
                              if (title === 'Ready to Book') {
                                return (
                                   <div className="flex gap-2">
-                                     <Button
-                                       size="sm"
-                                       onClick={() => order?.id && handleConfirmAndSchedule(order.id)}
-                                       className="text-xs px-3 py-1 h-8"
-                                       disabled={!order?.id}
-                                     >
-                                       Confirm & Schedule
-                                     </Button>
+                                      <Button
+                                        size="sm"
+                                        onClick={() => order?.id && handleConfirmAndSchedule(order.id)}
+                                        className="text-xs px-3 py-1 h-8"
+                                        disabled={!order?.id || isScheduling === order?.id}
+                                      >
+                                        {isScheduling === order?.id ? 'Scheduling...' : 'Confirm & Schedule'}
+                                      </Button>
                                      <Button
                                        size="sm"
                                        variant="outline"
@@ -1263,14 +1285,14 @@ export function ScheduleStatusListPage({
                            if (title === 'Ready to Book') {
                              return (
                                <>
-                                  <Button
-                                    size="sm"
-                                    onClick={() => order?.id && handleConfirmAndSchedule(order.id)}
-                                    className="flex-1 text-xs h-7"
-                                    disabled={!order?.id}
-                                  >
-                                    Confirm & Schedule
-                                  </Button>
+                                   <Button
+                                     size="sm"
+                                     onClick={() => order?.id && handleConfirmAndSchedule(order.id)}
+                                     className="flex-1 text-xs h-7"
+                                     disabled={!order?.id || isScheduling === order?.id}
+                                   >
+                                     {isScheduling === order?.id ? 'Scheduling...' : 'Confirm & Schedule'}
+                                   </Button>
                                   <Button
                                     size="sm"
                                     variant="outline"

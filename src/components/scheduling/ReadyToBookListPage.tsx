@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { ScheduleStatusNavigation } from './ScheduleStatusNavigation';
@@ -90,7 +90,7 @@ export function ReadyToBookListPage() {
     };
   }, [debouncedSearchTerm, pagination.offset, pagination.pageSize]);
 
-  const { data: ordersResponse = { data: [], count: 0 }, isLoading: ordersLoading } = useQuery({
+  const { data: ordersResponse = { data: [], count: 0 }, isLoading: ordersLoading, refetch: refetchOrders } = useQuery({
     queryKey: ['orders', 'ready-to-book', pagination.page, pagination.pageSize, debouncedSearchTerm],
     queryFn: async () => {
       try {
@@ -131,6 +131,51 @@ export function ReadyToBookListPage() {
     }
   });
 
+  // Listen for scheduling refresh events and real-time updates
+  useEffect(() => {
+    const handleRefresh = () => {
+      console.log('ReadyToBookListPage: Received refresh event, refetching data...');
+      refetchOrders();
+    };
+    
+    // Listen for custom refresh events
+    window.addEventListener('scheduling:refresh', handleRefresh);
+    
+    // Set up real-time subscriptions for orders and job_offers
+    const ordersChannel = supabase
+      .channel('ready-to-book-orders')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'orders'
+        },
+        () => {
+          console.log('ReadyToBookListPage: Orders real-time update received');
+          refetchOrders();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'job_offers'
+        },
+        () => {
+          console.log('ReadyToBookListPage: Job offers real-time update received');
+          refetchOrders();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      window.removeEventListener('scheduling:refresh', handleRefresh);
+      supabase.removeChannel(ordersChannel);
+    };
+  }, [refetchOrders]);
+
   if (ordersLoading || engineersLoading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -162,6 +207,10 @@ export function ReadyToBookListPage() {
             onPageSizeChange={controls.setPageSize}
             searchTerm={searchTerm}
             onSearchChange={setSearchTerm}
+            onUpdate={() => {
+              console.log('ReadyToBookListPage: Manual update requested, refetching...');
+              refetchOrders();
+            }}
             exportQueryBuilder={async () => {
               const result = await buildSearchQuery(false, false);
               return result.data || [];
