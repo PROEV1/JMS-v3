@@ -231,6 +231,22 @@ export const useAmendPurchaseOrder = () => {
         }
       }
 
+      // Mark stock request as received if this amendment came from a stock request
+      if (currentPO.stock_request_id) {
+        const { error: statusError } = await supabase
+          .from('stock_requests')
+          .update({ 
+            status: 'received',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', currentPO.stock_request_id);
+
+        if (statusError) {
+          console.error('Error updating stock request status:', statusError);
+          // Don't throw - status update failure shouldn't fail the entire amendment
+        }
+      }
+
       // Calculate total amendment value for display (manually since line_total is auto-calculated)
       const totalValue = newLines.reduce((sum, line) => sum + (line.quantity * line.unit_cost), 0);
 
