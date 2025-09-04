@@ -258,7 +258,7 @@ export const useAmendPurchaseOrder = () => {
       let description = `Successfully amended PO with ${data.amendedLines} items (Total: ${totalValueFormatted}).`;
       
       if (data.stockAdjustmentsCreated > 0) {
-        description += ` ${data.stockAdjustmentsCreated} stock adjustments created.`;
+        description += ` ${data.stockAdjustmentsCreated} stock adjustments applied to your van inventory.`;
       }
       
       description += ` Status remains pending for admin review.`;
