@@ -41,7 +41,8 @@ import {
   LogOut,
   Plus,
   ChevronsUpDown,
-  Quote
+  Quote,
+  FileCheck
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -76,6 +77,7 @@ const sidebarItems = [
     items: [
       { name: "Partner Quotes", href: "/ops/quotes", icon: Quote, permission: "quotes.manage" },
       { name: "Schedule", href: "/admin/schedule", icon: Calendar, permission: null },
+      { name: "QA Review", href: "https://main.d11c44f8r7qjmh.amplifyapp.com/dashboard", icon: FileCheck, permission: null },
     ]
   },
   {
@@ -100,6 +102,14 @@ export function AdminSidebar() {
 
   const isActive = (href: string) => {
     return location.pathname === href;
+  };
+
+  const handleNavigation = (href: string) => {
+    if (href.startsWith('http://') || href.startsWith('https://')) {
+      window.open(href, '_blank');
+    } else {
+      navigate(href);
+    }
   };
 
   return (
@@ -156,7 +166,7 @@ export function AdminSidebar() {
                           "w-full justify-start rounded-md px-2",
                           isActive(item.href) ? "bg-accent text-accent-foreground" : ""
                         )}
-                        onClick={() => navigate(item.href)}
+                        onClick={() => handleNavigation(item.href)}
                       >
                         <item.icon className="mr-2 h-4 w-4" />
                         <span>{item.name}</span>
