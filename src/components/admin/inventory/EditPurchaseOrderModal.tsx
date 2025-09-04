@@ -80,6 +80,7 @@ export function EditPurchaseOrderModal({ open, onOpenChange, purchaseOrderId }: 
         .from('purchase_orders')
         .select(`
           *,
+          engineers!engineer_id(id, name, email),
           purchase_order_lines(
             id, item_name, quantity, unit_cost, line_total, received_quantity
           )
@@ -318,6 +319,16 @@ export function EditPurchaseOrderModal({ open, onOpenChange, purchaseOrderId }: 
             </div>
 
             <div className="space-y-2">
+              <Label htmlFor="engineer">Engineer</Label>
+              <Input
+                id="engineer"
+                value={purchaseOrder.engineers?.name || "Not assigned"}
+                disabled
+                className="bg-muted"
+              />
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="status">Status</Label>
               <Select value={status} onValueChange={setStatus}>
                 <SelectTrigger>
@@ -331,7 +342,9 @@ export function EditPurchaseOrderModal({ open, onOpenChange, purchaseOrderId }: 
                 </SelectContent>
               </Select>
             </div>
+          </div>
 
+          <div className="grid grid-cols-1 gap-4">
             <div className="space-y-2">
               <Label htmlFor="expected-delivery">Expected Delivery</Label>
               <Input

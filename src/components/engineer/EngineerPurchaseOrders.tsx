@@ -16,9 +16,7 @@ interface PurchaseOrder {
   expected_delivery_date: string | null;
   created_at: string;
   notes: string | null;
-  supplier: {
-    name: string;
-  } | null;
+  supplier_id: string | null;
   purchase_order_lines: Array<{
     item_name: string;
     quantity: number;
@@ -82,7 +80,7 @@ export function EngineerPurchaseOrders() {
           expected_delivery_date,
           created_at,
           notes,
-          supplier:inventory_suppliers(name),
+          supplier_id,
           purchase_order_lines(item_name, quantity, unit_cost)
         `)
         .eq('engineer_id', engineer.id)
@@ -159,10 +157,10 @@ export function EngineerPurchaseOrders() {
                     </div>
                     
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      {po.supplier && (
+                      {po.supplier_id && (
                         <span className="flex items-center gap-1">
                           <Package className="h-4 w-4" />
-                          {po.supplier.name}
+                          Supplier ID: {po.supplier_id}
                         </span>
                       )}
                       
