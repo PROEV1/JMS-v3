@@ -116,6 +116,7 @@ function ItemComboBox({ value, itemId, inventoryItems, onSelect }: ItemComboBoxP
 
 export function CreatePurchaseOrderModal({ open, onOpenChange, stockRequest }: CreatePurchaseOrderModalProps) {
   const [supplierId, setSupplierId] = useState("");
+  const [engineerId, setEngineerId] = useState("");
   const [expectedDelivery, setExpectedDelivery] = useState("");
   const [notes, setNotes] = useState("");
   const [poNumber, setPoNumber] = useState("");
@@ -134,6 +135,20 @@ export function CreatePurchaseOrderModal({ open, onOpenChange, stockRequest }: C
       const { data, error } = await supabase
         .from('inventory_suppliers')
         .select('id, name')
+        .eq('is_active', true)
+        .order('name');
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  // Fetch engineers
+  const { data: engineers = [] } = useQuery({
+    queryKey: ['engineers'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('engineers')
+        .select('id, name, email')
         .eq('is_active', true)
         .order('name');
       if (error) throw error;
@@ -177,6 +192,7 @@ export function CreatePurchaseOrderModal({ open, onOpenChange, stockRequest }: C
   React.useEffect(() => {
     if (stockRequest && open) {
       setNotes(`Created from stock request #${stockRequest.id.slice(0, 8)} for ${stockRequest.engineer.name}`);
+      setEngineerId(stockRequest.engineer_id); // Pre-select engineer from stock request
       const stockRequestItems = stockRequest.lines.map((line, index) => ({
         id: (index + 1).toString(),
         item_id: line.item_id,
@@ -252,6 +268,7 @@ export function CreatePurchaseOrderModal({ open, onOpenChange, stockRequest }: C
         .insert({
           po_number: poNumber,
           supplier_id: supplierId,
+          engineer_id: engineerId || null,
           expected_delivery_date: expectedDelivery || null,
           notes,
           total_amount: totalAmount,
@@ -309,6 +326,7 @@ export function CreatePurchaseOrderModal({ open, onOpenChange, stockRequest }: C
       onOpenChange(false);
       // Reset form
       setSupplierId("");
+      setEngineerId("");
       setExpectedDelivery("");
       setNotes("");
       setPoNumber("");
@@ -335,7 +353,7 @@ export function CreatePurchaseOrderModal({ open, onOpenChange, stockRequest }: C
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-4 gap-4">
             <div className="space-y-2">
               <Label htmlFor="po-number">PO Number *</Label>
               <Input
@@ -356,6 +374,22 @@ export function CreatePurchaseOrderModal({ open, onOpenChange, stockRequest }: C
                   {suppliers.map(supplier => (
                     <SelectItem key={supplier.id} value={supplier.id} className="cursor-pointer hover:bg-accent">
                       {supplier.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="engineer">Engineer (Optional)</Label>
+              <Select value={engineerId} onValueChange={setEngineerId}>
+                <SelectTrigger className="bg-background border-input">
+                  <SelectValue placeholder="Select engineer" />
+                </SelectTrigger>
+                <SelectContent className="z-[100] bg-popover border shadow-lg" position="popper" side="bottom" align="start">
+                  {engineers.map(engineer => (
+                    <SelectItem key={engineer.id} value={engineer.id} className="cursor-pointer hover:bg-accent">
+                      {engineer.name}
                     </SelectItem>
                   ))}
                 </SelectContent>

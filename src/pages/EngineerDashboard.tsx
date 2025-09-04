@@ -11,6 +11,7 @@ import { StockRequestButton } from '@/components/engineer/StockRequestButton';
 import { IncorrectStockButton } from '@/components/engineer/IncorrectStockButton';
 import { useStockRequests } from '@/hooks/useStockRequests';
 import { useToast } from '@/hooks/use-toast';
+import { format } from 'date-fns';
 
 interface Job {
   id: string;
@@ -200,6 +201,32 @@ export default function EngineerDashboard() {
         `)
         .eq('engineer_id', engineer.id)
         .in('status', ['assigned', 'dispatched', 'delivered', 'in_transit'])
+        .limit(5);
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!engineer?.id,
+  });
+
+  // Get purchase orders assigned to this engineer (recent ones)
+  const { data: purchaseOrders } = useQuery({
+    queryKey: ['engineer-recent-pos', engineer?.id],
+    queryFn: async () => {
+      if (!engineer?.id) return [];
+
+      const { data, error } = await supabase
+        .from('purchase_orders')
+        .select(`
+          id,
+          po_number,
+          status,
+          total_amount,
+          expected_delivery_date,
+          supplier:inventory_suppliers(name)
+        `)
+        .eq('engineer_id', engineer.id)
+        .order('created_at', { ascending: false })
         .limit(5);
 
       if (error) throw error;
@@ -485,6 +512,53 @@ export default function EngineerDashboard() {
                         <Eye className="h-4 w-4 mr-1" />
                         View Details
                       </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Purchase Orders Section */}
+      {purchaseOrders && purchaseOrders.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
+              <Package className="h-5 w-5 text-green-500" />
+              My Purchase Orders
+            </h2>
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={() => navigate('/engineer/van-stock')}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              View All <ArrowRight className="h-4 w-4 ml-1" />
+            </Button>
+          </div>
+          <div className="grid gap-3">
+            {purchaseOrders.slice(0, 3).map((po) => (
+              <Card key={po.id} className="hover:shadow-sm transition-all duration-200">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="font-medium">{po.po_number}</h4>
+                        <Badge 
+                          variant={po.status === 'received' ? 'default' : 'secondary'}
+                          className="text-xs"
+                        >
+                          {po.status}
+                        </Badge>
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {po.supplier?.name} • £{po.total_amount.toFixed(2)}
+                        {po.expected_delivery_date && (
+                          <> • Expected: {format(new Date(po.expected_delivery_date), 'MMM dd')}</>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </CardContent>

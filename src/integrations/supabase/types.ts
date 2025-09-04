@@ -2907,6 +2907,7 @@ export type Database = {
           amended_by: string | null
           created_at: string
           created_by: string | null
+          engineer_id: string | null
           expected_delivery_date: string | null
           id: string
           notes: string | null
@@ -2924,6 +2925,7 @@ export type Database = {
           amended_by?: string | null
           created_at?: string
           created_by?: string | null
+          engineer_id?: string | null
           expected_delivery_date?: string | null
           id?: string
           notes?: string | null
@@ -2941,6 +2943,7 @@ export type Database = {
           amended_by?: string | null
           created_at?: string
           created_by?: string | null
+          engineer_id?: string | null
           expected_delivery_date?: string | null
           id?: string
           notes?: string | null
@@ -2959,6 +2962,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_engineer_id_fkey"
+            columns: ["engineer_id"]
+            isOneToOne: false
+            referencedRelation: "engineers"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "purchase_orders_stock_request_id_fkey"

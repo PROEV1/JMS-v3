@@ -72,6 +72,7 @@ export function PurchaseOrdersList() {
           id, po_number, status, order_date, expected_delivery_date, total_amount, notes, created_at,
           inventory_suppliers(name),
           profiles!purchase_orders_created_by_fkey(full_name),
+          engineers(name, email),
           purchase_order_lines(id)
         `)
         .order('created_at', { ascending: false });
@@ -185,6 +186,9 @@ export function PurchaseOrdersList() {
                     </div>
                     <div className="text-sm text-muted-foreground">
                       {po.inventory_suppliers?.name || 'No supplier'} • {po.purchase_order_lines?.length || 0} items • £{po.total_amount?.toFixed(2) || '0.00'}
+                      {po.engineers?.name && (
+                        <span> • <span className="text-blue-600 font-medium">Assigned to {po.engineers.name}</span></span>
+                      )}
                     </div>
                     <div className="text-xs text-muted-foreground">
                       ETA: {po.expected_delivery_date || 'TBD'} • Created: {new Date(po.created_at).toLocaleDateString()}

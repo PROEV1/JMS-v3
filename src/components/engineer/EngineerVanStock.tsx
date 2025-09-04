@@ -18,6 +18,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { InventoryKpiTile } from '../admin/inventory/shared/InventoryKpiTile';
 import { StatusChip } from '../admin/inventory/shared/StatusChip';
 import { EmptyState } from '../admin/inventory/shared/EmptyState';
+import { EngineerPurchaseOrders } from './EngineerPurchaseOrders';
 
 export function EngineerVanStock() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -369,6 +370,9 @@ export function EngineerVanStock() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Purchase Orders Section */}
+      <EngineerPurchaseOrders />
     </div>
   );
 }
