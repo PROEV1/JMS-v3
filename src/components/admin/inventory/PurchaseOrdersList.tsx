@@ -70,9 +70,9 @@ export function PurchaseOrdersList() {
         .from('purchase_orders')
         .select(`
           id, po_number, status, order_date, expected_delivery_date, total_amount, notes, created_at,
-          inventory_suppliers(name),
-          profiles!purchase_orders_created_by_fkey(full_name),
-          engineers(name, email),
+          inventory_suppliers!supplier_id(name),
+          profiles!created_by(full_name),
+          engineers!engineer_id(name, email),
           purchase_order_lines(id)
         `)
         .order('created_at', { ascending: false });
@@ -81,7 +81,11 @@ export function PurchaseOrdersList() {
         query = query.or(`po_number.ilike.%${searchQuery}%,inventory_suppliers.name.ilike.%${searchQuery}%`);
       }
 
-      const { data } = await query;
+      const { data, error } = await query;
+      if (error) {
+        console.error('Error fetching purchase orders:', error);
+        throw error;
+      }
       return data || [];
     }
   });
