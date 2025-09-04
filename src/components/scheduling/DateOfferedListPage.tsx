@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Clock } from 'lucide-react';
 import { useServerPagination } from '@/hooks/useServerPagination';
 import { keepPreviousData } from '@tanstack/react-query';
+import { FixOrderStatusButton } from '../admin/FixOrderStatusButton';
 
 export function DateOfferedListPage() {
   const { pagination, controls } = useServerPagination();
@@ -31,6 +32,8 @@ export function DateOfferedListPage() {
 
       const { data, error, count } = await query;
       if (error) throw error;
+      
+      console.log('DateOfferedListPage query result:', { data, count, query: 'status_enhanced = date_offered' });
       
       return { data: data || [], count: count || 0 };
     },
@@ -68,9 +71,12 @@ export function DateOfferedListPage() {
       
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Clock className="h-5 w-5" />
-            Date Offered ({totalCount})
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Clock className="h-5 w-5" />
+              Date Offered ({totalCount})
+            </div>
+            <FixOrderStatusButton orderId="5b609a0e-8036-48df-89ff-9a545cddec66" />
           </CardTitle>
         </CardHeader>
         <CardContent>

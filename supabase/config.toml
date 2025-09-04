@@ -60,3 +60,6 @@ verify_jwt = true
 
 [functions.admin-create-user-with-password]
 verify_jwt = true
+
+[functions.fix-order-status]
+verify_jwt = true
