@@ -202,9 +202,6 @@ export default function Auth() {
         {/* Main Heading */}
         <div className="text-center mb-8">
           <BrandHeading1 className="mb-3">Welcome to Pro EV</BrandHeading1>
-          <BrandBody className="text-muted-foreground max-w-md">
-            Access your personalized client portal to view quotes, track projects, and manage your home improvements.
-          </BrandBody>
         </div>
 
         {/* Auth Card */}
