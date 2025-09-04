@@ -19,7 +19,8 @@ import {
   UserCog,
   CreditCard,
   FormInput,
-  Zap
+  Zap,
+  FileCheck
 } from 'lucide-react';
 import {
   Sidebar,
@@ -52,6 +53,7 @@ export function AppSidebar({ userRole }: AppSidebarProps) {
     { icon: BarChart3, label: 'Quote Dashboard', href: '/ops/quotes', action: () => navigate('/ops/quotes') },
     { icon: ShoppingCart, label: 'Orders', href: '/admin/orders', action: () => navigate('/admin/orders') },
     { icon: Calendar, label: 'Schedule', href: '/admin/schedule', action: () => navigate('/admin/schedule') },
+    { icon: FileCheck, label: 'QA Review', href: 'https://main.d11c44f8r7qjmh.amplifyapp.com/dashboard', action: () => window.open('https://main.d11c44f8r7qjmh.amplifyapp.com/dashboard', '_blank') },
     { icon: FormInput, label: 'Surveys', href: '/admin/survey-forms', action: () => navigate('/admin/survey-forms') },
     { icon: Package, label: 'Inventory', href: '/admin/inventory', action: () => navigate('/admin/inventory') },
     { icon: Zap, label: 'Chargers', href: '/admin/chargers', action: () => navigate('/admin/chargers') },
