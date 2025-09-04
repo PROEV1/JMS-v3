@@ -7,6 +7,8 @@ import { ArrowLeft, Check, X, Shield, Wrench, MessageCircle, CheckCircle, Packag
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { BrandButton } from '@/components/brand/BrandButton';
+import { getStatusColor } from '@/lib/brandUtils';
 
 interface Quote {
   id: string;
@@ -237,15 +239,6 @@ export default function ClientQuoteDetail() {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'sent': return 'bg-orange-50 text-orange-700 border-orange-200';
-      case 'accepted': return 'bg-green-50 text-green-700 border-green-200';
-      case 'rejected': return 'bg-red-50 text-red-700 border-red-200';
-      case 'expired': return 'bg-gray-50 text-gray-700 border-gray-200';
-      default: return 'bg-gray-50 text-gray-700 border-gray-200';
-    }
-  };
 
   const formatStatus = (status: string) => {
     return status.charAt(0).toUpperCase() + status.slice(1);
@@ -318,7 +311,7 @@ export default function ClientQuoteDetail() {
                       {quote.expires_at && (
                         <>
                           <span>•</span>
-                          <span className="text-orange-600 font-medium">
+                          <span className="text-destructive font-medium">
                             Expires {new Date(quote.expires_at).toLocaleDateString()}
                           </span>
                         </>
@@ -345,11 +338,12 @@ export default function ClientQuoteDetail() {
                 {/* Action Buttons */}
                 {quote.status === 'sent' ? (
                   <div className="mt-6 flex flex-col sm:flex-row gap-3">
-                    <Button
+                    <BrandButton
                       onClick={handleAcceptQuote}
                       disabled={accepting}
                       size="lg"
-                      className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground font-medium rounded-full"
+                      brandVariant="primary"
+                      className="flex-1 rounded-full"
                     >
                       {accepting ? (
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2"></div>
@@ -357,8 +351,8 @@ export default function ClientQuoteDetail() {
                         <Check className="h-5 w-5 mr-2" />
                       )}
                       Accept Quote
-                    </Button>
-                    <Button
+                    </BrandButton>
+                    <BrandButton
                       onClick={handleRejectQuote}
                       disabled={rejecting}
                       variant="outline"
@@ -371,12 +365,12 @@ export default function ClientQuoteDetail() {
                         <X className="h-4 w-4 mr-2" />
                       )}
                       Decline
-                    </Button>
+                    </BrandButton>
                   </div>
                 ) : (
                   <div className="mt-6 p-4 bg-card rounded-lg border">
                     <div className="flex items-center justify-center gap-2 text-muted-foreground">
-                      <CheckCircle className="h-5 w-5 text-green-600" />
+                      <CheckCircle className="h-5 w-5 text-accent" />
                       <span>
                         You have {quote.status === 'accepted' ? 'accepted' : 'declined'} this quote
                         {quote.status === 'accepted' && ' - proceeding to installation scheduling'}
@@ -390,31 +384,31 @@ export default function ClientQuoteDetail() {
 
           {/* Changes Since Last Quote */}
           {previousSnapshot && (
-            <Card className="bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200">
+            <Card className="bg-gradient-subtle border-accent/20">
               <CardContent className="p-6">
                 <div className="space-y-4">
                   <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
-                    <h3 className="font-semibold text-blue-900">Changes Since Last Quote</h3>
+                    <div className="w-2 h-2 bg-accent rounded-full"></div>
+                    <h3 className="font-semibold text-foreground">Changes Since Last Quote</h3>
                   </div>
                   
                   {previousSnapshot.revision_reason && (
-                    <div className="bg-white/50 rounded-lg p-4">
-                      <p className="text-sm font-medium text-blue-800 mb-1">Reason for Revision</p>
-                      <p className="text-blue-700">{previousSnapshot.revision_reason}</p>
+                    <div className="bg-card/50 rounded-lg p-4 border">
+                      <p className="text-sm font-medium text-foreground mb-1">Reason for Revision</p>
+                      <p className="text-muted-foreground">{previousSnapshot.revision_reason}</p>
                     </div>
                   )}
                   
                   <div className="grid grid-cols-2 gap-4">
                     <div className="text-center">
-                      <p className="text-sm text-blue-600 mb-1">Previous Total</p>
-                      <p className="text-xl font-bold text-blue-800">
+                      <p className="text-sm text-muted-foreground mb-1">Previous Total</p>
+                      <p className="text-xl font-bold text-foreground">
                         £{(previousSnapshot.quote_data.total_cost || 0).toFixed(2)}
                       </p>
                     </div>
                     <div className="text-center">
-                      <p className="text-sm text-blue-600 mb-1">New Total</p>
-                      <p className="text-xl font-bold text-blue-800">
+                      <p className="text-sm text-muted-foreground mb-1">New Total</p>
+                      <p className="text-xl font-bold text-foreground">
                         £{quote.total_cost.toFixed(2)}
                       </p>
                     </div>
@@ -427,8 +421,8 @@ export default function ClientQuoteDetail() {
                     
                     if (difference !== 0) {
                       return (
-                        <div className={`text-center p-3 rounded-lg ${isIncrease ? 'bg-orange-100' : 'bg-green-100'}`}>
-                          <p className={`font-semibold ${isIncrease ? 'text-orange-700' : 'text-green-700'}`}>
+                        <div className={`text-center p-3 rounded-lg ${isIncrease ? 'bg-destructive/10 border border-destructive/20' : 'bg-accent/10 border border-accent/20'}`}>
+                          <p className={`font-semibold ${isIncrease ? 'text-destructive' : 'text-accent'}`}>
                             Price {isIncrease ? 'increased' : 'decreased'} by £{absChange.toFixed(2)}
                           </p>
                         </div>
@@ -443,43 +437,43 @@ export default function ClientQuoteDetail() {
 
           {/* Trust & Reassurance Row */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card className="p-4 bg-gradient-to-br from-green-50 to-green-100 border-green-200 hover:shadow-md transition-all">
+            <Card className="p-4 brand-card-interactive hover:shadow-md transition-all">
               <div className="text-center">
-                <div className="inline-flex p-3 bg-green-600 rounded-full mb-3">
-                  <Shield className="h-6 w-6 text-white" />
+                <div className="icon-bg-teal p-3 rounded-full mb-3 inline-flex">
+                  <Shield className="h-6 w-6 text-primary-foreground" />
                 </div>
-                <h4 className="font-semibold text-green-800 mb-1">5 Year Warranty</h4>
-                <p className="text-xs text-green-600">Comprehensive coverage</p>
+                <h4 className="font-semibold text-foreground mb-1">5 Year Warranty</h4>
+                <p className="text-xs text-muted-foreground">Comprehensive coverage</p>
               </div>
             </Card>
             
-            <Card className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 hover:shadow-md transition-all">
+            <Card className="p-4 brand-card-interactive hover:shadow-md transition-all">
               <div className="text-center">
-                <div className="inline-flex p-3 bg-blue-600 rounded-full mb-3">
-                  <Wrench className="h-6 w-6 text-white" />
+                <div className="icon-bg-pink p-3 rounded-full mb-3 inline-flex">
+                  <Wrench className="h-6 w-6 text-primary-foreground" />
                 </div>
-                <h4 className="font-semibold text-blue-800 mb-1">Professional Installation</h4>
-                <p className="text-xs text-blue-600">Certified engineers</p>
+                <h4 className="font-semibold text-foreground mb-1">Professional Installation</h4>
+                <p className="text-xs text-muted-foreground">Certified engineers</p>
               </div>
             </Card>
             
-            <Card className="p-4 bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 hover:shadow-md transition-all">
+            <Card className="p-4 brand-card-interactive hover:shadow-md transition-all">
               <div className="text-center">
-                <div className="inline-flex p-3 bg-purple-600 rounded-full mb-3">
-                  <MessageCircle className="h-6 w-6 text-white" />
+                <div className="icon-bg-cream p-3 rounded-full mb-3 inline-flex">
+                  <MessageCircle className="h-6 w-6 text-foreground" />
                 </div>
-                <h4 className="font-semibold text-purple-800 mb-1">Free Consultation</h4>
-                <p className="text-xs text-purple-600">Expert guidance included</p>
+                <h4 className="font-semibold text-foreground mb-1">Free Consultation</h4>
+                <p className="text-xs text-muted-foreground">Expert guidance included</p>
               </div>
             </Card>
             
-            <Card className="p-4 bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200 hover:shadow-md transition-all">
+            <Card className="p-4 brand-card-interactive hover:shadow-md transition-all">
               <div className="text-center">
-                <div className="inline-flex p-3 bg-orange-600 rounded-full mb-3">
-                  <Award className="h-6 w-6 text-white" />
+                <div className="icon-bg-teal p-3 rounded-full mb-3 inline-flex">
+                  <Award className="h-6 w-6 text-primary-foreground" />
                 </div>
-                <h4 className="font-semibold text-orange-800 mb-1">Quality Guarantee</h4>
-                <p className="text-xs text-orange-600">100% satisfaction</p>
+                <h4 className="font-semibold text-foreground mb-1">Quality Guarantee</h4>
+                <p className="text-xs text-muted-foreground">100% satisfaction</p>
               </div>
             </Card>
           </div>
@@ -598,34 +592,36 @@ export default function ClientQuoteDetail() {
           )}
 
           {/* Help Section */}
-          <Card className="bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200">
+          <Card className="brand-card">
             <CardContent className="p-6">
               <div className="text-center space-y-4">
-                <div className="inline-flex p-3 bg-blue-600 rounded-full">
-                  <MessageCircle className="h-6 w-6 text-white" />
+                <div className="icon-bg-pink p-3 rounded-full inline-flex">
+                  <MessageCircle className="h-6 w-6 text-primary-foreground" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-blue-900 mb-2">Need to Make Changes?</h3>
-                  <p className="text-blue-700 mb-4">
+                  <h3 className="font-semibold text-foreground mb-2">Need to Make Changes?</h3>
+                  <p className="text-muted-foreground mb-4">
                     Our expert team is ready to help customize this quote to perfectly match your needs.
                   </p>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                  <Button 
+                  <BrandButton 
                     variant="outline" 
-                    className="border-blue-300 text-blue-700 hover:bg-blue-200 rounded-full"
+                    brandVariant="secondary"
+                    className="rounded-full"
                     onClick={() => navigate('/client/messages')}
                   >
                     <MessageCircle className="h-4 w-4 mr-2" />
                     Send Message
-                  </Button>
-                  <Button 
+                  </BrandButton>
+                  <BrandButton 
                     variant="outline" 
-                    className="border-blue-300 text-blue-700 hover:bg-blue-200 rounded-full"
+                    brandVariant="secondary"
+                    className="rounded-full"
                   >
                     <Calendar className="h-4 w-4 mr-2" />
                     Schedule Call
-                  </Button>
+                  </BrandButton>
                 </div>
               </div>
             </CardContent>

@@ -9,6 +9,7 @@ import { Download, Share2, Calendar, Shield, Wrench, Mail, MessageCircle, Copy, 
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { ProEVLogo } from '@/components/ProEVLogo';
+import { getStatusColor } from '@/lib/brandUtils';
 import livingRoomImg from '@/assets/living-room-placeholder.jpg';
 import laptopImg from '@/assets/laptop-placeholder.jpg';
 import workspaceImg from '@/assets/workspace-placeholder.jpg';
@@ -165,15 +166,6 @@ export default function PublicQuoteView() {
     }).format(amount);
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'sent': return 'bg-primary text-white';
-      case 'accepted': return 'bg-brand-green text-white';
-      case 'declined': return 'bg-destructive text-destructive-foreground';
-      case 'expired': return 'bg-muted text-muted-foreground';
-      default: return 'bg-muted text-muted-foreground';
-    }
-  };
 
   const shareViaEmail = () => {
     if (!quote) return;
@@ -407,48 +399,48 @@ export default function PublicQuoteView() {
                             {relatedAccessories.length > 0 && (
                               <div>
                                 <h4 className="font-medium mb-3">Accessories</h4>
-                                <div className="space-y-2">
-                                  {relatedAccessories.map((accessory) => (
-                                    <div key={accessory.id} className="flex items-center space-x-3 p-2 bg-gray-50 rounded-lg">
-                                      <div className="w-12 h-12 flex-shrink-0">
-                                        <img
-                                          src={getProductImage(accessory)}
-                                          alt={accessory.product_name}
-                                          className="w-full h-full object-cover rounded"
-                                        />
-                                      </div>
-                                      <div className="flex-1">
-                                        <p className="text-sm font-medium">{accessory.product_name}</p>
-                                        <p className="text-xs text-muted-foreground">Qty: {accessory.quantity}</p>
-                                      </div>
-                                      <div className="text-sm font-medium">
-                                        +{formatCurrency(accessory.total_price)}
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
+                                 <div className="space-y-2">
+                                   {relatedAccessories.map((accessory) => (
+                                     <div key={accessory.id} className="flex items-center space-x-3 p-2 bg-muted/50 rounded-lg">
+                                       <div className="w-12 h-12 flex-shrink-0">
+                                         <img
+                                           src={getProductImage(accessory)}
+                                           alt={accessory.product_name}
+                                           className="w-full h-full object-cover rounded"
+                                         />
+                                       </div>
+                                       <div className="flex-1">
+                                         <p className="text-sm font-medium">{accessory.product_name}</p>
+                                         <p className="text-xs text-muted-foreground">Qty: {accessory.quantity}</p>
+                                       </div>
+                                       <div className="text-sm font-medium">
+                                         +{formatCurrency(accessory.total_price)}
+                                       </div>
+                                     </div>
+                                   ))}
+                                 </div>
                               </div>
                             )}
 
                             {/* Standard Free Items */}
                             <div>
                               <h4 className="font-medium mb-3">Always Included</h4>
-                              <div className="space-y-2">
-                                <div className="flex items-center justify-between p-2 bg-green-50 rounded-lg">
-                                  <div className="flex items-center space-x-3">
-                                    <Wrench className="h-4 w-4 text-brand-green" />
-                                    <span className="text-sm">Professional installation by certified team</span>
-                                  </div>
-                                  <span className="text-sm font-medium text-brand-green">Free</span>
-                                </div>
-                                <div className="flex items-center justify-between p-2 bg-green-50 rounded-lg">
-                                  <div className="flex items-center space-x-3">
-                                    <Wrench className="h-4 w-4 text-brand-green" />
-                                    <span className="text-sm">Stud Wall Removal</span>
-                                  </div>
-                                  <span className="text-sm font-medium text-brand-green">Free</span>
-                                </div>
-                              </div>
+                               <div className="space-y-2">
+                                 <div className="flex items-center justify-between p-2 bg-accent/10 rounded-lg border border-accent/20">
+                                   <div className="flex items-center space-x-3">
+                                     <Wrench className="h-4 w-4 text-accent" />
+                                     <span className="text-sm">Professional installation by certified team</span>
+                                   </div>
+                                   <span className="text-sm font-medium text-accent">Free</span>
+                                 </div>
+                                 <div className="flex items-center justify-between p-2 bg-accent/10 rounded-lg border border-accent/20">
+                                   <div className="flex items-center space-x-3">
+                                     <Wrench className="h-4 w-4 text-accent" />
+                                     <span className="text-sm">Stud Wall Removal</span>
+                                   </div>
+                                   <span className="text-sm font-medium text-accent">Free</span>
+                                 </div>
+                               </div>
                             </div>
 
                             {/* Pricing Summary */}
