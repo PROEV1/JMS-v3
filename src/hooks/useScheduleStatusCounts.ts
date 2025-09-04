@@ -91,14 +91,13 @@ export function useScheduleStatusCounts() {
       // Exclude scheduling_suppressed orders
       let needsSchedulingCount = 0;
         
-      // Get active offers to exclude
-      const { data: activeOffers } = await supabase
+      // Get offers to exclude (both pending and accepted)
+      const { data: offersToExclude } = await supabase
         .from('job_offers')
         .select('order_id')
-        .eq('status', 'pending')
-        .gt('expires_at', new Date().toISOString());
+        .in('status', ['pending', 'accepted']);
 
-      const activeOfferOrderIds = activeOffers?.map(offer => offer.order_id) || [];
+      const excludedOrderIds = offersToExclude?.map(offer => offer.order_id) || [];
 
       // Count ALL orders that need scheduling (regardless of engineer assignment)
       let query = supabase
@@ -107,9 +106,9 @@ export function useScheduleStatusCounts() {
         .eq('status_enhanced', 'awaiting_install_booking')
         .eq('scheduling_suppressed', false);
 
-      // Exclude orders with active offers
-      if (activeOfferOrderIds.length > 0) {
-        const safeIds = buildSafeUuidInClause(activeOfferOrderIds);
+      // Exclude orders with offers (both pending and accepted)
+      if (excludedOrderIds.length > 0) {
+        const safeIds = buildSafeUuidInClause(excludedOrderIds);
         if (safeIds) {
           query = query.not('id', 'in', `(${safeIds})`);
         }

@@ -27,14 +27,13 @@ export function NeedsSchedulingListPage() {
     return async (withPagination = true, withCount = true) => {
       console.log('NeedsSchedulingListPage: Building search query...');
       
-      // First get all active offers to exclude orders with them
-      const { data: activeOffers } = await supabase
+      // First get all offers to exclude orders with them (both pending and accepted)
+      const { data: offersToExclude } = await supabase
         .from('job_offers')
         .select('order_id')
-        .eq('status', 'pending')
-        .gt('expires_at', new Date().toISOString());
+        .in('status', ['pending', 'accepted']);
 
-      const activeOfferOrderIds = activeOffers?.map(offer => offer.order_id) || [];
+      const excludedOrderIds = offersToExclude?.map(offer => offer.order_id) || [];
 
       // Base query for orders that need scheduling (excluding those with active offers)
       let query = supabase
@@ -50,9 +49,9 @@ export function NeedsSchedulingListPage() {
         .eq('scheduling_suppressed', false)
         .order('created_at', { ascending: false });
 
-      // Exclude orders with active offers
-      if (activeOfferOrderIds.length > 0) {
-        const safeIds = buildSafeUuidInClause(activeOfferOrderIds);
+      // Exclude orders with offers (both pending and accepted)
+      if (excludedOrderIds.length > 0) {
+        const safeIds = buildSafeUuidInClause(excludedOrderIds);
         if (safeIds) {
           query = query.not('id', 'in', `(${safeIds})`);
         }
