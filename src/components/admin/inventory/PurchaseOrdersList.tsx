@@ -66,33 +66,26 @@ export function PurchaseOrdersList() {
   const { data: purchaseOrders } = useQuery({
     queryKey: ['purchase-orders', searchQuery],
     queryFn: async () => {
-      let query = supabase
+      const { data, error } = await supabase
         .from('purchase_orders')
         .select(`
           id, po_number, status, order_date, expected_delivery_date, total_amount, notes, created_at,
-          inventory_suppliers!supplier_id(name),
-          profiles!created_by(full_name),
-          engineers!engineer_id(name, email),
-          purchase_order_lines(id)
+          supplier_id, created_by, engineer_id
         `)
         .order('created_at', { ascending: false });
 
-      if (searchQuery) {
-        query = query.or(`po_number.ilike.%${searchQuery}%,inventory_suppliers.name.ilike.%${searchQuery}%`);
-      }
-
-      const { data, error } = await query;
       if (error) {
         console.error('Error fetching purchase orders:', error);
         throw error;
       }
+
+      console.log('Purchase orders data:', data);
       return data || [];
     }
   });
 
   const filteredPOs = purchaseOrders?.filter(po => 
-    po.po_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    po.inventory_suppliers?.name?.toLowerCase().includes(searchQuery.toLowerCase())
+    po.po_number.toLowerCase().includes(searchQuery.toLowerCase())
   ) || [];
 
   const getStatusForBadge = (status: string): OrderStatusEnhanced => {
@@ -189,9 +182,9 @@ export function PurchaseOrdersList() {
                       />
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      {po.inventory_suppliers?.name || 'No supplier'} • {po.purchase_order_lines?.length || 0} items • £{po.total_amount?.toFixed(2) || '0.00'}
-                      {po.engineers?.name && (
-                        <span> • <span className="text-blue-600 font-medium">Assigned to {po.engineers.name}</span></span>
+                      Supplier ID: {po.supplier_id} • £{po.total_amount?.toFixed(2) || '0.00'}
+                      {po.engineer_id && (
+                        <span> • <span className="text-blue-600 font-medium">Engineer ID: {po.engineer_id}</span></span>
                       )}
                     </div>
                     <div className="text-xs text-muted-foreground">
