@@ -1059,7 +1059,7 @@ export function ScheduleStatusListPage({
                                         className="text-xs px-3 py-1 h-8"
                                         disabled={!order?.id || isScheduling === order?.id}
                                       >
-                                        {isScheduling === order?.id ? 'Scheduling...' : 'Confirm & Schedule'}
+                                         {isScheduling === order?.id ? 'Scheduling...' : 'Schedule'}
                                       </Button>
                                      <Button
                                        size="sm"
@@ -1291,7 +1291,7 @@ export function ScheduleStatusListPage({
                                      className="flex-1 text-xs h-7"
                                      disabled={!order?.id || isScheduling === order?.id}
                                    >
-                                     {isScheduling === order?.id ? 'Scheduling...' : 'Confirm & Schedule'}
+                                     {isScheduling === order?.id ? 'Scheduling...' : 'Schedule'}
                                    </Button>
                                   <Button
                                     size="sm"
