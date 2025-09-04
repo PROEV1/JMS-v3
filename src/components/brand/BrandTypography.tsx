@@ -21,6 +21,9 @@ export const BrandTypography: React.FC<BrandTypographyProps> = ({
   // Only apply brand typography classes in v2
   const typographyClass = isV2 ? getTypographyClass(variant) : '';
   
+  // Don't render if no children
+  if (!children) return null;
+  
   return (
     <Component className={cn(typographyClass, className)}>
       {children}
