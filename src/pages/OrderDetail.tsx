@@ -840,9 +840,11 @@ export default function OrderDetail() {
 
             
             {/* Survey Section */}
+            {/* Commented out survey access panel
             {orderId && (
               <SurveySection orderId={orderId} />
             )}
+            */}
             
             {/* Survey Review Section - for orders with submitted surveys */}
             {order?.status_enhanced === 'awaiting_survey_review' && order?.client?.id && order?.quote_id && (
