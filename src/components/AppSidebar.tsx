@@ -20,7 +20,8 @@ import {
   CreditCard,
   FormInput,
   Zap,
-  FileCheck
+  FileCheck,
+  Warehouse
 } from 'lucide-react';
 import {
   Sidebar,
@@ -85,6 +86,7 @@ export function AppSidebar({ userRole }: AppSidebarProps) {
     { icon: FileText, label: 'Dashboard', href: '/engineer', action: () => navigate('/engineer') },
     { icon: FolderOpen, label: 'My Jobs', href: '/engineer/jobs', action: () => navigate('/engineer/jobs') },
     { icon: Package, label: 'Stock Requests', href: '/engineer/stock-requests', action: () => navigate('/engineer/stock-requests') },
+    { icon: Warehouse, label: 'Van Inventory', href: '/engineer/van-stock', action: () => navigate('/engineer/van-stock') },
     { icon: User, label: 'Profile', href: '/engineer/profile', action: () => navigate('/engineer/profile') },
   ];
 
