@@ -71,11 +71,17 @@ export default function EngineerDashboard() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  console.log('EngineerDashboard - Current user:', user);
+  console.log('EngineerDashboard - User ID:', user?.id);
+  console.log('EngineerDashboard - User email:', user?.email);
+
   // Get engineer profile
-  const { data: engineer } = useQuery({
+  const { data: engineer, error: engineerError, isLoading: engineerLoading } = useQuery({
     queryKey: ['engineer-profile', user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
+      
+      console.log('EngineerDashboard - Fetching engineer profile for user ID:', user.id);
       
       const { data, error } = await supabase
         .from('engineers')
@@ -83,11 +89,17 @@ export default function EngineerDashboard() {
         .eq('user_id', user.id)
         .single();
       
+      console.log('EngineerDashboard - Engineer profile query result:', { data, error });
+      
       if (error) throw error;
       return data;
     },
     enabled: !!user?.id
   });
+
+  console.log('EngineerDashboard - Engineer data:', engineer);
+  console.log('EngineerDashboard - Engineer error:', engineerError);
+  console.log('EngineerDashboard - Engineer loading:', engineerLoading);
 
   // Get stock requests count
   const { data: stockRequests } = useStockRequests(engineer?.id, 3);
@@ -197,9 +209,68 @@ export default function EngineerDashboard() {
   });
 
   if (!engineer) {
+    console.log('EngineerDashboard - No engineer found, showing error state');
+    console.log('EngineerDashboard - Engineer error details:', engineerError);
+    
+    if (engineerLoading) {
+      return (
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      );
+    }
+    
+    if (engineerError) {
+      console.error('EngineerDashboard - Error loading engineer profile:', engineerError);
+      return (
+        <div className="min-h-screen flex items-center justify-center p-4">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <CardTitle className="text-red-600">Access Error</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground mb-4">
+                Unable to load your engineer profile. This could be because:
+              </p>
+              <ul className="list-disc pl-4 space-y-1 text-sm text-muted-foreground mb-4">
+                <li>Your account hasn't been set up as an engineer</li>
+                <li>There's a database connection issue</li>
+                <li>You don't have the correct permissions</li>
+              </ul>
+              <div className="space-y-2">
+                <Button onClick={() => window.location.reload()} className="w-full">
+                  Try Again
+                </Button>
+                <Button variant="outline" onClick={() => navigate('/auth')} className="w-full">
+                  Return to Login
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
+    
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="text-amber-600">Profile Not Found</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground mb-4">
+              No engineer profile found for your account. Please contact your administrator to set up your engineer profile.
+            </p>
+            <div className="space-y-2">
+              <Button onClick={() => window.location.reload()} className="w-full">
+                Refresh Page
+              </Button>
+              <Button variant="outline" onClick={() => navigate('/auth')} className="w-full">
+                Return to Login
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }

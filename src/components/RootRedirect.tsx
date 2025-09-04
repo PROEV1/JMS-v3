@@ -6,7 +6,12 @@ export function RootRedirect() {
   const { user, loading } = useAuth();
   const { role, loading: roleLoading } = useUserRole();
 
-  console.log('RootRedirect - user:', user?.email, 'role:', role, 'loading:', loading, 'roleLoading:', roleLoading);
+  console.log('RootRedirect - user:', user?.email, 'user_id:', user?.id, 'role:', role, 'loading:', loading, 'roleLoading:', roleLoading);
+  
+  // Add more detailed debugging
+  console.log('RootRedirect - Full user object:', user);
+  console.log('RootRedirect - Auth loading state:', loading);
+  console.log('RootRedirect - Role loading state:', roleLoading);
 
   if (loading || roleLoading) {
     console.log('RootRedirect - showing loading spinner');

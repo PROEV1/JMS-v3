@@ -12,6 +12,8 @@ export function useUserRole() {
   useEffect(() => {
     const fetchUserRole = async () => {
       console.log('useUserRole: Starting fetch, user:', user);
+      console.log('useUserRole: User ID:', user?.id);
+      console.log('useUserRole: User email:', user?.email);
       
       if (!user?.id) {
         console.log('useUserRole: No user ID, setting role to null');
