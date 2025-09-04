@@ -4,12 +4,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { AlertTriangle, Package, Plus, Trash2 } from 'lucide-react';
+import { AlertTriangle, Package, Plus, Trash2, Eye } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { usePurchaseOrderForStockRequest, useAmendPurchaseOrder } from '@/hooks/usePurchaseOrderAmendment';
+import { AmendmentPreview } from './AmendmentPreview';
+import { formatCurrency, calculateLineTotal } from '@/lib/currency';
 
 interface AmendPurchaseOrderFormProps {
   engineerId: string;
@@ -32,6 +34,8 @@ export const AmendPurchaseOrderForm: React.FC<AmendPurchaseOrderFormProps> = ({
 }) => {
   const [amendmentItems, setAmendmentItems] = useState<AmendmentItem[]>([]);
   const [amendmentReason, setAmendmentReason] = useState<string>('');
+  const [showPreview, setShowPreview] = useState<boolean>(false);
+  const [previewData, setPreviewData] = useState<any>(null);
   
   const { user } = useAuth();
   const amendPO = useAmendPurchaseOrder();
@@ -138,6 +142,73 @@ export const AmendPurchaseOrderForm: React.FC<AmendPurchaseOrderFormProps> = ({
     }));
   };
 
+  const generatePreview = async () => {
+    if (!purchaseOrder || !amendmentReason.trim()) {
+      return;
+    }
+
+    const validItems = amendmentItems.filter(item => 
+      item.item_id && item.quantity > 0
+    );
+
+    if (validItems.length === 0) {
+      return;
+    }
+
+    try {
+      // Get current PO lines with costs
+      const currentLines = purchaseOrder.purchase_order_lines || [];
+      
+      // Calculate preview data by getting unit costs for each item
+      const previewItems = await Promise.all(validItems.map(async (item) => {
+        // Try to find existing cost from current PO
+        const existingLine = currentLines.find((line: any) => line.item_id === item.item_id);
+        let unitCost = existingLine?.unit_cost || 0;
+        
+        // If no existing cost, get from inventory item
+        if (unitCost === 0) {
+          const { data: inventoryItem } = await supabase
+            .from('inventory_items')
+            .select('default_cost')
+            .eq('id', item.item_id)
+            .single();
+          
+          unitCost = inventoryItem?.default_cost || 0;
+        }
+
+        // Find original quantities for comparison
+        const originalLine = currentLines.find((line: any) => line.item_id === item.item_id);
+        const oldQuantity = originalLine?.quantity || 0;
+        const oldLineTotal = calculateLineTotal(oldQuantity, unitCost);
+        const newLineTotal = calculateLineTotal(item.quantity, unitCost);
+
+        return {
+          item_id: item.item_id,
+          item_name: item.item_name,
+          item_sku: allItems?.find(i => i.id === item.item_id)?.sku || '',
+          old_quantity: oldQuantity,
+          new_quantity: item.quantity,
+          unit_cost: unitCost,
+          old_line_total: oldLineTotal,
+          new_line_total: newLineTotal
+        };
+      }));
+
+      const oldTotal = purchaseOrder.total_amount || 0;
+      const newTotal = previewItems.reduce((sum, item) => sum + item.new_line_total, 0);
+
+      setPreviewData({
+        items: previewItems,
+        oldTotal,
+        newTotal,
+        poNumber: purchaseOrder.po_number
+      });
+      setShowPreview(true);
+    } catch (error) {
+      console.error('Error generating preview:', error);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!amendmentReason.trim()) {
       return;
@@ -153,7 +224,7 @@ export const AmendPurchaseOrderForm: React.FC<AmendPurchaseOrderFormProps> = ({
 
     try {
       if (purchaseOrder) {
-        // Amend existing PO
+        // Use the enhanced amendment hook
         await amendPO.mutateAsync({
           purchaseOrderId: purchaseOrder.id,
           items: validItems.map(item => ({
@@ -165,7 +236,7 @@ export const AmendPurchaseOrderForm: React.FC<AmendPurchaseOrderFormProps> = ({
           engineerId
         });
       } else {
-        // Create amendment request by updating the stock request notes only
+        // For stock requests without PO, create amendment request
         const { error: updateError } = await supabase
           .from('stock_requests')
           .update({
@@ -178,7 +249,7 @@ export const AmendPurchaseOrderForm: React.FC<AmendPurchaseOrderFormProps> = ({
           throw updateError;
         }
 
-        // Delete existing lines and create new ones
+        // Update stock request lines
         const { error: deleteError } = await supabase
           .from('stock_request_lines')
           .delete()
@@ -201,60 +272,6 @@ export const AmendPurchaseOrderForm: React.FC<AmendPurchaseOrderFormProps> = ({
         if (insertError) {
           console.error('Error inserting new lines:', insertError);
           throw insertError;
-        }
-
-        // If there's a purchase order, update it too
-        if (stockRequest?.purchase_order_id) {
-          console.log('Updating purchase order lines for PO:', stockRequest.purchase_order_id);
-          
-          const { error: deletePoError } = await supabase
-            .from('purchase_order_lines')
-            .delete()
-            .eq('purchase_order_id', stockRequest.purchase_order_id);
-
-          if (deletePoError) {
-            console.error('Error deleting PO lines:', deletePoError);
-            throw deletePoError;
-          }
-
-          console.log('Inserting new PO lines:', validItems);
-          const { error: insertPoError } = await supabase
-            .from('purchase_order_lines')
-            .insert(validItems.map(item => ({
-              purchase_order_id: stockRequest.purchase_order_id,
-              item_id: item.item_id,
-              quantity: item.quantity,
-              item_name: item.item_name,
-              unit_cost: 2.00, // Default unit cost - should be retrieved from item or set properly
-              line_total: item.quantity * 2.00, // Calculate line total
-              received_quantity: 0
-            })));
-
-          if (insertPoError) {
-            console.error('Error inserting PO lines:', insertPoError);
-            throw insertPoError;
-          }
-          
-          // Update the total amount on the purchase order
-          const newTotalAmount = validItems.reduce((sum, item) => sum + (item.quantity * 2.00), 0);
-          const { error: updatePoError } = await supabase
-            .from('purchase_orders')
-            .update({ 
-              total_amount: newTotalAmount,
-              updated_at: new Date().toISOString(),
-              amended_at: new Date().toISOString(),
-              amended_by: user?.id
-            })
-            .eq('id', stockRequest.purchase_order_id);
-
-          if (updatePoError) {
-            console.error('Error updating PO total:', updatePoError);
-            throw updatePoError;
-          }
-          
-          console.log('Successfully updated PO lines');
-        } else {
-          console.log('No purchase order linked to this stock request');
         }
 
         console.log('Amendment request created successfully');
@@ -395,23 +412,58 @@ export const AmendPurchaseOrderForm: React.FC<AmendPurchaseOrderFormProps> = ({
         </div>
       </div>
 
-      <div className="flex gap-2 justify-end">
-        <Button variant="outline" onClick={onClose}>
-          Cancel
-        </Button>
-        <Button 
-          onClick={handleSubmit}
-          disabled={amendPO.isPending || !amendmentReason.trim() || amendmentItems.length === 0}
-          className="bg-blue-600 hover:bg-blue-700"
-        >
-          {amendPO.isPending 
-            ? 'Submitting...' 
-            : purchaseOrder 
-              ? 'Amend Purchase Order'
-              : 'Submit Amendment Request'
-          }
-        </Button>
-      </div>
+      {showPreview && previewData ? (
+        <AmendmentPreview 
+          items={previewData.items}
+          oldTotal={previewData.oldTotal}
+          newTotal={previewData.newTotal}
+          poNumber={previewData.poNumber}
+        />
+      ) : (
+        <div className="flex gap-2 justify-end">
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          {purchaseOrder && (
+            <Button 
+              variant="outline"
+              onClick={generatePreview}
+              disabled={!amendmentReason.trim() || amendmentItems.length === 0}
+              className="bg-gray-100 hover:bg-gray-200"
+            >
+              <Eye className="h-4 w-4 mr-2" />
+              Preview Changes
+            </Button>
+          )}
+          <Button 
+            onClick={handleSubmit}
+            disabled={amendPO.isPending || !amendmentReason.trim() || amendmentItems.length === 0}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            {amendPO.isPending 
+              ? 'Submitting...' 
+              : purchaseOrder 
+                ? 'Amend Purchase Order'
+                : 'Submit Amendment Request'
+            }
+          </Button>
+        </div>
+      )}
+
+      {showPreview && (
+        <div className="flex gap-2 justify-end pt-4 border-t">
+          <Button variant="outline" onClick={() => setShowPreview(false)}>
+            Back to Edit
+          </Button>
+          <Button 
+            onClick={handleSubmit}
+            disabled={amendPO.isPending}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            {amendPO.isPending ? 'Submitting...' : 'Confirm Amendment'}
+          </Button>
+        </div>
+      )}
     </div>
   );
 };
