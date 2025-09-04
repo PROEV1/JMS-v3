@@ -3780,6 +3780,10 @@ export type Database = {
         Args: { order_row: Database["public"]["Tables"]["orders"]["Row"] }
         Returns: Database["public"]["Enums"]["order_status_enhanced"]
       }
+      calculate_po_totals: {
+        Args: { p_po_id: string }
+        Returns: undefined
+      }
       can_access_partner_data: {
         Args: { target_partner_id: string; user_uuid: string }
         Returns: boolean
@@ -3791,6 +3795,16 @@ export type Database = {
       cleanup_orphaned_partner_clients: {
         Args: { p_partner_id?: string }
         Returns: number
+      }
+      create_stock_adjustment_for_po_amendment: {
+        Args: {
+          p_item_id: string
+          p_location_id: string
+          p_po_id: string
+          p_quantity_change: number
+          p_reference?: string
+        }
+        Returns: string
       }
       delete_partner_data_safe: {
         Args: { p_import_run_id?: string; p_partner_id: string }
@@ -3837,6 +3851,10 @@ export type Database = {
       get_engineer_soft_holds: {
         Args: { p_date: string; p_engineer_id: string }
         Returns: number
+      }
+      get_engineer_van_location: {
+        Args: { p_engineer_id: string }
+        Returns: string
       }
       get_geocode_from_cache: {
         Args: { p_postcode: string }
