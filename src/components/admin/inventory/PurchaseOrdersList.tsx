@@ -70,7 +70,9 @@ export function PurchaseOrdersList() {
         .from('purchase_orders')
         .select(`
           id, po_number, status, order_date, expected_delivery_date, total_amount, notes, created_at,
-          supplier_id, created_by, engineer_id
+          supplier_id, created_by, engineer_id,
+          engineers!purchase_orders_engineer_id_fkey(id, name),
+          inventory_suppliers(id, name)
         `)
         .order('created_at', { ascending: false });
 
@@ -182,9 +184,9 @@ export function PurchaseOrdersList() {
                       />
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      Supplier ID: {po.supplier_id} • £{po.total_amount?.toFixed(2) || '0.00'}
-                      {po.engineer_id && (
-                        <span> • <span className="text-blue-600 font-medium">Engineer ID: {po.engineer_id}</span></span>
+                      {po.inventory_suppliers?.name || 'Unknown Supplier'} • £{po.total_amount?.toFixed(2) || '0.00'}
+                      {po.engineers && (
+                        <span> • <span className="text-blue-600 font-medium">{po.engineers.name}</span></span>
                       )}
                     </div>
                     <div className="text-xs text-muted-foreground">
