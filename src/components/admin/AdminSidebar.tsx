@@ -8,12 +8,6 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet"
 import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion"
-import {
   Avatar,
   AvatarFallback,
   AvatarImage,
@@ -53,40 +47,15 @@ interface SidebarItem {
   permission: string | null;
 }
 
-interface SidebarSection {
-  title: string;
-  items: SidebarItem[];
-}
-
-const sidebarItems = [
-  {
-    title: "Main",
-    items: [
-      { name: "Ops Command Centre", href: "/admin", icon: LayoutDashboard, permission: null },
-    ]
-  },
-  {
-    title: "Data",
-    items: [
-      { name: "Quotes", href: "/admin/quotes", icon: Quote, permission: "quotes.manage" },
-      { name: "Orders", href: "/admin/orders", icon: File, permission: "orders.manage" },
-    ]
-  },
-  {
-    title: "Operations",
-    items: [
-      { name: "Partner Quotes", href: "/ops/quotes", icon: Quote, permission: "quotes.manage" },
-      { name: "Schedule", href: "/admin/schedule", icon: Calendar, permission: null },
-      { name: "QA Review", href: "https://main.d11c44f8r7qjmh.amplifyapp.com/dashboard", icon: FileCheck, permission: null },
-    ]
-  },
-  {
-    title: "Settings",
-    items: [
-      { name: "Users", href: "/admin/users", icon: User, permission: "users.manage" },
-      { name: "Settings", href: "/admin/settings", icon: Settings, permission: "settings.manage" },
-    ]
-  },
+const sidebarItems: SidebarItem[] = [
+  { name: "Ops Command Centre", href: "/admin", icon: LayoutDashboard, permission: null },
+  { name: "Quotes", href: "/admin/quotes", icon: Quote, permission: "quotes.manage" },
+  { name: "Orders", href: "/admin/orders", icon: File, permission: "orders.manage" },
+  { name: "Partner Quotes", href: "/ops/quotes", icon: Quote, permission: "quotes.manage" },
+  { name: "Schedule", href: "/admin/schedule", icon: Calendar, permission: null },
+  { name: "QA Review", href: "https://main.d11c44f8r7qjmh.amplifyapp.com/dashboard", icon: FileCheck, permission: null },
+  { name: "Users", href: "/admin/users", icon: User, permission: "users.manage" },
+  { name: "Settings", href: "/admin/settings", icon: Settings, permission: "settings.manage" },
 ];
 
 export function AdminSidebar() {
@@ -152,29 +121,20 @@ export function AdminSidebar() {
       </div>
       <div className="flex-1 space-y-2">
         <ScrollArea className="h-full">
-          <div className="space-y-1">
-            {sidebarItems.map((section, index) => (
-              <Accordion type="single" collapsible key={index}>
-                <AccordionItem value={section.title}>
-                  <AccordionTrigger className="font-medium">{section.title}</AccordionTrigger>
-                  <AccordionContent>
-                    {section.items.map((item) => (
-                      <Button
-                        key={item.name}
-                        variant="ghost"
-                        className={cn(
-                          "w-full justify-start rounded-md px-2",
-                          isActive(item.href) ? "bg-accent text-accent-foreground" : ""
-                        )}
-                        onClick={() => handleNavigation(item.href)}
-                      >
-                        <item.icon className="mr-2 h-4 w-4" />
-                        <span>{item.name}</span>
-                      </Button>
-                    ))}
-                  </AccordionContent>
-                </AccordionItem>
-              </Accordion>
+          <div className="space-y-1 px-3">
+            {sidebarItems.map((item) => (
+              <Button
+                key={item.name}
+                variant="ghost"
+                className={cn(
+                  "w-full justify-start rounded-md px-2",
+                  isActive(item.href) ? "bg-accent text-accent-foreground" : ""
+                )}
+                onClick={() => handleNavigation(item.href)}
+              >
+                <item.icon className="mr-2 h-4 w-4" />
+                <span>{item.name}</span>
+              </Button>
             ))}
           </div>
         </ScrollArea>
