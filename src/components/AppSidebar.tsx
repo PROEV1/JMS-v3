@@ -45,6 +45,9 @@ export function AppSidebar({ userRole }: AppSidebarProps) {
   const navigate = useNavigate();
   const currentPath = location.pathname;
   const { canManageUsers } = usePermissions();
+  
+  // Debug logging for role and permissions
+  console.log('AppSidebar render:', { userRole, canManageUsers });
 
   // Define navigation items based on user role - keeping exact same functionality as original Layout
   const adminMenuItems = [
