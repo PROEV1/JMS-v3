@@ -727,9 +727,8 @@ export default function AdminEngineers() {
                  <Table>
                    <TableHeader>
                      <TableRow>
-                       <TableHead>Engineer</TableHead>
-                       <TableHead>Type</TableHead>
-                       <TableHead>Region</TableHead>
+                        <TableHead>Engineer</TableHead>
+                        <TableHead>Region</TableHead>
                        <TableHead>Starting Postcode</TableHead>
                        <TableHead>Service Areas</TableHead>
                        <TableHead>Status</TableHead>
@@ -747,22 +746,6 @@ export default function AdminEngineers() {
                            <div>
                              <div className="font-medium">{engineer.name}</div>
                              <div className="text-sm text-muted-foreground">{engineer.email}</div>
-                           </div>
-                         </TableCell>
-                         <TableCell>
-                           <div className="space-y-1">
-                             <Badge 
-                               variant={engineer.is_subcontractor ? "secondary" : "default"}
-                               className={engineer.is_subcontractor ? "bg-purple-100 text-purple-800" : "bg-blue-100 text-blue-800"}
-                             >
-                               {engineer.is_subcontractor ? 'Subcontractor' : 'Employee'}
-                             </Badge>
-                             {engineer.is_subcontractor && (
-                               <div className="text-xs text-muted-foreground">
-                                 Max: {engineer.max_installs_per_day}/day
-                                 {engineer.ignore_working_hours && <div>24/7 Available</div>}
-                               </div>
-                             )}
                            </div>
                          </TableCell>
                          <TableCell>
