@@ -86,11 +86,13 @@ export function useRecordMaterialUsage() {
       queryClient.invalidateQueries({ queryKey: ['inventory-balances'] });
       queryClient.invalidateQueries({ queryKey: ['engineer-inventory'] });
       queryClient.invalidateQueries({ queryKey: ['engineer-inventory-items'] });
+      queryClient.invalidateQueries({ queryKey: ['assigned-chargers'] }); // Add charger refresh
       
       // Add a small delay to ensure database transaction is committed before refreshing
       setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: ['engineer-inventory-items'] });
         queryClient.refetchQueries({ queryKey: ['engineer-inventory-items'] });
+        queryClient.invalidateQueries({ queryKey: ['assigned-chargers'] });
       }, 100);
       
       toast({
@@ -128,6 +130,7 @@ export function useRevokeMaterialUsage() {
       queryClient.invalidateQueries({ queryKey: ['inventory-balances'] });
       queryClient.invalidateQueries({ queryKey: ['engineer-inventory'] });
       queryClient.invalidateQueries({ queryKey: ['engineer-inventory-items'] });
+      queryClient.invalidateQueries({ queryKey: ['assigned-chargers'] }); // Add charger refresh
       toast({
         title: "Material Usage Revoked",
         description: "Material usage has been removed from the job and stock restored",
