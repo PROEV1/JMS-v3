@@ -175,10 +175,10 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({
       // Map to lightweight DTO; avoid DB/Prisma/Supabase heavy types here
       const dto = {
         destination_location_id: values.destination_location_id,
-        order_id: values.job_id ?? null,
-        needed_by: values.needed_by_date ?? null,
+        order_id: values.job_id || undefined,
+        needed_by: values.needed_by_date || undefined,
         priority: values.priority,
-        notes: values.notes ?? '',
+        notes: values.notes || undefined,
         photo_url: undefined,
         lines: validLines.map(l => ({ 
           item_id: l.item_id, 
