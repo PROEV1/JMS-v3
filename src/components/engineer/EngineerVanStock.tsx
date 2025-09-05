@@ -19,9 +19,14 @@ import { InventoryKpiTile } from '../admin/inventory/shared/InventoryKpiTile';
 import { StatusChip } from '../admin/inventory/shared/StatusChip';
 import { EmptyState } from '../admin/inventory/shared/EmptyState';
 import { EngineerPurchaseOrders } from './EngineerPurchaseOrders';
+import { StockRequestButton } from './StockRequestButton';
+import { EngineerScanModal } from './EngineerScanModal';
+import { EngineerReturnModal } from './EngineerReturnModal';
 
 export function EngineerVanStock() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [showScanModal, setShowScanModal] = useState(false);
+  const [showReturnModal, setShowReturnModal] = useState(false);
 
   // Get engineer's van location
   const { data: engineer } = useQuery({
@@ -277,15 +282,20 @@ export function EngineerVanStock() {
 
       {/* Quick Actions */}
       <div className="flex gap-3">
-        <Button>
-          <Plus className="h-4 w-4 mr-2" />
-          Request Stock
-        </Button>
-        <Button variant="secondary">
+        {engineer && (
+          <StockRequestButton 
+            engineerId={engineer.id}
+            variant="default"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Request Stock
+          </StockRequestButton>
+        )}
+        <Button variant="secondary" onClick={() => setShowScanModal(true)}>
           <Scan className="h-4 w-4 mr-2" />
           Scan Item
         </Button>
-        <Button variant="secondary">
+        <Button variant="secondary" onClick={() => setShowReturnModal(true)}>
           <ArrowUpDown className="h-4 w-4 mr-2" />
           Return Stock
         </Button>
@@ -394,6 +404,25 @@ export function EngineerVanStock() {
 
       {/* Purchase Orders Section */}
       <EngineerPurchaseOrders />
+
+      {/* Modals */}
+      {vanLocation && (
+        <>
+          <EngineerScanModal 
+            open={showScanModal} 
+            onOpenChange={setShowScanModal}
+            vanLocationId={vanLocation.id}
+            vanLocationName={vanLocation.name}
+          />
+          <EngineerReturnModal 
+            open={showReturnModal} 
+            onOpenChange={setShowReturnModal}
+            vanLocationId={vanLocation.id}
+            vanLocationName={vanLocation.name}
+            stockItems={stockItems?.filter(item => item.type === 'regular') || []}
+          />
+        </>
+      )}
     </div>
   );
 }
