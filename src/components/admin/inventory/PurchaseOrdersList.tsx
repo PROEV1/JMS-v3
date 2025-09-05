@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   Search, 
   Plus, 
@@ -12,7 +13,9 @@ import {
   Package, 
   Clock, 
   AlertTriangle,
-  CheckCircle
+  CheckCircle,
+  Filter,
+  CalendarDays
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { CreatePurchaseOrderModal } from './CreatePurchaseOrderModal';
@@ -25,6 +28,9 @@ import { EmptyState } from './shared/EmptyState';
 
 export function PurchaseOrdersList() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortOrder, setSortOrder] = useState<'latest' | 'oldest'>('latest');
+  const [engineerFilter, setEngineerFilter] = useState<string>('all');
+  const [dateFilter, setDateFilter] = useState<string>('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -62,9 +68,24 @@ export function PurchaseOrdersList() {
     }
   });
 
+  // Get unique engineers for filter
+  const { data: engineers } = useQuery({
+    queryKey: ['engineers-for-filter'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('engineers')
+        .select('id, name')
+        .eq('is_active', true)
+        .order('name');
+      
+      if (error) throw error;
+      return data || [];
+    }
+  });
+
   // Purchase orders list
   const { data: purchaseOrders } = useQuery({
-    queryKey: ['purchase-orders', searchQuery],
+    queryKey: ['purchase-orders', searchQuery, sortOrder, engineerFilter, dateFilter],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('purchase_orders')
@@ -74,7 +95,7 @@ export function PurchaseOrdersList() {
           engineers!purchase_orders_engineer_id_fkey(id, name),
           inventory_suppliers(id, name)
         `)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: sortOrder === 'oldest' });
 
       if (error) {
         console.error('Error fetching purchase orders:', error);
@@ -86,9 +107,44 @@ export function PurchaseOrdersList() {
     }
   });
 
-  const filteredPOs = purchaseOrders?.filter(po => 
-    po.po_number.toLowerCase().includes(searchQuery.toLowerCase())
-  ) || [];
+  const filteredPOs = purchaseOrders?.filter(po => {
+    // Search filter
+    const matchesSearch = po.po_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      po.inventory_suppliers?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      po.engineers?.name?.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    // Engineer filter
+    const matchesEngineer = engineerFilter === 'all' || 
+      (engineerFilter === 'unassigned' && !po.engineer_id) ||
+      po.engineer_id === engineerFilter;
+    
+    // Date filter
+    const matchesDate = (() => {
+      if (dateFilter === 'all') return true;
+      
+      const poDate = new Date(po.created_at);
+      const now = new Date();
+      
+      switch (dateFilter) {
+        case 'today':
+          return poDate.toDateString() === now.toDateString();
+        case 'week':
+          const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          return poDate >= weekAgo;
+        case 'month':
+          const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+          return poDate >= monthAgo;
+        case 'overdue':
+          return po.expected_delivery_date && 
+            new Date(po.expected_delivery_date) < now && 
+            po.status !== 'received';
+        default:
+          return true;
+      }
+    })();
+    
+    return matchesSearch && matchesEngineer && matchesDate;
+  }) || [];
 
   const getStatusForBadge = (status: string): OrderStatusEnhanced => {
     switch (status) {
@@ -151,12 +207,54 @@ export function PurchaseOrdersList() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
             <Input
-              placeholder="Search POs..."
+              placeholder="Search POs, suppliers, engineers..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 w-64"
+              className="pl-10 w-80"
             />
           </div>
+          
+          {/* Sort Order Filter */}
+          <Select value={sortOrder} onValueChange={(value: 'latest' | 'oldest') => setSortOrder(value)}>
+            <SelectTrigger className="w-32">
+              <SelectValue placeholder="Sort" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="latest">Latest</SelectItem>
+              <SelectItem value="oldest">Oldest</SelectItem>
+            </SelectContent>
+          </Select>
+          
+          {/* Engineer Filter */}
+          <Select value={engineerFilter} onValueChange={setEngineerFilter}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="Engineer" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Engineers</SelectItem>
+              <SelectItem value="unassigned">Unassigned</SelectItem>
+              {engineers?.map((engineer) => (
+                <SelectItem key={engineer.id} value={engineer.id}>
+                  {engineer.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          
+          {/* Date Filter */}
+          <Select value={dateFilter} onValueChange={setDateFilter}>
+            <SelectTrigger className="w-36">
+              <CalendarDays className="h-4 w-4 mr-2" />
+              <SelectValue placeholder="Date" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Dates</SelectItem>
+              <SelectItem value="today">Today</SelectItem>
+              <SelectItem value="week">This Week</SelectItem>
+              <SelectItem value="month">This Month</SelectItem>
+              <SelectItem value="overdue">Overdue</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         
         <Button onClick={() => setShowCreateModal(true)}>
