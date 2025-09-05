@@ -62,6 +62,7 @@ export function RmaViewModal({ open, onOpenChange, rma }: RmaViewModalProps) {
     switch (status) {
       case 'pending_return': return 'bg-yellow-100 text-yellow-800';
       case 'in_transit': return 'bg-blue-100 text-blue-800';
+      case 'received_by_supplier': return 'bg-green-100 text-green-800';
       case 'replacement_received': return 'bg-green-100 text-green-800';
       case 'closed': return 'bg-gray-100 text-gray-800';
       default: return 'bg-gray-100 text-gray-800';

@@ -92,6 +92,13 @@ export function ReturnsRmasList() {
     }
   };
 
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'received_by_supplier': return 'RECEIVED';
+      default: return status.replace('_', ' ').toUpperCase();
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -163,7 +170,7 @@ export function ReturnsRmasList() {
                     <div className="flex items-center gap-3">
                       <span className="font-medium">{rma.rma_number}</span>
                       <StatusChip status={getStatusVariant(rma.status) as any}>
-                        {rma.status.replace('_', ' ')}
+                        {getStatusText(rma.status)}
                       </StatusChip>
                     </div>
                     <div className="text-sm text-muted-foreground">
