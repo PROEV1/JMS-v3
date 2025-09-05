@@ -33,6 +33,7 @@ export function ScanChargersModal({ open, onOpenChange }: ScanChargersModalProps
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [scanMode, setScanMode] = useState<'manual' | 'camera'>('manual');
   const [isScanning, setIsScanning] = useState(false);
+  const [isCheckingDuplicate, setIsCheckingDuplicate] = useState(false);
   const serialInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
@@ -90,31 +91,83 @@ export function ScanChargersModal({ open, onOpenChange }: ScanChargersModalProps
     setIsScanning(false);
   };
 
-  const handleScanResult = (scannedText: string) => {
-    // Check if serial already exists
+  // Check database for existing serial number
+  const checkSerialInDatabase = async (serialNumber: string) => {
+    const { data, error } = await supabase
+      .from('charger_inventory')
+      .select(`
+        id,
+        serial_number,
+        status,
+        location_id,
+        engineer_id,
+        inventory_locations(name),
+        engineers(name)
+      `)
+      .eq('serial_number', serialNumber)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error checking serial:', error);
+      return null;
+    }
+
+    return data;
+  };
+
+  const handleScanResult = async (scannedText: string) => {
+    // Check if serial already exists in current session
     if (scannedChargers.some(c => c.serialNumber === scannedText)) {
       toast({
         title: "Duplicate Serial",
-        description: "This serial number has already been scanned",
+        description: "This serial number has already been scanned in this session",
         variant: "destructive"
       });
       return;
     }
 
-    // Auto-add scanned serial to the list
-    const newScannedCharger: ScannedCharger = {
-      id: `temp-${Date.now()}-${Math.random()}`,
-      serialNumber: scannedText,
-      status: 'available'
-    };
+    // Check database for existing serial number
+    setIsCheckingDuplicate(true);
+    try {
+      const existingCharger = await checkSerialInDatabase(scannedText);
+      
+      if (existingCharger) {
+        const locationName = existingCharger.inventory_locations?.name || 'Unknown location';
+        const engineerName = existingCharger.engineers?.name || 'Unassigned';
+        
+        toast({
+          title: "Serial Already in System",
+          description: `Serial ${scannedText} already exists (Status: ${existingCharger.status}, Location: ${locationName}, Engineer: ${engineerName})`,
+          variant: "destructive"
+        });
+        setIsCheckingDuplicate(false);
+        return;
+      }
 
-    setScannedChargers(prev => [...prev, newScannedCharger]);
-    setCurrentSerial('');
+      // Auto-add scanned serial to the list
+      const newScannedCharger: ScannedCharger = {
+        id: `temp-${Date.now()}-${Math.random()}`,
+        serialNumber: scannedText,
+        status: 'available'
+      };
 
-    toast({
-      title: "Serial Added",
-      description: `Added serial: ${scannedText}`,
-    });
+      setScannedChargers(prev => [...prev, newScannedCharger]);
+      setCurrentSerial('');
+
+      toast({
+        title: "Serial Added",
+        description: `Added serial: ${scannedText}`,
+      });
+    } catch (error) {
+      console.error('Error checking duplicate:', error);
+      toast({
+        title: "Error",
+        description: "Could not verify serial number. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsCheckingDuplicate(false);
+    }
   };
 
   // Fetch charger models
@@ -333,11 +386,12 @@ export function ScanChargersModal({ open, onOpenChange }: ScanChargersModalProps
                         onKeyPress={(e) => {
                           if (e.key === 'Enter') {
                             e.preventDefault();
-                            if (currentSerial.trim()) {
+                            if (currentSerial.trim() && !isCheckingDuplicate) {
                               handleScanResult(currentSerial.trim());
                             }
                           }
                         }}
+                        disabled={isCheckingDuplicate}
                         className="font-mono"
                         autoFocus
                       />
@@ -345,15 +399,15 @@ export function ScanChargersModal({ open, onOpenChange }: ScanChargersModalProps
                     <div className="flex items-end">
                       <Button 
                         onClick={() => {
-                          if (currentSerial.trim()) {
+                          if (currentSerial.trim() && !isCheckingDuplicate) {
                             handleScanResult(currentSerial.trim());
                           }
                         }}
                         className="w-full"
-                        disabled={!currentSerial.trim()}
+                        disabled={!currentSerial.trim() || isCheckingDuplicate}
                       >
                         <Plus className="w-4 h-4 mr-1" />
-                        Add Serial
+                        {isCheckingDuplicate ? 'Checking...' : 'Add Serial'}
                       </Button>
                     </div>
                   </div>
