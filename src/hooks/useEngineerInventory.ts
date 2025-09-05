@@ -21,15 +21,22 @@ export const useEngineerInventory = () => {
     queryFn: async () => {
       if (!user?.id) throw new Error('User not authenticated');
 
+      console.log('🔍 ENGINEER INVENTORY: Starting for user:', user.id);
+      
       // Get the engineer's ID
       const { data: engineer, error: engineerError } = await supabase
         .from('engineers')
         .select('id')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
+      console.log('👤 ENGINEER DATA:', engineer, engineerError);
+      
       if (engineerError) throw engineerError;
-      if (!engineer) throw new Error('Engineer profile not found');
+      if (!engineer) {
+        console.log('❌ No engineer profile found for user:', user.id);
+        return [];
+      }
 
       // Get the engineer's van locations
       const { data: locations, error: locationsError } = await supabase
@@ -38,16 +45,26 @@ export const useEngineerInventory = () => {
         .eq('engineer_id', engineer.id)
         .eq('is_active', true);
 
+      console.log('📍 ENGINEER LOCATIONS QUERY for engineer:', engineer.id);
+      
       if (locationsError) throw locationsError;
+      
+      console.log('📍 ENGINEER LOCATIONS:', locations);
+      
       if (!locations || locations.length === 0) {
+        console.log('❌ No van locations found for engineer:', engineer.id);
         return [];
       }
 
       const locationIds = locations.map(loc => loc.id);
+      console.log('📍 LOCATION IDS:', locationIds);
 
       // Get inventory balances using the function
+      console.log('📦 GETTING BALANCES...');
       const { data: balances, error: balancesError } = await supabase
         .rpc('get_item_location_balances');
+
+      console.log('📦 BALANCES RESULT:', balances, balancesError);
 
       if (balancesError) throw balancesError;
 
@@ -56,7 +73,10 @@ export const useEngineerInventory = () => {
         locationIds.includes(balance.location_id)
       ) || [];
 
+      console.log('📦 ENGINEER BALANCES:', engineerBalances);
+
       if (engineerBalances.length === 0) {
+        console.log('❌ No balances found for engineer locations');
         return [];
       }
 

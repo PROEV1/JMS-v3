@@ -30,12 +30,15 @@ export function EngineerVanStock() {
       const { data: user } = await supabase.auth.getUser();
       if (!user.user) return null;
 
-      const { data } = await supabase
+      console.log('👤 GETTING ENGINEER PROFILE for user:', user.user.id);
+      
+      const { data, error } = await supabase
         .from('engineers')
         .select('id, name')
         .eq('user_id', user.user.id)
-        .single();
+        .maybeSingle();
 
+      console.log('👤 ENGINEER PROFILE RESULT:', data, error);
       return data;
     }
   });
@@ -46,12 +49,30 @@ export function EngineerVanStock() {
     queryFn: async () => {
       if (!engineer) return null;
 
-      const { data } = await supabase
+      console.log('🚐 GETTING VAN LOCATION for engineer:', engineer);
+      
+      // First try with engineer_id for exact match
+      let { data } = await supabase
         .from('inventory_locations')
         .select('id, name')
-        .eq('type', 'van')
-        .ilike('name', `%${engineer.name}%`)
+        .eq('engineer_id', engineer.id)
+        .eq('is_active', true)
         .maybeSingle();
+
+      console.log('🚐 VAN LOCATION BY ENGINEER_ID:', data);
+      
+      // If not found, try by name pattern
+      if (!data) {
+        ({ data } = await supabase
+          .from('inventory_locations')
+          .select('id, name')
+          .eq('type', 'van')
+          .ilike('name', `%${engineer.name}%`)
+          .eq('is_active', true)
+          .maybeSingle());
+        
+        console.log('🚐 VAN LOCATION BY NAME PATTERN:', data);
+      }
 
       return data;
     },
