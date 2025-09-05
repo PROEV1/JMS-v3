@@ -219,7 +219,7 @@ export function PurchaseOrdersList() {
             <SelectTrigger className="w-32">
               <SelectValue placeholder="Sort" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="bg-background border shadow-lg z-50">
               <SelectItem value="latest">Latest</SelectItem>
               <SelectItem value="oldest">Oldest</SelectItem>
             </SelectContent>
@@ -230,7 +230,7 @@ export function PurchaseOrdersList() {
             <SelectTrigger className="w-40">
               <SelectValue placeholder="Engineer" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="bg-background border shadow-lg z-50">
               <SelectItem value="all">All Engineers</SelectItem>
               <SelectItem value="unassigned">Unassigned</SelectItem>
               {engineers?.map((engineer) => (
@@ -247,7 +247,7 @@ export function PurchaseOrdersList() {
               <CalendarDays className="h-4 w-4 mr-2" />
               <SelectValue placeholder="Date" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="bg-background border shadow-lg z-50">
               <SelectItem value="all">All Dates</SelectItem>
               <SelectItem value="today">Today</SelectItem>
               <SelectItem value="week">This Week</SelectItem>
