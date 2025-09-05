@@ -83,6 +83,8 @@ export function useRecordMaterialUsage() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['materials-used', variables.orderId] });
       queryClient.invalidateQueries({ queryKey: ['inventory-balances'] });
+      queryClient.invalidateQueries({ queryKey: ['engineer-inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['engineer-inventory-items'] });
       toast({
         title: "Material Recorded",
         description: `${variables.itemName} has been added to job materials`,
@@ -116,9 +118,11 @@ export function useRevokeMaterialUsage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['materials-used'] });
       queryClient.invalidateQueries({ queryKey: ['inventory-balances'] });
+      queryClient.invalidateQueries({ queryKey: ['engineer-inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['engineer-inventory-items'] });
       toast({
         title: "Material Usage Revoked",
-        description: "Material usage has been removed from the job",
+        description: "Material usage has been removed from the job and stock restored",
       });
     },
     onError: (error) => {

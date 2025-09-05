@@ -57,7 +57,7 @@ export function EngineerMaterialsUsed({ orderId, engineerId }: EngineerMaterials
     enabled: !!engineerId
   });
 
-  // Fetch inventory items available in engineer's van
+  // Fetch inventory items available in engineer's van using same method as Van Inventory
   const { data: inventoryItems = [] } = useQuery({
     queryKey: ['engineer-inventory-items', engineerLocation?.id],
     queryFn: async () => {
@@ -68,49 +68,31 @@ export function EngineerMaterialsUsed({ orderId, engineerId }: EngineerMaterials
       
       console.log('📦 INVENTORY QUERY: Starting for location:', engineerLocation.id, engineerLocation.name);
       
-      // Get inventory transactions for this location using direct query
-      const { data: txnData, error } = await supabase
-        .from('inventory_txns')
-        .select('item_id, location_id, direction, qty, status')
-        .eq('location_id', engineerLocation.id)
-        .in('status', ['approved', 'pending']); // Include pending for now
+      // Use same RPC method as Van Inventory for consistency
+      const { data: balances, error: balancesError } = await supabase
+        .rpc('get_item_location_balances');
       
-      if (error) {
-        console.error('❌ INVENTORY TXN ERROR:', error);
-        throw error;
+      if (balancesError) {
+        console.error('❌ INVENTORY BALANCES ERROR:', balancesError);
+        throw balancesError;
       }
       
-      console.log('📋 TRANSACTIONS FOUND:', txnData?.length || 0, 'transactions');
-      console.log('📊 Transaction details:', txnData);
+      console.log('📦 ALL BALANCES:', balances);
       
-      // Calculate balances manually
-      const balances = new Map<string, number>();
+      // Filter balances for this engineer's location
+      const engineerBalances = balances?.filter(balance => 
+        balance.location_id === engineerLocation.id && balance.on_hand > 0
+      ) || [];
       
-      txnData?.forEach(txn => {
-        const current = balances.get(txn.item_id) || 0;
-        if (txn.direction === 'in' || txn.direction === 'adjust') {
-          balances.set(txn.item_id, current + txn.qty);
-        } else {
-          balances.set(txn.item_id, current - txn.qty);
-        }
-      });
+      console.log('📦 ENGINEER BALANCES:', engineerBalances);
       
-      console.log('🧮 CALCULATED BALANCES:', Object.fromEntries(balances));
-      
-      // Filter items with positive stock
-      const itemsWithStock = Array.from(balances.entries())
-        .filter(([_, qty]) => qty > 0)
-        .map(([itemId, qty]) => ({ item_id: itemId, on_hand: qty }));
-      
-      console.log('✅ ITEMS WITH STOCK:', itemsWithStock);
-      
-      // Get item details
-      if (itemsWithStock.length === 0) {
+      if (engineerBalances.length === 0) {
         console.log('📦 NO STOCK: No items with positive stock found');
         return [];
       }
       
-      const itemIds = itemsWithStock.map(item => item.item_id);
+      // Get item details
+      const itemIds = engineerBalances.map(balance => balance.item_id);
       console.log('🔎 FETCHING ITEM DETAILS for IDs:', itemIds);
       
       const { data: itemDetails, error: itemError } = await supabase
@@ -129,7 +111,7 @@ export function EngineerMaterialsUsed({ orderId, engineerId }: EngineerMaterials
       
       const result = itemDetails?.map(item => ({
         ...item,
-        on_hand: itemsWithStock.find(v => v.item_id === item.id)?.on_hand || 0
+        on_hand: engineerBalances.find(b => b.item_id === item.id)?.on_hand || 0
       })) || [];
       
       console.log('🎯 FINAL INVENTORY RESULT:', result);
@@ -459,19 +441,11 @@ export function EngineerMaterialsUsed({ orderId, engineerId }: EngineerMaterials
                       <AlertDialogFooter className="flex-col gap-2 sm:flex-row">
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                         <AlertDialogAction
-                          onClick={() => handleRevoke(material.id, false)}
+                          onClick={() => handleRevoke(material.id, true)}
                           className="bg-destructive hover:bg-destructive/90"
                         >
-                          Remove Only
+                          Remove & Restore Stock
                         </AlertDialogAction>
-                        {material.location_id && (
-                          <AlertDialogAction
-                            onClick={() => handleRevoke(material.id, true)}
-                            className="border border-input bg-background hover:bg-accent"
-                          >
-                            Remove & Restore Stock
-                          </AlertDialogAction>
-                        )}
                       </AlertDialogFooter>
                     </AlertDialogContent>
                   </AlertDialog>
