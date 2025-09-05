@@ -1,8 +1,12 @@
 import React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { CalendarDays, Package, User, FileText, AlertCircle } from 'lucide-react';
+import { CalendarDays, Package, User, FileText, AlertCircle, CheckCircle } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 interface RmaViewModalProps {
   open: boolean;
@@ -11,6 +15,40 @@ interface RmaViewModalProps {
 }
 
 export function RmaViewModal({ open, onOpenChange, rma }: RmaViewModalProps) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const markAsReceivedMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from('returns_rmas')
+        .update({
+          status: 'received_by_supplier' as const,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', rma.id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({
+        title: "RMA Status Updated",
+        description: `RMA ${rma.rma_number} marked as received by supplier`,
+      });
+      queryClient.invalidateQueries({ queryKey: ['returns-rmas'] });
+      queryClient.invalidateQueries({ queryKey: ['rma-metrics'] });
+      onOpenChange(false);
+    },
+    onError: (error) => {
+      console.error('Error updating RMA status:', error);
+      toast({
+        title: "Error Updating Status",
+        description: "Failed to update RMA status. Please try again.",
+        variant: "destructive"
+      });
+    }
+  });
+
   if (!rma) return null;
 
   const getStatusColor = (status: string) => {
@@ -29,9 +67,22 @@ export function RmaViewModal({ open, onOpenChange, rma }: RmaViewModalProps) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Package className="h-5 w-5" />
-            RMA Details - {rma.rma_number}
+          <DialogTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              RMA Details - {rma.rma_number}
+            </div>
+            {rma.status === 'in_transit' && (
+              <Button 
+                onClick={() => markAsReceivedMutation.mutate()}
+                disabled={markAsReceivedMutation.isPending}
+                size="sm"
+                className="ml-auto"
+              >
+                <CheckCircle className="h-4 w-4 mr-2" />
+                {markAsReceivedMutation.isPending ? 'Updating...' : 'Mark as Received'}
+              </Button>
+            )}
           </DialogTitle>
         </DialogHeader>
 
