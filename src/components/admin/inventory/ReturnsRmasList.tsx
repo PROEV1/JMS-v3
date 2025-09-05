@@ -11,7 +11,8 @@ import {
   RotateCcw, 
   Truck, 
   Clock,
-  AlertTriangle
+  AlertTriangle,
+  Filter
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { InventoryKpiTile } from './shared/InventoryKpiTile';
@@ -29,6 +30,7 @@ export function ReturnsRmasList() {
   const [showViewModal, setShowViewModal] = useState(false);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [showShipModal, setShowShipModal] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
 
   // Header metrics
   const { data: metrics } = useQuery({
@@ -60,10 +62,11 @@ export function ReturnsRmasList() {
         .from('returns_rmas')
         .select(`
           id, rma_number, serial_number, status, return_reason, return_date, 
-          replacement_serial_number, created_at,
+          replacement_serial_number, created_at, created_by,
           inventory_items(name, sku),
           inventory_suppliers(name),
-          returns_rma_lines(quantity, condition_notes)
+          returns_rma_lines(quantity, condition_notes),
+          profiles(full_name)
         `)
         .order('created_at', { ascending: false });
 
@@ -148,6 +151,14 @@ export function ReturnsRmasList() {
               className="pl-10 w-64"
             />
           </div>
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => setShowFilters(!showFilters)}
+          >
+            <Filter className="h-4 w-4 mr-2" />
+            Filters
+          </Button>
         </div>
         
         <Button onClick={() => setShowCreateModal(true)}>
@@ -186,6 +197,9 @@ export function ReturnsRmasList() {
                     </div>
                     <div className="text-xs text-muted-foreground">
                       Opened: {new Date(rma.created_at).toLocaleDateString()} • Reason: {rma.return_reason}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      Created by: {rma.profiles?.full_name || 'System'}
                     </div>
                     {rma.replacement_serial_number && (
                       <div className="text-xs text-green-600">
