@@ -33,7 +33,7 @@ export function RmaViewModal({ open, onOpenChange, rma }: RmaViewModalProps) {
     onSuccess: () => {
       toast({
         title: "RMA Status Updated",
-        description: `RMA ${rma.rma_number} marked as received by supplier`,
+        description: `RMA ${rma.rma_number} marked as received`,
       });
       queryClient.invalidateQueries({ queryKey: ['returns-rmas'] });
       queryClient.invalidateQueries({ queryKey: ['rma-metrics'] });
@@ -50,6 +50,13 @@ export function RmaViewModal({ open, onOpenChange, rma }: RmaViewModalProps) {
   });
 
   if (!rma) return null;
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'received_by_supplier': return 'RECEIVED';
+      default: return status.replace('_', ' ').toUpperCase();
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -91,7 +98,7 @@ export function RmaViewModal({ open, onOpenChange, rma }: RmaViewModalProps) {
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">Status:</span>
             <Badge className={getStatusColor(rma.status)}>
-              {rma.status.replace('_', ' ').toUpperCase()}
+              {getStatusText(rma.status)}
             </Badge>
           </div>
 

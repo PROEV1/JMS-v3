@@ -93,7 +93,7 @@ export function RmaUpdateModal({ open, onOpenChange, rma }: RmaUpdateModalProps)
               <SelectContent>
                 <SelectItem value="pending_return">Pending Return</SelectItem>
                 <SelectItem value="in_transit">In Transit</SelectItem>
-                <SelectItem value="received_by_supplier">Received by Supplier</SelectItem>
+                <SelectItem value="received_by_supplier">Received</SelectItem>
                 <SelectItem value="replacement_sent">Replacement Sent</SelectItem>
                 <SelectItem value="replacement_received">Replacement Received</SelectItem>
                 <SelectItem value="closed">Closed</SelectItem>
