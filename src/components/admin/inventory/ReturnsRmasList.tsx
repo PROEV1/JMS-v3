@@ -55,7 +55,8 @@ export function ReturnsRmasList() {
           id, rma_number, serial_number, status, return_reason, return_date, 
           replacement_serial_number, created_at,
           inventory_items(name, sku),
-          inventory_suppliers(name)
+          inventory_suppliers(name),
+          returns_rma_lines(quantity, condition_notes)
         `)
         .order('created_at', { ascending: false });
 
@@ -160,6 +161,11 @@ export function ReturnsRmasList() {
                     </div>
                     <div className="text-sm text-muted-foreground">
                       {rma.inventory_items?.name} ({rma.inventory_items?.sku})
+                      {rma.returns_rma_lines && rma.returns_rma_lines.length > 0 && (
+                        <span className="ml-2 font-medium">
+                          • Qty: {rma.returns_rma_lines.reduce((total: number, line: any) => total + line.quantity, 0)}
+                        </span>
+                      )}
                     </div>
                     <div className="text-xs text-muted-foreground">
                       Serial: {rma.serial_number || 'N/A'} • Supplier: {rma.inventory_suppliers?.name || 'N/A'}
