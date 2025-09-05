@@ -56,16 +56,19 @@ export function ScanChargersModal({ open, onOpenChange }: ScanChargersModalProps
 
       if (videoRef.current) {
         setIsScanning(true);
+        console.log('Starting camera scanner...');
+        
         await codeReaderRef.current.decodeFromVideoDevice(
           undefined,
           videoRef.current,
           (result, error) => {
             if (result) {
+              console.log('Scanned result:', result.getText());
               const scannedText = result.getText();
-              setCurrentSerial(scannedText);
-              if (selectedChargerModel) {
-                handleScanResult(scannedText);
-              }
+              handleScanResult(scannedText);
+            }
+            if (error && !(error.name === 'NotFoundException')) {
+              console.error('Scanner error:', error);
             }
           }
         );
@@ -89,21 +92,22 @@ export function ScanChargersModal({ open, onOpenChange }: ScanChargersModalProps
   };
 
   const handleScanResult = (scannedText: string) => {
-    if (!selectedChargerModel) {
-      toast({
-        title: "Select Charger Model",
-        description: "Please select a charger model first",
-        variant: "destructive"
-      });
-      return;
-    }
-
     // Check if serial already exists
     if (scannedChargers.some(c => c.serialNumber === scannedText)) {
       toast({
         title: "Duplicate Serial",
         description: "This serial number has already been scanned",
         variant: "destructive"
+      });
+      return;
+    }
+
+    // If no charger model selected, just set the serial for manual selection
+    if (!selectedChargerModel) {
+      setCurrentSerial(scannedText);
+      toast({
+        title: "Serial Scanned",
+        description: `Scanned: ${scannedText}. Please select a charger model.`,
       });
       return;
     }
@@ -123,7 +127,7 @@ export function ScanChargersModal({ open, onOpenChange }: ScanChargersModalProps
     setCurrentSerial('');
 
     toast({
-      title: "Charger Scanned",
+      title: "Charger Added",
       description: `Added ${selectedModel.name} - ${scannedText}`,
     });
   };
@@ -329,22 +333,49 @@ export function ScanChargersModal({ open, onOpenChange }: ScanChargersModalProps
                       playsInline
                       muted
                     />
-                    {!selectedChargerModel && (
-                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                        <p className="text-white text-center">
-                          Select a charger model first to start scanning
-                        </p>
-                      </div>
-                    )}
-                    {selectedChargerModel && isScanning && (
-                      <div className="absolute top-4 left-4 bg-green-500 text-white px-3 py-1 rounded-full text-sm">
-                        📷 Ready to scan
-                      </div>
-                    )}
+                     {!isScanning && (
+                       <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                         <p className="text-white text-center">
+                           Starting camera...
+                         </p>
+                       </div>
+                     )}
+                     {isScanning && (
+                       <div className="absolute top-4 left-4 bg-green-500 text-white px-3 py-1 rounded-full text-sm">
+                         📷 Ready to scan
+                       </div>
+                     )}
+                     {currentSerial && (
+                       <div className="absolute bottom-4 left-4 bg-blue-500 text-white px-3 py-1 rounded-full text-sm">
+                         Scanned: {currentSerial}
+                       </div>
+                     )}
                   </div>
                   <div className="text-sm text-muted-foreground">
-                    <p>💡 <strong>Camera Tip:</strong> Point your camera at the QR code or barcode. Chargers will be added automatically when scanned successfully.</p>
+                    <p>💡 <strong>Camera Tip:</strong> Point your camera at any QR code or barcode. You can scan first, then select the charger model, or select the model first for automatic adding.</p>
                   </div>
+                  
+                  {/* Quick Add Section - when serial is scanned but no model selected */}
+                  {currentSerial && !selectedChargerModel && (
+                    <Card className="border-blue-200 bg-blue-50">
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-medium">Scanned: <code className="bg-white px-2 py-1 rounded">{currentSerial}</code></p>
+                            <p className="text-sm text-muted-foreground">Select a charger model to add this serial</p>
+                          </div>
+                          <Button 
+                            onClick={handleAddScannedCharger}
+                            disabled={!selectedChargerModel}
+                            size="sm"
+                          >
+                            <Plus className="w-4 h-4 mr-1" />
+                            Add
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
                 </div>
               )}
 
