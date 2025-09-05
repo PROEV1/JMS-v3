@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Zap, Truck, Warehouse, Package, Eye, MapPin, User, Plus, Settings, UserCheck, Search } from "lucide-react";
+import { Zap, Truck, Warehouse, Package, Eye, MapPin, User, Plus, Settings, UserCheck, Search, Scan } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { InventoryKpiTile } from './shared/InventoryKpiTile';
 import { StatusChip } from './shared/StatusChip';
@@ -15,6 +15,7 @@ import { ChargerDispatchPanel } from './ChargerDispatchPanel';
 import { AddChargerModal } from './AddChargerModal';
 import { AssignChargerModal } from './AssignChargerModal';
 import { EditChargerModal } from './EditChargerModal';
+import { ScanChargersModal } from './ScanChargersModal';
 
 interface ChargerUnit {
   id: string;
@@ -54,6 +55,7 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
   const [showDispatchPanel, setShowDispatchPanel] = useState(false);
   const [showAddChargerModal, setShowAddChargerModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
+  const [showScanModal, setShowScanModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedCharger, setSelectedCharger] = useState<ChargerUnit | null>(null);
   const [selectedChargerModel, setSelectedChargerModel] = useState('');
@@ -204,6 +206,14 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
           >
             <Plus className="w-4 h-4" />
             Add Charger
+          </Button>
+          <Button 
+            onClick={() => setShowScanModal(true)}
+            variant="outline"
+            className="flex items-center gap-2"
+          >
+            <Scan className="w-4 h-4" />
+            Scan Chargers
           </Button>
           <Button 
             variant="outline"
@@ -457,7 +467,12 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
         </Card>
       )}
 
-      <AddChargerModal 
+      <ScanChargersModal
+        open={showScanModal}
+        onOpenChange={setShowScanModal}
+      />
+
+      <AddChargerModal
         open={showAddChargerModal}
         onOpenChange={setShowAddChargerModal}
       />
