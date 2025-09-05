@@ -26,7 +26,7 @@ export function EngineerMaterialsUsed({ orderId, engineerId }: EngineerMaterials
   const [serialNumber, setSerialNumber] = useState("");
   const [locationId, setLocationId] = useState<string>("");
   const [notes, setNotes] = useState("");
-  const [deductStock, setDeductStock] = useState(false);
+  const [deductStock, setDeductStock] = useState(true);
 
   const { data: materialsUsed = [], isLoading } = useMaterialsUsed(orderId);
   const recordMaterialMutation = useRecordMaterialUsage();
@@ -223,7 +223,7 @@ export function EngineerMaterialsUsed({ orderId, engineerId }: EngineerMaterials
     setSerialNumber("");
     setLocationId("");
     setNotes("");
-    setDeductStock(false);
+    setDeductStock(true);
   };
 
   const handleRevoke = (usageId: string, shouldRestoreStock: boolean) => {
