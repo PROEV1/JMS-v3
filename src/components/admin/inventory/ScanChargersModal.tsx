@@ -108,7 +108,7 @@ export function ScanChargersModal({ open, onOpenChange }: ScanChargersModalProps
       status: 'available'
     };
 
-    setScannedChargers([...scannedChargers, newScannedCharger]);
+    setScannedChargers(prev => [...prev, newScannedCharger]);
     setCurrentSerial('');
 
     toast({
@@ -152,7 +152,43 @@ export function ScanChargersModal({ open, onOpenChange }: ScanChargersModalProps
 
   // Remove charger from preview list
   const handleRemoveScannedCharger = (id: string) => {
-    setScannedChargers(scannedChargers.filter(c => c.id !== id));
+    setScannedChargers(prev => prev.filter(c => c.id !== id));
+  };
+
+  // Apply charger model to all unassigned chargers
+  const handleSelectAllChargerModel = (modelId: string) => {
+    const selectedModel = chargerModels.find(m => m.id === modelId);
+    if (!selectedModel) return;
+
+    setScannedChargers(prev => prev.map(charger => 
+      !charger.chargerItemId 
+        ? { 
+            ...charger, 
+            chargerModel: selectedModel.name,
+            chargerItemId: selectedModel.id
+          }
+        : charger
+    ));
+
+    const unassignedCount = scannedChargers.filter(c => !c.chargerItemId).length;
+    toast({
+      title: "Bulk Assignment Complete",
+      description: `Applied ${selectedModel.name} to ${unassignedCount} charger(s)`,
+    });
+  };
+
+  // Clear all charger model assignments
+  const handleClearAllAssignments = () => {
+    setScannedChargers(prev => prev.map(charger => ({
+      ...charger,
+      chargerModel: undefined,
+      chargerItemId: undefined
+    })));
+
+    toast({
+      title: "Assignments Cleared",
+      description: "All charger model assignments have been cleared",
+    });
   };
 
   // Submit all scanned chargers
@@ -333,10 +369,44 @@ export function ScanChargersModal({ open, onOpenChange }: ScanChargersModalProps
           {scannedChargers.length > 0 && (
             <Card>
               <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-medium">Scanned Chargers Preview</h3>
-                  <Badge variant="secondary">{scannedChargers.length} charger(s)</Badge>
-                </div>
+                 <div className="flex items-center justify-between mb-4">
+                   <h3 className="font-medium">Scanned Chargers Preview</h3>
+                   <Badge variant="secondary">{scannedChargers.length} charger(s)</Badge>
+                 </div>
+
+                 {/* Bulk Assignment Section */}
+                 <div className="mb-4 p-3 bg-muted/30 rounded-lg border">
+                   <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+                     <div className="flex-1">
+                       <label className="text-sm font-medium mb-2 block">Bulk Assign Charger Model:</label>
+                       <Select onValueChange={handleSelectAllChargerModel}>
+                         <SelectTrigger className="w-full sm:w-[250px]">
+                           <SelectValue placeholder="Select model to apply to all..." />
+                         </SelectTrigger>
+                         <SelectContent>
+                           {chargerModels.map(model => (
+                             <SelectItem key={model.id} value={model.id}>
+                               {model.name}
+                             </SelectItem>
+                           ))}
+                         </SelectContent>
+                       </Select>
+                     </div>
+                     <div className="flex gap-2">
+                       <Button 
+                         variant="outline" 
+                         size="sm"
+                         onClick={handleClearAllAssignments}
+                         disabled={!scannedChargers.some(c => c.chargerItemId)}
+                       >
+                         Clear All
+                       </Button>
+                     </div>
+                   </div>
+                   <div className="text-xs text-muted-foreground mt-2">
+                     💡 Use bulk assign to quickly apply the same charger model to all unassigned serials
+                   </div>
+                 </div>
 
                 <Table>
                   <TableHeader>
