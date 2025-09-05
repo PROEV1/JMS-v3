@@ -128,33 +128,41 @@ export function EngineerReturnModal({
       // Create RMA record
       const currentUser = (await supabase.auth.getUser()).data.user;
       
-      // Create multiple RMA records if quantity > 1
-      const rmaRecords = [];
-      for (let i = 0; i < qty; i++) {
-        const recordNumber = qty > 1 ? `${rmaNumber}-${String(i + 1).padStart(2, '0')}` : rmaNumber;
-        rmaRecords.push({
-          rma_number: recordNumber,
-          item_id: itemId,
-          supplier_id: suppliers[0]?.id || null, // Use first supplier as default
+      // Create one main RMA record
+      const { data: rmaData, error: rmaError } = await supabase
+        .from('returns_rmas')
+        .insert({
+          rma_number: rmaNumber,
+          item_id: itemId, // Primary item for the RMA
+          supplier_id: suppliers[0]?.id || null,
           return_reason: reason,
           notes: supplierNotes,
           status: 'pending_return',
           created_by: currentUser?.id
-        });
-      }
-
-      const { error: rmaError } = await supabase
-        .from('returns_rmas')
-        .insert(rmaRecords);
+        })
+        .select()
+        .single();
 
       if (rmaError) throw rmaError;
 
-      return { rmaNumber, recordCount: rmaRecords.length };
+      // Create line item for the quantity being returned
+      const { error: lineError } = await supabase
+        .from('returns_rma_lines')
+        .insert({
+          rma_id: rmaData.id,
+          item_id: itemId,
+          quantity: qty,
+          condition_notes: supplierNotes
+        });
+
+      if (lineError) throw lineError;
+
+      return { rmaNumber, recordCount: 1 };
     },
     onSuccess: (data) => {
       toast({
         title: "RMA Created Successfully",
-        description: `Created ${data.recordCount} RMA record(s) - ${data.rmaNumber}`,
+        description: `Created RMA ${data.rmaNumber} with ${returnQuantity} units`,
         action: (
           <Button 
             variant="outline" 
