@@ -18,10 +18,17 @@ import { InventoryKpiTile } from './shared/InventoryKpiTile';
 import { StatusChip } from './shared/StatusChip';
 import { EmptyState } from './shared/EmptyState';
 import { CreateRMAModal } from './CreateRMAModal';
+import { RmaViewModal } from './RmaViewModal';
+import { RmaUpdateModal } from './RmaUpdateModal';
+import { RmaShipModal } from './RmaShipModal';
 
 export function ReturnsRmasList() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [selectedRma, setSelectedRma] = useState<any>(null);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const [showShipModal, setShowShipModal] = useState(false);
 
   // Header metrics
   const { data: metrics } = useQuery({
@@ -181,16 +188,38 @@ export function ReturnsRmasList() {
                   </div>
                   
                   <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => {
+                        setSelectedRma(rma);
+                        setShowViewModal(true);
+                      }}
+                    >
                       <Eye className="h-4 w-4 mr-1" />
                       View
                     </Button>
-                    <Button variant="outline" size="sm">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => {
+                        setSelectedRma(rma);
+                        setShowUpdateModal(true);
+                      }}
+                    >
                       <Edit className="h-4 w-4 mr-1" />
                       Update
                     </Button>
                     {rma.status === 'pending_return' && (
-                      <Button variant="outline" size="sm">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => {
+                          setSelectedRma(rma);
+                          setShowShipModal(true);
+                        }}
+                      >
+                        <Truck className="h-4 w-4 mr-1" />
                         Ship Return
                       </Button>
                     )}
@@ -213,6 +242,24 @@ export function ReturnsRmasList() {
       <CreateRMAModal 
         open={showCreateModal} 
         onOpenChange={setShowCreateModal} 
+      />
+
+      <RmaViewModal
+        open={showViewModal}
+        onOpenChange={setShowViewModal}
+        rma={selectedRma}
+      />
+
+      <RmaUpdateModal
+        open={showUpdateModal}
+        onOpenChange={setShowUpdateModal}
+        rma={selectedRma}
+      />
+
+      <RmaShipModal
+        open={showShipModal}
+        onOpenChange={setShowShipModal}
+        rma={selectedRma}
       />
     </div>
   );
