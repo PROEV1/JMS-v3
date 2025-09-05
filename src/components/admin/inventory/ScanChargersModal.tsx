@@ -15,8 +15,8 @@ import { BrowserMultiFormatReader } from '@zxing/library';
 interface ScannedCharger {
   id: string;
   serialNumber: string;
-  chargerModel: string;
-  chargerItemId: string;
+  chargerModel?: string;
+  chargerItemId?: string;
   status: string;
 }
 
@@ -29,7 +29,6 @@ export function ScanChargersModal({ open, onOpenChange }: ScanChargersModalProps
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [currentSerial, setCurrentSerial] = useState('');
-  const [selectedChargerModel, setSelectedChargerModel] = useState('');
   const [scannedChargers, setScannedChargers] = useState<ScannedCharger[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [scanMode, setScanMode] = useState<'manual' | 'camera'>('manual');
@@ -102,24 +101,10 @@ export function ScanChargersModal({ open, onOpenChange }: ScanChargersModalProps
       return;
     }
 
-    // If no charger model selected, just set the serial for manual selection
-    if (!selectedChargerModel) {
-      setCurrentSerial(scannedText);
-      toast({
-        title: "Serial Scanned",
-        description: `Scanned: ${scannedText}. Please select a charger model.`,
-      });
-      return;
-    }
-
-    const selectedModel = chargerModels.find(m => m.id === selectedChargerModel);
-    if (!selectedModel) return;
-
+    // Auto-add scanned serial to the list
     const newScannedCharger: ScannedCharger = {
       id: `temp-${Date.now()}-${Math.random()}`,
       serialNumber: scannedText,
-      chargerModel: selectedModel.name,
-      chargerItemId: selectedModel.id,
       status: 'available'
     };
 
@@ -127,8 +112,8 @@ export function ScanChargersModal({ open, onOpenChange }: ScanChargersModalProps
     setCurrentSerial('');
 
     toast({
-      title: "Charger Added",
-      description: `Added ${selectedModel.name} - ${scannedText}`,
+      title: "Serial Added",
+      description: `Added serial: ${scannedText}`,
     });
   };
 
@@ -149,59 +134,20 @@ export function ScanChargersModal({ open, onOpenChange }: ScanChargersModalProps
     enabled: open
   });
 
-  // Add scanned charger to preview list
-  const handleAddScannedCharger = () => {
-    if (!currentSerial.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter a serial number",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (!selectedChargerModel) {
-      toast({
-        title: "Error", 
-        description: "Please select a charger model",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Check if serial already exists in scanned list
-    if (scannedChargers.some(c => c.serialNumber === currentSerial.trim())) {
-      toast({
-        title: "Duplicate Serial",
-        description: "This serial number has already been scanned",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    const selectedModel = chargerModels.find(m => m.id === selectedChargerModel);
+  // Update charger model for a specific charger
+  const handleUpdateChargerModel = (chargerId: string, modelId: string) => {
+    const selectedModel = chargerModels.find(m => m.id === modelId);
     if (!selectedModel) return;
 
-    const newScannedCharger: ScannedCharger = {
-      id: `temp-${Date.now()}-${Math.random()}`,
-      serialNumber: currentSerial.trim(),
-      chargerModel: selectedModel.name,
-      chargerItemId: selectedModel.id,
-      status: 'available'
-    };
-
-    setScannedChargers([...scannedChargers, newScannedCharger]);
-    setCurrentSerial('');
-    
-    // Focus back to serial input for next scan
-    setTimeout(() => {
-      serialInputRef.current?.focus();
-    }, 100);
-
-    toast({
-      title: "Charger Added",
-      description: `Added ${selectedModel.name} - ${currentSerial.trim()}`,
-    });
+    setScannedChargers(prev => prev.map(charger => 
+      charger.id === chargerId 
+        ? { 
+            ...charger, 
+            chargerModel: selectedModel.name,
+            chargerItemId: selectedModel.id
+          }
+        : charger
+    ));
   };
 
   // Remove charger from preview list
@@ -236,7 +182,6 @@ export function ScanChargersModal({ open, onOpenChange }: ScanChargersModalProps
       queryClient.invalidateQueries({ queryKey: ['charger-items'] });
       setScannedChargers([]);
       setCurrentSerial('');
-      setSelectedChargerModel('');
       onOpenChange(false);
     },
     onError: (error: any) => {
@@ -249,6 +194,17 @@ export function ScanChargersModal({ open, onOpenChange }: ScanChargersModalProps
   });
 
   const handleSubmit = () => {
+    // Check if all chargers have models assigned
+    const chargersWithoutModels = scannedChargers.filter(c => !c.chargerItemId);
+    if (chargersWithoutModels.length > 0) {
+      toast({
+        title: "Missing Charger Models",
+        description: `Please assign charger models to all ${chargersWithoutModels.length} chargers before submitting.`,
+        variant: "destructive"
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     submitChargersMutation.mutate();
     setIsSubmitting(false);
@@ -258,16 +214,8 @@ export function ScanChargersModal({ open, onOpenChange }: ScanChargersModalProps
     stopScanner();
     setScannedChargers([]);
     setCurrentSerial('');
-    setSelectedChargerModel('');
     setScanMode('manual');
     onOpenChange(false);
-  };
-
-  const handleSerialKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleAddScannedCharger();
-    }
   };
 
   return (
@@ -305,23 +253,6 @@ export function ScanChargersModal({ open, onOpenChange }: ScanChargersModalProps
                 </Button>
               </div>
 
-              {/* Charger Model Selection (always visible) */}
-              <div className="mb-4">
-                <label className="text-sm font-medium mb-2 block">Charger Model</label>
-                <Select value={selectedChargerModel} onValueChange={setSelectedChargerModel}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select charger model first" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {chargerModels.map(model => (
-                      <SelectItem key={model.id} value={model.id}>
-                        {model.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
               {/* Camera Scanning Mode */}
               {scanMode === 'camera' && (
                 <div className="space-y-4">
@@ -345,37 +276,10 @@ export function ScanChargersModal({ open, onOpenChange }: ScanChargersModalProps
                          📷 Ready to scan
                        </div>
                      )}
-                     {currentSerial && (
-                       <div className="absolute bottom-4 left-4 bg-blue-500 text-white px-3 py-1 rounded-full text-sm">
-                         Scanned: {currentSerial}
-                       </div>
-                     )}
                   </div>
                   <div className="text-sm text-muted-foreground">
-                    <p>💡 <strong>Camera Tip:</strong> Point your camera at any QR code or barcode. You can scan first, then select the charger model, or select the model first for automatic adding.</p>
+                    <p>💡 <strong>Camera Tip:</strong> Point your camera at any QR code or barcode. Serials will be added automatically to the list below.</p>
                   </div>
-                  
-                  {/* Quick Add Section - when serial is scanned but no model selected */}
-                  {currentSerial && !selectedChargerModel && (
-                    <Card className="border-blue-200 bg-blue-50">
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium">Scanned: <code className="bg-white px-2 py-1 rounded">{currentSerial}</code></p>
-                            <p className="text-sm text-muted-foreground">Select a charger model to add this serial</p>
-                          </div>
-                          <Button 
-                            onClick={handleAddScannedCharger}
-                            disabled={!selectedChargerModel}
-                            size="sm"
-                          >
-                            <Plus className="w-4 h-4 mr-1" />
-                            Add
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
                 </div>
               )}
 
@@ -390,24 +294,35 @@ export function ScanChargersModal({ open, onOpenChange }: ScanChargersModalProps
                         placeholder="Enter serial number"
                         value={currentSerial}
                         onChange={(e) => setCurrentSerial(e.target.value)}
-                        onKeyPress={handleSerialKeyPress}
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            if (currentSerial.trim()) {
+                              handleScanResult(currentSerial.trim());
+                            }
+                          }
+                        }}
                         className="font-mono"
                         autoFocus
                       />
                     </div>
                     <div className="flex items-end">
                       <Button 
-                        onClick={handleAddScannedCharger}
+                        onClick={() => {
+                          if (currentSerial.trim()) {
+                            handleScanResult(currentSerial.trim());
+                          }
+                        }}
                         className="w-full"
-                        disabled={!currentSerial.trim() || !selectedChargerModel}
+                        disabled={!currentSerial.trim()}
                       >
                         <Plus className="w-4 h-4 mr-1" />
-                        Add Charger
+                        Add Serial
                       </Button>
                     </div>
                   </div>
                   <div className="text-sm text-muted-foreground">
-                    <p>💡 <strong>Manual Tip:</strong> Enter serial numbers manually and press Enter or click "Add Charger" to add each one to the preview list.</p>
+                    <p>💡 <strong>Manual Tip:</strong> Enter serial numbers and press Enter or click "Add Serial" to add them to the list below.</p>
                   </div>
                 </div>
               )}
@@ -435,14 +350,29 @@ export function ScanChargersModal({ open, onOpenChange }: ScanChargersModalProps
                   <TableBody>
                     {scannedChargers.map(charger => (
                       <TableRow key={charger.id}>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <div className="p-1.5 bg-primary/10 rounded">
-                              <Zap className="w-3 h-3 text-primary" />
-                            </div>
-                            <span className="font-medium">{charger.chargerModel}</span>
-                          </div>
-                        </TableCell>
+                       <TableCell>
+                         {charger.chargerModel ? (
+                           <div className="flex items-center gap-2">
+                             <div className="p-1.5 bg-primary/10 rounded">
+                               <Zap className="w-3 h-3 text-primary" />
+                             </div>
+                             <span className="font-medium">{charger.chargerModel}</span>
+                           </div>
+                         ) : (
+                           <Select onValueChange={(value) => handleUpdateChargerModel(charger.id, value)}>
+                             <SelectTrigger className="w-[200px]">
+                               <SelectValue placeholder="Select model..." />
+                             </SelectTrigger>
+                             <SelectContent>
+                               {chargerModels.map(model => (
+                                 <SelectItem key={model.id} value={model.id}>
+                                   {model.name}
+                                 </SelectItem>
+                               ))}
+                             </SelectContent>
+                           </Select>
+                         )}
+                       </TableCell>
                         <TableCell>
                           <code className="text-sm bg-muted px-2 py-1 rounded">
                             {charger.serialNumber}
