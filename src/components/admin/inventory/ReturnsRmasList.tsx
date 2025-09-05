@@ -3,6 +3,9 @@ import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 import { 
   Search, 
   Plus, 
@@ -12,8 +15,12 @@ import {
   Truck, 
   Clock,
   AlertTriangle,
-  Filter
+  Filter,
+  CalendarIcon,
+  X
 } from 'lucide-react';
+import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { InventoryKpiTile } from './shared/InventoryKpiTile';
 import { StatusChip } from './shared/StatusChip';
@@ -31,6 +38,11 @@ export function ReturnsRmasList() {
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [showShipModal, setShowShipModal] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  
+  // Filter states
+  const [sortOrder, setSortOrder] = useState('newest');
+  const [dateFrom, setDateFrom] = useState<Date>();
+  const [dateTo, setDateTo] = useState<Date>();
 
   // Header metrics
   const { data: metrics } = useQuery({
@@ -56,7 +68,7 @@ export function ReturnsRmasList() {
 
   // Returns & RMAs list
   const { data: returns } = useQuery({
-    queryKey: ['returns-rmas', searchQuery],
+    queryKey: ['returns-rmas', searchQuery, sortOrder, dateFrom, dateTo],
     queryFn: async () => {
       let query = supabase
         .from('returns_rmas')
@@ -67,8 +79,20 @@ export function ReturnsRmasList() {
           inventory_suppliers(name),
           returns_rma_lines(quantity, condition_notes),
           profiles(full_name)
-        `)
-        .order('created_at', { ascending: false });
+        `);
+
+      // Apply date filters
+      if (dateFrom) {
+        query = query.gte('created_at', dateFrom.toISOString());
+      }
+      if (dateTo) {
+        const endOfDay = new Date(dateTo);
+        endOfDay.setHours(23, 59, 59, 999);
+        query = query.lte('created_at', endOfDay.toISOString());
+      }
+
+      // Apply sorting
+      query = query.order('created_at', { ascending: sortOrder === 'oldest' });
 
       if (searchQuery) {
         query = query.or(`rma_number.ilike.%${searchQuery}%,serial_number.ilike.%${searchQuery}%,inventory_items.name.ilike.%${searchQuery}%`);
@@ -79,11 +103,13 @@ export function ReturnsRmasList() {
     }
   });
 
-  const filteredReturns = returns?.filter(rma => 
-    rma.rma_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    rma.serial_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    rma.inventory_items?.name?.toLowerCase().includes(searchQuery.toLowerCase())
-  ) || [];
+  const clearFilters = () => {
+    setSortOrder('newest');
+    setDateFrom(undefined);
+    setDateTo(undefined);
+  };
+
+  const filteredReturns = returns || [];
 
   const getStatusVariant = (status: string) => {
     switch (status) {
@@ -166,6 +192,85 @@ export function ReturnsRmasList() {
           Create Return/RMA
         </Button>
       </div>
+
+      {/* Filter Panel */}
+      {showFilters && (
+        <Card className="p-4">
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">Sort by:</span>
+              <Select value={sortOrder} onValueChange={setSortOrder}>
+                <SelectTrigger className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="newest">Newest</SelectItem>
+                  <SelectItem value="oldest">Oldest</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">Date From:</span>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-40 justify-start text-left font-normal",
+                      !dateFrom && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {dateFrom ? format(dateFrom, "PPP") : <span>Pick a date</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={dateFrom}
+                    onSelect={setDateFrom}
+                    initialFocus
+                    className={cn("p-3 pointer-events-auto")}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">Date To:</span>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-40 justify-start text-left font-normal",
+                      !dateTo && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {dateTo ? format(dateTo, "PPP") : <span>Pick a date</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={dateTo}
+                    onSelect={setDateTo}
+                    initialFocus
+                    className={cn("p-3 pointer-events-auto")}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <Button variant="outline" size="sm" onClick={clearFilters}>
+              <X className="h-4 w-4 mr-2" />
+              Clear Filters
+            </Button>
+          </div>
+        </Card>
+      )}
 
       {/* Returns Table */}
       <Card>
