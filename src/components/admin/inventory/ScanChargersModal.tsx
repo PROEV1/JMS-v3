@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,10 +6,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
-import { Scan, X, Zap, Plus, Trash2 } from "lucide-react";
+import { Scan, X, Zap, Plus, Trash2, Camera, Keyboard } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { BrowserMultiFormatReader } from '@zxing/library';
 
 interface ScannedCharger {
   id: string;
@@ -31,7 +32,101 @@ export function ScanChargersModal({ open, onOpenChange }: ScanChargersModalProps
   const [selectedChargerModel, setSelectedChargerModel] = useState('');
   const [scannedChargers, setScannedChargers] = useState<ScannedCharger[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [scanMode, setScanMode] = useState<'manual' | 'camera'>('manual');
+  const [isScanning, setIsScanning] = useState(false);
   const serialInputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
+
+  // Initialize camera scanner
+  useEffect(() => {
+    if (open && scanMode === 'camera') {
+      initializeScanner();
+    }
+    return () => {
+      stopScanner();
+    };
+  }, [open, scanMode]);
+
+  const initializeScanner = async () => {
+    try {
+      if (!codeReaderRef.current) {
+        codeReaderRef.current = new BrowserMultiFormatReader();
+      }
+
+      if (videoRef.current) {
+        setIsScanning(true);
+        await codeReaderRef.current.decodeFromVideoDevice(
+          undefined,
+          videoRef.current,
+          (result, error) => {
+            if (result) {
+              const scannedText = result.getText();
+              setCurrentSerial(scannedText);
+              if (selectedChargerModel) {
+                handleScanResult(scannedText);
+              }
+            }
+          }
+        );
+      }
+    } catch (error) {
+      console.error('Error initializing scanner:', error);
+      toast({
+        title: "Camera Error",
+        description: "Could not access camera. Please check permissions or use manual entry.",
+        variant: "destructive"
+      });
+      setScanMode('manual');
+    }
+  };
+
+  const stopScanner = () => {
+    if (codeReaderRef.current) {
+      codeReaderRef.current.reset();
+    }
+    setIsScanning(false);
+  };
+
+  const handleScanResult = (scannedText: string) => {
+    if (!selectedChargerModel) {
+      toast({
+        title: "Select Charger Model",
+        description: "Please select a charger model first",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Check if serial already exists
+    if (scannedChargers.some(c => c.serialNumber === scannedText)) {
+      toast({
+        title: "Duplicate Serial",
+        description: "This serial number has already been scanned",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const selectedModel = chargerModels.find(m => m.id === selectedChargerModel);
+    if (!selectedModel) return;
+
+    const newScannedCharger: ScannedCharger = {
+      id: `temp-${Date.now()}-${Math.random()}`,
+      serialNumber: scannedText,
+      chargerModel: selectedModel.name,
+      chargerItemId: selectedModel.id,
+      status: 'available'
+    };
+
+    setScannedChargers([...scannedChargers, newScannedCharger]);
+    setCurrentSerial('');
+
+    toast({
+      title: "Charger Scanned",
+      description: `Added ${selectedModel.name} - ${scannedText}`,
+    });
+  };
 
   // Fetch charger models
   const { data: chargerModels = [] } = useQuery({
@@ -156,9 +251,11 @@ export function ScanChargersModal({ open, onOpenChange }: ScanChargersModalProps
   };
 
   const handleClose = () => {
+    stopScanner();
     setScannedChargers([]);
     setCurrentSerial('');
     setSelectedChargerModel('');
+    setScanMode('manual');
     onOpenChange(false);
   };
 
@@ -180,54 +277,109 @@ export function ScanChargersModal({ open, onOpenChange }: ScanChargersModalProps
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto space-y-6">
-          {/* Scanning Section */}
+          {/* Mode Selection */}
           <Card>
-            <CardContent className="p-4 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="md:col-span-1">
-                  <label className="text-sm font-medium mb-2 block">Charger Model</label>
-                  <Select value={selectedChargerModel} onValueChange={setSelectedChargerModel}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select charger model" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {chargerModels.map(model => (
-                        <SelectItem key={model.id} value={model.id}>
-                          {model.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="md:col-span-1">
-                  <label className="text-sm font-medium mb-2 block">Serial Number / QR Code</label>
-                  <Input
-                    ref={serialInputRef}
-                    placeholder="Scan or enter serial number"
-                    value={currentSerial}
-                    onChange={(e) => setCurrentSerial(e.target.value)}
-                    onKeyPress={handleSerialKeyPress}
-                    className="font-mono"
-                    autoFocus
-                  />
-                </div>
-
-                <div className="md:col-span-1 flex items-end">
-                  <Button 
-                    onClick={handleAddScannedCharger}
-                    className="w-full"
-                    disabled={!currentSerial.trim() || !selectedChargerModel}
-                  >
-                    <Plus className="w-4 h-4 mr-1" />
-                    Add Charger
-                  </Button>
-                </div>
+            <CardContent className="p-4">
+              <div className="flex gap-2 mb-4">
+                <Button
+                  variant={scanMode === 'camera' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setScanMode('camera')}
+                  className="flex items-center gap-2"
+                >
+                  <Camera className="w-4 h-4" />
+                  Camera Scan
+                </Button>
+                <Button
+                  variant={scanMode === 'manual' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setScanMode('manual')}
+                  className="flex items-center gap-2"
+                >
+                  <Keyboard className="w-4 h-4" />
+                  Manual Entry
+                </Button>
               </div>
 
-              <div className="text-sm text-muted-foreground">
-                <p>💡 <strong>Tip:</strong> Select a charger model, then scan/enter serial numbers. Press Enter or click "Add Charger" to add each one to the preview list.</p>
+              {/* Charger Model Selection (always visible) */}
+              <div className="mb-4">
+                <label className="text-sm font-medium mb-2 block">Charger Model</label>
+                <Select value={selectedChargerModel} onValueChange={setSelectedChargerModel}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select charger model first" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {chargerModels.map(model => (
+                      <SelectItem key={model.id} value={model.id}>
+                        {model.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
+
+              {/* Camera Scanning Mode */}
+              {scanMode === 'camera' && (
+                <div className="space-y-4">
+                  <div className="relative bg-black rounded-lg overflow-hidden" style={{ aspectRatio: '4/3' }}>
+                    <video
+                      ref={videoRef}
+                      className="w-full h-full object-cover"
+                      autoPlay
+                      playsInline
+                      muted
+                    />
+                    {!selectedChargerModel && (
+                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                        <p className="text-white text-center">
+                          Select a charger model first to start scanning
+                        </p>
+                      </div>
+                    )}
+                    {selectedChargerModel && isScanning && (
+                      <div className="absolute top-4 left-4 bg-green-500 text-white px-3 py-1 rounded-full text-sm">
+                        📷 Ready to scan
+                      </div>
+                    )}
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    <p>💡 <strong>Camera Tip:</strong> Point your camera at the QR code or barcode. Chargers will be added automatically when scanned successfully.</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Manual Entry Mode */}
+              {scanMode === 'manual' && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">Serial Number / QR Code</label>
+                      <Input
+                        ref={serialInputRef}
+                        placeholder="Enter serial number"
+                        value={currentSerial}
+                        onChange={(e) => setCurrentSerial(e.target.value)}
+                        onKeyPress={handleSerialKeyPress}
+                        className="font-mono"
+                        autoFocus
+                      />
+                    </div>
+                    <div className="flex items-end">
+                      <Button 
+                        onClick={handleAddScannedCharger}
+                        className="w-full"
+                        disabled={!currentSerial.trim() || !selectedChargerModel}
+                      >
+                        <Plus className="w-4 h-4 mr-1" />
+                        Add Charger
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    <p>💡 <strong>Manual Tip:</strong> Enter serial numbers manually and press Enter or click "Add Charger" to add each one to the preview list.</p>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
