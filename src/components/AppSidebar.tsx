@@ -109,8 +109,13 @@ export function AppSidebar({ userRole }: AppSidebarProps) {
   }
 
   const isActive = (item: any) => {
+    // Exact match for dashboard routes
+    if (item.href === '/admin' || item.href === '/client' || item.href === '/engineer') {
+      return location.pathname === item.href;
+    }
+    // For other routes, check exact match or if it's a sub-route
     return location.pathname === item.href || 
-      (item.href !== '/' && location.pathname.startsWith(item.href));
+      (item.href !== '/' && location.pathname.startsWith(item.href + '/'));
   };
 
   return (
