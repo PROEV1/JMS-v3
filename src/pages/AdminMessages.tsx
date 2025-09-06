@@ -15,6 +15,10 @@ interface Client {
   id: string;
   full_name: string;
   email: string;
+  user_id: string;
+  last_message?: string;
+  last_message_at?: string;
+  unread_count?: number;
 }
 
 export default function AdminMessages() {
@@ -33,33 +37,13 @@ export default function AdminMessages() {
 
   const loadClients = async () => {
     try {
-      // First get all client IDs who have sent messages
-      const { data: messageData, error: messageError } = await supabase
-        .from('messages')
-        .select('sender_id')
-        .not('sender_id', 'is', null);
+      // Get clients with their last message and unread count
+      const { data: clientsWithMessages, error } = await supabase
+        .rpc('get_clients_with_last_message');
 
-      if (messageError) throw messageError;
+      if (error) throw error;
 
-      // Get unique sender IDs
-      const senderIds = [...new Set(messageData?.map(m => m.sender_id) || [])];
-
-      if (senderIds.length === 0) {
-        setClients([]);
-        setLoading(false);
-        return;
-      }
-
-      // Now get clients whose user_id matches any of the sender IDs
-      const { data: clientData, error: clientError } = await supabase
-        .from('clients')
-        .select('id, full_name, email, user_id')
-        .in('user_id', senderIds)
-        .order('full_name');
-
-      if (clientError) throw clientError;
-
-      setClients(clientData || []);
+      setClients(clientsWithMessages || []);
     } catch (error) {
       console.error('Error loading clients:', error);
       toast({
@@ -151,22 +135,44 @@ export default function AdminMessages() {
                     }`}
                     onClick={() => setSelectedClientId(client.id)}
                   >
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between">
-                        <p className="font-medium">{client.full_name}</p>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/admin/clients/${client.id}`);
-                          }}
-                          className="h-6 px-2 text-xs"
-                        >
-                          View Profile
-                        </Button>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <p className="font-medium truncate">{client.full_name}</p>
+                          {client.unread_count && client.unread_count > 0 && (
+                            <Badge variant="secondary" className="text-xs px-2 py-0 bg-primary text-primary-foreground">
+                              {client.unread_count}
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground truncate mb-1">{client.email}</p>
+                        {client.last_message && (
+                          <p className="text-sm text-muted-foreground truncate">
+                            {client.last_message}
+                          </p>
+                        )}
+                        {client.last_message_at && (
+                          <p className="text-xs text-muted-foreground/70 mt-1">
+                            {new Date(client.last_message_at).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </p>
+                        )}
                       </div>
-                      <p className="text-sm text-muted-foreground">{client.email}</p>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/admin/clients/${client.id}`);
+                        }}
+                        className="h-6 px-2 text-xs flex-shrink-0"
+                      >
+                        View Profile
+                      </Button>
                     </div>
                   </div>
                 ))

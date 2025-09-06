@@ -3,11 +3,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { showErrorToast, showSuccessToast } from '@/utils/apiErrorHandler';
-import { Send, MessageCircle } from 'lucide-react';
-import { Button } from './ui/button';
-import { Textarea } from './ui/textarea';
+import { MessageCircle, User, Mail, Phone, MapPin } from 'lucide-react';
 import { Card } from './ui/card';
+import { Avatar, AvatarFallback } from './ui/avatar';
+import { Badge } from './ui/badge';
 import ChatBubble from './ChatBubble';
+import ChatInput from './ChatInput';
 
 interface Message {
   id: string;
@@ -37,9 +38,8 @@ export const WhatsAppChat: React.FC<WhatsAppChatProps> = ({
 }) => {
   const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
-  const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
-  const [sending, setSending] = useState(false);
+  const [clientInfo, setClientInfo] = useState<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -85,6 +85,19 @@ export const WhatsAppChat: React.FC<WhatsAppChatProps> = ({
         console.log('Messages loaded:', data);
         setMessages(data || []);
       }
+
+      // Load client info if we have clientId
+      if (clientId) {
+        const { data: client, error: clientError } = await supabase
+          .from('clients')
+          .select('id, full_name, email, phone_number, postcode')
+          .eq('id', clientId)
+          .single();
+        
+        if (!clientError && client) {
+          setClientInfo(client);
+        }
+      }
     } catch (err) {
       console.error('Error in loadMessages:', err);
       setMessages([]);
@@ -119,16 +132,13 @@ export const WhatsAppChat: React.FC<WhatsAppChatProps> = ({
     };
   }, [clientId, quoteId, projectId]);
 
-  const sendMessage = async () => {
-    if (!newMessage.trim() || sending) return;
-
+  const sendMessage = async (content: string) => {
     try {
-      setSending(true);
       console.log('Sending message with context:', { clientId, quoteId, projectId });
 
       const { data, error } = await supabase.functions.invoke('send-message', {
         body: {
-          content: newMessage.trim(),
+          content,
           clientId,
           quoteId,
           projectId,
@@ -140,7 +150,6 @@ export const WhatsAppChat: React.FC<WhatsAppChatProps> = ({
       }
 
       console.log('Message sent successfully:', data);
-      setNewMessage('');
       showSuccessToast('Message sent');
       
       // Reload messages to show the new one
@@ -148,15 +157,7 @@ export const WhatsAppChat: React.FC<WhatsAppChatProps> = ({
     } catch (error) {
       console.error('Error sending message:', error);
       showErrorToast(error instanceof Error ? error.message : 'Failed to send message');
-    } finally {
-      setSending(false);
-    }
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
+      throw error;
     }
   };
 
@@ -171,18 +172,64 @@ export const WhatsAppChat: React.FC<WhatsAppChatProps> = ({
     );
   }
 
+  // Group messages by date
+  const groupedMessages = messages.reduce((groups: { [key: string]: Message[] }, message) => {
+    const date = new Date(message.created_at).toDateString();
+    if (!groups[date]) {
+      groups[date] = [];
+    }
+    groups[date].push(message);
+    return groups;
+  }, {});
+
   return (
-    <Card className={`flex flex-col h-[500px] ${className}`}>
-      {/* Header */}
-      <div className="flex items-center gap-2 p-4 border-b">
-        <MessageCircle className="h-5 w-5 text-primary" />
-        <h3 className="font-semibold">Messages</h3>
-      </div>
+    <Card className={`flex flex-col h-[600px] ${className}`}>
+      {/* Conversation Header */}
+      {clientInfo && (
+        <div className="sticky top-0 bg-background/95 backdrop-blur-sm border-b border-border/50 p-4 z-10">
+          <div className="flex items-center gap-3">
+            <Avatar className="h-10 w-10">
+              <AvatarFallback className="bg-primary/10 text-primary font-semibold">
+                {clientInfo.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <h3 className="font-semibold truncate">{clientInfo.full_name}</h3>
+                <Badge variant="outline" className="text-xs">
+                  <User className="w-3 h-3 mr-1" />
+                  Client
+                </Badge>
+              </div>
+              <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
+                {clientInfo.email && (
+                  <div className="flex items-center gap-1">
+                    <Mail className="w-3 h-3" />
+                    <span className="truncate">{clientInfo.email}</span>
+                  </div>
+                )}
+                {clientInfo.phone_number && (
+                  <div className="flex items-center gap-1">
+                    <Phone className="w-3 h-3" />
+                    <span>{clientInfo.phone_number}</span>
+                  </div>
+                )}
+                {clientInfo.postcode && (
+                  <div className="flex items-center gap-1">
+                    <MapPin className="w-3 h-3" />
+                    <span>{clientInfo.postcode}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto">
         {messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-center">
+          <div className="flex flex-col items-center justify-center h-full text-center p-8">
             <MessageCircle className="h-12 w-12 text-muted-foreground/50 mb-4" />
             <p className="text-muted-foreground mb-2">No messages yet</p>
             <p className="text-sm text-muted-foreground/80">
@@ -190,42 +237,53 @@ export const WhatsAppChat: React.FC<WhatsAppChatProps> = ({
             </p>
           </div>
         ) : (
-          messages.map((message) => (
-            <ChatBubble
-              key={message.id}
-              message={message}
-              isOwn={message.sender_id === user?.id}
-            />
-          ))
+          <div className="p-4 space-y-6">
+            {Object.entries(groupedMessages).map(([date, dayMessages]) => (
+              <div key={date}>
+                {/* Date Separator */}
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="h-px bg-border flex-1" />
+                  <span className="text-xs text-muted-foreground font-medium px-2 py-1 bg-muted rounded-full">
+                    {new Date(date).toLocaleDateString('en-US', {
+                      weekday: 'long',
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    })}
+                  </span>
+                  <div className="h-px bg-border flex-1" />
+                </div>
+                
+                {/* Messages for this date */}
+                <div className="space-y-2">
+                  {dayMessages.map((message, index) => {
+                    const prevMessage = index > 0 ? dayMessages[index - 1] : null;
+                    const isGrouped = prevMessage && 
+                      prevMessage.sender_id === message.sender_id &&
+                      new Date(message.created_at).getTime() - new Date(prevMessage.created_at).getTime() < 300000; // 5 minutes
+                    
+                    return (
+                      <ChatBubble
+                        key={message.id}
+                        message={message}
+                        isOwn={message.sender_id === user?.id}
+                        isGrouped={isGrouped}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
         )}
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area */}
-      <div className="p-4 border-t">
-        <div className="flex gap-2">
-          <Textarea
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder="Type your message..."
-            className="flex-1 min-h-[40px] max-h-[120px] resize-none"
-            disabled={sending}
-          />
-          <Button
-            onClick={sendMessage}
-            disabled={!newMessage.trim() || sending}
-            size="sm"
-            className="px-3"
-          >
-            {sending ? (
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-            ) : (
-              <Send className="h-4 w-4" />
-            )}
-          </Button>
-        </div>
-      </div>
+      {/* Chat Input */}
+      <ChatInput
+        onSendMessage={sendMessage}
+        placeholder="Type your message..."
+      />
     </Card>
   );
 };

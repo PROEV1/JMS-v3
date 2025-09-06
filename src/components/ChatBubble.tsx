@@ -21,6 +21,7 @@ interface ChatBubbleProps {
   isOwn: boolean;
   showAvatar?: boolean;
   senderName?: string;
+  isGrouped?: boolean;
 }
 
 export default function ChatBubble({ message, isOwn, showAvatar = true, senderName }: ChatBubbleProps) {
