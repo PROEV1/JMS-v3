@@ -51,7 +51,7 @@ export function AppSidebar({ userRole }: AppSidebarProps) {
 
   // Define navigation items based on user role - keeping exact same functionality as original Layout
   const adminMenuItems = [
-    { icon: Home, label: 'Dashboard', href: '/admin/orders' },
+    { icon: Home, label: 'Dashboard', href: '/admin' },
     { icon: FileText, label: 'Quotes', href: '/admin/quotes' },
     { icon: BarChart3, label: 'Quote Dashboard', href: '/ops/quotes' },
     { icon: ShoppingCart, label: 'Orders', href: '/admin/orders' },
@@ -71,7 +71,7 @@ export function AppSidebar({ userRole }: AppSidebarProps) {
   ];
 
   const clientMenuItems = [
-    { icon: Home, label: 'Dashboard', href: '/client/orders' },
+    { icon: Home, label: 'Dashboard', href: '/client' },
     { icon: FileText, label: 'Quotes', href: '/client/quotes' },
     { icon: ShoppingCart, label: 'Orders', href: '/client/orders' },
     { icon: MessageCircle, label: 'Messages', href: '/client/messages' },
@@ -82,7 +82,7 @@ export function AppSidebar({ userRole }: AppSidebarProps) {
   ];
 
   const engineerMenuItems = [
-    { icon: FileText, label: 'Dashboard', href: '/engineer/jobs' },
+    { icon: FileText, label: 'Dashboard', href: '/engineer' },
     { icon: FolderOpen, label: 'My Jobs', href: '/engineer/jobs' },
     { icon: Package, label: 'Stock Requests', href: '/engineer/stock-requests' },
     { icon: Warehouse, label: 'Van Inventory', href: '/engineer/van-stock' },
@@ -109,7 +109,11 @@ export function AppSidebar({ userRole }: AppSidebarProps) {
   }
 
   const isActive = (item: any) => {
-    // For dashboard routes that now point to specific pages, use exact match
+    // Exact match for dashboard routes
+    if (item.href === '/admin' || item.href === '/client' || item.href === '/engineer') {
+      return location.pathname === item.href;
+    }
+    // For other routes, check exact match or if it's a sub-route
     return location.pathname === item.href || 
       (item.href !== '/' && location.pathname.startsWith(item.href + '/'));
   };
@@ -135,6 +139,7 @@ export function AppSidebar({ userRole }: AppSidebarProps) {
                     <SidebarMenuButton asChild>
                       <Link
                         to={item.href}
+                        state={item.label === 'Dashboard' ? { bypassRestore: true } : undefined}
                         className={isActive(item) 
                           ? "bg-accent text-accent-foreground font-medium" 
                           : "hover:bg-accent/50"

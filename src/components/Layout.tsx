@@ -46,6 +46,13 @@ export default function Layout({ children }: LayoutProps) {
       const currentPath = location.pathname;
       const savedPath = sessionStorage.getItem('lastAuthenticatedPath');
       
+      // Check if navigation was explicitly bypassed (user clicked Dashboard)
+      const bypassRestore = location.state?.bypassRestore;
+      if (bypassRestore) {
+        console.log('Layout: Bypassing self-heal due to explicit dashboard navigation');
+        return;
+      }
+      
       // Define section roots that might be default redirects
       const sectionRoots = ['/admin', '/client', '/engineer'];
       
@@ -71,7 +78,7 @@ export default function Layout({ children }: LayoutProps) {
         }, 100);
       }
     }
-  }, [user, userRole, location.pathname, navigate]);
+  }, [user, userRole, location.pathname, location.state, navigate]);
 
   if (loading || roleLoading) {
     return (
