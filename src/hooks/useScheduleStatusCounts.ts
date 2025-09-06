@@ -159,10 +159,22 @@ export function useScheduleStatusCounts() {
   useEffect(() => {
     fetchCounts();
     
+    // Set up real-time subscriptions for orders and job_offers
+    const countsChannel = supabase
+      .channel('schedule-counts-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, fetchCounts)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'job_offers' }, fetchCounts)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'engineers' }, fetchCounts)
+      .subscribe();
+    
     // Listen for refresh events
     const handleRefresh = () => fetchCounts();
     window.addEventListener('scheduling:refresh', handleRefresh);
-    return () => window.removeEventListener('scheduling:refresh', handleRefresh);
+    
+    return () => {
+      supabase.removeChannel(countsChannel);
+      window.removeEventListener('scheduling:refresh', handleRefresh);
+    };
   }, []);
 
   return { counts, loading, refetch: fetchCounts };
