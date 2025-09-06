@@ -3985,6 +3985,10 @@ export type Database = {
         }
         Returns: string
       }
+      mark_client_messages_read: {
+        Args: { p_client_id: string }
+        Returns: boolean
+      }
       record_material_usage: {
         Args: {
           p_deduct_stock?: boolean
