@@ -91,7 +91,14 @@ export function ScheduleStatusListPage({
   });
   
   // Fetch all job offers for the displayed orders
-  const { offers, refetch: refetchOffers, releaseOffer, resendOffer } = useJobOffers();
+  const { offers, refetch: refetchOffers, releaseOffer, resendOffer, loading: offersLoading } = useJobOffers();
+  
+  console.log('ScheduleStatusListPage offers debug:', {
+    offersCount: offers.length,
+    offersLoading,
+    title,
+    sampleOffers: offers.slice(0, 3)
+  });
 
   // Enhanced filtering logic with null safety
   const filteredAndSortedOrders = (() => {
@@ -302,11 +309,18 @@ export function ScheduleStatusListPage({
 
   // Helper function to get active offer for an order
   const getActiveOfferForOrder = (orderId: string) => {
-    return offers.find(offer => 
+    const activeOffer = offers.find(offer => 
       offer.order_id === orderId && 
       offer.status === 'pending' && 
       new Date(offer.expires_at) > new Date()
     );
+    console.log('getActiveOfferForOrder Debug:', {
+      orderId,
+      activeOffer,
+      allOffersForOrder: offers.filter(o => o.order_id === orderId),
+      totalOffers: offers.length
+    });
+    return activeOffer;
   };
 
   // Helper function to get latest offer for an order (any status)
@@ -1313,15 +1327,22 @@ export function ScheduleStatusListPage({
                                   </Button>
                                </>
                              );
-                            } else if (activeOffer && title === 'Date Offered') {
-                              const timeRemaining = getTimeRemaining(activeOffer.expires_at);
-                              return (
-                                <>
-                                  <div className="w-full mb-2">
-                                    <div className="text-xs text-muted-foreground text-center">
-                                      Expires in: {timeRemaining}
-                                    </div>
-                                  </div>
+                             } else if (activeOffer && title === 'Date Offered') {
+                               const timeRemaining = getTimeRemaining(activeOffer.expires_at);
+                               console.log('Date Offered buttons - Debug:', {
+                                 orderId: order.id,
+                                 activeOffer: activeOffer,
+                                 title: title,
+                                 allOffers: offers.filter(o => o.order_id === order.id),
+                                 totalOffers: offers.length
+                               });
+                               return (
+                                 <>
+                                   <div className="w-full mb-2">
+                                     <div className="text-xs text-muted-foreground text-center">
+                                       Expires in: {timeRemaining}
+                                     </div>
+                                   </div>
                                     <Button
                                       onClick={() => order?.id && handleAcceptOffer(order.id)}
                                       size="sm"
