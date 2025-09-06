@@ -93,18 +93,27 @@ const statusTiles: StatusTile[] = [
   }
 ];
 
-function StatusTile({ tile, orders, totalJobs, navigate, offerCounts }: {
+function StatusTile({ tile, orders, totalJobs, navigate, offerCounts, ordersWithOffers }: {
   tile: StatusTile;
   orders: Order[];
   totalJobs: number;
   navigate: (path: string) => void;
   offerCounts: JobOfferCount;
+  ordersWithOffers: Set<string>;
 }) {
   // Special handling for offer-based tiles - count offers instead of orders
   let count: number;
   let tileOrders: Order[] = [];
   
-  if (tile.id === 'date_offered') {
+  if (tile.id === 'needs_scheduling') {
+    // Use exact same logic as ScheduleStatusNavigation
+    tileOrders = orders.filter(order => 
+      order.status_enhanced === 'awaiting_install_booking' && 
+      !order.scheduling_suppressed &&
+      !ordersWithOffers.has(order.id)
+    );
+    count = tileOrders.length;
+  } else if (tile.id === 'date_offered') {
     // Count orders with status_enhanced = 'date_offered' to match the list page
     tileOrders = orders.filter(order => order.status_enhanced === 'date_offered');
     count = tileOrders.length;
@@ -185,11 +194,20 @@ export function SchedulePipelineDashboard({ orders }: SchedulePipelineDashboardP
     rejected: 0, 
     expired: 0 
   });
+  const [ordersWithOffers, setOrdersWithOffers] = useState<Set<string>>(new Set());
 
-  // Fetch job offers counts for all statuses using head queries for robust counting
+  // Fetch job offers counts and orders with offers
   useEffect(() => {
     const fetchOfferCounts = async () => {
       try {
+        // Get all offers to determine which orders have offers (for needs scheduling calculation)
+        const { data: allOffers } = await supabase
+          .from('job_offers')
+          .select('order_id, status');
+        
+        const ordersWithOffersSet = new Set(allOffers?.map(offer => offer.order_id) || []);
+        setOrdersWithOffers(ordersWithOffersSet);
+
         // Count job offers for all job types
         const [pendingResult, acceptedResult, rejectedResult, expiredResult] = await Promise.all([
           (async () => {
@@ -269,16 +287,19 @@ export function SchedulePipelineDashboard({ orders }: SchedulePipelineDashboardP
         console.error('Error fetching offer counts:', error);
         // Set defaults on error
         setOfferCounts({ pending: 0, accepted: 0, rejected: 0, expired: 0 });
+        setOrdersWithOffers(new Set());
       }
     };
 
     fetchOfferCounts();
   }, []);
 
-  // Stats calculation for summary badges (all job types)
+  // Stats calculation for summary badges - use corrected logic
   const totalJobs = orders.length;
   const needsScheduling = orders.filter(o => 
-    ['needs_scheduling', 'awaiting_install_booking'].includes(o.status_enhanced)
+    o.status_enhanced === 'awaiting_install_booking' && 
+    !o.scheduling_suppressed &&
+    !ordersWithOffers.has(o.id)
   ).length;
   const inProgress = orders.filter(o => 
     ['date_offered', 'date_accepted', 'scheduled', 'in_progress'].includes(o.status_enhanced)
@@ -324,6 +345,7 @@ export function SchedulePipelineDashboard({ orders }: SchedulePipelineDashboardP
             totalJobs={totalJobs}
             navigate={navigate}
             offerCounts={offerCounts}
+            ordersWithOffers={ordersWithOffers}
           />
         ))}
       </div>
