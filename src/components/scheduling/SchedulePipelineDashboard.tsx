@@ -105,7 +105,9 @@ function StatusTile({ tile, orders, totalJobs, navigate, offerCounts }: {
   let tileOrders: Order[] = [];
   
   if (tile.id === 'date_offered') {
-    count = offerCounts.pending;
+    // Count orders with status_enhanced = 'date_offered' to match the list page
+    tileOrders = orders.filter(order => order.status_enhanced === 'date_offered');
+    count = tileOrders.length;
   } else if (tile.id === 'date_accepted') {
     count = offerCounts.accepted;
   } else if (tile.id === 'date_rejected') {

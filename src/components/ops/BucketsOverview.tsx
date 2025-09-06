@@ -5,6 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import { useOpsBuckets } from '@/hooks/useOpsBuckets';
 import { SchedulePipelineDashboard } from '@/components/scheduling/SchedulePipelineDashboard';
 import { useScheduleStatusCounts } from '@/hooks/useScheduleStatusCounts';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { Clock, FileText, CheckCircle, CreditCard } from 'lucide-react';
 
 export function BucketsOverview() {
@@ -12,7 +14,24 @@ export function BucketsOverview() {
   const { buckets, loading } = useOpsBuckets();
   const { counts: scheduleStatusCounts } = useScheduleStatusCounts();
 
-  if (loading) {
+  // Fetch orders for SchedulePipelineDashboard
+  const { data: orders = [], isLoading: ordersLoading } = useQuery({
+    queryKey: ['orders-for-pipeline'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          client:clients(full_name, email, postcode),
+          engineer:engineers(name, email)
+        `);
+      
+      if (error) throw error;
+      return data || [];
+    }
+  });
+
+  if (loading || ordersLoading) {
     return (
       <div className="space-y-4">
         <h2 className="text-xl font-semibold">Status Buckets Overview</h2>
@@ -25,8 +44,6 @@ export function BucketsOverview() {
     );
   }
 
-  // Mock orders data for SchedulePipelineDashboard - it will fetch its own data
-  const mockOrders: any[] = [];
 
   return (
     <div className="space-y-6">
@@ -35,7 +52,7 @@ export function BucketsOverview() {
       {/* Jobs Pipeline - Use existing SchedulePipelineDashboard */}
       <div className="space-y-4">
         <h3 className="text-lg font-medium">Jobs Pipeline</h3>
-        <SchedulePipelineDashboard orders={mockOrders} />
+        <SchedulePipelineDashboard orders={orders} />
       </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
