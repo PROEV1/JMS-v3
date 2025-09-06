@@ -37,51 +37,68 @@ export default function AdminMessages() {
 
   const loadClients = async () => {
     try {
-      // Get clients with their last message and unread count using joins
-      const { data: clientsData, error } = await supabase
-        .from('clients')
-        .select(`
-          id,
-          full_name,
-          email,
-          user_id,
-          messages!inner(content, created_at, sender_id, is_read)
-        `)
-        .order('messages(created_at)', { ascending: false });
+      // First, get all unique client IDs from messages
+      const { data: messageClients, error: msgError } = await supabase
+        .from('messages')
+        .select('sender_id')
+        .not('sender_id', 'is', null);
 
-      if (error) throw error;
+      if (msgError) throw msgError;
 
-      // Process the data to get unique clients with last message info
-      const clientsMap = new Map();
+      // Get unique sender IDs
+      const uniqueSenderIds = [...new Set(messageClients?.map(m => m.sender_id) || [])];
       
-      clientsData?.forEach((client: any) => {
-        if (!clientsMap.has(client.id)) {
-          const unread_count = client.messages.filter((m: any) => 
-            !m.is_read && m.sender_id === client.user_id
-          ).length;
-          
-          clientsMap.set(client.id, {
-            id: client.id,
-            full_name: client.full_name,
-            email: client.email,
-            user_id: client.user_id,
-            last_message: client.messages[0]?.content || null,
-            last_message_at: client.messages[0]?.created_at || null,
-            unread_count
-          });
+      if (uniqueSenderIds.length === 0) {
+        setClients([]);
+        setLoading(false);
+        return;
+      }
+
+      // Get clients whose user_id matches the sender IDs
+      const { data: clientsData, error: clientError } = await supabase
+        .from('clients')
+        .select('id, full_name, email, user_id')
+        .in('user_id', uniqueSenderIds);
+
+      if (clientError) throw clientError;
+
+      // For each client, get their last message and unread count
+      const clientsWithMessages = await Promise.all(
+        (clientsData || []).map(async (client: any) => {
+          // Get last message
+          const { data: lastMessage } = await supabase
+            .from('messages')
+            .select('content, created_at')
+            .or(`sender_id.eq.${client.user_id},client_id.eq.${client.id}`)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+
+          // Get unread count (messages FROM the client that are unread)
+          const { count: unreadCount } = await supabase
+            .from('messages')
+            .select('*', { count: 'exact', head: true })
+            .eq('sender_id', client.user_id)
+            .eq('is_read', false);
+
+          return {
+            ...client,
+            last_message: lastMessage?.content || null,
+            last_message_at: lastMessage?.created_at || null,
+            unread_count: unreadCount || 0
+          };
+        })
+      );
+
+      // Sort by last message date
+      clientsWithMessages.sort((a, b) => {
+        if (a.last_message_at && b.last_message_at) {
+          return new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime();
         }
+        return a.full_name.localeCompare(b.full_name);
       });
 
-      const clientsArray = Array.from(clientsMap.values())
-        .sort((a, b) => {
-          // Sort by last message date, then by name
-          if (a.last_message_at && b.last_message_at) {
-            return new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime();
-          }
-          return a.full_name.localeCompare(b.full_name);
-        });
-
-      setClients(clientsArray);
+      setClients(clientsWithMessages);
     } catch (error) {
       console.error('Error loading clients:', error);
       toast({
