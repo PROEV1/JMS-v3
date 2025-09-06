@@ -32,6 +32,27 @@ export default function AdminMessages() {
 
   useEffect(() => {
     loadClients();
+    
+    // Set up real-time subscription to refresh client list when messages change
+    const channel = supabase
+      .channel('admin-messages')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'messages'
+        },
+        () => {
+          // Reload client list when any message changes (new, updated, etc.)
+          loadClients();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const loadClients = async () => {
@@ -236,6 +257,7 @@ export default function AdminMessages() {
           {selectedClientId ? (
             <WhatsAppChat 
               clientId={selectedClientId}
+              onMessagesRead={() => loadClients()}
             />
           ) : (
             <Card className="h-[600px] flex items-center justify-center">

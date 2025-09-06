@@ -108,7 +108,7 @@ export default function ChatBubble({
               : `bg-muted text-foreground ${isGrouped ? 'rounded-bl-md' : 'rounded-bl-sm'}`
           }`}
         >
-          <p className="text-sm leading-relaxed whitespace-pre-wrap">
+          <p className={`text-sm leading-relaxed whitespace-pre-wrap ${isOwn ? 'text-white' : ''}`}>
             {message.content}
           </p>
         </div>

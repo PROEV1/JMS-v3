@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { showErrorToast, showSuccessToast } from '@/utils/apiErrorHandler';
+import { markMessagesAsRead } from '@/utils/messageUtils';
 import { MessageCircle, User, Mail, Phone, MapPin } from 'lucide-react';
 import { Card } from './ui/card';
 import { Avatar, AvatarFallback } from './ui/avatar';
@@ -28,13 +29,15 @@ interface WhatsAppChatProps {
   quoteId?: string;
   projectId?: string;
   className?: string;
+  onMessagesRead?: () => void;
 }
 
 export const WhatsAppChat: React.FC<WhatsAppChatProps> = ({
   clientId,
   quoteId,
   projectId,
-  className = ''
+  className = '',
+  onMessagesRead
 }) => {
   const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -97,6 +100,12 @@ export const WhatsAppChat: React.FC<WhatsAppChatProps> = ({
         if (!clientError && client) {
           setClientInfo(client);
         }
+
+        // Mark messages as read when viewing conversation
+        const markResult = await markMessagesAsRead(clientId);
+        if (markResult && onMessagesRead) {
+          onMessagesRead();
+        }
       }
     } catch (err) {
       console.error('Error in loadMessages:', err);
@@ -123,6 +132,23 @@ export const WhatsAppChat: React.FC<WhatsAppChatProps> = ({
         (payload) => {
           console.log('New message received:', payload);
           setMessages(current => [...current, payload.new as Message]);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'messages',
+          filter: clientId ? `client_id=eq.${clientId}` : quoteId ? `quote_id=eq.${quoteId}` : `project_id=eq.${projectId}`
+        },
+        (payload) => {
+          console.log('Message updated:', payload);
+          setMessages(current => 
+            current.map(msg => 
+              msg.id === payload.new.id ? { ...msg, ...payload.new } as Message : msg
+            )
+          );
         }
       )
       .subscribe();
