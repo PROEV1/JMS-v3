@@ -33,6 +33,7 @@ import AdminScheduleStatus from '@/pages/AdminScheduleStatus';
 import EngineerAvailability from '@/pages/EngineerAvailability';
 import EngineerProfile from '@/pages/EngineerProfile';
 import AdminMessages from '@/pages/AdminMessages';
+import AdminClientDetail from '@/pages/AdminClientDetail';
 import AdminPartnerQuotes from '@/pages/AdminPartnerQuotes';
 import Auth from '@/pages/Auth';
 import Layout from '@/components/Layout';
@@ -105,6 +106,7 @@ function App() {
         <Route path="/admin/orders/:id" element={<ProtectedRoute><Layout><OrderDetail /></Layout></ProtectedRoute>} />
         <Route path="/orders/:id" element={<ProtectedRoute><Layout><OrderDetail /></Layout></ProtectedRoute>} />
         <Route path="/admin/clients" element={<ProtectedRoute><Layout><AdminClients /></Layout></ProtectedRoute>} />
+        <Route path="/admin/clients/:id" element={<ProtectedRoute><Layout><AdminClientDetail /></Layout></ProtectedRoute>} />
         <Route path="/admin/leads" element={<ProtectedRoute><Layout><AdminLeads /></Layout></ProtectedRoute>} />
         <Route path="/admin/products" element={<ProtectedRoute><Layout><AdminProducts /></Layout></ProtectedRoute>} />
         <Route path="/admin/inventory" element={<ProtectedRoute><Layout><AdminInventory /></Layout></ProtectedRoute>} />
