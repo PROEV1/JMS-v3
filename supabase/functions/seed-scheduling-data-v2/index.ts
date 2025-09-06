@@ -239,15 +239,28 @@ serve(async (req) => {
     const firstNames = ['James', 'Mary', 'John', 'Patricia', 'Robert', 'Jennifer', 'Michael', 'Linda', 'William', 'Elizabeth', 'David', 'Barbara', 'Richard', 'Susan', 'Joseph', 'Jessica', 'Thomas', 'Sarah', 'Christopher', 'Karen', 'Charles', 'Nancy', 'Daniel', 'Lisa', 'Matthew', 'Betty', 'Anthony', 'Helen', 'Mark', 'Sandra'];
     const lastNames = ['Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller', 'Davis', 'Rodriguez', 'Martinez', 'Hernandez', 'Lopez', 'Gonzalez', 'Wilson', 'Anderson', 'Thomas', 'Taylor', 'Moore', 'Jackson', 'Martin', 'Lee', 'Perez', 'Thompson', 'White', 'Harris', 'Sanchez', 'Clark', 'Ramirez', 'Lewis', 'Robinson'];
 
-    // Order statuses distribution - focused on scheduling pipeline
-    const orderStatuses = [
-      { status: 'awaiting_install_booking', weight: 50 }, // Main unscheduled status - increased for more "Needs Scheduling" jobs
-      { status: 'scheduled', weight: 25 }, // Main scheduled status  
-      { status: 'in_progress', weight: 12 }, // Currently being worked on
-      { status: 'install_completed_pending_qa', weight: 8 }, // Pending QA
-      { status: 'completed', weight: 3 }, // Finished jobs
-      { status: 'awaiting_payment', weight: 2 } // Few payment issues
+    // Comprehensive order bucket distribution to ensure all scheduling tiles are populated
+    const orderBuckets = [
+      { type: 'needs_scheduling', weight: 15, config: { status_enhanced: 'awaiting_install_booking', scheduling_suppressed: false, no_offers: true } },
+      { type: 'date_offered', weight: 12, config: { status_enhanced: 'date_offered', has_pending_offer: true } },
+      { type: 'ready_to_book', weight: 10, config: { status_enhanced: 'awaiting_install_booking', has_accepted_offer: true } },
+      { type: 'scheduled', weight: 20, config: { status_enhanced: 'scheduled', has_install_date: true, has_engineer: true } },
+      { type: 'completion_pending', weight: 8, config: { status_enhanced: 'install_completed_pending_qa', engineer_signed_off: true } },
+      { type: 'completed', weight: 5, config: { status_enhanced: 'completed', fully_complete: true } },
+      { type: 'on_hold', weight: 10, config: { scheduling_suppressed: true, partner_status: 'ON_HOLD' } },
+      { type: 'cancelled', weight: 5, config: { partner_status: 'CANCELLED' } },
+      { type: 'date_rejected', weight: 8, config: { has_rejected_offer: true, no_active_offers: true } },
+      { type: 'offer_expired', weight: 7, config: { has_expired_offer: true, no_active_offers: true } }
     ];
+    
+    // Partner statuses for variety
+    const partnerStatuses = ['ON_HOLD', 'INSTALL_DATE_CONFIRMED', 'INSTALLED', 'COMPLETION_PENDING', 'CANCELLED', 'CANCELLATION_REQUESTED', 'SWITCH_JOB_SUB_TYPE_REQUESTED'];
+    
+    // Time periods for different scenarios
+    const now = new Date();
+    const pastDate = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000)); // 7 days ago
+    const futureDate = new Date(now.getTime() + (7 * 24 * 60 * 60 * 1000)); // 7 days from now
+    const nearFutureDate = new Date(now.getTime() + (2 * 24 * 60 * 60 * 1000)); // 2 days from now
 
     let createdCounts = {
       users: 0,
@@ -493,112 +506,201 @@ serve(async (req) => {
               }
             ]);
 
-          // Create orders for this quote
+          // Create orders for this quote with comprehensive bucket distribution
           const numOrders = Math.floor(Math.random() * (orders_per_client_max - orders_per_client_min + 1)) + orders_per_client_min;
           
           for (let o = 0; o < numOrders; o++) {
             orderSeq++;
             
-            // Select random status with weighted distribution
-            const totalWeight = orderStatuses.reduce((sum, s) => sum + s.weight, 0);
-            let random = Math.random() * totalWeight;
-            let selectedStatus = orderStatuses[0].status;
-            for (const statusOption of orderStatuses) {
-              random -= statusOption.weight;
-              if (random <= 0) {
-                selectedStatus = statusOption.status;
+            // Weighted random bucket selection
+            const totalWeight = orderBuckets.reduce((sum, s) => sum + s.weight, 0);
+            let randomWeight = Math.random() * totalWeight;
+            let selectedBucket = orderBuckets[0];
+            
+            for (const bucket of orderBuckets) {
+              randomWeight -= bucket.weight;
+              if (randomWeight <= 0) {
+                selectedBucket = bucket;
                 break;
               }
             }
-
+            
+            console.log(`Creating order for bucket: ${selectedBucket.type}`);
+            
             // Determine if this is urgent (15% chance)
             const isUrgent = Math.random() < 0.15;
             if (isUrgent) createdCounts.urgent++;
-
-            // Generate realistic amounts
-            const depositAmount = Math.floor(totalCost * 0.3);
-            let amountPaid = totalCost; // Most orders are fully paid to reach scheduling stage
-            let agreementSignedAt = new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString(); // Signed in past 30 days
-            let manualStatusOverride = false;
-
-            // Adjust payment and agreement based on status
-            if (selectedStatus === 'awaiting_payment') {
-              amountPaid = Math.random() < 0.3 ? depositAmount : 0; // Some partial payments
-              agreementSignedAt = null;
-              manualStatusOverride = true; // Override auto-calculation
-            }
-
-            // For awaiting_install_booking status, disable survey requirement to bypass survey gates
-            let surveyRequired = true;
-            if (selectedStatus === 'awaiting_install_booking') {
-              surveyRequired = false; // Disable survey to reach "Needs Scheduling"
-              manualStatusOverride = true;
-            }
-
-            // Generate scheduled date and engineer assignment based on status
+            
+            // Calculate basic order properties
+            const estimatedDuration = Math.random() < 0.8 ? 4 : (Math.random() < 0.5 ? 6 : 8);
+            const depositAmount = Math.floor(totalCost * 0.3); // 30% deposit
+            
+            // Initialize order properties
             let scheduledDate = null;
             let assignedEngineer = null;
-            let engineerSignedOffAt = null;
-
-            if (selectedStatus === 'awaiting_install_booking') {
-              // No scheduled date yet, but some might have engineers pre-assigned
-              if (engineers && engineers.length > 0 && Math.random() < 0.4) {
-                assignedEngineer = engineers[Math.floor(Math.random() * engineers.length)].id;
-              }
-            } else if (selectedStatus === 'scheduled') {
-              // Future scheduled dates, always have engineers
-              const daysOffset = Math.floor(Math.random() * 60) + 1; // 1-60 days in future
-              scheduledDate = new Date(Date.now() + daysOffset * 24 * 60 * 60 * 1000).toISOString();
-              if (engineers && engineers.length > 0) {
-                assignedEngineer = engineers[Math.floor(Math.random() * engineers.length)].id;
-              }
-            } else if (selectedStatus === 'in_progress') {
-              // Today or recent past dates, always have engineers
-              const daysOffset = Math.floor(Math.random() * 7) - 3; // -3 to +3 days from today
-              scheduledDate = new Date(Date.now() + daysOffset * 24 * 60 * 60 * 1000).toISOString();
-              if (engineers && engineers.length > 0) {
-                assignedEngineer = engineers[Math.floor(Math.random() * engineers.length)].id;
-              }
-            } else if (['install_completed_pending_qa', 'completed'].includes(selectedStatus)) {
-              // Past dates, always have engineers
-              const daysOffset = -Math.floor(Math.random() * 30) - 1; // 1-30 days ago
-              scheduledDate = new Date(Date.now() + daysOffset * 24 * 60 * 60 * 1000).toISOString();
-              if (engineers && engineers.length > 0) {
-                assignedEngineer = engineers[Math.floor(Math.random() * engineers.length)].id;
-              }
-              if (selectedStatus === 'completed') {
-                engineerSignedOffAt = new Date(Date.now() + daysOffset * 24 * 60 * 60 * 1000 + 8 * 60 * 60 * 1000).toISOString(); // 8 hours after install
-              }
+            let amountPaid = depositAmount; // Most orders have deposit paid
+            let engineerSignedOff = null;
+            let agreementSigned = new Date(now.getTime() - Math.random() * 7 * 24 * 60 * 60 * 1000); // Most have agreement
+            let orderStatus = 'active';
+            let manualStatusOverride = false;
+            let manualStatusNotes = null;
+            let schedulingSuppressed = false;
+            let partnerStatus = null;
+            let surveyRequired = false; // Disable survey gating for most seeded orders
+            
+            // Configure order based on selected bucket
+            switch (selectedBucket.type) {
+              case 'needs_scheduling':
+                // Pure needs scheduling - no offers, ready to go
+                manualStatusOverride = true;
+                manualStatusNotes = 'Seeded for needs scheduling bucket';
+                break;
+                
+              case 'date_offered':
+                // Will create pending job offer after order creation
+                assignedEngineer = engineers?.[Math.floor(Math.random() * engineers.length)]?.id;
+                break;
+                
+              case 'ready_to_book':
+                // Will create accepted job offer after order creation
+                assignedEngineer = engineers?.[Math.floor(Math.random() * engineers.length)]?.id;
+                break;
+                
+              case 'scheduled':
+                scheduledDate = Math.random() < 0.5 ? nearFutureDate : futureDate;
+                assignedEngineer = engineers?.[Math.floor(Math.random() * engineers.length)]?.id;
+                break;
+                
+              case 'completion_pending':
+                scheduledDate = pastDate;
+                assignedEngineer = engineers?.[Math.floor(Math.random() * engineers.length)]?.id;
+                engineerSignedOff = new Date(pastDate.getTime() + (2 * 60 * 60 * 1000)); // 2 hours after install
+                amountPaid = totalCost;
+                break;
+                
+              case 'completed':
+                scheduledDate = pastDate;
+                assignedEngineer = engineers?.[Math.floor(Math.random() * engineers.length)]?.id;
+                engineerSignedOff = new Date(pastDate.getTime() + (2 * 60 * 60 * 1000));
+                amountPaid = totalCost;
+                orderStatus = 'completed';
+                break;
+                
+              case 'on_hold':
+                schedulingSuppressed = true;
+                partnerStatus = partnerStatuses[Math.floor(Math.random() * 3)]; // First 3 are hold statuses
+                break;
+                
+              case 'cancelled':
+                partnerStatus = Math.random() < 0.5 ? 'CANCELLED' : 'CANCELLATION_REQUESTED';
+                break;
+                
+              case 'date_rejected':
+                // Will create rejected job offer after order creation
+                assignedEngineer = engineers?.[Math.floor(Math.random() * engineers.length)]?.id;
+                break;
+                
+              case 'offer_expired':
+                // Will create expired job offer after order creation  
+                assignedEngineer = engineers?.[Math.floor(Math.random() * engineers.length)]?.id;
+                break;
             }
-
-            await supabaseAdmin
+            
+            const { data: order, error: orderError } = await supabaseAdmin
               .from('orders')
               .insert({
                 client_id: client.id,
                 quote_id: quote.id,
                 order_number: `ORD2024-${String(orderSeq).padStart(4, '0')}`,
-                status: selectedStatus === 'completed' ? 'completed' : 'pending',
-                status_enhanced: selectedStatus,
+                status: orderStatus,
                 manual_status_override: manualStatusOverride,
-                manual_status_notes: manualStatusOverride ? 'Status manually set by seeding function' : null,
+                manual_status_notes: manualStatusNotes,
                 survey_required: surveyRequired,
                 total_amount: totalCost,
                 deposit_amount: depositAmount,
                 amount_paid: amountPaid,
-                agreement_signed_at: agreementSignedAt,
-                scheduled_install_date: scheduledDate,
+                agreement_signed_at: agreementSigned?.toISOString(),
+                scheduled_install_date: scheduledDate?.toISOString(),
                 engineer_id: assignedEngineer,
-                engineer_signed_off_at: engineerSignedOffAt,
+                engineer_signed_off_at: engineerSignedOff?.toISOString(),
+                scheduling_suppressed: schedulingSuppressed,
+                partner_status: partnerStatus,
+                is_partner_job: partnerStatus ? true : false,
                 postcode: location.postcode,
                 job_address: `${Math.floor(Math.random() * 200) + 1} ${['Oak Avenue', 'Elm Street', 'Pine Road', 'Birch Close', 'Cedar Drive'][Math.floor(Math.random() * 5)]}, ${location.city}, ${location.postcode}`,
-                estimated_duration_hours: Math.floor(Math.random() * 4) + 3,
+                estimated_duration_hours: estimatedDuration,
                 travel_time_minutes: Math.floor(Math.random() * 60) + 15,
                 installation_notes: isUrgent ? `URGENT - ${tag} - Priority installation required` : `${tag} - Standard installation`,
-                internal_install_notes: `Generated by seed data - Region: ${location.region}`,
+                internal_install_notes: `Generated by seed data for ${selectedBucket.type} bucket - Region: ${location.region}`,
                 updated_at: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString()
-              });
+              })
+              .select()
+              .single();
 
+            if (orderError) {
+              console.error(`Failed to create order for client ${client.full_name}:`, orderError);
+              consecutiveErrors++;
+              if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+                console.log(`Stopping after ${MAX_CONSECUTIVE_ERRORS} consecutive errors`);
+                break;
+              }
+              continue;
+            }
+
+            console.log(`Created order ${order.order_number} for bucket ${selectedBucket.type}`);
             createdCounts.orders++;
+            consecutiveErrors = 0;
+            
+            // Create job offers based on bucket type
+            if (['date_offered', 'ready_to_book', 'date_rejected', 'offer_expired'].includes(selectedBucket.type)) {
+              const offeredDate = selectedBucket.type === 'offer_expired' ? 
+                new Date(now.getTime() - (3 * 24 * 60 * 60 * 1000)) : // 3 days ago for expired
+                new Date(now.getTime() + (1 * 24 * 60 * 60 * 1000)); // Tomorrow for others
+              
+              let offerStatus = 'pending';
+              let expiresAt = new Date(now.getTime() + (24 * 60 * 60 * 1000)); // 24 hours from now
+              let acceptedAt = null;
+              let rejectedAt = null;
+              let expiredAt = null;
+              
+              switch (selectedBucket.type) {
+                case 'ready_to_book':
+                  offerStatus = 'accepted';
+                  acceptedAt = new Date(now.getTime() - (60 * 60 * 1000)); // 1 hour ago
+                  break;
+                case 'date_rejected':
+                  offerStatus = 'rejected';
+                  rejectedAt = new Date(now.getTime() - (60 * 60 * 1000));
+                  break;
+                case 'offer_expired':
+                  offerStatus = 'expired';
+                  expiresAt = new Date(now.getTime() - (24 * 60 * 60 * 1000)); // Expired yesterday
+                  expiredAt = new Date(now.getTime() - (12 * 60 * 60 * 1000)); // 12 hours ago
+                  break;
+              }
+              
+              const { error: offerError } = await supabaseAdmin
+                .from('job_offers')
+                .insert({
+                  order_id: order.id,
+                  engineer_id: assignedEngineer,
+                  offered_date: offeredDate.toISOString(),
+                  time_window: '09:00-17:00',
+                  status: offerStatus,
+                  expires_at: expiresAt.toISOString(),
+                  accepted_at: acceptedAt?.toISOString(),
+                  rejected_at: rejectedAt?.toISOString(),
+                  expired_at: expiredAt?.toISOString(),
+                  client_token: `token_${order.id}_${Math.random().toString(36).substr(2, 9)}`,
+                  created_by: user.id
+                });
+                
+              if (offerError) {
+                console.error(`Failed to create job offer for order ${order.order_number}:`, offerError);
+              } else {
+                console.log(`Created ${offerStatus} job offer for order ${order.order_number}`);
+              }
+            }
           }
         }
       }
