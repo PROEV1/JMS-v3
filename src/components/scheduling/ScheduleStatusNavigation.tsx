@@ -144,19 +144,12 @@ export function ScheduleStatusNavigation({ currentStatus }: ScheduleStatusNaviga
     const fetchCounts = async () => {
       try {
         // Fetch offer-based counts
-        // For date-offered, we need to count pending offers for orders that have engineers and aren't back to awaiting_install_booking
-        const { data: pendingOffers } = await supabase
-          .from('job_offers')
-          .select('order_id')
-          .eq('status', 'pending')
-          .gt('expires_at', new Date().toISOString());
-
-        let dateOfferedCount = 0;
-        if (pendingOffers?.length) {
-          // Count unique order IDs with pending offers (regardless of order status)
-          const uniqueOrderIds = [...new Set(pendingOffers.map(offer => offer.order_id))];
-          dateOfferedCount = uniqueOrderIds.length;
-        }
+        // For date-offered, count orders with status_enhanced = 'date_offered' to match the list page
+        const { count: dateOfferedCount } = await supabase
+          .from('orders')
+          .select('*', { count: 'exact', head: true })
+          .eq('status_enhanced', 'date_offered')
+          .eq('scheduling_suppressed', false);
 
         // For date-rejected, count unique orders with rejected offers but no active offers
         let dateRejectedCount = 0;
@@ -271,7 +264,7 @@ export function ScheduleStatusNavigation({ currentStatus }: ScheduleStatusNaviga
 
         setCounts({
           'needs-scheduling': needsSchedulingCount,
-          'date-offered': dateOfferedCount,
+          'date-offered': dateOfferedCount || 0,
           'ready-to-book': readyToBookCount,
           'date-rejected': dateRejectedCount,
           'offer-expired': expiredResult.count || 0,
