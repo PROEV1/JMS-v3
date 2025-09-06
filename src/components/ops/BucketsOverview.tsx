@@ -27,6 +27,11 @@ export function BucketsOverview() {
         `);
       
       if (error) throw error;
+      console.log('BucketsOverview: Orders fetched for pipeline:', {
+        totalCount: data?.length || 0,
+        dateOfferedCount: data?.filter(o => o.status_enhanced === 'date_offered').length || 0,
+        sampleStatuses: data?.slice(0, 5).map(o => ({ id: o.id, status: o.status_enhanced })) || []
+      });
       return data || [];
     }
   });

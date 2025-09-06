@@ -108,6 +108,12 @@ function StatusTile({ tile, orders, totalJobs, navigate, offerCounts }: {
     // Count orders with status_enhanced = 'date_offered' to match the list page
     tileOrders = orders.filter(order => order.status_enhanced === 'date_offered');
     count = tileOrders.length;
+    console.log('SchedulePipelineDashboard: Date Offered count debug:', {
+      totalOrders: orders.length,
+      dateOfferedOrders: tileOrders.length,
+      dateOfferedOrderIds: tileOrders.map(o => o.id),
+      allStatuses: orders.map(o => ({ id: o.id, status: o.status_enhanced }))
+    });
   } else if (tile.id === 'date_accepted') {
     count = offerCounts.accepted;
   } else if (tile.id === 'date_rejected') {
