@@ -67,7 +67,9 @@ export default function ChatInput({
             "rounded-full w-10 h-10 p-0 flex-shrink-0 shadow-md",
             "transition-all duration-200",
             "hover:shadow-lg hover:scale-105",
-            message.trim() ? "bg-primary" : "bg-muted text-muted-foreground"
+            message.trim() 
+              ? "bg-primary hover:bg-primary/90 text-primary-foreground" 
+              : "bg-muted text-muted-foreground hover:bg-muted/80"
           )}
         >
           {sending ? (

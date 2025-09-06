@@ -8,7 +8,6 @@ import { Search, MessageSquare } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
-import { ProEVLogo } from '@/components/ProEVLogo';
 import { WhatsAppChat } from '@/components/WhatsAppChat';
 
 interface Client {
@@ -131,15 +130,6 @@ export default function AdminMessages() {
 
   return (
     <div className="container mx-auto py-6 space-y-6">
-      {/* Pro EV Header */}
-      <div className="flex items-center justify-between mb-8">
-        <ProEVLogo variant="main" size="lg" />
-        <div className="text-right">
-          <p className="text-sm text-muted-foreground">Pro EV Admin Portal</p>
-          <p className="text-xs text-muted-foreground">Message Management</p>
-        </div>
-      </div>
-
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

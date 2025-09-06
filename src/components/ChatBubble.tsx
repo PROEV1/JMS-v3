@@ -92,7 +92,7 @@ export default function ChatBubble({
         {!isOwn && showAvatar && !isGrouped && (
           <div className="flex items-center gap-2 mb-1">
             <span className="text-sm font-medium text-foreground">
-              {senderName || `${message.sender_role.replace('_', ' ')}`}
+              {senderName || formatRole(message.sender_role)}
             </span>
             <Badge variant="secondary" className="text-xs px-2 py-0">
               {formatRole(message.sender_role)}
