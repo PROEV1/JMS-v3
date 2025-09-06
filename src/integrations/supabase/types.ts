@@ -3832,6 +3832,18 @@ export type Database = {
           version_number: number
         }[]
       }
+      get_clients_with_last_message: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          email: string
+          full_name: string
+          id: string
+          last_message: string
+          last_message_at: string
+          unread_count: number
+          user_id: string
+        }[]
+      }
       get_engineer_daily_time_with_holds: {
         Args: { p_date: string; p_engineer_id: string }
         Returns: number

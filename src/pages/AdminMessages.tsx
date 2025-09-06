@@ -37,13 +37,51 @@ export default function AdminMessages() {
 
   const loadClients = async () => {
     try {
-      // Get clients with their last message and unread count
-      const { data: clientsWithMessages, error } = await supabase
-        .rpc('get_clients_with_last_message');
+      // Get clients with their last message and unread count using joins
+      const { data: clientsData, error } = await supabase
+        .from('clients')
+        .select(`
+          id,
+          full_name,
+          email,
+          user_id,
+          messages!inner(content, created_at, sender_id, is_read)
+        `)
+        .order('messages(created_at)', { ascending: false });
 
       if (error) throw error;
 
-      setClients(clientsWithMessages || []);
+      // Process the data to get unique clients with last message info
+      const clientsMap = new Map();
+      
+      clientsData?.forEach((client: any) => {
+        if (!clientsMap.has(client.id)) {
+          const unread_count = client.messages.filter((m: any) => 
+            !m.is_read && m.sender_id === client.user_id
+          ).length;
+          
+          clientsMap.set(client.id, {
+            id: client.id,
+            full_name: client.full_name,
+            email: client.email,
+            user_id: client.user_id,
+            last_message: client.messages[0]?.content || null,
+            last_message_at: client.messages[0]?.created_at || null,
+            unread_count
+          });
+        }
+      });
+
+      const clientsArray = Array.from(clientsMap.values())
+        .sort((a, b) => {
+          // Sort by last message date, then by name
+          if (a.last_message_at && b.last_message_at) {
+            return new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime();
+          }
+          return a.full_name.localeCompare(b.full_name);
+        });
+
+      setClients(clientsArray);
     } catch (error) {
       console.error('Error loading clients:', error);
       toast({

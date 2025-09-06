@@ -1,5 +1,4 @@
-
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Check, CheckCheck, Clock, AlertCircle } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
@@ -24,86 +23,127 @@ interface ChatBubbleProps {
   isGrouped?: boolean;
 }
 
-export default function ChatBubble({ message, isOwn, showAvatar = true, senderName }: ChatBubbleProps) {
-  const formatTime = (dateString: string) => {
-    return formatDistanceToNow(new Date(dateString), { addSuffix: true });
-  };
+const formatRole = (role: string) => {
+  switch (role) {
+    case 'admin':
+      return 'Pro EV Team';
+    case 'engineer':
+      return 'Engineer';
+    case 'client':
+      return 'Client';
+    case 'manager':
+      return 'Manager';
+    case 'standard_office_user':
+      return 'Office';
+    default:
+      return role.replace('_', ' ');
+  }
+};
 
-  const getInitials = (name?: string) => {
-    if (!name) {
-      if (message.sender_role === 'admin') return 'PS';
-      if (message.sender_role === 'engineer') return 'EN';
+const getRoleInitials = (role: string) => {
+  switch (role) {
+    case 'admin':
+      return 'PS';
+    case 'engineer':
+      return 'EN';
+    case 'client':
       return 'CL';
-    }
-    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-  };
+    case 'manager':
+      return 'MG';
+    case 'standard_office_user':
+      return 'OF';
+    default:
+      return 'US';
+  }
+};
 
+export default function ChatBubble({ 
+  message, 
+  isOwn, 
+  showAvatar = true,
+  senderName,
+  isGrouped = false
+}: ChatBubbleProps) {
   return (
-    <div className={`flex gap-2 mb-1 ${isOwn ? 'flex-row-reverse' : 'flex-row'} group`}>
-      {showAvatar && (
-        <div className={`pt-1 ${isOwn ? 'pl-2' : 'pr-2'}`}>
-          <Avatar className="w-8 h-8 border-2 border-background shadow-sm transition-transform duration-200 group-hover:scale-105">
-            <AvatarFallback className={`text-xs ${
-              message.sender_role === 'admin' 
-                ? 'bg-primary text-primary-foreground' 
-                : 'bg-secondary text-secondary-foreground'
-            }`}>
-              {getInitials(senderName)}
-            </AvatarFallback>
-            {/* If you have user images, enable this */}
-            {/* <AvatarImage src="/path-to-image.jpg" alt={senderName || 'User'} /> */}
-          </Avatar>
-        </div>
+    <div className={`flex items-start gap-3 ${isOwn ? 'flex-row-reverse' : ''} ${isGrouped ? 'mt-1' : 'mt-4'}`}>
+      {/* Avatar */}
+      {showAvatar && !isGrouped && (
+        <Avatar className="h-8 w-8 flex-shrink-0">
+          <AvatarFallback className={`text-sm font-medium ${
+            isOwn 
+              ? 'bg-primary text-primary-foreground' 
+              : 'bg-muted text-muted-foreground'
+          }`}>
+            {senderName 
+              ? senderName.split(' ').map(n => n[0]).join('').toUpperCase()
+              : getRoleInitials(message.sender_role)
+            }
+          </AvatarFallback>
+        </Avatar>
       )}
-      
-      <div className={`flex flex-col max-w-[85%] ${isOwn ? 'items-end' : 'items-start'}`}>
-        {(!isOwn && senderName && showAvatar) && (
-          <div className="flex items-center gap-2 mb-1 pl-1">
-            <span className="text-xs font-medium text-muted-foreground">{senderName}</span>
-            <Badge variant={message.sender_role === 'admin' ? 'default' : 'secondary'} className="text-[10px] px-1.5 py-0">
-              {message.sender_role === 'admin' ? 'Pro EV Team' : message.sender_role === 'engineer' ? 'Engineer' : 'Client'}
+
+      {/* Spacer for grouped messages */}
+      {showAvatar && isGrouped && (
+        <div className="h-8 w-8 flex-shrink-0" />
+      )}
+
+      <div className={`flex flex-col max-w-[70%] ${isOwn ? 'items-end' : 'items-start'}`}>
+        {/* Sender info - only show for first message in group */}
+        {!isOwn && showAvatar && !isGrouped && (
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-sm font-medium text-foreground">
+              {senderName || `${message.sender_role.replace('_', ' ')}`}
+            </span>
+            <Badge variant="secondary" className="text-xs px-2 py-0">
+              {formatRole(message.sender_role)}
             </Badge>
           </div>
         )}
-        
-        <div className={`relative px-4 py-3 shadow-sm transition-all duration-200 group-hover:shadow-md ${
-          isOwn 
-            ? 'bg-gradient-to-br from-primary to-primary/90 text-primary-foreground rounded-2xl rounded-tr-sm' 
-            : 'bg-card border border-border/40 rounded-2xl rounded-tl-sm'
-        }`}>
-          <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
-          
-          <div className={`flex items-center gap-1 mt-1 ${
-            isOwn ? 'justify-end' : 'justify-start'
+
+        {/* Message bubble */}
+        <div
+          className={`rounded-2xl px-4 py-2 max-w-full break-words transition-all ${
+            isOwn
+              ? `bg-primary text-primary-foreground ${isGrouped ? 'rounded-br-md' : 'rounded-br-sm'}`
+              : `bg-muted text-foreground ${isGrouped ? 'rounded-bl-md' : 'rounded-bl-sm'}`
+          }`}
+        >
+          <p className="text-sm leading-relaxed whitespace-pre-wrap">
+            {message.content}
+          </p>
+        </div>
+
+        {/* Message meta info - only show for last message in group or single messages */}
+        {!isGrouped && (
+          <div className={`flex items-center gap-2 mt-1 text-xs text-muted-foreground ${
+            isOwn ? 'flex-row-reverse' : ''
           }`}>
-            <span className={`text-xs ${
-              isOwn ? 'text-primary-foreground/70' : 'text-muted-foreground'
-            }`}>
-              {formatTime(message.created_at)}
+            <span>
+              {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
             </span>
             
+            {/* Delivery status for own messages */}
             {isOwn && (
-              <div className="ml-1">
+              <div className="flex items-center">
                 {message.status === 'sending' && (
-                  <Clock className="w-3 h-3 text-primary-foreground/50 animate-pulse" />
+                  <Clock className="w-3 h-3 text-muted-foreground" />
                 )}
                 {message.status === 'failed' && (
-                  <AlertCircle className="w-3 h-3 text-red-400" />
+                  <AlertCircle className="w-3 h-3 text-destructive" />
                 )}
                 {message.status === 'sent' && (
-                  <Check className="w-3 h-3 text-primary-foreground/70" />
-                )}
-                {message.status === 'delivered' && !message.is_read && (
-                  <CheckCheck className="w-3 h-3 text-primary-foreground/70" />
+                  <Check className="w-3 h-3 text-muted-foreground" />
                 )}
                 {message.status === 'delivered' && message.is_read && (
-                  <CheckCheck className="w-3 h-3 text-blue-400" />
+                  <CheckCheck className="w-3 h-3 text-primary" />
+                )}
+                {message.status === 'delivered' && !message.is_read && (
+                  <CheckCheck className="w-3 h-3 text-muted-foreground" />
                 )}
               </div>
             )}
-            
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
