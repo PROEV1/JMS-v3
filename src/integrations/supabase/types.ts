@@ -4038,6 +4038,21 @@ export type Database = {
         }
         Returns: string
       }
+      upsert_clients_for_partner_bulk: {
+        Args: { p_clients: Json; p_partner_id: string }
+        Returns: {
+          client_id: string
+          email: string
+        }[]
+      }
+      upsert_orders_for_partner_bulk: {
+        Args: { p_orders: Json; p_partner_id: string }
+        Returns: {
+          order_id: string
+          partner_external_id: string
+          was_insert: boolean
+        }[]
+      }
       user_can_view_client: {
         Args: { client_uuid: string }
         Returns: boolean

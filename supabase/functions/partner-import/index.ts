@@ -140,8 +140,8 @@ serve(async (req) => {
       job_duration_defaults = null
     } = body
 
-    // Use max_rows if provided, otherwise fall back to chunk_size, otherwise default to 200
-    const actualChunkSize = max_rows || chunk_size || 200
+    // Use max_rows if provided, otherwise fall back to chunk_size, otherwise default to 1000
+    const actualChunkSize = max_rows || chunk_size || 1000
 
     if (!profile_id) {
       console.error('Missing profile_id')
@@ -365,19 +365,43 @@ serve(async (req) => {
     }
 
 
-    // STAGE 4: Process the data
+    // STAGE 4: Process the data with bulk operations
     const dataProcessingStartTime = performance.now();
     const rowTimes: Array<{ row_index: number; time_ms: number; partner_external_id?: string }> = [];
     
-    console.log('Starting data processing...')
+    console.log('Starting bulk data processing...')
 
-    for (let i = 0; i < filteredData.length; i++) {
-      const rowStartTime = performance.now();
-      const row = filteredData[i]
-      const rowIndex = start_row + i + 1 // +1 because we skip header row
+    // Process in batches for bulk operations
+    const batchSize = 500; // Process 500 rows at a time for optimal memory usage
+    const totalBatches = Math.ceil(filteredData.length / batchSize);
+    
+    for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+      const batchStartTime = performance.now();
+      const batchStart = batchIndex * batchSize;
+      const batchEnd = Math.min(batchStart + batchSize, filteredData.length);
+      const batchData = filteredData.slice(batchStart, batchEnd);
+      
+      console.log(`Processing batch ${batchIndex + 1}/${totalBatches} (rows ${batchStart + start_row + 1} to ${batchEnd + start_row})...`);
+      
+      // Prepare batch data structures
+      const clientsBatch: any[] = [];
+      const ordersBatch: any[] = [];
+      const batchWarnings: any[] = [];
+      const batchErrors: any[] = [];
+      const emailToRowIndexMap = new Map<string, number>();
+      const externalIdToRowIndexMap = new Map<string, number>();
+      
+      // Phase 1: Process and validate all rows in batch
+      for (let i = 0; i < batchData.length; i++) {
+        const rowStartTime = performance.now();
+        const row = batchData[i];
+        const rowIndex = start_row + batchStart + i + 1; // +1 because we skip header row
 
-      try {
-        console.log(`Processing row ${rowIndex}:`, row)
+        try {
+          // Reduced logging for performance - only log every 100 rows
+          if (rowIndex % 100 === 0) {
+            console.log(`Processing batch row ${rowIndex}...`);
+          }
 
         // Extract and validate data using column mappings
         const clientName = row[columnMappings.client_name] || null
@@ -395,21 +419,19 @@ serve(async (req) => {
         // Support both 'job_type' and 'type' column mappings
         const jobType = row[columnMappings.job_type] || row[columnMappings.type] || null
 
-        // Skip if no external ID
-        if (!partnerExternalId) {
-          console.log(`Row ${rowIndex}: Skipping - no partner external ID`)
-          results.skipped++
-          details.skipped.push({ row: rowIndex, reason: 'No partner external ID' })
-          continue
-        }
+          // Skip if no external ID
+          if (!partnerExternalId) {
+            results.skipped++;
+            details.skipped.push({ row: rowIndex, reason: 'No partner external ID' });
+            continue;
+          }
 
-        // Validate required fields
-        if (!clientName || !clientEmail) {
-          console.log(`Row ${rowIndex}: Skipping - missing required client data`)
-          results.skipped++
-          details.skipped.push({ row: rowIndex, reason: 'Missing required client data' })
-          continue
-        }
+          // Validate required fields
+          if (!clientName || !clientEmail) {
+            results.skipped++;
+            details.skipped.push({ row: rowIndex, reason: 'Missing required client data' });
+            continue;
+          }
 
         // Normalize phone number
         let normalizedPhone: string | null = null
@@ -419,18 +441,17 @@ serve(async (req) => {
           // Handle scientific notation
           if (phone.includes('E+') || phone.includes('e+')) {
             try {
-              const num = parseFloat(phone)
+              const num = parseFloat(phone);
               if (!isNaN(num)) {
-                phone = num.toString()
+                phone = num.toString();
               }
             } catch (e) {
-              console.log(`Row ${rowIndex}: Invalid phone format: ${clientPhone}`)
-              warnings.push({
+              batchWarnings.push({
                 row: rowIndex,
                 column: 'client_phone',
                 message: `Invalid phone number format: '${clientPhone}'. Phone number skipped.`,
                 data: { original_phone: clientPhone }
-              })
+              });
             }
           }
           
@@ -441,28 +462,28 @@ serve(async (req) => {
           } else if (cleanPhone.length >= 10 && cleanPhone.length <= 11) {
             normalizedPhone = cleanPhone
           }
-        } else if (clientPhone === '#ERROR!') {
-          warnings.push({
-            row: rowIndex,
-            column: 'client_phone',
-            message: `Invalid phone number format: '${clientPhone}'. Phone number skipped.`,
-            data: { original_phone: clientPhone }
-          })
-        }
-
-        // Engineer mapping
-        let engineerId: string | null = null
-        if (engineerIdentifier) {
-          engineerId = engineerMap.get(engineerIdentifier) || null
-          if (!engineerId) {
-            warnings.push({
+          } else if (clientPhone === '#ERROR!') {
+            batchWarnings.push({
               row: rowIndex,
-              column: 'engineer_identifier',
-              message: `No engineer mapping found for identifier: '${engineerIdentifier}'`,
-              data: { engineer_identifier: engineerIdentifier }
-            })
+              column: 'client_phone',
+              message: `Invalid phone number format: '${clientPhone}'. Phone number skipped.`,
+              data: { original_phone: clientPhone }
+            });
           }
-        }
+
+          // Engineer mapping
+          let engineerId: string | null = null;
+          if (engineerIdentifier) {
+            engineerId = engineerMap.get(engineerIdentifier) || null;
+            if (!engineerId) {
+              batchWarnings.push({
+                row: rowIndex,
+                column: 'engineer_identifier',
+                message: `No engineer mapping found for identifier: '${engineerIdentifier}'`,
+                data: { engineer_identifier: engineerIdentifier }
+              });
+            }
+          }
 
         // Status mapping
         let mappedStatus: string | null = null
@@ -492,13 +513,10 @@ serve(async (req) => {
             }
             
             if (dateObj && !isNaN(dateObj.getTime())) {
-              parsedInstallDate = dateObj.toISOString()
-              console.log(`Row ${rowIndex}: Parsed date '${installDate}' to '${parsedInstallDate}'`)
-            } else {
-              console.log(`Row ${rowIndex}: Could not parse date: ${installDate}`)
+              parsedInstallDate = dateObj.toISOString();
             }
           } catch (e) {
-            console.log(`Row ${rowIndex}: Invalid date format: ${installDate}`, e)
+            // Silent handling for performance
           }
         }
 
@@ -509,20 +527,20 @@ serve(async (req) => {
           if (!isNaN(numAmount)) {
             parsedQuoteAmount = numAmount
           } else {
-            warnings.push({
+            batchWarnings.push({
               row: rowIndex,
               column: 'quote_amount',
               message: `Invalid quote amount '${quoteAmount}' left blank`,
               data: { original_amount: quoteAmount }
-            })
+            });
           }
         } else if (quoteAmount === 'NaN') {
-          warnings.push({
+          batchWarnings.push({
             row: rowIndex,
             column: 'quote_amount',
             message: `Quote amount contains 'NaN' - left blank`,
             data: { original_amount: quoteAmount }
-          })
+          });
         }
 
         // Parse estimated duration hours with job type based defaults
@@ -534,7 +552,7 @@ serve(async (req) => {
           if (!isNaN(numDuration) && numDuration > 0 && numDuration <= 12) {
             parsedEstimatedDurationHours = numDuration;
           } else {
-            warnings.push({
+            batchWarnings.push({
               row: rowIndex,
               column: 'estimated_duration_hours',
               message: `Invalid duration '${estimatedDurationHours}' - using job type default`,
@@ -549,198 +567,209 @@ serve(async (req) => {
             
             if (defaultDuration !== undefined) {
               parsedEstimatedDurationHours = defaultDuration;
-              console.log(`Row ${rowIndex}: Using ${defaultDuration}h default for job type '${jobType}'`);
-            } else {
-              console.log(`Row ${rowIndex}: No default found for job type '${jobType}', using fallback 3h`);
             }
-          } else {
-            console.log(`Row ${rowIndex}: No job type specified, using fallback 3h`);
           }
         }
 
-        // Map job type to normalized values
-        let mappedJobType = 'installation'; // Default
-        if (jobType) {
-          const normalizedType = jobType.toLowerCase().replace(/[^a-z0-9]/g, '');
-          
-          if (['servicecall', 'maintenancevisit', 'warrantyvisit'].includes(normalizedType)) {
-            mappedJobType = 'service_call';
-          } else if (['assessment', 'survey', 'sitevisit', 'inperson'].includes(normalizedType)) {
-            mappedJobType = 'assessment';
-          } else {
-            mappedJobType = 'installation';
+          // Map job type to normalized values
+          let mappedJobType = 'installation'; // Default
+          if (jobType) {
+            const normalizedType = jobType.toLowerCase().replace(/[^a-z0-9]/g, '');
+            
+            if (['servicecall', 'maintenancevisit', 'warrantyvisit'].includes(normalizedType)) {
+              mappedJobType = 'service_call';
+            } else if (['assessment', 'survey', 'sitevisit', 'inperson'].includes(normalizedType)) {
+              mappedJobType = 'assessment';
+            } else {
+              mappedJobType = 'installation';
+            }
           }
           
-          console.log(`Row ${rowIndex}: Mapped job type '${jobType}' to '${mappedJobType}'`);
-        }
-
-        if (!dry_run) {
-          // Find or create client using safe database function
-          let client
+          // Prepare client data for batch processing
+          const normalizedEmail = clientEmail.toLowerCase();
+          emailToRowIndexMap.set(normalizedEmail, rowIndex);
+          externalIdToRowIndexMap.set(partnerExternalId, rowIndex);
           
-          const { data: clientId, error: clientUpsertError } = await supabase
-            .rpc('upsert_client_for_partner', {
-              p_full_name: clientName,
-              p_email: clientEmail.toLowerCase(),
-              p_phone: normalizedPhone,
-              p_address: jobAddress,
-              p_postcode: postcode,
-              p_partner_id: profile.partner_id
-            })
+          clientsBatch.push({
+            full_name: clientName,
+            email: normalizedEmail,
+            phone: normalizedPhone,
+            address: jobAddress,
+            postcode: postcode
+          });
           
-          performanceMetrics.database_calls.total_count++;
-          performanceMetrics.database_calls.client_queries++;
-
-          if (clientUpsertError || !clientId) {
-            console.error(`Row ${rowIndex}: Client upsert error:`, clientUpsertError)
-            errors.push({
-              row: rowIndex,
-              message: `Client upsert failed: ${clientUpsertError?.message || 'Unknown error'}`,
-              data: { error: clientUpsertError }
-            })
-            results.errors++
-            continue
-          }
-          
-          client = { id: clientId }
-
-          // Prepare order data for upsert
-          const orderData: any = {
-            client_id: client.id,
-            partner_id: profile.partner_id,
+          // Prepare order data
+          const orderData = {
             partner_external_id: partnerExternalId,
-            is_partner_job: true,
-            job_address: jobAddress,
-            postcode: postcode,
             partner_status: mappedStatus,
+            scheduled_install_date: parsedInstallDate,
+            engineer_id: engineerId,
             total_amount: parsedQuoteAmount,
-            amount_paid: 0,
-            deposit_amount: 0,
-            status: 'awaiting_payment',
-            survey_required: profile.partners?.client_survey_required ?? true,
             estimated_duration_hours: parsedEstimatedDurationHours,
             job_type: mappedJobType,
-            updated_at: new Date().toISOString()
-          }
-
-          if (engineerId) {
-            orderData.engineer_id = engineerId
-          }
-
-          if (parsedInstallDate) {
-            orderData.scheduled_install_date = parsedInstallDate
-            console.log(`Row ${rowIndex}: Setting scheduled_install_date to ${parsedInstallDate}`)
-          }
-          
-          // Log engineer and date assignment for debugging
-          console.log(`Row ${rowIndex}: Engineer mapping - identifier: '${engineerIdentifier}' -> engineerId: '${engineerId}'`)
-          console.log(`Row ${rowIndex}: Date parsing - original: '${installDate}' -> parsed: '${parsedInstallDate}'`)
+            email: normalizedEmail // Use this to match with client after bulk upsert
+          };
           
           // Apply status actions if defined in profile
           if (partnerStatus) {
-            const statusActions = profile.status_actions || {}
-            const statusAction = statusActions[partnerStatus]
+            const statusActions = profile.status_actions || {};
+            const statusAction = statusActions[partnerStatus];
             
             if (statusAction) {
-              // Apply scheduling suppression based on status actions
               if (statusAction.actions?.suppress_scheduling) {
-                orderData.scheduling_suppressed = true
-                orderData.scheduling_suppressed_reason = statusAction.actions.suppression_reason || 'status_mapping'
+                orderData.scheduling_suppressed = true;
+                orderData.scheduling_suppressed_reason = statusAction.actions.suppression_reason || 'status_mapping';
               } else {
-                orderData.scheduling_suppressed = false
-                orderData.scheduling_suppressed_reason = null
+                orderData.scheduling_suppressed = false;
+                orderData.scheduling_suppressed_reason = null;
               }
             }
           }
+          
+          ordersBatch.push(orderData);
+          
+          // Track row processing time
+          const rowEndTime = performance.now();
+          const rowTime = rowEndTime - rowStartTime;
+          rowTimes.push({
+            row_index: rowIndex,
+            time_ms: rowTime,
+            partner_external_id: partnerExternalId
+          });
 
-          console.log(`Row ${rowIndex}: Processing order with partner_external_id: ${partnerExternalId}`)
-
-          // Check if order exists first (for tracking insert vs update)
-          const { data: existingOrder } = await supabase
-            .from('orders')
-            .select('id')
-            .eq('partner_id', profile.partner_id)
-            .eq('partner_external_id', partnerExternalId)
-            .maybeSingle()
-
-          const isUpdate = !!existingOrder
-
-          // Use proper upsert with the unique constraint
-          const { data: orderResult, error: orderError } = await supabase
-            .from('orders')
-            .upsert(orderData, {
-              onConflict: 'partner_id,partner_external_id',
-              ignoreDuplicates: false
-            })
-            .select('id, order_number')
-            .single()
-
+        } catch (error) {
+          batchErrors.push({
+            row: rowIndex,
+            message: `Processing failed: ${error.message}`,
+            data: { error: error }
+          });
+          results.errors++;
+        }
+      }
+      
+      // Phase 2: Bulk process clients and orders if not dry run
+      if (!dry_run && clientsBatch.length > 0) {
+        try {
+          // Bulk upsert clients
+          const { data: clientMappings, error: clientBulkError } = await supabase
+            .rpc('upsert_clients_for_partner_bulk', {
+              p_clients: JSON.stringify(clientsBatch),
+              p_partner_id: profile.partner_id
+            });
+          
           performanceMetrics.database_calls.total_count++;
-          if (isUpdate) {
-            performanceMetrics.database_calls.update_operations++;
-          } else {
-            performanceMetrics.database_calls.insert_operations++;
+          performanceMetrics.database_calls.client_queries++;
+          
+          if (clientBulkError || !clientMappings) {
+            console.error('Bulk client upsert error:', clientBulkError);
+            // Fall back to individual processing for this batch
+            for (const clientData of clientsBatch) {
+              batchErrors.push({
+                row: emailToRowIndexMap.get(clientData.email),
+                message: `Bulk client upsert failed: ${clientBulkError?.message || 'Unknown error'}`,
+                data: { error: clientBulkError }
+              });
+              results.errors++;
+            }
+            continue;
           }
-
-          if (orderError) {
-            console.error(`Row ${rowIndex}: Order upsert error (partner_external_id: ${partnerExternalId}):`, orderError)
-            errors.push({
-              row: rowIndex,
-              partner_external_id: partnerExternalId,
-              message: `Order upsert failed: ${orderError.message}`,
-              data: { error: orderError }
-            })
-            results.errors++
-          } else {
-            if (isUpdate) {
-              results.updated++
-              details.updated.push({
-                row: rowIndex,
-                order_id: orderResult.id,
-                order_number: orderResult.order_number,
-                partner_external_id: partnerExternalId
-              })
-              console.log(`Row ${rowIndex}: Successfully updated order ${orderResult.id} with number ${orderResult.order_number}`)
-            } else {
-              results.inserted++
+          
+          // Create email to client_id mapping
+          const emailToClientId = new Map<string, string>();
+          clientMappings.forEach((mapping: any) => {
+            emailToClientId.set(mapping.email, mapping.client_id);
+          });
+          
+          // Update orders batch with client_ids
+          const ordersWithClientIds = ordersBatch.map(order => ({
+            ...order,
+            client_id: emailToClientId.get(order.email)
+          })).filter(order => order.client_id); // Only include orders with valid client_id
+          
+          // Remove email field as it's no longer needed
+          ordersWithClientIds.forEach(order => delete order.email);
+          
+          // Bulk upsert orders
+          const { data: orderMappings, error: orderBulkError } = await supabase
+            .rpc('upsert_orders_for_partner_bulk', {
+              p_orders: JSON.stringify(ordersWithClientIds),
+              p_partner_id: profile.partner_id
+            });
+          
+          performanceMetrics.database_calls.total_count++;
+          if (orderBulkError || !orderMappings) {
+            console.error('Bulk order upsert error:', orderBulkError);
+            for (const orderData of ordersWithClientIds) {
+              batchErrors.push({
+                row: externalIdToRowIndexMap.get(orderData.partner_external_id),
+                message: `Bulk order upsert failed: ${orderBulkError?.message || 'Unknown error'}`,
+                data: { error: orderBulkError }
+              });
+              results.errors++;
+            }
+            continue;
+          }
+          
+          // Update results based on bulk operation results
+          orderMappings.forEach((mapping: any) => {
+            const rowIndex = externalIdToRowIndexMap.get(mapping.partner_external_id);
+            if (mapping.was_insert) {
+              results.inserted++;
               details.inserted.push({
                 row: rowIndex,
-                order_id: orderResult.id,
-                order_number: orderResult.order_number,
-                partner_external_id: partnerExternalId
-              })
-              console.log(`Row ${rowIndex}: Successfully inserted order ${orderResult.id} with number ${orderResult.order_number}`)
+                order_id: mapping.order_id,
+                partner_external_id: mapping.partner_external_id
+              });
+            } else {
+              results.updated++;
+              details.updated.push({
+                row: rowIndex,
+                order_id: mapping.order_id,
+                partner_external_id: mapping.partner_external_id
+              });
             }
+            
+            if (mapping.was_insert) {
+              performanceMetrics.database_calls.insert_operations++;
+            } else {
+              performanceMetrics.database_calls.update_operations++;
+            }
+          });
+          
+        } catch (bulkError) {
+          console.error('Bulk processing error:', bulkError);
+          // Add all rows in batch to errors
+          for (let i = 0; i < batchData.length; i++) {
+            const rowIndex = start_row + batchStart + i + 1;
+            batchErrors.push({
+              row: rowIndex,
+              message: `Bulk processing failed: ${bulkError.message}`,
+              data: { error: bulkError }
+            });
+            results.errors++;
           }
-        } else {
-          // Dry run - just count as inserted for simulation
-          results.inserted++
+        }
+      } else if (dry_run) {
+        // Dry run - just count as inserted for simulation
+        for (let i = 0; i < ordersBatch.length; i++) {
+          const rowIndex = start_row + batchStart + i + 1;
+          results.inserted++;
           details.inserted.push({
             row: rowIndex,
-            partner_external_id: partnerExternalId,
+            partner_external_id: ordersBatch[i].partner_external_id,
             dry_run: true
-          })
+          });
         }
-
-        // Track row processing time
-        const rowEndTime = performance.now();
-        const rowTime = rowEndTime - rowStartTime;
-        rowTimes.push({
-          row_index: rowIndex,
-          time_ms: rowTime,
-          partner_external_id: partnerExternalId
-        });
-
-      } catch (error) {
-        console.error(`Row ${rowIndex}: Processing error:`, error)
-        errors.push({
-          row: rowIndex,
-          message: `Processing failed: ${error.message}`,
-          data: { error: error }
-        })
-        results.errors++
       }
+      
+      // Add batch warnings and errors to global collections
+      warnings.push(...batchWarnings);
+      errors.push(...batchErrors);
+      
+      const batchEndTime = performance.now();
+      console.log(`Batch ${batchIndex + 1}/${totalBatches} completed in ${(batchEndTime - batchStartTime).toFixed(2)}ms`);
     }
+
 
     performanceMetrics.stages.data_processing_ms = performance.now() - dataProcessingStartTime;
 
