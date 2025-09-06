@@ -1,5 +1,5 @@
 import React from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, Link } from 'react-router-dom';
 import { 
   BarChart3, 
   Users, 
@@ -43,7 +43,6 @@ interface AppSidebarProps {
 export function AppSidebar({ userRole }: AppSidebarProps) {
   const { state } = useSidebar();
   const location = useLocation();
-  const navigate = useNavigate();
   const currentPath = location.pathname;
   const { canManageUsers } = usePermissions();
   
@@ -52,42 +51,42 @@ export function AppSidebar({ userRole }: AppSidebarProps) {
 
   // Define navigation items based on user role - keeping exact same functionality as original Layout
   const adminMenuItems = [
-    { icon: Home, label: 'Dashboard', href: '/admin', action: () => navigate('/admin') },
-    { icon: FileText, label: 'Quotes', href: '/admin/quotes', action: () => navigate('/admin/quotes') },
-    { icon: BarChart3, label: 'Quote Dashboard', href: '/ops/quotes', action: () => navigate('/ops/quotes') },
-    { icon: ShoppingCart, label: 'Orders', href: '/admin/orders', action: () => navigate('/admin/orders') },
-    { icon: Calendar, label: 'Schedule', href: '/admin/schedule', action: () => navigate('/admin/schedule') },
-    { icon: FileCheck, label: 'QA Review', href: 'https://main.d11c44f8r7qjmh.amplifyapp.com/dashboard', action: () => window.open('https://main.d11c44f8r7qjmh.amplifyapp.com/dashboard', '_blank') },
-    { icon: FormInput, label: 'Surveys', href: '/admin/survey-forms', action: () => navigate('/admin/survey-forms') },
-    { icon: Package, label: 'Inventory', href: '/admin/inventory', action: () => navigate('/admin/inventory') },
-    { icon: Zap, label: 'Chargers', href: '/admin/chargers', action: () => navigate('/admin/chargers') },
-    { icon: User, label: 'Engineers', href: '/admin/engineers', action: () => navigate('/admin/engineers') },
-    { icon: Users, label: 'Clients', href: '/admin/clients', action: () => navigate('/admin/clients') },
-    { icon: Users, label: 'Leads', href: '/admin/leads', action: () => navigate('/admin/leads') },
-    { icon: Package, label: 'Products', href: '/admin/products', action: () => navigate('/admin/products') },
-    { icon: MessageCircle, label: 'Messages', href: '/admin/messages', action: () => navigate('/admin/messages') },
-    { icon: Users, label: 'Partners', href: '/admin/partners', action: () => navigate('/admin/partners') },
-    ...(canManageUsers ? [{ icon: UserCog, label: 'Users', href: '/admin/users', action: () => navigate('/admin/users') }] : []),
-    { icon: Settings, label: 'Settings', href: '/admin/settings', action: () => navigate('/admin/settings') },
+    { icon: Home, label: 'Dashboard', href: '/admin' },
+    { icon: FileText, label: 'Quotes', href: '/admin/quotes' },
+    { icon: BarChart3, label: 'Quote Dashboard', href: '/ops/quotes' },
+    { icon: ShoppingCart, label: 'Orders', href: '/admin/orders' },
+    { icon: Calendar, label: 'Schedule', href: '/admin/schedule' },
+    { icon: FileCheck, label: 'QA Review', href: 'https://main.d11c44f8r7qjmh.amplifyapp.com/dashboard', external: true },
+    { icon: FormInput, label: 'Surveys', href: '/admin/survey-forms' },
+    { icon: Package, label: 'Inventory', href: '/admin/inventory' },
+    { icon: Zap, label: 'Chargers', href: '/admin/chargers' },
+    { icon: User, label: 'Engineers', href: '/admin/engineers' },
+    { icon: Users, label: 'Clients', href: '/admin/clients' },
+    { icon: Users, label: 'Leads', href: '/admin/leads' },
+    { icon: Package, label: 'Products', href: '/admin/products' },
+    { icon: MessageCircle, label: 'Messages', href: '/admin/messages' },
+    { icon: Users, label: 'Partners', href: '/admin/partners' },
+    ...(canManageUsers ? [{ icon: UserCog, label: 'Users', href: '/admin/users' }] : []),
+    { icon: Settings, label: 'Settings', href: '/admin/settings' },
   ];
 
   const clientMenuItems = [
-    { icon: Home, label: 'Dashboard', href: '/client', action: () => navigate('/client') },
-    { icon: FileText, label: 'Quotes', href: '/client/quotes', action: () => navigate('/client/quotes') },
-    { icon: ShoppingCart, label: 'Orders', href: '/client/orders', action: () => navigate('/client/orders') },
-    { icon: MessageCircle, label: 'Messages', href: '/client/messages', action: () => navigate('/client/messages') },
-    { icon: FolderOpen, label: 'Documents', href: '/client/documents', action: () => navigate('/client/documents') },
-    { icon: CreditCard, label: 'Payments', href: '/client/payments', action: () => navigate('/client/payments') },
-    { icon: Calendar, label: 'Availability', href: '/client/date-blocking', action: () => navigate('/client/date-blocking') },
-    { icon: User, label: 'Profile', href: '/client/profile', action: () => navigate('/client/profile') },
+    { icon: Home, label: 'Dashboard', href: '/client' },
+    { icon: FileText, label: 'Quotes', href: '/client/quotes' },
+    { icon: ShoppingCart, label: 'Orders', href: '/client/orders' },
+    { icon: MessageCircle, label: 'Messages', href: '/client/messages' },
+    { icon: FolderOpen, label: 'Documents', href: '/client/documents' },
+    { icon: CreditCard, label: 'Payments', href: '/client/payments' },
+    { icon: Calendar, label: 'Availability', href: '/client/date-blocking' },
+    { icon: User, label: 'Profile', href: '/client/profile' },
   ];
 
   const engineerMenuItems = [
-    { icon: FileText, label: 'Dashboard', href: '/engineer', action: () => navigate('/engineer') },
-    { icon: FolderOpen, label: 'My Jobs', href: '/engineer/jobs', action: () => navigate('/engineer/jobs') },
-    { icon: Package, label: 'Stock Requests', href: '/engineer/stock-requests', action: () => navigate('/engineer/stock-requests') },
-    { icon: Warehouse, label: 'Van Inventory', href: '/engineer/van-stock', action: () => navigate('/engineer/van-stock') },
-    { icon: User, label: 'Profile', href: '/engineer/profile', action: () => navigate('/engineer/profile') },
+    { icon: FileText, label: 'Dashboard', href: '/engineer' },
+    { icon: FolderOpen, label: 'My Jobs', href: '/engineer/jobs' },
+    { icon: Package, label: 'Stock Requests', href: '/engineer/stock-requests' },
+    { icon: Warehouse, label: 'Van Inventory', href: '/engineer/van-stock' },
+    { icon: User, label: 'Profile', href: '/engineer/profile' },
   ];
 
   // Select appropriate menu items based on user role
@@ -123,16 +122,28 @@ export function AppSidebar({ userRole }: AppSidebarProps) {
             <SidebarMenu>
               {menuItems.map((item, index) => (
                 <SidebarMenuItem key={index}>
-                  <SidebarMenuButton 
-                    onClick={item.action}
-                    className={isActive(item) 
-                      ? "bg-accent text-accent-foreground font-medium" 
-                      : "hover:bg-accent/50"
-                    }
-                  >
-                    <item.icon className="h-4 w-4" />
-                    <span>{item.label}</span>
-                  </SidebarMenuButton>
+                  {item.external ? (
+                    <SidebarMenuButton 
+                      onClick={() => window.open(item.href, '_blank')}
+                      className="hover:bg-accent/50"
+                    >
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.label}</span>
+                    </SidebarMenuButton>
+                  ) : (
+                    <SidebarMenuButton asChild>
+                      <Link
+                        to={item.href}
+                        className={isActive(item) 
+                          ? "bg-accent text-accent-foreground font-medium" 
+                          : "hover:bg-accent/50"
+                        }
+                      >
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.label}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  )}
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
