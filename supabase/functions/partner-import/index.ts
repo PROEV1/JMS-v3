@@ -607,7 +607,14 @@ serve(async (req) => {
             total_amount: parsedQuoteAmount,
             estimated_duration_hours: parsedEstimatedDurationHours,
             job_type: mappedJobType,
-            email: normalizedEmail // Use this to match with client after bulk upsert
+            email: normalizedEmail, // Use this to match with client after bulk upsert
+            is_partner_job: true,
+            job_address: jobAddress,
+            postcode: postcode,
+            amount_paid: 0,
+            deposit_amount: 0,
+            status: 'active',
+            survey_required: profile.partners?.client_survey_required ?? true
           };
           
           // Apply status actions if defined in profile
@@ -650,10 +657,12 @@ serve(async (req) => {
       // Phase 2: Bulk process clients and orders if not dry run
       if (!dry_run && clientsBatch.length > 0) {
         try {
+          console.log(`Bulk processing batch ${batchIndex + 1}: ${clientsBatch.length} clients, ${ordersBatch.length} orders`);
+          
           // Bulk upsert clients
           const { data: clientMappings, error: clientBulkError } = await supabase
             .rpc('upsert_clients_for_partner_bulk', {
-              p_clients: JSON.stringify(clientsBatch),
+              p_clients: clientsBatch,
               p_partner_id: profile.partner_id
             });
           
@@ -692,7 +701,7 @@ serve(async (req) => {
           // Bulk upsert orders
           const { data: orderMappings, error: orderBulkError } = await supabase
             .rpc('upsert_orders_for_partner_bulk', {
-              p_orders: JSON.stringify(ordersWithClientIds),
+              p_orders: ordersWithClientIds,
               p_partner_id: profile.partner_id
             });
           
