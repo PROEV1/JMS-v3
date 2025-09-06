@@ -143,140 +143,97 @@ export function ScheduleStatusNavigation({ currentStatus }: ScheduleStatusNaviga
   useEffect(() => {
     const fetchCounts = async () => {
       try {
-        // Fetch offer-based counts
-        // For date-offered, count orders with status_enhanced = 'date_offered' to match the list page
-        const { count: dateOfferedCount } = await supabase
-          .from('orders')
-          .select('*', { count: 'exact', head: true })
-          .eq('status_enhanced', 'date_offered')
-          .eq('scheduling_suppressed', false);
-
-        // For date-rejected, count unique orders with rejected offers but no active offers
-        let dateRejectedCount = 0;
-        const { data: rejectedOffers } = await supabase
-          .from('job_offers')
-          .select('order_id')
-          .eq('status', 'rejected');
-
-        if (rejectedOffers?.length) {
-          const { data: activeOffers } = await supabase
+        // Fetch all orders and job offers in parallel for efficient counting
+        const [ordersResult, offersResult] = await Promise.all([
+          supabase
+            .from('orders')
+            .select('id, status_enhanced, scheduling_suppressed, scheduled_install_date'),
+          supabase
             .from('job_offers')
-            .select('order_id')
-            .in('status', ['pending', 'accepted'])
-            .gt('expires_at', new Date().toISOString());
-
-          const ordersWithActiveOffers = new Set(activeOffers?.map(offer => offer.order_id) || []);
-          const uniqueRejectedOrderIds = [...new Set(rejectedOffers.map(offer => offer.order_id))]
-            .filter(orderId => !ordersWithActiveOffers.has(orderId));
-          dateRejectedCount = uniqueRejectedOrderIds.length;
-        }
-
-        const expiredResult = await supabase
-          .from('job_offers')
-          .select('*', { count: 'exact', head: true })
-          .eq('status', 'expired');
-
-        // Fetch order-based counts with new buckets
-        const [
-          scheduledResult, 
-          onHoldResult, 
-          completionPendingResult,
-          completedResult,
-          cancelledResult
-        ] = await Promise.all([
-          supabase
-            .from('orders')
-            .select('*', { count: 'exact', head: true })
-            .eq('status_enhanced', 'scheduled')
-            .eq('scheduling_suppressed', false),
-          supabase
-            .from('orders')
-            .select('*', { count: 'exact', head: true })
-            .eq('status_enhanced', 'on_hold_parts_docs'),
-          supabase
-            .from('orders')
-            .select('*', { count: 'exact', head: true })
-            .eq('status_enhanced', 'install_completed_pending_qa'),
-          supabase
-            .from('orders')
-            .select('*', { count: 'exact', head: true })
-            .eq('status_enhanced', 'completed'),
-          supabase
-            .from('orders')
-            .select('*', { count: 'exact', head: true })
-            .eq('status_enhanced', 'cancelled')
+            .select('order_id, status, expires_at')
         ]);
 
-        // For needs-scheduling, get count of ALL orders (assigned and unassigned) with no active offers
-        // Exclude scheduling_suppressed orders
-        let needsSchedulingCount = 0;
-        
-        // Get offers to exclude (both pending and accepted)
-        const { data: offersToExclude } = await supabase
-          .from('job_offers')
-          .select('order_id')
-          .in('status', ['pending', 'accepted']);
+        const orders = ordersResult.data || [];
+        const offers = offersResult.data || [];
 
-        const excludedOrderIds = offersToExclude?.map(offer => offer.order_id) || [];
-
-        // Count ALL orders that need scheduling (regardless of engineer assignment)
-        let query = supabase
-          .from('orders')
-          .select('*', { count: 'exact', head: true })
-          .eq('status_enhanced', 'awaiting_install_booking')
-          .eq('scheduling_suppressed', false);
-
-        // Exclude orders with offers (both pending and accepted)
-        if (excludedOrderIds.length > 0) {
-          const safeIds = buildSafeUuidInClause(excludedOrderIds);
-          if (safeIds) {
-            query = query.not('id', 'in', `(${safeIds})`);
+        // Create lookup maps for faster processing
+        const orderOffers = new Map<string, typeof offers>();
+        offers.forEach(offer => {
+          if (!orderOffers.has(offer.order_id)) {
+            orderOffers.set(offer.order_id, []);
           }
-        }
-
-        const { count } = await query;
-        needsSchedulingCount = count || 0;
-
-        // For ready-to-book, count orders with accepted offers that haven't been scheduled yet
-        // Exclude scheduling_suppressed orders
-        let readyToBookCount = 0;
-        const { data: acceptedOffers } = await supabase
-          .from('job_offers')
-          .select('order_id')
-          .eq('status', 'accepted');
-        
-        if (acceptedOffers?.length) {
-          const acceptedOfferIds = acceptedOffers.map(offer => offer.order_id);
-          const safeAcceptedIds = buildSafeUuidInClause(acceptedOfferIds);
-          
-          if (safeAcceptedIds) {
-            const { count: ordersWithAcceptedOffersCount } = await supabase
-              .from('orders')
-              .select('*', { count: 'exact', head: true })
-              .eq('status_enhanced', 'awaiting_install_booking')
-              .is('scheduled_install_date', null)
-              .eq('scheduling_suppressed', false)
-              .in('id', acceptedOfferIds);
-            
-            readyToBookCount = ordersWithAcceptedOffersCount || 0;
-          }
-        }
-
-        setCounts({
-          'needs-scheduling': needsSchedulingCount,
-          'date-offered': dateOfferedCount || 0,
-          'ready-to-book': readyToBookCount,
-          'date-rejected': dateRejectedCount,
-          'offer-expired': expiredResult.count || 0,
-          'scheduled': scheduledResult.count || 0,
-          'completion-pending': completionPendingResult.count || 0,
-          'completed': completedResult.count || 0,
-          'on-hold': onHoldResult.count || 0,
-          'cancelled': cancelledResult.count || 0
+          orderOffers.get(offer.order_id)!.push(offer);
         });
+
+        const now = new Date().toISOString();
+        const counts = {
+          'needs-scheduling': 0,
+          'date-offered': 0,
+          'ready-to-book': 0,
+          'date-rejected': 0,
+          'offer-expired': 0,
+          'scheduled': 0,
+          'completion-pending': 0,
+          'completed': 0,
+          'on-hold': 0,
+          'cancelled': 0
+        };
+
+        // Process each order once to determine its bucket
+        orders.forEach(order => {
+          const orderOfferList = orderOffers.get(order.id) || [];
+          
+          // Direct status mappings
+          if (order.status_enhanced === 'scheduled' && !order.scheduling_suppressed) {
+            counts['scheduled']++;
+          } else if (order.status_enhanced === 'on_hold_parts_docs') {
+            counts['on-hold']++;
+          } else if (order.status_enhanced === 'install_completed_pending_qa') {
+            counts['completion-pending']++;
+          } else if (order.status_enhanced === 'completed') {
+            counts['completed']++;
+          } else if (order.status_enhanced === 'cancelled') {
+            counts['cancelled']++;
+          } else if (order.status_enhanced === 'date_offered' && !order.scheduling_suppressed) {
+            counts['date-offered']++;
+          } else if (order.status_enhanced === 'awaiting_install_booking' && !order.scheduling_suppressed) {
+            // Check for active offers to determine sub-bucket
+            const activeOffers = orderOfferList.filter(offer => 
+              offer.status === 'pending' && offer.expires_at > now
+            );
+            const acceptedOffers = orderOfferList.filter(offer => offer.status === 'accepted');
+            const hasRejectedOffers = orderOfferList.some(offer => offer.status === 'rejected');
+            const hasExpiredOffers = orderOfferList.some(offer => offer.status === 'expired');
+
+            if (acceptedOffers.length > 0 && !order.scheduled_install_date) {
+              counts['ready-to-book']++;
+            } else if (activeOffers.length === 0 && acceptedOffers.length === 0) {
+              if (hasRejectedOffers && !hasExpiredOffers) {
+                counts['date-rejected']++;
+              } else if (hasExpiredOffers && !hasRejectedOffers) {
+                counts['offer-expired']++;
+              } else {
+                counts['needs-scheduling']++;
+              }
+            }
+          }
+        });
+
+        setCounts(counts);
       } catch (error) {
         console.error('Error fetching status counts:', error);
-        setCounts({});
+        setCounts({
+          'needs-scheduling': 0,
+          'date-offered': 0,
+          'ready-to-book': 0,
+          'date-rejected': 0,
+          'offer-expired': 0,
+          'scheduled': 0,
+          'completion-pending': 0,
+          'completed': 0,
+          'on-hold': 0,
+          'cancelled': 0
+        });
       } finally {
         setLoading(false);
       }
