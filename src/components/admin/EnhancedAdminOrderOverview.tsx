@@ -1,6 +1,7 @@
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { EnhancedJobStatusBadge, OrderStatusEnhanced } from "./EnhancedJobStatusBadge";
 import { PartnerJobBadge } from './PartnerJobBadge';
 import { cn } from "@/lib/utils";
@@ -14,7 +15,9 @@ import {
   FileText,
   CreditCard,
   CheckCircle,
-  Clock
+  Clock,
+  AlertCircle,
+  ChevronRight
 } from "lucide-react";
 
 interface Order {
@@ -69,12 +72,12 @@ export function EnhancedAdminOrderOverview({ order }: EnhancedAdminOrderOverview
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'Not set';
-    return format(new Date(dateString), 'PPP');
+    return format(new Date(dateString), 'dd MMM yyyy');
   };
 
-  const formatDateTime = (dateString: string | null) => {
-    if (!dateString) return 'Not set';
-    return format(new Date(dateString), 'PPP p');
+  const formatTime = (dateString: string | null) => {
+    if (!dateString) return '';
+    return format(new Date(dateString), 'HH:mm');
   };
 
   const getProgressSteps = () => {
@@ -83,31 +86,25 @@ export function EnhancedAdminOrderOverview({ order }: EnhancedAdminOrderOverview
         id: 'payment',
         label: 'Payment',
         completed: order.amount_paid >= order.total_amount,
-        icon: CreditCard,
-        details: `${formatCurrency(order.amount_paid)} / ${formatCurrency(order.total_amount)}`
+        icon: CreditCard
       },
       {
-        id: 'agreement',
+        id: 'agreement', 
         label: 'Agreement',
         completed: !!order.agreement_signed_at,
-        icon: FileText,
-        details: order.agreement_signed_at ? formatDateTime(order.agreement_signed_at) : 'Not signed'
+        icon: FileText
       },
       {
         id: 'scheduling',
-        label: 'Install Scheduled',
+        label: 'Scheduled',
         completed: !!order.scheduled_install_date && !!order.engineer,
-        icon: Calendar,
-        details: order.scheduled_install_date 
-          ? `${formatDate(order.scheduled_install_date)} - ${order.engineer?.name || 'No engineer'}`
-          : 'Not scheduled'
+        icon: Calendar
       },
       {
         id: 'completion',
-        label: 'Installation',
+        label: 'Complete',
         completed: order.status === 'completed',
-        icon: CheckCircle,
-        details: order.status === 'completed' ? 'Complete' : 'Pending'
+        icon: CheckCircle
       }
     ];
 
@@ -116,199 +113,218 @@ export function EnhancedAdminOrderOverview({ order }: EnhancedAdminOrderOverview
 
   const progressSteps = getProgressSteps();
   const completedSteps = progressSteps.filter(step => step.completed).length;
+  const nextStep = progressSteps.find(step => !step.completed);
+  
+  const outstandingAmount = order.total_amount - order.amount_paid;
+  const hasOutstanding = outstandingAmount > 0;
 
   return (
-    <Card className="p-6">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left Column - Client & Order Info */}
-        <div className="space-y-6">
-          {/* Status Badge */}
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold">Order Overview</h2>
-            <EnhancedJobStatusBadge 
-              status={order.status_enhanced} 
-              manualOverride={order.manual_status_override}
-            />
-          </div>
-
-          {/* Client Information */}
-          <div className="space-y-3">
-            <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
-              Client Details
-            </h3>
-            <div className="space-y-2">
+    <TooltipProvider>
+      <div className="space-y-4">
+        {/* Top Summary Bar */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Client Block */}
+          <Card className="p-4">
+            <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <User className="h-4 w-4 text-muted-foreground" />
-                <span className="font-medium">{order.client.full_name}</span>
+                <span className="font-medium text-sm">Client</span>
               </div>
-              <div className="flex items-center gap-2">
-                <Mail className="h-4 w-4 text-muted-foreground" />
-                <a 
-                  href={`mailto:${order.client.email}`}
-                  className="text-primary hover:underline"
-                >
-                  {order.client.email}
-                </a>
-              </div>
-              {order.client?.phone && (
-                <div className="flex items-center gap-2">
-                  <Phone className="h-4 w-4 text-muted-foreground" />
-                  <a 
-                    href={`tel:${order.client.phone}`}
-                    className="text-primary hover:underline"
-                  >
-                    {order.client.phone}
-                  </a>
-                </div>
-              )}
-              {order.client?.address && (
-                <div className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">{order.client.address}</span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Order Information */}
-          <div className="space-y-3">
-            <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
-              Order Details
-            </h3>
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <span className="text-muted-foreground">Order Number:</span>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <p className="font-mono">{order.order_number}</p>
-                  {order.job_type && (
-                    <Badge variant="secondary" className="text-xs">
-                      {order.job_type.charAt(0).toUpperCase() + order.job_type.slice(1).replace('_', ' ')}
-                    </Badge>
-                  )}
-                  <PartnerJobBadge
-                    isPartnerJob={order.is_partner_job}
-                    partnerName={order.partners?.name}
-                    subPartner={order.sub_partner}
-                    partnerStatus={order.partner_status}
-                    partnerUrl={order.partner_external_url}
-                  />
-                </div>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Quote Number:</span>
-                <p className="font-mono">{order.quote?.quote_number || 'N/A'}</p>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Order Value:</span>
-                <p className="font-semibold">{formatCurrency(order.total_amount)}</p>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Created:</span>
-                <p>{formatDate(order.created_at)}</p>
+              <div className="flex gap-1">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={() => window.open(`mailto:${order.client.email}`, '_blank')}
+                    >
+                      <Mail className="h-3 w-3" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Email client</TooltipContent>
+                </Tooltip>
+                {order.client.phone && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button 
+                        variant="ghost" 
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => window.open(`tel:${order.client.phone}`, '_blank')}
+                      >
+                        <Phone className="h-3 w-3" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Call client</TooltipContent>
+                  </Tooltip>
+                )}
               </div>
             </div>
-          </div>
-
-          {/* Engineer Assignment */}
-          <div className="space-y-3">
-            <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
-              Engineer Assignment
-            </h3>
-            {order.engineer ? (
-              <div className="flex items-center gap-2">
-                <User className="h-4 w-4 text-muted-foreground" />
-                <span className="font-medium">{order.engineer.name}</span>
-                <Badge variant="outline">{order.engineer.email}</Badge>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Clock className="h-4 w-4" />
-                <span>No engineer assigned</span>
-              </div>
+            <p className="font-semibold text-foreground">{order.client.full_name}</p>
+            <p className="text-sm text-muted-foreground truncate">{order.client.email}</p>
+            {order.client.address && (
+              <p className="text-xs text-muted-foreground mt-1 truncate">{order.client.address}</p>
             )}
-          </div>
+          </Card>
+
+          {/* Order Block */}
+          <Card className="p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <FileText className="h-4 w-4 text-muted-foreground" />
+              <span className="font-medium text-sm">Order</span>
+            </div>
+            <div className="flex items-center gap-2 mb-1">
+              <p className="font-semibold font-mono">{order.order_number}</p>
+              <EnhancedJobStatusBadge 
+                status={order.status_enhanced} 
+                manualOverride={order.manual_status_override}
+              />
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              {order.job_type && (
+                <Badge variant="secondary" className="text-xs h-5">
+                  {order.job_type.charAt(0).toUpperCase() + order.job_type.slice(1).replace('_', ' ')}
+                </Badge>
+              )}
+              <PartnerJobBadge
+                isPartnerJob={order.is_partner_job}
+                partnerName={order.partners?.name}
+                subPartner={order.sub_partner}
+                partnerStatus={order.partner_status}
+                partnerUrl={order.partner_external_url}
+              />
+            </div>
+          </Card>
+
+          {/* Money Block */}
+          <Card className={cn("p-4", hasOutstanding && "border-orange-200 bg-orange-50")}>
+            <div className="flex items-center gap-2 mb-2">
+              <CreditCard className="h-4 w-4 text-muted-foreground" />
+              <span className="font-medium text-sm">Payment</span>
+              {hasOutstanding && (
+                <AlertCircle className="h-3 w-3 text-orange-600" />
+              )}
+            </div>
+            <p className="font-semibold text-lg">{formatCurrency(order.total_amount)}</p>
+            {hasOutstanding ? (
+              <p className="text-sm text-orange-600 font-medium">
+                {formatCurrency(outstandingAmount)} outstanding
+              </p>
+            ) : (
+              <p className="text-sm text-green-600">Fully paid</p>
+            )}
+          </Card>
         </div>
 
-        {/* Right Column - Progress Tracker */}
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
-              Job Progress
-            </h3>
-            <span className="text-sm text-muted-foreground">
-              {completedSteps} of {progressSteps.length} completed
-            </span>
+        {/* Progress Strip */}
+        <Card className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <span className="font-medium text-sm">Progress</span>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              {nextStep && (
+                <>
+                  <span>Next:</span>
+                  <span className="font-medium">{nextStep.label}</span>
+                  <ChevronRight className="h-3 w-3" />
+                </>
+              )}
+              <span>{completedSteps} of {progressSteps.length}</span>
+            </div>
           </div>
-
+          
           {/* Progress Bar */}
-          <div className="w-full bg-muted rounded-full h-2">
+          <div className="w-full bg-muted rounded-full h-2 mb-4">
             <div 
               className="bg-primary h-2 rounded-full transition-all duration-300"
               style={{ width: `${(completedSteps / progressSteps.length) * 100}%` }}
             />
           </div>
 
-          {/* Progress Steps */}
-          <div className="space-y-4">
+          {/* Horizontal Progress Steps */}
+          <div className="flex items-center justify-between">
             {progressSteps.map((step, index) => {
               const IconComponent = step.icon;
               return (
-                <div key={step.id} className="flex items-start gap-3">
-                  <div className={`
-                    p-2 rounded-full transition-colors
-                    ${step.completed 
-                      ? 'bg-primary text-primary-foreground' 
-                      : 'bg-muted text-muted-foreground'
-                    }
-                  `}>
-                    <IconComponent className="h-4 w-4" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className={`font-medium ${step.completed ? 'text-foreground' : 'text-muted-foreground'}`}>
+                <Tooltip key={step.id}>
+                  <TooltipTrigger asChild>
+                    <div className="flex flex-col items-center gap-1 cursor-help">
+                      <div className={cn(
+                        "p-2 rounded-full transition-colors border-2",
+                        step.completed 
+                          ? "bg-primary text-primary-foreground border-primary" 
+                          : "bg-background text-muted-foreground border-muted"
+                      )}>
+                        <IconComponent className="h-3 w-3" />
+                      </div>
+                      <span className={cn(
+                        "text-xs font-medium",
+                        step.completed ? "text-foreground" : "text-muted-foreground"
+                      )}>
                         {step.label}
                       </span>
-                      {step.completed && (
-                        <Badge variant="secondary" className="h-5 text-xs">
-                          ✓
-                        </Badge>
-                      )}
                     </div>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {step.details}
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="font-medium">{step.label}</p>
+                    <p className="text-sm">
+                      {step.completed ? "✓ Complete" : "Pending"}
                     </p>
-                  </div>
-                </div>
+                  </TooltipContent>
+                </Tooltip>
               );
             })}
           </div>
+        </Card>
 
-          {/* Quick Actions */}
-          <div className="pt-4 border-t">
-            <h4 className="font-medium text-sm mb-3">Quick Actions</h4>
-            <div className="grid grid-cols-2 gap-2">
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => window.open(`mailto:${order.client?.email}`, '_blank')}
-              >
-                <Mail className="h-4 w-4 mr-1" />
-                Email Client
+        {/* Installation Card */}
+        <Card className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <span className="font-medium text-sm">Installation</span>
+            </div>
+            {!order.scheduled_install_date && (
+              <Button variant="outline" size="sm">
+                Schedule Install
               </Button>
-              {order.client?.phone && (
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => window.open(`tel:${order.client.phone}`, '_blank')}
-                >
-                  <Phone className="h-4 w-4 mr-1" />
-                  Call Client
-                </Button>
+            )}
+          </div>
+
+          {order.scheduled_install_date ? (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-semibold">{formatDate(order.scheduled_install_date)}</p>
+                  {formatTime(order.scheduled_install_date) && (
+                    <p className="text-sm text-muted-foreground">{formatTime(order.scheduled_install_date)}</p>
+                  )}
+                </div>
+                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                  Scheduled
+                </Badge>
+              </div>
+              {order.engineer ? (
+                <div className="flex items-center gap-2 pt-2 border-t">
+                  <User className="h-3 w-3 text-muted-foreground" />
+                  <span className="text-sm font-medium">{order.engineer.name}</span>
+                  <span className="text-xs text-muted-foreground">({order.engineer.email})</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 pt-2 border-t text-orange-600">
+                  <AlertCircle className="h-3 w-3" />
+                  <span className="text-sm">No engineer assigned</span>
+                </div>
               )}
             </div>
-          </div>
-        </div>
+          ) : (
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Clock className="h-4 w-4" />
+              <span className="text-sm">Installation not yet scheduled</span>
+            </div>
+          )}
+        </Card>
       </div>
-    </Card>
+    </TooltipProvider>
   );
 }
