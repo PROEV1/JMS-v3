@@ -4086,6 +4086,7 @@ export type Database = {
       message_status: "sending" | "sent" | "delivered" | "failed"
       offer_status: "pending" | "accepted" | "rejected" | "expired"
       order_job_type: "installation" | "assessment" | "service_call"
+      order_status: "active" | "paused" | "cancelled" | "completed"
       order_status_enhanced:
         | "quote_accepted"
         | "awaiting_payment"
@@ -4289,6 +4290,7 @@ export const Constants = {
       message_status: ["sending", "sent", "delivered", "failed"],
       offer_status: ["pending", "accepted", "rejected", "expired"],
       order_job_type: ["installation", "assessment", "service_call"],
+      order_status: ["active", "paused", "cancelled", "completed"],
       order_status_enhanced: [
         "quote_accepted",
         "awaiting_payment",
