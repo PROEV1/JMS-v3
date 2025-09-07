@@ -87,16 +87,22 @@ export function LocationStockModal({ open, onOpenChange, location }: LocationSto
     }) => {
       console.log('🚀 Starting stock adjustment:', { itemId, locationId: location?.id, adjustment, reason });
       
+      // Determine direction based on adjustment
+      const direction = adjustment > 0 ? 'in' : 'out';
+      const qty = Math.abs(adjustment);
+      
       const { data, error } = await supabase
         .from('inventory_txns')
         .insert({
           item_id: itemId,
           location_id: location?.id,
-          direction: 'adjust',
-          qty: adjustment,
+          direction: direction,
+          qty: qty,
           reference: `Stock adjustment: ${reason}`,
           notes: `${reason} via location stock modal`,
-          status: 'approved' // Auto-approve admin stock adjustments
+          status: 'approved', // Auto-approve admin stock adjustments
+          approved_by: (await supabase.auth.getUser()).data.user?.id,
+          approved_at: new Date().toISOString()
         })
         .select()
         .single();
