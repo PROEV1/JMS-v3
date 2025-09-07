@@ -806,10 +806,14 @@ export function ScheduleStatusListPage({
         toast.success('Installation booked successfully');
       }
 
+      console.log('🚀 Smart Assignment: Assignment successful, refreshing data...');
       // Refresh the parent component
       if (onUpdate) {
         onUpdate();
       }
+      
+      // Trigger global refresh to update all status counts and lists
+      window.dispatchEvent(new CustomEvent('scheduling:refresh'));
 
     } catch (error: any) {
       console.error('Assignment error:', error);
