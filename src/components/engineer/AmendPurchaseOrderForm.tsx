@@ -4,8 +4,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { AlertTriangle, Package, Plus, Trash2, Eye } from 'lucide-react';
+import { AlertTriangle, Package, Plus, Trash2, Eye, Info } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -28,6 +29,13 @@ interface AmendmentItem {
   notes: string;
 }
 
+interface VanStockItem {
+  item_id: string;
+  item_name: string;
+  current_quantity: number;
+  unit: string;
+}
+
 export const AmendPurchaseOrderForm: React.FC<AmendPurchaseOrderFormProps> = ({
   engineerId,
   stockRequestId,
@@ -37,6 +45,7 @@ export const AmendPurchaseOrderForm: React.FC<AmendPurchaseOrderFormProps> = ({
   const [amendmentReason, setAmendmentReason] = useState<string>('');
   const [showPreview, setShowPreview] = useState<boolean>(false);
   const [previewData, setPreviewData] = useState<any>(null);
+  const [amendmentMode, setAmendmentMode] = useState<'correct' | 'additional'>('correct');
   
   const { user } = useAuth();
   const amendPO = useAmendPurchaseOrder();
@@ -88,6 +97,73 @@ export const AmendPurchaseOrderForm: React.FC<AmendPurchaseOrderFormProps> = ({
     }
   });
 
+  // Get current van stock for the engineer
+  const { data: vanStock } = useQuery({
+    queryKey: ['van-stock', engineerId],
+    queryFn: async () => {
+      // First get the engineer's van location
+      const { data: vanLocation, error: locationError } = await supabase
+        .from('inventory_locations')
+        .select('id')
+        .eq('engineer_id', engineerId)
+        .eq('type', 'van')
+        .single();
+
+      if (locationError || !vanLocation) {
+        console.error('No van location found for engineer:', engineerId);
+        return [];
+      }
+
+      // Get all inventory transactions for this location to calculate current stock
+      const { data: transactions, error: txnError } = await supabase
+        .from('inventory_txns')
+        .select(`
+          item_id,
+          direction,
+          qty,
+          status,
+          inventory_items!inner(id, name, sku, unit)
+        `)
+        .eq('location_id', vanLocation.id)
+        .eq('status', 'approved');
+
+      if (txnError) {
+        console.error('Error fetching inventory transactions:', txnError);
+        return [];
+      }
+
+      // Calculate current stock levels by item
+      const stockLevels = new Map<string, { item_name: string; unit: string; total: number }>();
+      
+      transactions?.forEach((txn: any) => {
+        const itemId = txn.item_id;
+        const qty = txn.direction === 'in' ? txn.qty : -txn.qty;
+        
+        if (!stockLevels.has(itemId)) {
+          stockLevels.set(itemId, {
+            item_name: txn.inventory_items.name,
+            unit: txn.inventory_items.unit,
+            total: 0
+          });
+        }
+        
+        const current = stockLevels.get(itemId)!;
+        current.total += qty;
+      });
+
+      // Convert to array format, excluding items with zero or negative stock
+      return Array.from(stockLevels.entries())
+        .filter(([_, data]) => data.total > 0)
+        .map(([item_id, data]) => ({
+          item_id,
+          item_name: data.item_name,
+          current_quantity: data.total,
+          unit: data.unit
+        }));
+    },
+    enabled: !!engineerId
+  });
+
   // Pre-populate with original stock request items as baseline
   useEffect(() => {
     if (stockRequest?.lines) {
@@ -103,6 +179,21 @@ export const AmendPurchaseOrderForm: React.FC<AmendPurchaseOrderFormProps> = ({
       setAmendmentItems(items);
     }
   }, [stockRequest]);
+
+  // Helper function to get current van stock for an item
+  const getCurrentVanStock = (itemId: string): number => {
+    const stockItem = vanStock?.find(item => item.item_id === itemId);
+    return stockItem?.current_quantity || 0;
+  };
+
+  // Helper function to calculate final quantities based on mode
+  const calculateFinalQuantity = (item: AmendmentItem): number => {
+    if (amendmentMode === 'additional') {
+      const currentStock = getCurrentVanStock(item.item_id);
+      return currentStock + item.quantity;
+    }
+    return item.quantity;
+  };
 
   console.log('AmendPurchaseOrderForm state:', { 
     stockRequest, 
@@ -231,7 +322,7 @@ export const AmendPurchaseOrderForm: React.FC<AmendPurchaseOrderFormProps> = ({
           purchaseOrderId: purchaseOrder.id,
           items: validItems.map(item => ({
             item_id: item.item_id,
-            quantity: item.quantity,
+            quantity: calculateFinalQuantity(item),
             notes: item.notes
           })),
           amendmentReason,
@@ -243,17 +334,26 @@ export const AmendPurchaseOrderForm: React.FC<AmendPurchaseOrderFormProps> = ({
           requestId: stockRequestId,
           lines: validItems.map(item => ({
             item_id: item.item_id,
-            qty: item.quantity,
+            qty: calculateFinalQuantity(item),
             notes: item.notes
           })),
           status: 'submitted' // Reset to submitted for review after amendment
         });
 
         // Update the request notes separately to include amendment reason
+        const itemsList = validItems.map(item => {
+          const finalQty = calculateFinalQuantity(item);
+          const currentStock = getCurrentVanStock(item.item_id);
+          const displayText = amendmentMode === 'additional' 
+            ? `- ${item.item_name}: +${item.quantity} (current: ${currentStock}, total will be: ${finalQty})`
+            : `- ${item.item_name}: ${finalQty}`;
+          return displayText + (item.notes ? ` (${item.notes})` : '');
+        }).join('\n');
+
         const { error: notesError } = await supabase
           .from('stock_requests')
           .update({
-            notes: `AMENDMENT REQUEST: ${amendmentReason}\n\nRequested items:\n${validItems.map(item => `- ${item.item_name}: ${item.quantity}${item.notes ? ` (${item.notes})` : ''}`).join('\n')}\n\nOriginal notes: ${stockRequest?.notes || 'None'}`
+            notes: `AMENDMENT REQUEST (${amendmentMode === 'additional' ? 'Additional Stock' : 'Correct Request'}): ${amendmentReason}\n\nRequested items:\n${itemsList}\n\nOriginal notes: ${stockRequest?.notes || 'None'}`
           })
           .eq('id', stockRequestId);
 
@@ -296,7 +396,7 @@ export const AmendPurchaseOrderForm: React.FC<AmendPurchaseOrderFormProps> = ({
             {purchaseOrder ? `Amend Purchase Order - ${purchaseOrder.po_number}` : 'Report Stock Issues'}
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <p className="text-sm text-blue-700">
             {purchaseOrder 
               ? 'This will update the existing purchase order with corrected quantities and any additional items needed.'
@@ -304,6 +404,38 @@ export const AmendPurchaseOrderForm: React.FC<AmendPurchaseOrderFormProps> = ({
             }
             The office will be notified of these changes.
           </p>
+
+          <div className="space-y-3">
+            <Label className="text-sm font-medium text-blue-800">Amendment Type</Label>
+            <RadioGroup 
+              value={amendmentMode} 
+              onValueChange={(value: 'correct' | 'additional') => setAmendmentMode(value)}
+              className="space-y-2"
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="correct" id="correct" />
+                <Label htmlFor="correct" className="text-sm cursor-pointer">
+                  Correct Original Request - Replace the originally requested quantities
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="additional" id="additional" />
+                <Label htmlFor="additional" className="text-sm cursor-pointer">
+                  Request Additional Stock - Add extra quantities to what I currently have
+                </Label>
+              </div>
+            </RadioGroup>
+            
+            <div className="flex items-start gap-2 p-3 bg-blue-100 rounded-lg">
+              <Info className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+              <p className="text-xs text-blue-700">
+                {amendmentMode === 'additional' 
+                  ? 'You\'ll specify how many EXTRA items you need. The system will add these to your current van stock.'
+                  : 'You\'ll specify the TOTAL quantities that should have been in the original request. This replaces the original quantities.'
+                }
+              </p>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -334,61 +466,78 @@ export const AmendPurchaseOrderForm: React.FC<AmendPurchaseOrderFormProps> = ({
             </Button>
           </div>
 
-          {amendmentItems.map((item) => (
-            <Card key={item.id} className="p-4">
-              <div className="grid grid-cols-12 gap-4 items-end">
-                <div className="col-span-5">
-                  <Label>Item</Label>
-                  <Select
-                    value={item.item_id}
-                    onValueChange={(value) => updateItem(item.id, 'item_id', value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select item..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {allItems?.map((inventoryItem) => (
-                        <SelectItem key={inventoryItem.id} value={inventoryItem.id}>
-                          {inventoryItem.name} ({inventoryItem.sku})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+          {amendmentItems.map((item) => {
+            const currentStock = getCurrentVanStock(item.item_id);
+            const finalQuantity = calculateFinalQuantity(item);
+            
+            return (
+              <Card key={item.id} className="p-4">
+                <div className="grid grid-cols-12 gap-4 items-end">
+                  <div className="col-span-5">
+                    <Label>Item</Label>
+                    <Select
+                      value={item.item_id}
+                      onValueChange={(value) => updateItem(item.id, 'item_id', value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select item..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {allItems?.map((inventoryItem) => (
+                          <SelectItem key={inventoryItem.id} value={inventoryItem.id}>
+                            {inventoryItem.name} ({inventoryItem.sku})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {item.item_id && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Current van stock: {currentStock}
+                      </p>
+                    )}
+                  </div>
 
-                <div className="col-span-2">
-                  <Label>Quantity</Label>
-                  <Input
-                    type="number"
-                    min="1"
-                    value={item.quantity}
-                    onChange={(e) => updateItem(item.id, 'quantity', parseInt(e.target.value) || 1)}
-                  />
-                </div>
+                  <div className="col-span-2">
+                    <Label>
+                      {amendmentMode === 'additional' ? 'Extra Qty' : 'Total Qty'}
+                    </Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      value={item.quantity}
+                      onChange={(e) => updateItem(item.id, 'quantity', parseInt(e.target.value) || 1)}
+                    />
+                    {item.item_id && amendmentMode === 'additional' && (
+                      <p className="text-xs text-green-600 mt-1">
+                        Final total: {finalQuantity}
+                      </p>
+                    )}
+                  </div>
 
-                <div className="col-span-4">
-                  <Label>Notes</Label>
-                  <Input
-                    value={item.notes}
-                    onChange={(e) => updateItem(item.id, 'notes', e.target.value)}
-                    placeholder="Additional notes..."
-                  />
-                </div>
+                  <div className="col-span-4">
+                    <Label>Notes</Label>
+                    <Input
+                      value={item.notes}
+                      onChange={(e) => updateItem(item.id, 'notes', e.target.value)}
+                      placeholder="Additional notes..."
+                    />
+                  </div>
 
-                <div className="col-span-1">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => removeItem(item.id)}
-                    className="w-full"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  <div className="col-span-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => removeItem(item.id)}
+                      className="w-full"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            </Card>
-          ))}
+              </Card>
+            );
+          })}
 
           {amendmentItems.length === 0 && (
             <div className="text-center py-8 text-muted-foreground">
