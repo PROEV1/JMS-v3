@@ -200,12 +200,13 @@ export function SchedulePipelineDashboard({ orders }: SchedulePipelineDashboardP
   useEffect(() => {
     const fetchOfferCounts = async () => {
       try {
-        // Get all offers to determine which orders have offers (for needs scheduling calculation)
-        const { data: allOffers } = await supabase
+        // Get offers with pending or accepted status to exclude from needs scheduling (matching NeedsSchedulingListPage logic)
+        const { data: offersToExclude } = await supabase
           .from('job_offers')
-          .select('order_id, status');
+          .select('order_id')
+          .in('status', ['pending', 'accepted']);
         
-        const ordersWithOffersSet = new Set(allOffers?.map(offer => offer.order_id) || []);
+        const ordersWithOffersSet = new Set(offersToExclude?.map(offer => offer.order_id) || []);
         setOrdersWithOffers(ordersWithOffersSet);
 
         // Count job offers for all job types
