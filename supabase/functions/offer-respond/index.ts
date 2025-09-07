@@ -125,81 +125,31 @@ serve(async (req: Request) => {
     const responseTime = now.toISOString();
 
     if (response === 'accept') {
-      // Re-check capacity before accepting (including subcontractor limits)
-      const offeredDateOnly = new Date(jobOffer.offered_date).toISOString().split('T')[0];
-      
-      // Get current workload
-      const { data: currentWorkload } = await supabase
-        .rpc('get_engineer_daily_workload_with_holds', {
-          p_engineer_id: jobOffer.engineer_id,
-          p_date: offeredDateOnly
-        });
+      // Use a transaction to prevent lock contention
+      const { error: transactionError } = await supabase.rpc('accept_job_offer_transaction', {
+        p_offer_id: jobOffer.id,
+        p_order_id: jobOffer.order_id,
+        p_engineer_id: jobOffer.engineer_id,
+        p_time_window: jobOffer.time_window,
+        p_response_time: responseTime
+      });
 
-      // Get engineer-specific job limit
-      let maxJobsPerDay: number;
-      if (jobOffer.engineer.is_subcontractor) {
-        maxJobsPerDay = jobOffer.engineer.max_installs_per_day || 5;
-      } else {
-        const { data: adminSettings } = await supabase
-          .from('admin_settings')
-          .select('setting_value')
-          .eq('setting_key', 'scheduling_config')
-          .single();
+      if (transactionError) {
+        console.error('Transaction failed:', transactionError);
         
-        maxJobsPerDay = jobOffer.engineer.max_installs_per_day || adminSettings?.setting_value?.max_jobs_per_day || 3;
-      }
-
-      // Check if accepting would exceed capacity
-      if ((currentWorkload || 0) + 1 > maxJobsPerDay) {
+        // Handle specific error cases
+        if (transactionError.message?.includes('capacity')) {
+          return json({ 
+            ok: false, 
+            error: transactionError.message
+          }, 409, requestId);
+        }
+        
         return json({ 
           ok: false, 
-          error: `Engineer is now at capacity (${currentWorkload}/${maxJobsPerDay} jobs). Please try scheduling for a different date.` 
-        }, 409, requestId);
+          error: 'Failed to accept offer. Please try again.'
+        }, 500, requestId);
       }
-
-      // Accept the offer
-      const { error: updateOfferError } = await supabase
-        .from('job_offers')
-        .update({
-          status: 'accepted',
-          accepted_at: responseTime
-        })
-        .eq('id', jobOffer.id);
-
-      if (updateOfferError) {
-        throw new Error('Failed to update offer status');
-      }
-
-      // Assign engineer to the order and clear manual override so triggers can calculate status
-      const { error: updateOrderError } = await supabase
-        .from('orders')
-        .update({
-          engineer_id: jobOffer.engineer_id,
-          time_window: jobOffer.time_window,
-          manual_status_override: false,
-          manual_status_notes: null
-          // Don't set scheduled_install_date or status_enhanced - let triggers handle status calculation
-        })
-        .eq('id', jobOffer.order_id);
-
-      if (updateOrderError) {
-        console.error('Failed to assign engineer to order:', updateOrderError);
-        throw new Error('Failed to assign engineer to order');
-      }
-
-      // Log activity
-      await supabase.rpc('log_order_activity', {
-        p_order_id: jobOffer.order_id,
-        p_activity_type: 'offer_accepted',
-        p_description: `Client accepted installation offer for ${new Date(jobOffer.offered_date).toLocaleDateString()} with ${jobOffer.engineer.name} - Ready to book`,
-        p_details: {
-          offer_id: jobOffer.id,
-          engineer_id: jobOffer.engineer_id,
-          offered_date: jobOffer.offered_date,
-          time_window: jobOffer.time_window,
-          accepted_at: responseTime
-        }
-      });
 
       console.log(`Offer accepted for order ${jobOffer.order.order_number} - moved to ready-to-book`);
 
