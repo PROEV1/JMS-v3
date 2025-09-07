@@ -232,6 +232,53 @@ export const useUpdateStockRequestLines = () => {
       lines: Array<{ item_id: string; qty: number; notes?: string }>; 
       status?: StockRequestStatus;
     }) => {
+      // First, get the current request and its status
+      const { data: currentRequest, error: requestError } = await supabase
+        .from('stock_requests')
+        .select('status, destination_location_id')
+        .eq('id', requestId)
+        .single();
+
+      if (requestError) throw requestError;
+
+      // If the request was previously "received", we need to reverse the inventory transactions
+      if (currentRequest.status === 'received') {
+        console.log('Request was previously received - reversing inventory transactions');
+        
+        // Get the current stock request lines to reverse the transactions
+        const { data: currentLines, error: currentLinesError } = await supabase
+          .from('stock_request_lines')
+          .select('item_id, qty')
+          .eq('request_id', requestId);
+
+        if (currentLinesError) throw currentLinesError;
+
+        if (currentLines && currentLines.length > 0) {
+          // Create "out" transactions to reverse the previous stock additions
+          const reverseTransactions = currentLines.map(line => ({
+            item_id: line.item_id,
+            location_id: currentRequest.destination_location_id,
+            qty: line.qty,
+            direction: 'out',
+            status: 'approved',
+            notes: `Stock reversed due to amendment of request #${requestId.slice(0, 8)}`,
+            reference: `Amendment Reversal: ${requestId}`,
+            approved_at: new Date().toISOString()
+          }));
+
+          const { error: reverseTxnError } = await supabase
+            .from('inventory_txns')
+            .insert(reverseTransactions);
+
+          if (reverseTxnError) {
+            console.error('Failed to create reverse inventory transactions:', reverseTxnError);
+            throw reverseTxnError;
+          }
+
+          console.log('Successfully created reverse inventory transactions');
+        }
+      }
+
       // Delete existing lines
       const { error: deleteError } = await supabase
         .from('stock_request_lines')
@@ -254,7 +301,7 @@ export const useUpdateStockRequestLines = () => {
         if (insertError) throw insertError;
       }
 
-      // Update request status
+      // Update request status (reset to submitted when amending)
       const { data, error } = await supabase
         .from('stock_requests')
         .update({ 
@@ -270,6 +317,10 @@ export const useUpdateStockRequestLines = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['stock-requests'] });
+      // Invalidate inventory queries since amending can affect stock levels
+      queryClient.invalidateQueries({ queryKey: ['engineer-inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['van-stock'] });
+      queryClient.invalidateQueries({ queryKey: ['van-stock-metrics'] });
       showSuccessToast('Stock request updated successfully');
     },
     onError: (error) => {
