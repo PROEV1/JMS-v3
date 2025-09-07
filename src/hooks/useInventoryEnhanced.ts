@@ -219,7 +219,7 @@ export function useInventoryEnhanced() {
 
       const reference = `Transfer ${quantity} units`;
 
-      // Create outbound transaction
+      // Create outbound transaction (auto-approved for internal transfers)
       const { error: outError } = await supabase
         .from('inventory_txns')
         .insert({
@@ -228,12 +228,14 @@ export function useInventoryEnhanced() {
           direction: 'out',
           qty: quantity,
           reference,
-          notes
+          notes,
+          status: 'approved',
+          approved_at: new Date().toISOString()
         });
 
       if (outError) throw outError;
 
-      // Create inbound transaction
+      // Create inbound transaction (auto-approved for internal transfers)
       const { data, error } = await supabase
         .from('inventory_txns')
         .insert({
@@ -242,7 +244,9 @@ export function useInventoryEnhanced() {
           direction: 'in',
           qty: quantity,
           reference,
-          notes
+          notes,
+          status: 'approved',
+          approved_at: new Date().toISOString()
         })
         .select()
         .single();
