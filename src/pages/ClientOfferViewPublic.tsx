@@ -8,11 +8,11 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { CalendarDays, Clock, User, CheckCircle, XCircle, AlertTriangle, Calendar } from 'lucide-react';
+import { CalendarDays, Clock, User, CheckCircle, XCircle, AlertTriangle, Calendar, RefreshCw } from 'lucide-react';
 import { BrandTypography } from '@/components/brand/BrandTypography';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { ProEVLogo } from '@/components/ProEVLogo';
+import { apiClient, buildFunctionUrl } from '@/lib/apiClient';
 
 interface OfferDetails {
   id: string;
@@ -49,6 +49,7 @@ export default function ClientOfferViewPublic() {
   const [blockStartDate, setBlockStartDate] = useState('');
   const [blockEndDate, setBlockEndDate] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [retryAttempts, setRetryAttempts] = useState(0);
 
   useEffect(() => {
     const fetchOffer = async () => {
@@ -57,48 +58,60 @@ export default function ClientOfferViewPublic() {
       console.log('Fetching offer with token:', token);
 
       try {
-        const { data, error } = await supabase.functions.invoke('offer-lookup', {
-          body: { token }
-        });
+        // Use apiClient with timeout instead of direct supabase invoke
+        const url = buildFunctionUrl('offer-lookup');
+        const response = await apiClient.post(url, { token }, { 
+          timeoutMs: 10000, // 10 second timeout
+          retries: 2
+        } as any);
 
-        console.log('Offer lookup response:', { data, error });
+        console.log('Offer lookup response:', response);
 
-        if (error || !data || data?.error) {
-          setError(data?.error || 'Failed to load offer details');
-          if (data?.expired) {
+        if (!response.ok || response.error) {
+          setError(response.error || 'Failed to load offer details');
+          if (response.expired) {
             setError('This offer has expired');
           }
-        } else if (data?.data) {
-          setOffer(data.data);
-          console.log('Offer loaded successfully:', data.data);
+        } else if (response.data) {
+          setOffer(response.data);
+          console.log('Offer loaded successfully:', response.data);
         } else {
           setError('Invalid offer data received');
         }
       } catch (err: any) {
-        setError('Failed to load offer details');
         console.error('Error fetching offer:', err);
+        
+        // Provide user-friendly error messages
+        if (err.code === 'CircuitOpen') {
+          setError('Service temporarily unavailable. Please try again in a moment.');
+        } else if (err.status === 0 || err.code === 'AbortError') {
+          setError('Request timed out. Please check your connection and try again.');
+        } else if (err.status === 404) {
+          setError('This offer could not be found or has expired.');
+        } else {
+          setError('Failed to load offer details. Please try again.');
+        }
       } finally {
         setLoading(false);
       }
     };
 
     fetchOffer();
-  }, [token]);
+  }, [token, retryAttempts]);
 
   const handleAccept = async () => {
     if (!token) return;
     
     setResponding(true);
     try {
-      const { data, error } = await supabase.functions.invoke('offer-respond', {
-        body: {
-          token,
-          response: 'accept'
-        }
-      });
+      const url = buildFunctionUrl('offer-respond');
+      const response = await apiClient.post(url, {
+        token,
+        response: 'accept'
+      }, { timeoutMs: 15000 } as any);
 
-      if (error || data?.error) {
-        throw new Error(data?.error || 'Failed to accept offer');
+      if (!response.ok || response.error) {
+        throw new Error(response.error || 'Failed to accept offer');
       }
 
       toast({
@@ -116,12 +129,12 @@ export default function ClientOfferViewPublic() {
       }
 
     } catch (err: any) {
+      console.error('Error accepting offer:', err);
       toast({
         title: "Error",
         description: err.message || 'Failed to accept offer',
         variant: "destructive",
       });
-      console.error('Error accepting offer:', err);
     } finally {
       setResponding(false);
     }
@@ -172,12 +185,11 @@ export default function ClientOfferViewPublic() {
         };
       }
 
-      const { data, error } = await supabase.functions.invoke('offer-respond', {
-        body: requestBody
-      });
+      const url = buildFunctionUrl('offer-respond');
+      const response = await apiClient.post(url, requestBody, { timeoutMs: 15000 } as any);
 
-      if (error || data?.error) {
-        throw new Error(data?.error || 'Failed to reject offer');
+      if (!response.ok || response.error) {
+        throw new Error(response.error || 'Failed to reject offer');
       }
 
       toast({
@@ -271,12 +283,26 @@ export default function ClientOfferViewPublic() {
               <p className="text-sm text-muted-foreground mb-4">
                 If you believe this is an error, please contact our support team.
               </p>
-              <Button 
-                variant="outline" 
-                onClick={() => window.location.href = 'mailto:support@proev.co.uk'}
-              >
-                Contact Support
-              </Button>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setError(null);
+                    setLoading(true);
+                    setRetryAttempts(prev => prev + 1);
+                  }}
+                  disabled={retryAttempts >= 3}
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  {retryAttempts >= 3 ? 'Max retries reached' : 'Try Again'}
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => window.location.href = 'mailto:support@proev.co.uk'}
+                >
+                  Contact Support
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>

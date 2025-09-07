@@ -47,6 +47,8 @@ import ClientPayments from '@/pages/ClientPayments';
 import ClientProfilePage from '@/pages/ClientProfilePage';
 import EnhancedClientOrderView from '@/pages/EnhancedClientOrderView';
 import ClientOfferViewPublic from '@/pages/ClientOfferViewPublic';
+import ClientOfferView from '@/pages/ClientOfferView';
+import { ErrorBoundaryRoute } from '@/components/ErrorBoundaryRoute';
 import EngineerDashboard from '@/pages/EngineerDashboard';
 import EngineerJobs from '@/pages/EngineerJobs';
 import EngineerJobDetail from '@/pages/EngineerJobDetail';
@@ -65,7 +67,21 @@ function App() {
         <Route path="/login" element={<Auth />} />
         <Route path="/auth" element={<Auth />} />
         <Route path="/quote/:token" element={<PublicQuoteView />} />
-        <Route path="/offers/:token" element={<ClientOfferViewPublic />} />
+        <Route path="/offers/:token" element={
+          <ErrorBoundaryRoute>
+            <ClientOfferViewPublic />
+          </ErrorBoundaryRoute>
+        } />
+        <Route path="/client-offer/:token" element={
+          <ErrorBoundaryRoute>
+            <ClientOfferView />
+          </ErrorBoundaryRoute>
+        } />
+        <Route path="/public/client-offer/:token" element={
+          <ErrorBoundaryRoute>
+            <ClientOfferViewPublic />
+          </ErrorBoundaryRoute>
+        } />
         
         {/* Survey Routes - Public access with token validation */}
         <Route path="/survey/:orderId" element={<SurveyPage />} />

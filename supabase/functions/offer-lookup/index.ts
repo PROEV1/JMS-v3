@@ -12,9 +12,16 @@ serve(async (req) => {
 
   try {
     const url = new URL(req.url);
+    
+    // Health check endpoint
     if (url.searchParams.get('test') === '1') {
-      return json({ ok: true, status: 'alive', function: url.pathname }, 200, requestId);
+      return json({ ok: true, status: 'alive', function: url.pathname, timestamp: new Date().toISOString() }, 200, requestId);
     }
+
+    // Add request timeout handling
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Request timeout')), 25000); // 25s timeout (less than 30s Edge Function limit)
+    });
 
     let token;
     console.log('Offer lookup called with method:', req.method);
@@ -59,15 +66,35 @@ serve(async (req) => {
 
     console.log('Looking up offer with token:', token);
 
-    // Look up the offer by client token (using separate queries to avoid ambiguous embeds)
-    const { data: jobOffer, error: offerError } = await supabase
-      .from('job_offers')
-      .select('*')
-      .eq('client_token', token)
-      .single();
+    // Wrap database operations in timeout promise race
+    const dbOperations = async () => {
+      // Look up the offer by client token (using separate queries to avoid ambiguous embeds)
+      const { data: jobOffer, error: offerError } = await supabase
+        .from('job_offers')
+        .select('*')
+        .eq('client_token', token)
+        .single();
+
+      return { jobOffer, offerError };
+    };
+
+    const { jobOffer, offerError } = await Promise.race([
+      dbOperations(),
+      timeoutPromise
+    ]) as { jobOffer: any; offerError: any };
 
     if (offerError || !jobOffer) {
       console.log('Offer not found, error:', offerError);
+      
+      // More specific error messages
+      if (offerError?.code === 'PGRST116') {
+        return json({ 
+          ok: false,
+          error: 'Invalid or expired offer link',
+          expired: true
+        }, 404, requestId);
+      }
+      
       return json({ 
         ok: false,
         error: 'Offer not found or expired',
@@ -166,6 +193,21 @@ serve(async (req) => {
 
   } catch (error: any) {
     console.error('Error in offer-lookup function:', error);
-    return json({ ok: false, error: String(error) }, 500, requestId);
+    
+    // Handle specific error types
+    if (error.message === 'Request timeout') {
+      return json({ 
+        ok: false, 
+        error: 'Service temporarily busy. Please try again.', 
+        code: 'TIMEOUT' 
+      }, 504, requestId);
+    }
+    
+    // Don't expose internal errors to users
+    return json({ 
+      ok: false, 
+      error: 'An unexpected error occurred. Please try again.', 
+      code: 'INTERNAL_ERROR' 
+    }, 500, requestId);
   }
 });
