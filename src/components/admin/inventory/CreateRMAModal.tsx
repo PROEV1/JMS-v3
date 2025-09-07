@@ -19,6 +19,7 @@ interface CreateRMAModalProps {
 interface RMALine {
   id: string;
   item_id: string;
+  item_name?: string; // For custom typed items
   item_type: 'inventory' | 'charger';
   qty: number;
   reason: string;
@@ -32,7 +33,7 @@ export function CreateRMAModal({ open, onOpenChange }: CreateRMAModalProps) {
   const [originalOrderId, setOriginalOrderId] = useState('');
   const [reason, setReason] = useState('');
   const [lines, setLines] = useState<RMALine[]>([
-    { id: '1', item_id: '', item_type: 'inventory', qty: 1, reason: '', condition: 'damaged' }
+    { id: '1', item_id: '', item_name: '', item_type: 'inventory', qty: 1, reason: '', condition: 'damaged' }
   ]);
 
   const { toast } = useToast();
@@ -98,6 +99,7 @@ export function CreateRMAModal({ open, onOpenChange }: CreateRMAModalProps) {
     setLines([...lines, { 
       id: Date.now().toString(), 
       item_id: '', 
+      item_name: '',
       item_type: 'inventory',
       qty: 1, 
       reason: '', 
@@ -142,14 +144,14 @@ export function CreateRMAModal({ open, onOpenChange }: CreateRMAModalProps) {
       });
     });
     
-    if (!rmaNumber || !supplierId || !reason || lines.some(line => !line.item_id || !line.qty || !line.reason)) {
+    if (!rmaNumber || !supplierId || !reason || lines.some(line => (!line.item_id && !line.item_name) || !line.qty || !line.reason)) {
       const missingFields = [];
       if (!rmaNumber) missingFields.push('RMA Number');
       if (!supplierId) missingFields.push('Supplier');
       if (!reason) missingFields.push('Overall Reason');
       
       lines.forEach((line, index) => {
-        if (!line.item_id) missingFields.push(`Line ${index + 1}: Item`);
+        if (!line.item_id && !line.item_name) missingFields.push(`Line ${index + 1}: Item`);
         if (!line.qty) missingFields.push(`Line ${index + 1}: Quantity`);
         if (!line.reason) missingFields.push(`Line ${index + 1}: Reason`);
       });
@@ -178,10 +180,11 @@ export function CreateRMAModal({ open, onOpenChange }: CreateRMAModalProps) {
             
           rmaRecords.push({
             rma_number: recordNumber,
-            item_id: line.item_id,
+            item_id: line.item_id || null, // Use null if custom item
+            custom_item_name: line.item_id ? null : line.item_name, // Store custom name if no item_id
             supplier_id: supplierId,
             return_reason: `${reason} - ${line.reason} (${line.condition})`,
-            notes: `Type: ${line.item_type}, Condition: ${line.condition}`,
+            notes: `Type: ${line.item_type}, Condition: ${line.condition}, Item: ${line.item_name || 'Selected from inventory'}`,
             created_by: currentUser?.id
           });
         }
@@ -205,7 +208,7 @@ export function CreateRMAModal({ open, onOpenChange }: CreateRMAModalProps) {
       setRmaType('return');
       setOriginalOrderId('');
       setReason('');
-      setLines([{ id: '1', item_id: '', item_type: 'inventory', qty: 1, reason: '', condition: 'damaged' }]);
+      setLines([{ id: '1', item_id: '', item_name: '', item_type: 'inventory', qty: 1, reason: '', condition: 'damaged' }]);
     } catch (error) {
       console.error('Error creating RMA:', error);
       toast({
@@ -311,31 +314,57 @@ export function CreateRMAModal({ open, onOpenChange }: CreateRMAModalProps) {
                       </Select>
                     </div>
 
-                    <div className="col-span-3">
-                      <Label>Item</Label>
-                      <Select 
-                        value={line.item_id} 
-                        onValueChange={(value) => updateLine(line.id, 'item_id', value)}
-                      >
-                        <SelectTrigger className="bg-background">
-                          <SelectValue placeholder="Select item" />
-                        </SelectTrigger>
-                        <SelectContent className="z-[60] bg-background border shadow-lg max-h-[200px]">
-                          {line.item_type === 'inventory' 
-                            ? inventoryItems.map(item => (
-                                <SelectItem key={item.id} value={item.id}>
-                                  {item.name} ({item.sku})
-                                </SelectItem>
-                              ))
-                            : chargers.map(charger => (
-                                <SelectItem key={charger.id} value={charger.id}>
-                                  {charger.inventory_items?.name} - {charger.serial_number}
-                                </SelectItem>
-                              ))
-                          }
-                        </SelectContent>
-                      </Select>
-                    </div>
+                     <div className="col-span-3">
+                       <Label>Item</Label>
+                       <div className="relative">
+                         <Input
+                           value={line.item_name || ''}
+                           onChange={(e) => {
+                             const value = e.target.value;
+                             updateLine(line.id, 'item_name', value);
+                             updateLine(line.id, 'item_id', ''); // Clear item_id when typing custom
+                           }}
+                           placeholder="Type item name or select from dropdown"
+                           className="pr-20"
+                         />
+                         <Select 
+                           value={line.item_id} 
+                           onValueChange={(value) => {
+                             updateLine(line.id, 'item_id', value);
+                             // Find the selected item and set its name
+                             if (line.item_type === 'inventory') {
+                               const selectedItem = inventoryItems.find(item => item.id === value);
+                               if (selectedItem) {
+                                 updateLine(line.id, 'item_name', `${selectedItem.name} (${selectedItem.sku})`);
+                               }
+                             } else {
+                               const selectedCharger = chargers.find(charger => charger.id === value);
+                               if (selectedCharger) {
+                                 updateLine(line.id, 'item_name', `${selectedCharger.inventory_items?.name} - ${selectedCharger.serial_number}`);
+                               }
+                             }
+                           }}
+                         >
+                           <SelectTrigger className="absolute right-0 top-0 w-16 h-full bg-background border-l-0 rounded-l-none">
+                             <SelectValue placeholder="▼" />
+                           </SelectTrigger>
+                           <SelectContent className="z-[60] bg-background border shadow-lg max-h-[200px]">
+                             {line.item_type === 'inventory' 
+                               ? inventoryItems.map(item => (
+                                   <SelectItem key={item.id} value={item.id}>
+                                     {item.name} ({item.sku})
+                                   </SelectItem>
+                                 ))
+                               : chargers.map(charger => (
+                                   <SelectItem key={charger.id} value={charger.id}>
+                                     {charger.inventory_items?.name} - {charger.serial_number}
+                                   </SelectItem>
+                                 ))
+                             }
+                           </SelectContent>
+                         </Select>
+                       </div>
+                     </div>
 
                     <div className="col-span-2">
                       <Label>Quantity</Label>
