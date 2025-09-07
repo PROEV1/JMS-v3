@@ -330,7 +330,7 @@ export const AmendPurchaseOrderForm: React.FC<AmendPurchaseOrderFormProps> = ({
           requestId: stockRequestId,
           lines: validItems.map(item => ({
             item_id: item.item_id,
-            qty: calculateFinalQuantity(item), // For stock requests, we do want the final total
+            qty: item.quantity, // Only the additional quantity, consistent with PO path
             notes: item.notes
           })),
           status: 'submitted' // Reset to submitted for review after amendment
