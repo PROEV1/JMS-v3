@@ -46,7 +46,7 @@ const RequestCard: React.FC<RequestCardProps> = ({ request, onStatusChange, onCr
   const [newStatus, setNewStatus] = useState<StockRequestStatus | ''>('');
   const [statusNotes, setStatusNotes] = useState('');
 
-  const StatusIcon = statusIcons[request.status];
+  const StatusIcon = statusIcons[request.status] || Package;
   const priorityColor = request.priority === 'high' ? 'destructive' : 
                        request.priority === 'medium' ? 'outline' : 'secondary';
 
