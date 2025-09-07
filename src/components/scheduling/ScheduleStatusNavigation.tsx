@@ -117,7 +117,10 @@ function StatusNavTile({ tile, count, isActive, navigate }: {
         tile.colorClass,
         isActive && "ring-inset ring-2 ring-primary"
       )}
-      onClick={() => navigate(tile.route)}
+      onClick={() => {
+        console.log(`StatusNavTile: Navigating to ${tile.route} for ${tile.title}`);
+        navigate(tile.route);
+      }}
     >
       <CardContent className="p-3 flex flex-col justify-between">
         <div className="flex items-start gap-2 mb-2">
