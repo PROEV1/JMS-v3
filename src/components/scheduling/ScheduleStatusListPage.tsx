@@ -410,44 +410,16 @@ export function ScheduleStatusListPage({
     console.log('🚀 Starting optimistic UI update for offer acceptance...');
     
     try {
-      // Update the job offer status to accepted (don't schedule yet)
-      const { error: offerError } = await supabase
-        .from('job_offers')
-        .update({
-          status: 'accepted',
-          accepted_at: new Date().toISOString()
-        })
-        .eq('id', activeOffer.id);
-
-      if (offerError) throw offerError;
-
-      // CRITICAL: Also update the order to clear any manual override and trigger status recalculation
-      const { error: orderError } = await supabase
-        .from('orders')
-        .update({
-          manual_status_override: false,
-          manual_status_notes: null,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', orderId);
-
-      if (orderError) {
-        console.error('Failed to update order:', orderError);
-        throw orderError;
-      }
-
-      // Log the activity
-      await supabase.rpc('log_order_activity', {
+      // Use the atomic transaction function to handle offer acceptance
+      const { error } = await supabase.rpc('accept_job_offer_transaction', {
+        p_offer_id: activeOffer.id,
         p_order_id: orderId,
-        p_activity_type: 'offer_accepted',
-        p_description: 'Installation offer accepted by admin - moved to ready-to-book',
-        p_details: {
-          offer_id: activeOffer.id,
-          engineer_id: activeOffer.engineer_id,
-          offered_date: activeOffer.offered_date,
-          method: 'admin_manual'
-        }
+        p_engineer_id: activeOffer.engineer_id,
+        p_time_window: activeOffer.time_window || 'All Day',
+        p_response_time: new Date().toISOString()
       });
+
+      if (error) throw error;
 
       console.log('Offer accepted successfully, refreshing data...');
       toast.success('Offer accepted - job moved to Ready to Book');
