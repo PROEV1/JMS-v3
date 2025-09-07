@@ -21,8 +21,6 @@ const statusIcons = {
   submitted: Clock,
   approved: CheckCircle,
   rejected: XCircle,
-  in_pick: Package,
-  in_transit: Truck,
   cancelled: XCircle,
   received: CheckCircle,
   amend: Package
@@ -501,8 +499,6 @@ export const AdminStockRequestsBoard = () => {
               <SelectItem value="all">All Statuses</SelectItem>
               <SelectItem value="submitted">Submitted</SelectItem>
               <SelectItem value="approved">Approved</SelectItem>
-              <SelectItem value="in_pick">In Pick</SelectItem>
-              <SelectItem value="in_transit">In Transit</SelectItem>
               <SelectItem value="rejected">Rejected</SelectItem>
               <SelectItem value="received">Received</SelectItem>
               <SelectItem value="cancelled">Cancelled</SelectItem>
