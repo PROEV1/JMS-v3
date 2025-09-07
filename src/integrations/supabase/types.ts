@@ -3731,6 +3731,16 @@ export type Database = {
       }
     }
     Functions: {
+      accept_job_offer_transaction: {
+        Args: {
+          p_engineer_id: string
+          p_offer_id: string
+          p_order_id: string
+          p_response_time: string
+          p_time_window: string
+        }
+        Returns: undefined
+      }
       admin_delete_order: {
         Args: { p_order_id: string }
         Returns: boolean
