@@ -46,11 +46,14 @@ export function NeedsSchedulingListPage() {
       const { data: ordersWithActiveOffers } = await supabase
         .from('job_offers')
         .select('order_id')
-        .in('status', ['pending', 'accepted'])
-        .or('status.neq.pending,expires_at.gt.' + new Date().toISOString());
+        .or('status.eq.accepted,and(status.eq.pending,expires_at.gt.' + new Date().toISOString() + ')');
+      
+      console.log('NeedsSchedulingListPage: Orders with active offers to exclude:', ordersWithActiveOffers?.length || 0);
       
       if (ordersWithActiveOffers?.length) {
-        query = query.not('id', 'in', `(${ordersWithActiveOffers.map(o => o.order_id).join(',')})`);
+        const orderIds = ordersWithActiveOffers.map(o => o.order_id);
+        console.log('NeedsSchedulingListPage: Excluding order IDs:', orderIds);
+        query = query.not('id', 'in', `(${orderIds.join(',')})`);
       }
 
       query = query.order('created_at', { ascending: false });

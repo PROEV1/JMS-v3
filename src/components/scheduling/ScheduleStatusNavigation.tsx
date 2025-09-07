@@ -199,8 +199,7 @@ export function ScheduleStatusNavigation({ currentStatus }: ScheduleStatusNaviga
         const { data: ordersWithActiveOffers } = await supabase
           .from('job_offers')
           .select('order_id')
-          .in('status', ['pending', 'accepted'])
-          .or('status.neq.pending,expires_at.gt.' + new Date().toISOString());
+          .or('status.eq.accepted,and(status.eq.pending,expires_at.gt.' + new Date().toISOString() + ')');
         
         let needsSchedulingQuery = supabase
           .from('orders')
