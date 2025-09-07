@@ -316,17 +316,23 @@ export function CreateRMAModal({ open, onOpenChange }: CreateRMAModalProps) {
 
                      <div className="col-span-3">
                        <Label>Item</Label>
-                       <div className="relative">
-                         <Input
-                           value={line.item_name || ''}
-                           onChange={(e) => {
-                             const value = e.target.value;
-                             updateLine(line.id, 'item_name', value);
-                             updateLine(line.id, 'item_id', ''); // Clear item_id when typing custom
-                           }}
-                           placeholder="Type item name or select from dropdown"
-                           className="pr-20"
-                         />
+                       <div className="space-y-2">
+                         {/* Custom item input */}
+                         <div className="space-y-1">
+                           <Input
+                             value={line.item_name || ''}
+                             onChange={(e) => {
+                               const value = e.target.value;
+                               updateLine(line.id, 'item_name', value);
+                               updateLine(line.id, 'item_id', ''); // Clear item_id when typing custom
+                             }}
+                             placeholder="Type custom part name..."
+                             className="text-sm"
+                           />
+                           <p className="text-xs text-muted-foreground">Or select from inventory below:</p>
+                         </div>
+                         
+                         {/* Inventory dropdown */}
                          <Select 
                            value={line.item_id} 
                            onValueChange={(value) => {
@@ -345,8 +351,8 @@ export function CreateRMAModal({ open, onOpenChange }: CreateRMAModalProps) {
                              }
                            }}
                          >
-                           <SelectTrigger className="absolute right-0 top-0 w-16 h-full bg-background border-l-0 rounded-l-none">
-                             <SelectValue placeholder="▼" />
+                           <SelectTrigger className="bg-background text-sm">
+                             <SelectValue placeholder="Select from inventory..." />
                            </SelectTrigger>
                            <SelectContent className="z-[60] bg-background border shadow-lg max-h-[200px]">
                              {line.item_type === 'inventory' 
