@@ -411,6 +411,7 @@ export function ScheduleStatusListPage({
     
     try {
       // Use the atomic transaction function to handle offer acceptance
+      console.log('🔧 Using transaction function for offer acceptance - Fixed timeout issue');
       const { error } = await supabase.rpc('accept_job_offer_transaction', {
         p_offer_id: activeOffer.id,
         p_order_id: orderId,
