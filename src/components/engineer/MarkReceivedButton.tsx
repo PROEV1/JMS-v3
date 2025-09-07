@@ -38,8 +38,8 @@ export const MarkReceivedButton: React.FC<MarkReceivedButtonProps> = ({
     }
   };
 
-  // Only show for in_transit requests
-  if (request.status !== 'in_transit') {
+  // Only show for approved requests (since in_transit status is removed)
+  if (request.status !== 'approved') {
     return null;
   }
 

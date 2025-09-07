@@ -79,9 +79,7 @@ const RequestCard: React.FC<RequestCardProps> = ({ request, onStatusChange, onCr
   const getAvailableStatusTransitions = (currentStatus: StockRequestStatus): StockRequestStatus[] => {
     switch (currentStatus) {
       case 'submitted': return ['approved', 'rejected', 'amend'];
-      case 'approved': return ['in_pick', 'cancelled', 'amend'];
-      case 'in_pick': return ['in_transit', 'cancelled', 'amend'];
-      case 'in_transit': return ['cancelled']; // Removed 'delivered', now engineers mark as received
+      case 'approved': return ['cancelled', 'amend'];
       default: return [];
     }
   };
@@ -363,14 +361,12 @@ export const AdminStockRequestsBoard = () => {
     
     const submitted = requests.filter(r => r.status === 'submitted').length;
     const approved = requests.filter(r => r.status === 'approved').length;
-    const inPick = requests.filter(r => r.status === 'in_pick').length;
-    const inTransit = requests.filter(r => r.status === 'in_transit').length;
     const rejected = requests.filter(r => r.status === 'rejected').length;
     const cancelled = requests.filter(r => r.status === 'cancelled').length;
     const received = requests.filter(r => r.status === 'received').length;
     const total = requests.length;
     
-    return { submitted, approved, inPick, inTransit, rejected, cancelled, received, total };
+    return { submitted, approved, rejected, cancelled, received, total };
   }, [requests]);
 
   // Filter requests
@@ -430,7 +426,7 @@ export const AdminStockRequestsBoard = () => {
     return acc;
   }, {} as Record<StockRequestStatus, StockRequestWithDetails[]>) || {};
 
-  const statusOrder: StockRequestStatus[] = ['submitted', 'approved', 'in_pick', 'in_transit', 'received', 'cancelled'];
+  const statusOrder: StockRequestStatus[] = ['submitted', 'approved', 'received', 'cancelled'];
 
   return (
     <div className="space-y-6">
@@ -454,21 +450,12 @@ export const AdminStockRequestsBoard = () => {
         />
 
         <InventoryKpiTile
-          title="In Pick"
-          value={metrics.inPick || 0}
-          icon={Package}
-          variant="info"
-          onClick={() => setStatusFilter('in_pick')}
-          subtitle="Being prepared"
-        />
-
-        <InventoryKpiTile
-          title="In Transit"
-          value={metrics.inTransit || 0}
-          icon={Truck}
-          variant="info"
-          onClick={() => setStatusFilter('in_transit')}
-          subtitle="En route"
+          title="Approved"
+          value={metrics.approved || 0}
+          icon={CheckCircle}
+          variant="success"
+          onClick={() => setStatusFilter('approved')}
+          subtitle="Ready for fulfillment"
         />
 
         <InventoryKpiTile
@@ -478,6 +465,15 @@ export const AdminStockRequestsBoard = () => {
           variant="success"
           onClick={() => setStatusFilter('received')}
           subtitle="Successfully delivered"
+        />
+
+        <InventoryKpiTile
+          title="Cancelled"
+          value={metrics.cancelled || 0}
+          icon={XCircle}
+          variant="neutral"
+          onClick={() => setStatusFilter('cancelled')}
+          subtitle="Cancelled requests"
         />
       </div>
 
