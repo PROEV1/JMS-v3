@@ -12,7 +12,8 @@ import {
   Plus,
   ArrowUpDown,
   TrendingUp,
-  Clock
+  Clock,
+  Wrench
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { InventoryKpiTile } from '../admin/inventory/shared/InventoryKpiTile';
@@ -22,11 +23,13 @@ import { EngineerPurchaseOrders } from './EngineerPurchaseOrders';
 import { StockRequestButton } from './StockRequestButton';
 import { EngineerScanModal } from './EngineerScanModal';
 import { EngineerReturnModal } from './EngineerReturnModal';
+import { UseMaterialsModal } from './UseMaterialsModal';
 
 export function EngineerVanStock() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showScanModal, setShowScanModal] = useState(false);
   const [showReturnModal, setShowReturnModal] = useState(false);
+  const [showUseMaterialsModal, setShowUseMaterialsModal] = useState(false);
 
   // Get engineer's van location
   const { data: engineer } = useQuery({
@@ -281,7 +284,7 @@ export function EngineerVanStock() {
       </div>
 
       {/* Quick Actions */}
-      <div className="flex gap-3">
+      <div className="flex gap-3 flex-wrap">
         {engineer && (
           <StockRequestButton 
             engineerId={engineer.id}
@@ -294,6 +297,10 @@ export function EngineerVanStock() {
         <Button variant="secondary" onClick={() => setShowScanModal(true)}>
           <Scan className="h-4 w-4 mr-2" />
           Scan Item
+        </Button>
+        <Button variant="secondary" onClick={() => setShowUseMaterialsModal(true)}>
+          <Wrench className="h-4 w-4 mr-2" />
+          Use Materials
         </Button>
         <Button variant="secondary" onClick={() => setShowReturnModal(true)}>
           <ArrowUpDown className="h-4 w-4 mr-2" />
@@ -406,7 +413,7 @@ export function EngineerVanStock() {
       <EngineerPurchaseOrders />
 
       {/* Modals */}
-      {vanLocation && (
+      {vanLocation && engineer && (
         <>
           <EngineerScanModal 
             open={showScanModal} 
@@ -419,6 +426,13 @@ export function EngineerVanStock() {
             onOpenChange={setShowReturnModal}
             vanLocationId={vanLocation.id}
             vanLocationName={vanLocation.name}
+            stockItems={stockItems?.filter(item => item.type === 'regular') || []}
+          />
+          <UseMaterialsModal
+            open={showUseMaterialsModal}
+            onOpenChange={setShowUseMaterialsModal}
+            engineerId={engineer.id}
+            vanLocationId={vanLocation.id}
             stockItems={stockItems?.filter(item => item.type === 'regular') || []}
           />
         </>
