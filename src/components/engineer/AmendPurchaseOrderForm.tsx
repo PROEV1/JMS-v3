@@ -45,7 +45,6 @@ export const AmendPurchaseOrderForm: React.FC<AmendPurchaseOrderFormProps> = ({
   const [amendmentReason, setAmendmentReason] = useState<string>('');
   const [showPreview, setShowPreview] = useState<boolean>(false);
   const [previewData, setPreviewData] = useState<any>(null);
-  const [amendmentMode, setAmendmentMode] = useState<'correct' | 'additional'>('correct');
   
   const { user } = useAuth();
   const amendPO = useAmendPurchaseOrder();
@@ -107,7 +106,7 @@ export const AmendPurchaseOrderForm: React.FC<AmendPurchaseOrderFormProps> = ({
         .select('id')
         .eq('engineer_id', engineerId)
         .eq('type', 'van')
-        .single();
+        .maybeSingle();
 
       if (locationError || !vanLocation) {
         console.error('No van location found for engineer:', engineerId);
@@ -186,13 +185,10 @@ export const AmendPurchaseOrderForm: React.FC<AmendPurchaseOrderFormProps> = ({
     return stockItem?.current_quantity || 0;
   };
 
-  // Helper function to calculate final quantities based on mode
+  // Helper function to calculate final quantities (always add to current stock)
   const calculateFinalQuantity = (item: AmendmentItem): number => {
-    if (amendmentMode === 'additional') {
-      const currentStock = getCurrentVanStock(item.item_id);
-      return currentStock + item.quantity;
-    }
-    return item.quantity;
+    const currentStock = getCurrentVanStock(item.item_id);
+    return currentStock + item.quantity;
   };
 
   console.log('AmendPurchaseOrderForm state:', { 
@@ -344,16 +340,13 @@ export const AmendPurchaseOrderForm: React.FC<AmendPurchaseOrderFormProps> = ({
         const itemsList = validItems.map(item => {
           const finalQty = calculateFinalQuantity(item);
           const currentStock = getCurrentVanStock(item.item_id);
-          const displayText = amendmentMode === 'additional' 
-            ? `- ${item.item_name}: +${item.quantity} (current: ${currentStock}, total will be: ${finalQty})`
-            : `- ${item.item_name}: ${finalQty}`;
-          return displayText + (item.notes ? ` (${item.notes})` : '');
+          return `- ${item.item_name}: +${item.quantity} (current: ${currentStock}, total will be: ${finalQty})${item.notes ? ` (${item.notes})` : ''}`;
         }).join('\n');
 
         const { error: notesError } = await supabase
           .from('stock_requests')
           .update({
-            notes: `AMENDMENT REQUEST (${amendmentMode === 'additional' ? 'Additional Stock' : 'Correct Request'}): ${amendmentReason}\n\nRequested items:\n${itemsList}\n\nOriginal notes: ${stockRequest?.notes || 'None'}`
+            notes: `AMENDMENT REQUEST (Additional Stock): ${amendmentReason}\n\nRequested items:\n${itemsList}\n\nOriginal notes: ${stockRequest?.notes || 'None'}`
           })
           .eq('id', stockRequestId);
 
@@ -393,48 +386,19 @@ export const AmendPurchaseOrderForm: React.FC<AmendPurchaseOrderFormProps> = ({
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-blue-800">
             <Package className="h-5 w-5" />
-            {purchaseOrder ? `Amend Purchase Order - ${purchaseOrder.po_number}` : 'Report Stock Issues'}
+            {purchaseOrder ? `Amend Purchase Order - ${purchaseOrder.po_number}` : 'Request Additional Stock'}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-blue-700">
-            {purchaseOrder 
-              ? 'This will update the existing purchase order with corrected quantities and any additional items needed.'
-              : 'Report discrepancies in the originally requested items or request additional items. This will create an amendment request for the office to process.'
-            }
-            The office will be notified of these changes.
+            Request additional stock to be added to your current van inventory. The quantities you specify will be added to what you currently have in your van.
           </p>
 
-          <div className="space-y-3">
-            <Label className="text-sm font-medium text-blue-800">Amendment Type</Label>
-            <RadioGroup 
-              value={amendmentMode} 
-              onValueChange={(value: 'correct' | 'additional') => setAmendmentMode(value)}
-              className="space-y-2"
-            >
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="correct" id="correct" />
-                <Label htmlFor="correct" className="text-sm cursor-pointer">
-                  Correct Original Request - Replace the originally requested quantities
-                </Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="additional" id="additional" />
-                <Label htmlFor="additional" className="text-sm cursor-pointer">
-                  Request Additional Stock - Add extra quantities to what I currently have
-                </Label>
-              </div>
-            </RadioGroup>
-            
-            <div className="flex items-start gap-2 p-3 bg-blue-100 rounded-lg">
-              <Info className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
-              <p className="text-xs text-blue-700">
-                {amendmentMode === 'additional' 
-                  ? 'You\'ll specify how many EXTRA items you need. The system will add these to your current van stock.'
-                  : 'You\'ll specify the TOTAL quantities that should have been in the original request. This replaces the original quantities.'
-                }
-              </p>
-            </div>
+          <div className="flex items-start gap-2 p-3 bg-blue-100 rounded-lg">
+            <Info className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+            <p className="text-xs text-blue-700">
+              The quantities you enter will be ADDED to your current van stock. For example, if you have 48 cables and request 12 more, you'll have 60 total.
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -498,16 +462,14 @@ export const AmendPurchaseOrderForm: React.FC<AmendPurchaseOrderFormProps> = ({
                   </div>
 
                   <div className="col-span-2">
-                    <Label>
-                      {amendmentMode === 'additional' ? 'Extra Qty' : 'Total Qty'}
-                    </Label>
+                    <Label>Additional Qty</Label>
                     <Input
                       type="number"
                       min="1"
                       value={item.quantity}
                       onChange={(e) => updateItem(item.id, 'quantity', parseInt(e.target.value) || 1)}
                     />
-                    {item.item_id && amendmentMode === 'additional' && (
+                    {item.item_id && (
                       <p className="text-xs text-green-600 mt-1">
                         Final total: {finalQuantity}
                       </p>
@@ -579,8 +541,8 @@ export const AmendPurchaseOrderForm: React.FC<AmendPurchaseOrderFormProps> = ({
             {amendPO.isPending 
               ? 'Submitting...' 
               : purchaseOrder 
-                ? 'Amend Purchase Order'
-                : 'Submit Amendment Request'
+                ? 'Request Additional Stock'
+                : 'Submit Additional Stock Request'
             }
           </Button>
         </div>
@@ -596,7 +558,7 @@ export const AmendPurchaseOrderForm: React.FC<AmendPurchaseOrderFormProps> = ({
             disabled={amendPO.isPending}
             className="bg-blue-600 hover:bg-blue-700"
           >
-            {amendPO.isPending ? 'Submitting...' : 'Confirm Amendment'}
+            {amendPO.isPending ? 'Submitting...' : 'Confirm Additional Stock Request'}
           </Button>
         </div>
       )}
