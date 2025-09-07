@@ -15,7 +15,7 @@ export function BucketsOverview() {
   const { counts: scheduleStatusCounts } = useScheduleStatusCounts();
 
   // Fetch orders for SchedulePipelineDashboard
-  const { data: orders = [], isLoading: ordersLoading } = useQuery({
+  const { data: orders = [], isLoading: ordersLoading, refetch: refetchOrders } = useQuery({
     queryKey: ['orders-for-pipeline'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -30,11 +30,13 @@ export function BucketsOverview() {
       if (error) throw error;
       console.log('BucketsOverview: Orders fetched for pipeline:', {
         totalCount: data?.length || 0,
-        dateOfferedCount: data?.filter(o => o.status_enhanced === 'date_offered').length || 0,
-        sampleStatuses: data?.slice(0, 5).map(o => ({ id: o.id, status: o.status_enhanced })) || []
+        needsSchedulingCount: data?.filter(o => o.status_enhanced === 'awaiting_install_booking').length || 0,
+        totalLimit: 'Set to 10000 to avoid 1000 row default limit'
       });
       return data || [];
-    }
+    },
+    staleTime: 0, // Always refetch
+    refetchOnMount: true,
   });
 
   if (loading || ordersLoading) {
@@ -53,7 +55,15 @@ export function BucketsOverview() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-semibold">Status Buckets Overview</h2>
+      <div className="flex justify-between items-center">
+        <h2 className="text-xl font-semibold">Status Buckets Overview</h2>
+        <button 
+          onClick={() => refetchOrders()} 
+          className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm hover:bg-primary/90"
+        >
+          Refresh Data
+        </button>
+      </div>
       
       {/* Jobs Pipeline - Use existing SchedulePipelineDashboard */}
       <div className="space-y-4">
