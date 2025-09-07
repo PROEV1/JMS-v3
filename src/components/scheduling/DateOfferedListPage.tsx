@@ -15,33 +15,51 @@ export function DateOfferedListPage() {
   const { data: ordersResponse = { data: [], count: 0 }, isLoading: ordersLoading } = useQuery({
     queryKey: ['orders', 'date-offered', pagination.page, pagination.pageSize],
     queryFn: async () => {
-      console.log('DateOfferedListPage: Querying for orders with active pending offers...');
+      console.log('DateOfferedListPage: Starting query for orders with pending offers...');
       
-      // SIMPLIFIED: Just query for orders with active pending offers directly
-      // This matches the navigation count logic exactly
-      const query = supabase
+      // STEP 1: Get order IDs with active pending offers
+      const { data: offerData, error: offerError } = await supabase
+        .from('job_offers')
+        .select('order_id')
+        .eq('status', 'pending')
+        .gt('expires_at', new Date().toISOString());
+
+      if (offerError) {
+        console.error('DateOfferedListPage: Error fetching offers:', offerError);
+        throw offerError;
+      }
+
+      console.log('DateOfferedListPage: Found pending offers for orders:', offerData?.length || 0);
+
+      if (!offerData || offerData.length === 0) {
+        console.log('DateOfferedListPage: No pending offers found');
+        return { data: [], count: 0 };
+      }
+
+      // STEP 2: Get orders for those IDs with pagination
+      const orderIds = offerData.map(o => o.order_id);
+      console.log('DateOfferedListPage: Querying orders for IDs:', orderIds.slice(0, 3), '...');
+
+      const { data: ordersData, error: ordersError, count } = await supabase
         .from('orders')
         .select(`
           *,
           client:client_id(full_name, email, phone, postcode, address),
           engineer:engineer_id(name, email, region),
-          partner:partner_id(name),
-          job_offers!inner(id, status, offered_date, expires_at, created_at)
+          partner:partner_id(name)
         `, { count: 'exact' })
-        .eq('job_offers.status', 'pending')
-        .gt('job_offers.expires_at', new Date().toISOString())
+        .in('id', orderIds)
         .is('scheduled_install_date', null)
         .range(pagination.offset, pagination.offset + pagination.pageSize - 1)
-        .order('job_offers.created_at', { ascending: false });
+        .order('created_at', { ascending: false });
 
-      const { data, error, count } = await query;
-      if (error) {
-        console.error('DateOfferedListPage query error:', error);
-        throw error;
+      if (ordersError) {
+        console.error('DateOfferedListPage: Error fetching orders:', ordersError);
+        throw ordersError;
       }
       
-      console.log('DateOfferedListPage: Found orders with pending offers:', data?.length || 0, 'Total count:', count);
-      return { data: data || [], count: count || 0 };
+      console.log('DateOfferedListPage: Final result - Orders:', ordersData?.length || 0, 'Total count:', count);
+      return { data: ordersData || [], count: count || 0 };
     },
     placeholderData: keepPreviousData,
   });
