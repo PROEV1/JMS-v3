@@ -279,8 +279,10 @@ export function ScheduleStatusListPage({
   };
 
   const handleSmartAssign = (order: Order) => {
+    console.log('🚀 Smart Assign clicked for order:', order.order_number, order.id);
     setSelectedOrder(order);
     setShowSmartAssign(true);
+    console.log('🚀 Smart Assignment Modal should now be open');
   };
 
   // Helper function to calculate time remaining until expiry (nearest hour)
@@ -726,6 +728,8 @@ export function ScheduleStatusListPage({
     try {
       if (action === 'send_offer') {
         // Send offer to client
+        console.log('🚀 Smart Assignment: Sending offer via edge function for order:', selectedOrder.order_number);
+        console.log('🚀 Smart Assignment: Engineer ID:', engineerId, 'Date:', date);
         const { data, error } = await supabase.functions.invoke('send-offer', {
           body: {
             order_id: selectedOrder.id,
