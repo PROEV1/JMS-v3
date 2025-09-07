@@ -425,12 +425,25 @@ export function ScheduleStatusListPage({
       console.log('Offer accepted successfully, refreshing data...');
       toast.success('Offer accepted - job moved to Ready to Book');
       
+      // Force a more aggressive refresh to ensure UI updates
+      console.log('🔄 Force refreshing all scheduling data after offer acceptance...');
+      await queryClient.invalidateQueries({ queryKey: ['orders'] });
+      await queryClient.invalidateQueries({ queryKey: ['job-offers'] });
+      await queryClient.refetchQueries({ queryKey: ['orders'] });
+      await queryClient.refetchQueries({ queryKey: ['job-offers'] });
+      
       // Use centralized refresh
       await refreshSchedulingData();
       if (onUpdate) onUpdate();
       
       // Dispatch refresh event to update status counts and other components
       window.dispatchEvent(new CustomEvent('scheduling:refresh'));
+      
+      // Force navigation refresh if we're in the date offered view
+      if (window.location.pathname.includes('date-offered')) {
+        console.log('🔄 Triggering page refresh for better UX...');
+        window.location.reload();
+      }
     } catch (error) {
       console.error('Failed to accept offer:', error);
       toast.error('Failed to accept offer');
