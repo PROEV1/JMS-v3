@@ -313,12 +313,12 @@ export const AmendPurchaseOrderForm: React.FC<AmendPurchaseOrderFormProps> = ({
 
     try {
       if (purchaseOrder) {
-        // Use the enhanced amendment hook
+        // Use the enhanced amendment hook - pass only the additional quantities, not the final total
         await amendPO.mutateAsync({
           purchaseOrderId: purchaseOrder.id,
           items: validItems.map(item => ({
             item_id: item.item_id,
-            quantity: calculateFinalQuantity(item),
+            quantity: item.quantity, // Only the additional quantity, not the final total
             notes: item.notes
           })),
           amendmentReason,
@@ -330,7 +330,7 @@ export const AmendPurchaseOrderForm: React.FC<AmendPurchaseOrderFormProps> = ({
           requestId: stockRequestId,
           lines: validItems.map(item => ({
             item_id: item.item_id,
-            qty: calculateFinalQuantity(item),
+            qty: calculateFinalQuantity(item), // For stock requests, we do want the final total
             notes: item.notes
           })),
           status: 'submitted' // Reset to submitted for review after amendment
