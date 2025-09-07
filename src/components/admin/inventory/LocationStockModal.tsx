@@ -109,11 +109,19 @@ export function LocationStockModal({ open, onOpenChange, location }: LocationSto
       console.log('✅ Stock adjustment success:', data);
       return data;
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       console.log('🔄 Refreshing stock data after successful adjustment');
-      // Only refresh this modal's data
-      refetchStock();
+      
+      // Small delay to ensure database consistency
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Invalidate multiple related query keys to ensure fresh data
+      queryClient.invalidateQueries({ queryKey: ['location-stock'] });
       queryClient.invalidateQueries({ queryKey: ['item-location-balances'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory-items'] });
+      
+      // Force refetch this specific query
+      await refetchStock();
     },
     onError: (error: any) => {
       console.error('💥 Stock adjustment failed:', error);
