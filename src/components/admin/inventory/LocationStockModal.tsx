@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Package, AlertTriangle, Plus, Minus, Trash2 } from "lucide-react";
@@ -28,6 +29,7 @@ interface StockItem {
 export function LocationStockModal({ open, onOpenChange, location }: LocationStockModalProps) {
   const [showItemPicker, setShowItemPicker] = useState(false);
   const [debounceMap, setDebounceMap] = useState<Record<string, NodeJS.Timeout>>({});
+  const [editingStock, setEditingStock] = useState<Record<string, string>>({});
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -186,6 +188,17 @@ export function LocationStockModal({ open, onOpenChange, location }: LocationSto
     refetchStock();
   }, [refetchStock]);
 
+  const handleDirectStockChange = useCallback((itemId: string, newStock: string, currentStock: number) => {
+    const newStockNum = parseInt(newStock);
+    if (isNaN(newStockNum) || newStockNum < 0) return;
+    
+    const adjustment = newStockNum - currentStock;
+    if (adjustment !== 0) {
+      const reason = adjustment > 0 ? 'Stock adjustment (increase)' : 'Stock adjustment (decrease)';
+      debouncedAdjustStock(itemId, adjustment, reason);
+    }
+  }, [debouncedAdjustStock]);
+
   if (!location) return null;
 
   // Calculate metrics
@@ -281,10 +294,33 @@ export function LocationStockModal({ open, onOpenChange, location }: LocationSto
                         </div>
                         
                         <div className="flex items-center gap-3">
-                          <div className="text-right">
-                            <p className="text-lg font-semibold">{item.current_stock}</p>
-                            <p className="text-sm text-muted-foreground">{item.unit}</p>
-                          </div>
+                           <div className="text-right">
+                             <Input
+                               type="number"
+                               value={editingStock[item.item_id] !== undefined ? editingStock[item.item_id] : item.current_stock.toString()}
+                               onChange={(e) => {
+                                 setEditingStock(prev => ({ ...prev, [item.item_id]: e.target.value }));
+                               }}
+                               onBlur={(e) => {
+                                 const newValue = e.target.value;
+                                 handleDirectStockChange(item.item_id, newValue, item.current_stock);
+                                 setEditingStock(prev => {
+                                   const updated = { ...prev };
+                                   delete updated[item.item_id];
+                                   return updated;
+                                 });
+                               }}
+                               onKeyPress={(e) => {
+                                 if (e.key === 'Enter') {
+                                   e.currentTarget.blur();
+                                 }
+                               }}
+                               className="w-20 text-lg font-semibold text-right"
+                               min="0"
+                               disabled={isPending}
+                             />
+                             <p className="text-sm text-muted-foreground mt-1">{item.unit}</p>
+                           </div>
                           
                           <div className="flex gap-1">
                             <Button 
