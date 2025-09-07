@@ -106,13 +106,21 @@ function StatusTile({ tile, orders, totalJobs, navigate, offerCounts, ordersWith
   let tileOrders: Order[] = [];
   
   if (tile.id === 'needs_scheduling') {
-    // Use exact same logic as ScheduleStatusNavigation
+    // Use exact same logic as NeedsSchedulingListPage
     tileOrders = orders.filter(order => 
       order.status_enhanced === 'awaiting_install_booking' && 
       !order.scheduling_suppressed &&
       !ordersWithOffers.has(order.id)
     );
     count = tileOrders.length;
+    console.log('SchedulePipelineDashboard: Needs Scheduling count debug:', {
+      totalOrders: orders.length,
+      awaitingInstallBooking: orders.filter(o => o.status_enhanced === 'awaiting_install_booking').length,
+      notSuppressed: orders.filter(o => o.status_enhanced === 'awaiting_install_booking' && !o.scheduling_suppressed).length,
+      withoutOffers: orders.filter(o => o.status_enhanced === 'awaiting_install_booking' && !o.scheduling_suppressed && !ordersWithOffers.has(o.id)).length,
+      ordersWithOffers: Array.from(ordersWithOffers),
+      finalCount: count
+    });
   } else if (tile.id === 'date_offered') {
     // Count orders with status_enhanced = 'date_offered' to match the list page
     tileOrders = orders.filter(order => order.status_enhanced === 'date_offered');
@@ -302,6 +310,12 @@ export function SchedulePipelineDashboard({ orders }: SchedulePipelineDashboardP
     !o.scheduling_suppressed &&
     !ordersWithOffers.has(o.id)
   ).length;
+  
+  console.log('SchedulePipelineDashboard: Summary stats debug:', {
+    totalJobs,
+    needsScheduling,
+    ordersWithOffers: Array.from(ordersWithOffers)
+  });
   const inProgress = orders.filter(o => 
     ['date_offered', 'date_accepted', 'scheduled', 'in_progress'].includes(o.status_enhanced)
   ).length;
