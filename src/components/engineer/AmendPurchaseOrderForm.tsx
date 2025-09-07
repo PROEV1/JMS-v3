@@ -11,7 +11,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { usePurchaseOrderForStockRequest, useAmendPurchaseOrder } from '@/hooks/usePurchaseOrderAmendment';
-import { useUpdateStockRequestLines } from '@/hooks/useStockRequests';
+import { useUpdateStockRequestLines, useCreateStockRequest } from '@/hooks/useStockRequests';
 import { AmendmentPreview } from './AmendmentPreview';
 import { formatCurrency, calculateLineTotal } from '@/lib/currency';
 
@@ -49,14 +49,17 @@ export const AmendPurchaseOrderForm: React.FC<AmendPurchaseOrderFormProps> = ({
   const { user } = useAuth();
   const amendPO = useAmendPurchaseOrder();
   const updateStockRequestLines = useUpdateStockRequestLines();
+  const createStockRequest = useCreateStockRequest();
   
   // Get the PO linked to this stock request
   const { data: purchaseOrder, isLoading: poLoading } = usePurchaseOrderForStockRequest(stockRequestId);
   
-  // Get the original stock request to show baseline items
+  // Get the original stock request to show baseline items (only if stockRequestId exists)
   const { data: stockRequest, isLoading: srLoading } = useQuery({
     queryKey: ['stock-request-for-amendment', stockRequestId],
     queryFn: async () => {
+      if (!stockRequestId) return null; // No existing request for new requests
+      
       console.log('Fetching stock request for amendment:', stockRequestId);
       const { data, error } = await supabase
         .from('stock_requests')
@@ -78,7 +81,7 @@ export const AmendPurchaseOrderForm: React.FC<AmendPurchaseOrderFormProps> = ({
       console.log('Stock request fetched:', data);
       return data;
     },
-    enabled: !!stockRequestId
+    enabled: !!stockRequestId // Only run if stockRequestId exists
   });
   
   // Get all inventory items for adding new items
@@ -163,7 +166,7 @@ export const AmendPurchaseOrderForm: React.FC<AmendPurchaseOrderFormProps> = ({
     enabled: !!engineerId
   });
 
-  // Pre-populate with original stock request items as baseline
+  // Pre-populate with original stock request items as baseline (only if stock request exists)
   useEffect(() => {
     if (stockRequest?.lines) {
       console.log('Setting up amendment items from stock request lines:', stockRequest.lines);
@@ -176,8 +179,11 @@ export const AmendPurchaseOrderForm: React.FC<AmendPurchaseOrderFormProps> = ({
         notes: line.notes || ''
       }));
       setAmendmentItems(items);
+    } else if (!stockRequestId) {
+      // For new requests, start with empty items
+      setAmendmentItems([]);
     }
-  }, [stockRequest]);
+  }, [stockRequest, stockRequestId]);
 
   // Helper function to get current van stock for an item
   const getCurrentVanStock = (itemId: string): number => {
@@ -324,8 +330,8 @@ export const AmendPurchaseOrderForm: React.FC<AmendPurchaseOrderFormProps> = ({
           amendmentReason,
           engineerId
         });
-      } else {
-        // For stock requests without PO, use the enhanced amendment hook that handles inventory transactions
+      } else if (stockRequestId) {
+        // For existing stock requests without PO, use the enhanced amendment hook
         await updateStockRequestLines.mutateAsync({
           requestId: stockRequestId,
           lines: validItems.map(item => ({
@@ -355,6 +361,32 @@ export const AmendPurchaseOrderForm: React.FC<AmendPurchaseOrderFormProps> = ({
         }
 
         console.log('Amendment request created successfully');
+      } else {
+        // For new stock requests, create a completely new request
+        const { data: vanLocation } = await supabase
+          .from('inventory_locations')
+          .select('id')
+          .eq('engineer_id', engineerId)
+          .eq('type', 'van')
+          .single();
+
+        if (!vanLocation) {
+          throw new Error('Van location not found for engineer');
+        }
+
+        await createStockRequest.mutateAsync({
+          engineer_id: engineerId,
+          destination_location_id: vanLocation.id,
+          priority: 'medium',
+          notes: `STOCK ISSUE REPORT: ${amendmentReason}\n\nRequested items:\n${validItems.map(item => `- ${item.item_name}: ${item.quantity}${item.notes ? ` (${item.notes})` : ''}`).join('\n')}`,
+          lines: validItems.map(item => ({
+            item_id: item.item_id,
+            qty: item.quantity,
+            notes: item.notes
+          }))
+        });
+
+        console.log('New stock request created successfully');
       }
 
       onClose();
@@ -367,7 +399,7 @@ export const AmendPurchaseOrderForm: React.FC<AmendPurchaseOrderFormProps> = ({
     return <div className="p-4">Loading...</div>;
   }
 
-  if (!stockRequest) {
+  if (stockRequestId && !stockRequest) {
     return (
       <Card className="border-red-200 bg-red-50">
         <CardContent className="p-6">
@@ -386,12 +418,20 @@ export const AmendPurchaseOrderForm: React.FC<AmendPurchaseOrderFormProps> = ({
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-blue-800">
             <Package className="h-5 w-5" />
-            {purchaseOrder ? `Amend Purchase Order - ${purchaseOrder.po_number}` : 'Request Additional Stock'}
+            {purchaseOrder 
+              ? `Amend Purchase Order - ${purchaseOrder.po_number}` 
+              : stockRequestId 
+                ? 'Request Additional Stock' 
+                : 'Report Stock Issue / Request Additional Stock'
+            }
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-blue-700">
-            Request additional stock to be added to your current van inventory. The quantities you specify will be added to what you currently have in your van.
+            {stockRequestId 
+              ? 'Request additional stock to be added to your current van inventory. The quantities you specify will be added to what you currently have in your van.'
+              : 'Report a stock issue or request additional stock for your van. You can add multiple items to your request.'
+            }
           </p>
 
           <div className="flex items-start gap-2 p-3 bg-blue-100 rounded-lg">
@@ -535,14 +575,16 @@ export const AmendPurchaseOrderForm: React.FC<AmendPurchaseOrderFormProps> = ({
           )}
           <Button 
             onClick={handleSubmit}
-            disabled={amendPO.isPending || !amendmentReason.trim() || amendmentItems.length === 0}
+            disabled={amendPO.isPending || updateStockRequestLines.isPending || createStockRequest.isPending || !amendmentReason.trim() || amendmentItems.length === 0}
             className="bg-blue-600 hover:bg-blue-700"
           >
-            {amendPO.isPending 
+            {(amendPO.isPending || updateStockRequestLines.isPending || createStockRequest.isPending)
               ? 'Submitting...' 
               : purchaseOrder 
                 ? 'Request Additional Stock'
-                : 'Submit Additional Stock Request'
+                : stockRequestId
+                  ? 'Submit Additional Stock Request'
+                  : 'Submit Stock Issue Report'
             }
           </Button>
         </div>

@@ -26,17 +26,14 @@ export const IncorrectStockForm: React.FC<IncorrectStockFormProps> = ({
     return <div className="p-4">Checking for existing purchase order...</div>;
   }
 
-  // If there's no stock request ID, show error
+  // If there's no stock request ID, show form for creating new request
   if (!stockRequestId) {
     return (
-      <Card className="border-red-200 bg-red-50">
-        <CardContent className="p-6">
-          <div className="flex items-center gap-2 text-red-800">
-            <AlertTriangle className="h-5 w-5" />
-            <span>Cannot report stock issues without a stock request reference.</span>
-          </div>
-        </CardContent>
-      </Card>
+      <AmendPurchaseOrderForm
+        engineerId={engineerId}
+        stockRequestId=""  // Empty string indicates new request
+        onClose={onClose}
+      />
     );
   }
 
