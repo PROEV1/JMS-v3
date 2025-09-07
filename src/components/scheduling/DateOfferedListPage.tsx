@@ -15,61 +15,53 @@ export function DateOfferedListPage() {
   const { data: ordersResponse = { data: [], count: 0 }, isLoading: ordersLoading } = useQuery({
     queryKey: ['orders', 'date-offered', pagination.page, pagination.pageSize],
     queryFn: async () => {
-      // Try status-based first, then fallback to offers-based
-      const [statusBased, offersBased] = await Promise.all([
-        supabase
-          .from('orders')
-          .select(`
-            *,
-            client:client_id(full_name, email, phone, postcode, address),
-            engineer:engineer_id(name, email, region),
-            partner:partner_id(name)
-          `, { count: 'exact' })
-          .eq('status_enhanced', 'date_offered')
-          .eq('scheduling_suppressed', false)
-          .is('scheduled_install_date', null)
-          .order('created_at', { ascending: false }),
-        
-        supabase
-          .from('orders')
-          .select(`
-            *,
-            client:client_id(full_name, email, phone, postcode, address),
-            engineer:engineer_id(name, email, region),
-            partner:partner_id(name),
-            job_offers!inner(id, status, offered_date, expires_at)
-          `)
-          .eq('job_offers.status', 'pending')
-          .gt('job_offers.expires_at', new Date().toISOString())
-          .is('scheduled_install_date', null)
-          .order('created_at', { ascending: false })
-      ]);
+      // OPTIMIZED: Single query with fallback logic
+      // First check if we have any orders with status_enhanced = 'date_offered'
+      const statusBasedQuery = supabase
+        .from('orders')
+        .select(`
+          *,
+          client:client_id(full_name, email, phone, postcode, address),
+          engineer:engineer_id(name, email, region),
+          partner:partner_id(name)
+        `, { count: 'exact' })
+        .eq('status_enhanced', 'date_offered')
+        .eq('scheduling_suppressed', false)
+        .is('scheduled_install_date', null)
+        .range(pagination.offset, pagination.offset + pagination.pageSize - 1)
+        .order('created_at', { ascending: false });
 
-      if (statusBased.error) throw statusBased.error;
-      if (offersBased.error) throw offersBased.error;
-      
-      // Combine and deduplicate results
-      const statusOrders = statusBased.data || [];
-      const offersOrders = offersBased.data || [];
-      const allOrders = [...statusOrders, ...offersOrders];
-      const uniqueOrders = allOrders.filter((order, index, self) => 
-        index === self.findIndex(o => o.id === order.id)
-      );
+      const statusResult = await statusBasedQuery;
+      if (statusResult.error) throw statusResult.error;
 
-      // Apply pagination to combined results
-      const paginatedOrders = uniqueOrders.slice(
-        pagination.offset, 
-        pagination.offset + pagination.pageSize
-      );
+      // If we have results from status, use them
+      if (statusResult.data && statusResult.data.length > 0) {
+        console.log('DateOfferedListPage: Using status-based results:', statusResult.data.length);
+        return { data: statusResult.data, count: statusResult.count || 0 };
+      }
+
+      // Fallback: If no status-based results, query by active pending offers
+      console.log('DateOfferedListPage: No status-based results, falling back to offers-based query');
+      const offersBasedQuery = supabase
+        .from('orders')
+        .select(`
+          *,
+          client:client_id(full_name, email, phone, postcode, address),
+          engineer:engineer_id(name, email, region),
+          partner:partner_id(name),
+          job_offers!inner(id, status, offered_date, expires_at)
+        `, { count: 'exact' })
+        .eq('job_offers.status', 'pending')
+        .gt('job_offers.expires_at', new Date().toISOString())
+        .is('scheduled_install_date', null)
+        .range(pagination.offset, pagination.offset + pagination.pageSize - 1)
+        .order('created_at', { ascending: false });
+
+      const offersResult = await offersBasedQuery;
+      if (offersResult.error) throw offersResult.error;
       
-      console.log('DateOfferedListPage query result:', { 
-        statusCount: statusOrders.length,
-        offersCount: offersOrders.length,
-        uniqueCount: uniqueOrders.length,
-        paginatedCount: paginatedOrders.length
-      });
-      
-      return { data: paginatedOrders, count: uniqueOrders.length };
+      console.log('DateOfferedListPage: Using offers-based results:', offersResult.data?.length || 0);
+      return { data: offersResult.data || [], count: offersResult.count || 0 };
     },
     placeholderData: keepPreviousData,
   });
@@ -82,13 +74,14 @@ export function DateOfferedListPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('engineers')
-        .select('*')
+        .select('id, name, email, availability') // Include availability for type compatibility
         .eq('availability', true)
         .order('name');
 
       if (error) throw error;
       return data || [];
-    }
+    },
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
 
   if (ordersLoading || engineersLoading) {
@@ -124,7 +117,8 @@ export function DateOfferedListPage() {
             onPageChange={controls.setPage}
             onPageSizeChange={controls.setPageSize}
             exportQueryBuilder={async () => {
-              const { data, error } = await supabase
+              // For export, use the same optimized logic but without pagination
+              const statusResult = await supabase
                 .from('orders')
                 .select(`
                   *,
@@ -138,8 +132,30 @@ export function DateOfferedListPage() {
                 .is('scheduled_install_date', null)
                 .order('created_at', { ascending: false });
               
-              if (error) throw error;
-              return data || [];
+              if (statusResult.error) throw statusResult.error;
+              
+              // If no status-based results, fallback to offers-based
+              if (!statusResult.data || statusResult.data.length === 0) {
+                const offersResult = await supabase
+                  .from('orders')
+                  .select(`
+                    *,
+                    client:client_id(full_name, email, phone, postcode, address),
+                    engineer:engineer_id(name, email, region),
+                    partner:partner_id(name),
+                    quote:quote_id(quote_number),
+                    job_offers!inner(id, status, offered_date, expires_at)
+                  `)
+                  .eq('job_offers.status', 'pending')
+                  .gt('job_offers.expires_at', new Date().toISOString())
+                  .is('scheduled_install_date', null)
+                  .order('created_at', { ascending: false });
+                
+                if (offersResult.error) throw offersResult.error;
+                return offersResult.data || [];
+              }
+              
+              return statusResult.data || [];
             }}
           />
         </CardContent>
