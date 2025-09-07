@@ -24,7 +24,8 @@ export function BucketsOverview() {
           *,
           client:clients(full_name, email, postcode),
           engineer:engineers(name, email)
-        `);
+        `)
+        .limit(10000); // Ensure we get all orders, not just 1000
       
       if (error) throw error;
       console.log('BucketsOverview: Orders fetched for pipeline:', {
