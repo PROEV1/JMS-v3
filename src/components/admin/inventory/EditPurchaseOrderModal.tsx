@@ -82,11 +82,18 @@ export function EditPurchaseOrderModal({ open, onOpenChange, purchaseOrderId }: 
           *,
           engineers!purchase_orders_engineer_id_fkey(id, name, email),
           purchase_order_lines(
-            id, item_name, quantity, unit_cost, line_total, received_quantity
+            id, 
+            item_name, 
+            quantity, 
+            unit_cost, 
+            line_total, 
+            received_quantity,
+            item_id,
+            inventory_items(name, sku)
           )
         `)
         .eq('id', purchaseOrderId)
-        .single();
+        .maybeSingle();
         
       if (error) throw error;
       return data;
@@ -104,7 +111,7 @@ export function EditPurchaseOrderModal({ open, onOpenChange, purchaseOrderId }: 
       
       const items = purchaseOrder.purchase_order_lines?.map((line: any) => ({
         id: line.id,
-        item_name: line.item_name,
+        item_name: line.inventory_items?.name || line.item_name || '',
         quantity: line.quantity,
         unit_cost: line.unit_cost,
         line_total: line.line_total,
@@ -200,6 +207,15 @@ export function EditPurchaseOrderModal({ open, onOpenChange, purchaseOrderId }: 
     setIsSubmitting(true);
 
     try {
+      console.log('Updating purchase order with data:', {
+        supplierId,
+        expectedDelivery,
+        notes,
+        status,
+        totalAmount,
+        poItems
+      });
+
       // Update the purchase order
       const { error: poError } = await supabase
         .from('purchase_orders')
@@ -212,14 +228,21 @@ export function EditPurchaseOrderModal({ open, onOpenChange, purchaseOrderId }: 
         })
         .eq('id', purchaseOrderId);
 
-      if (poError) throw poError;
+      if (poError) {
+        console.error('Purchase order update error:', poError);
+        throw poError;
+      }
 
       // Handle purchase order lines updates
       const existingItems = poItems.filter(item => !item.id.startsWith('new-'));
       const newItems = poItems.filter(item => item.id.startsWith('new-'));
 
+      console.log('Existing items to update:', existingItems);
+      console.log('New items to insert:', newItems);
+
       // Update existing items
       for (const item of existingItems) {
+        console.log('Updating item:', item.id, item);
         const { error } = await supabase
           .from('purchase_order_lines')
           .update({
@@ -229,7 +252,10 @@ export function EditPurchaseOrderModal({ open, onOpenChange, purchaseOrderId }: 
           })
           .eq('id', item.id);
           
-        if (error) throw error;
+        if (error) {
+          console.error('Item update error:', error);
+          throw error;
+        }
       }
 
       // Insert new items
