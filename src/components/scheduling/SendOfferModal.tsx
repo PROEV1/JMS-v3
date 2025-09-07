@@ -11,6 +11,7 @@ import { CalendarDays, Clock, User, Mail, MessageSquare, Send, CheckCircle, Aler
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useSchedulingRefresh } from '@/hooks/useSchedulingRefresh';
 import { Order, getOrderEstimatedHours } from '@/utils/schedulingUtils';
 import { getBestPostcode } from '@/utils/postcodeUtils';
 import { format, addDays, startOfDay, isBefore } from 'date-fns';
@@ -41,6 +42,7 @@ export function SendOfferModal({
   onOfferSent
 }: SendOfferModalProps) {
   const queryClient = useQueryClient();
+  const { refreshSchedulingData } = useSchedulingRefresh();
   const [selectedEngineerId, setSelectedEngineerId] = useState(preselectedEngineerId || '');
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(preselectedDate);
   const [timeWindow, setTimeWindow] = useState('AM (9:00 - 12:00)');
@@ -123,6 +125,21 @@ export function SendOfferModal({
     }
 
     setSending(true);
+    
+    // OPTIMISTIC UPDATE: Immediately update the order status to date_offered
+    console.log('🚀 Starting optimistic UI update for offer creation...');
+    queryClient.setQueryData(['orders', 'needs-scheduling'], (oldData: any) => {
+      if (!oldData?.data) return oldData;
+      return {
+        ...oldData,
+        data: oldData.data.map((ord: any) => 
+          ord.id === order.id 
+            ? { ...ord, status_enhanced: 'date_offered' }
+            : ord
+        )
+      };
+    });
+    
     try {
       const { data, error } = await supabase.functions.invoke('send-offer', {
         body: {
@@ -154,21 +171,34 @@ export function SendOfferModal({
          description: 'Installation offer sent successfully!',
        });
        
-       // Invalidate all order-related queries to refresh the UI
-       await queryClient.invalidateQueries({ queryKey: ['orders'] });
-       await queryClient.invalidateQueries({ queryKey: ['schedule-counts'] });
+       console.log('✅ Offer sent successfully, refreshing all scheduling data...');
+       
+       // Use centralized refresh instead of manual invalidation
+       await refreshSchedulingData();
        
        onOfferSent?.();
-       // Trigger refresh for status tiles
+       // Trigger refresh for other components
        window.dispatchEvent(new CustomEvent('scheduling:refresh'));
        
-       // Close modal after a short delay to ensure refresh completes
-       setTimeout(() => {
-         handleClose();
-       }, 300);
+       // Close modal immediately since optimistic update already happened
+       handleClose();
 
     } catch (err: any) {
       console.error('Error sending offer:', err);
+      
+      // REVERT OPTIMISTIC UPDATE on error
+      console.log('❌ Offer creation failed, reverting optimistic update...');
+      queryClient.setQueryData(['orders', 'needs-scheduling'], (oldData: any) => {
+        if (!oldData?.data) return oldData;
+        return {
+          ...oldData,
+          data: oldData.data.map((ord: any) => 
+            ord.id === order.id 
+              ? { ...ord, status_enhanced: 'awaiting_install_booking' }
+              : ord
+          )
+        };
+      });
       
       // Handle specific error types
       const errorMessage = err.message || 'Failed to send offer';

@@ -11,10 +11,12 @@ import { useServerPagination } from '@/hooks/useServerPagination';
 import { keepPreviousData } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { useDebounce } from '@/hooks/useDebounce';
+import { useSchedulingRefresh } from '@/hooks/useSchedulingRefresh';
 
 export function NeedsSchedulingListPage() {
   console.log('NeedsSchedulingListPage: Starting component render');
   const queryClient = useQueryClient();
+  const { refreshSchedulingData, debouncedRefresh } = useSchedulingRefresh();
   const { pagination, controls } = useServerPagination();
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState('');
@@ -22,20 +24,13 @@ export function NeedsSchedulingListPage() {
   
   // Always include assigned engineers - no toggle needed
 
-  // Build search query with enhanced search across related tables
+  // Build search query - FIXED: No longer exclude based on offers, rely on status_enhanced
   const buildSearchQuery = useMemo(() => {
     return async (withPagination = true, withCount = true) => {
       console.log('NeedsSchedulingListPage: Building search query...');
       
-      // First get all offers to exclude orders with them (both pending and accepted)
-      const { data: offersToExclude } = await supabase
-        .from('job_offers')
-        .select('order_id')
-        .in('status', ['pending', 'accepted']);
-
-      const excludedOrderIds = offersToExclude?.map(offer => offer.order_id) || [];
-
-      // Base query for orders that need scheduling (excluding those with active offers)
+      // CRITICAL FIX: Only filter by status_enhanced, not by excluding offers
+      // The database triggers handle status calculation including offer states
       let query = supabase
         .from('orders')
         .select(`
@@ -48,14 +43,6 @@ export function NeedsSchedulingListPage() {
         .eq('status_enhanced', 'awaiting_install_booking')
         .eq('scheduling_suppressed', false)
         .order('created_at', { ascending: false });
-
-      // Exclude orders with offers (both pending and accepted)
-      if (excludedOrderIds.length > 0) {
-        const safeIds = buildSafeUuidInClause(excludedOrderIds);
-        if (safeIds) {
-          query = query.not('id', 'in', `(${safeIds})`);
-        }
-      }
 
       // Apply search filter across all relevant tables
       if (debouncedSearchTerm) {
@@ -161,17 +148,17 @@ export function NeedsSchedulingListPage() {
     }
   });
 
-  // Listen for scheduling refresh events and real-time updates
+  // FIXED: Centralized refresh system with debouncing
   useEffect(() => {
     const handleRefresh = () => {
-      console.log('NeedsSchedulingListPage: Received refresh event, refetching data...');
-      refetchOrders();
+      console.log('NeedsSchedulingListPage: Received refresh event, using centralized refresh...');
+      debouncedRefresh();
     };
     
     // Listen for custom refresh events
     window.addEventListener('scheduling:refresh', handleRefresh);
     
-    // Set up real-time subscriptions for orders and job_offers
+    // Set up real-time subscriptions with debounced refresh
     const ordersChannel = supabase
       .channel('needs-scheduling-orders')
       .on(
@@ -183,7 +170,7 @@ export function NeedsSchedulingListPage() {
         },
         (payload) => {
           console.log('NeedsSchedulingListPage: Orders real-time update:', payload);
-          refetchOrders();
+          debouncedRefresh();
         }
       )
       .on(
@@ -195,7 +182,7 @@ export function NeedsSchedulingListPage() {
         },
         (payload) => {
           console.log('NeedsSchedulingListPage: Job offers real-time update:', payload);
-          refetchOrders();
+          debouncedRefresh();
         }
       )
       .subscribe();
@@ -204,7 +191,7 @@ export function NeedsSchedulingListPage() {
       window.removeEventListener('scheduling:refresh', handleRefresh);
       supabase.removeChannel(ordersChannel);
     };
-  }, [refetchOrders]);
+  }, [debouncedRefresh]);
 
   console.log('NeedsSchedulingListPage - Orders count:', orders?.length, 'Engineers count:', engineers?.length);
   
@@ -277,8 +264,8 @@ export function NeedsSchedulingListPage() {
             searchTerm={searchTerm}
             onSearchChange={setSearchTerm}
             onUpdate={() => {
-              console.log('NeedsSchedulingListPage: Manual update requested, refetching...');
-              refetchOrders();
+              console.log('NeedsSchedulingListPage: Manual update requested, using centralized refresh...');
+              refreshSchedulingData();
             }}
             exportQueryBuilder={async () => {
               const result = await buildSearchQuery(false, false);

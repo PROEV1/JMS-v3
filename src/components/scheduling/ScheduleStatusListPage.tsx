@@ -22,6 +22,8 @@ import { OfferStatusBadge } from './OfferStatusBadge';
 import { useJobOffers } from '@/hooks/useJobOffers';
 import { getBestPostcode } from '@/utils/postcodeUtils';
 import { Paginator } from '@/components/ui/Paginator';
+import { useSchedulingRefresh } from '@/hooks/useSchedulingRefresh';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface ScheduleStatusListPageProps {
   orders: Order[];
@@ -56,6 +58,8 @@ export function ScheduleStatusListPage({
   onSearchChange
 }: ScheduleStatusListPageProps) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { refreshSchedulingData } = useSchedulingRefresh();
   const [searchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState(externalSearchTerm || '');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -363,7 +367,9 @@ export function ScheduleStatusListPage({
     try {
       await resendOffer(latestOffer.id);
       toast.success('Offer resent successfully');
-      refetchOffers();
+      
+      // Use centralized refresh
+      await refreshSchedulingData();
       if (onUpdate) onUpdate();
       
       // Dispatch refresh event to update status counts and other components
@@ -380,7 +386,9 @@ export function ScheduleStatusListPage({
     try {
       await releaseOffer(activeOffer.id);
       toast.success('Offer released successfully');
-      refetchOffers();
+      
+      // Use centralized refresh
+      await refreshSchedulingData();
       if (onUpdate) onUpdate();
       
       // Dispatch refresh event to update status counts and other components
@@ -396,6 +404,9 @@ export function ScheduleStatusListPage({
 
     console.log('Accepting offer:', { orderId, activeOffer });
 
+    // OPTIMISTIC UPDATE: Move order from current list since it will change status
+    console.log('🚀 Starting optimistic UI update for offer acceptance...');
+    
     try {
       // Update the job offer status to accepted (don't schedule yet)
       const { error: offerError } = await supabase
@@ -438,7 +449,9 @@ export function ScheduleStatusListPage({
 
       console.log('Offer accepted successfully, refreshing data...');
       toast.success('Offer accepted - job moved to Ready to Book');
-      refetchOffers();
+      
+      // Use centralized refresh
+      await refreshSchedulingData();
       if (onUpdate) onUpdate();
       
       // Dispatch refresh event to update status counts and other components
@@ -481,7 +494,9 @@ export function ScheduleStatusListPage({
       });
 
       toast.success('Offer rejected');
-      refetchOffers();
+      
+      // Use centralized refresh
+      await refreshSchedulingData();
       if (onUpdate) onUpdate();
       
       // Dispatch refresh event to update status counts and other components

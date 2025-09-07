@@ -182,34 +182,12 @@ export function ScheduleStatusNavigation({ currentStatus }: ScheduleStatusNaviga
             .eq('status_enhanced', 'cancelled')
         ]);
 
-        // For needs-scheduling, use EXACT same logic as useScheduleStatusCounts
-        let needsSchedulingCount = 0;
-        
-        // Get offers to exclude (both pending and accepted)
-        const { data: offersToExclude } = await supabase
-          .from('job_offers')
-          .select('order_id')
-          .in('status', ['pending', 'accepted']);
-
-        const excludedOrderIds = offersToExclude?.map(offer => offer.order_id) || [];
-
-        // Count ALL orders that need scheduling (regardless of engineer assignment)
-        let query = supabase
+        // FIXED: No longer exclude based on offers, rely on status_enhanced
+        const { count: needsSchedulingCount } = await supabase
           .from('orders')
           .select('*', { count: 'exact', head: true })
           .eq('status_enhanced', 'awaiting_install_booking')
           .eq('scheduling_suppressed', false);
-
-        // Exclude orders with offers (both pending and accepted)
-        if (excludedOrderIds.length > 0) {
-          const safeIds = buildSafeUuidInClause(excludedOrderIds);
-          if (safeIds) {
-            query = query.not('id', 'in', `(${safeIds})`);
-          }
-        }
-
-        const { count } = await query;
-        needsSchedulingCount = count || 0;
 
         // For ready-to-book, use EXACT same logic as useScheduleStatusCounts
         let readyToBookCount = 0;
@@ -257,7 +235,7 @@ export function ScheduleStatusNavigation({ currentStatus }: ScheduleStatusNaviga
           .eq('status', 'expired');
 
         setCounts({
-          'needs-scheduling': needsSchedulingCount,
+          'needs-scheduling': needsSchedulingCount || 0,
           'date-offered': dateOfferedResult.count || 0,
           'ready-to-book': readyToBookCount,
           'date-rejected': dateRejectedCount,
