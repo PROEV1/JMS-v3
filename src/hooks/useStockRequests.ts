@@ -129,6 +129,47 @@ export const useUpdateStockRequestStatus = () => {
         throw error;
       }
 
+      // If status is 'received', create inventory transactions to add stock to the engineer's van
+      if (status === 'received') {
+        console.log('Status changed to received - creating inventory transactions for request:', id);
+        
+        // Get the stock request lines to know what items and quantities to add
+        const { data: requestLines, error: linesError } = await supabase
+          .from('stock_request_lines')
+          .select('item_id, qty')
+          .eq('request_id', id);
+
+        if (linesError) {
+          console.error('Failed to fetch stock request lines:', linesError);
+          throw linesError;
+        }
+
+        if (requestLines && requestLines.length > 0) {
+          // Create inventory transactions for each item
+          const transactions = requestLines.map(line => ({
+            item_id: line.item_id,
+            location_id: data.destination_location_id,
+            qty: line.qty,
+            direction: 'in',
+            status: 'approved',
+            notes: `Stock received from request #${id.slice(0, 8)}`,
+            reference: `Stock Request: ${id}`,
+            approved_at: new Date().toISOString()
+          }));
+
+          const { error: txnError } = await supabase
+            .from('inventory_txns')
+            .insert(transactions);
+
+          if (txnError) {
+            console.error('Failed to create inventory transactions:', txnError);
+            throw txnError;
+          }
+
+          console.log('Successfully created inventory transactions for received stock');
+        }
+      }
+
       // If the status is being changed to 'cancelled', also void any associated purchase order
       if (status === 'cancelled' && data.purchase_order_id) {
         console.log('Cancelling associated purchase order:', data.purchase_order_id);
@@ -158,9 +199,15 @@ export const useUpdateStockRequestStatus = () => {
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['stock-requests'] });
       queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
+      // Invalidate inventory queries to refresh stock counts
+      queryClient.invalidateQueries({ queryKey: ['engineer-inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['van-stock'] });
+      queryClient.invalidateQueries({ queryKey: ['van-stock-metrics'] });
       
       if (variables.status === 'cancelled' && data?.purchase_order_id) {
         showSuccessToast('Stock request cancelled and associated purchase order voided');
+      } else if (variables.status === 'received') {
+        showSuccessToast('Stock received and added to van inventory');
       } else {
         showSuccessToast('Request status updated');
       }
