@@ -104,11 +104,15 @@ export default function ClientOfferViewPublic() {
     
     setResponding(true);
     try {
+      console.log('Accepting offer with token:', token);
+      
       const url = buildFunctionUrl('offer-respond');
       const response = await apiClient.post(url, {
         token,
         response: 'accept'
       }, { timeoutMs: 15000 } as any);
+
+      console.log('Accept response:', response);
 
       if (!response.ok || response.error) {
         throw new Error(response.error || 'Failed to accept offer');
