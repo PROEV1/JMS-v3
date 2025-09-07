@@ -43,9 +43,6 @@ export function BucketsOverview() {
         <div className="mb-6">
           <h2 className="text-2xl font-bold mb-4">Scheduling Pipeline</h2>
           <div className="flex flex-wrap gap-3">
-            <Badge variant="outline" className="px-3 py-1">
-              Total Jobs (Loading...)
-            </Badge>
             <Badge variant="secondary" className="px-3 py-1">
               {scheduleStatusCounts.needsScheduling} Need Scheduling
             </Badge>
