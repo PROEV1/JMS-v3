@@ -96,7 +96,7 @@ export function LocationStockModal({ open, onOpenChange, location }: LocationSto
           qty: adjustment,
           reference: `Stock adjustment: ${reason}`,
           notes: `${reason} via location stock modal`,
-          status: 'pending' // Change to pending instead of approved
+          status: 'approved' // Auto-approve admin stock adjustments
         })
         .select()
         .single();
