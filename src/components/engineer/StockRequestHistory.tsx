@@ -118,14 +118,6 @@ export const StockRequestHistory: React.FC<StockRequestHistoryProps> = ({ engine
                       {request.lines.length} item{request.lines.length !== 1 ? 's' : ''}
                     </span>
                     <MarkReceivedButton request={request} />
-                    <IncorrectStockButton 
-                      engineerId={engineerId} 
-                      stockRequestId={request.id}
-                      size="sm"
-                      variant="outline"
-                    >
-                      Report Issue
-                    </IncorrectStockButton>
                   </div>
                 </div>
               </CardHeader>

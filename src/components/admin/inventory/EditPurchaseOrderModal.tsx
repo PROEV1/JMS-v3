@@ -225,8 +225,7 @@ export function EditPurchaseOrderModal({ open, onOpenChange, purchaseOrderId }: 
           .update({
             item_name: item.item_name,
             quantity: item.quantity,
-            unit_cost: item.unit_cost,
-            line_total: item.line_total
+            unit_cost: item.unit_cost
           })
           .eq('id', item.id);
           
@@ -243,7 +242,6 @@ export function EditPurchaseOrderModal({ open, onOpenChange, purchaseOrderId }: 
             item_name: item.item_name,
             quantity: item.quantity,
             unit_cost: item.unit_cost,
-            line_total: item.line_total,
             received_quantity: 0
           })));
           
