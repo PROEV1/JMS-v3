@@ -25,9 +25,12 @@ export function BucketsOverview() {
           client:clients(full_name, email, postcode),
           engineer:engineers(name, email)
         `)
-        .limit(10000); // Ensure we get all orders, not just 1000
+        .limit(50000); // Much higher limit to ensure we get all orders
       
-      if (error) throw error;
+      if (error) {
+        console.error('BucketsOverview: Error fetching orders:', error);
+        throw error;
+      }
       console.log('BucketsOverview: Orders fetched for pipeline:', {
         totalCount: data?.length || 0,
         needsSchedulingCount: data?.filter(o => o.status_enhanced === 'awaiting_install_booking').length || 0,
