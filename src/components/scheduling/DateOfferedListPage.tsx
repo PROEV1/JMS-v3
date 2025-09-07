@@ -15,27 +15,61 @@ export function DateOfferedListPage() {
   const { data: ordersResponse = { data: [], count: 0 }, isLoading: ordersLoading } = useQuery({
     queryKey: ['orders', 'date-offered', pagination.page, pagination.pageSize],
     queryFn: async () => {
-      let query = supabase
-        .from('orders')
-        .select(`
-          *,
-          client:client_id(full_name, email, phone, postcode, address),
-          engineer:engineer_id(name, email, region),
-          partner:partner_id(name)
-        `, { count: 'exact' })
-        .eq('status_enhanced', 'date_offered')
-        .eq('scheduling_suppressed', false)
-        .is('scheduled_install_date', null) // Extra safeguard to ensure not scheduled
-        .order('created_at', { ascending: false });
+      // Try status-based first, then fallback to offers-based
+      const [statusBased, offersBased] = await Promise.all([
+        supabase
+          .from('orders')
+          .select(`
+            *,
+            client:client_id(full_name, email, phone, postcode, address),
+            engineer:engineer_id(name, email, region),
+            partner:partner_id(name)
+          `, { count: 'exact' })
+          .eq('status_enhanced', 'date_offered')
+          .eq('scheduling_suppressed', false)
+          .is('scheduled_install_date', null)
+          .order('created_at', { ascending: false }),
+        
+        supabase
+          .from('orders')
+          .select(`
+            *,
+            client:client_id(full_name, email, phone, postcode, address),
+            engineer:engineer_id(name, email, region),
+            partner:partner_id(name),
+            job_offers!inner(id, status, offered_date, expires_at)
+          `)
+          .eq('job_offers.status', 'pending')
+          .gt('job_offers.expires_at', new Date().toISOString())
+          .is('scheduled_install_date', null)
+          .order('created_at', { ascending: false })
+      ]);
 
-      query = query.range(pagination.offset, pagination.offset + pagination.pageSize - 1);
+      if (statusBased.error) throw statusBased.error;
+      if (offersBased.error) throw offersBased.error;
+      
+      // Combine and deduplicate results
+      const statusOrders = statusBased.data || [];
+      const offersOrders = offersBased.data || [];
+      const allOrders = [...statusOrders, ...offersOrders];
+      const uniqueOrders = allOrders.filter((order, index, self) => 
+        index === self.findIndex(o => o.id === order.id)
+      );
 
-      const { data, error, count } = await query;
-      if (error) throw error;
+      // Apply pagination to combined results
+      const paginatedOrders = uniqueOrders.slice(
+        pagination.offset, 
+        pagination.offset + pagination.pageSize
+      );
       
-      console.log('DateOfferedListPage query result:', { data, count, query: 'status_enhanced = date_offered' });
+      console.log('DateOfferedListPage query result:', { 
+        statusCount: statusOrders.length,
+        offersCount: offersOrders.length,
+        uniqueCount: uniqueOrders.length,
+        paginatedCount: paginatedOrders.length
+      });
       
-      return { data: data || [], count: count || 0 };
+      return { data: paginatedOrders, count: uniqueOrders.length };
     },
     placeholderData: keepPreviousData,
   });

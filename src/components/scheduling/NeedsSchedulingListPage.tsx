@@ -29,8 +29,7 @@ export function NeedsSchedulingListPage() {
     return async (withPagination = true, withCount = true) => {
       console.log('NeedsSchedulingListPage: Building search query...');
       
-      // CRITICAL FIX: Only filter by status_enhanced, not by excluding offers
-      // The database triggers handle status calculation including offer states
+      // CRITICAL FIX: Exclude orders with active offers since database trigger isn't working
       let query = supabase
         .from('orders')
         .select(`
@@ -41,8 +40,20 @@ export function NeedsSchedulingListPage() {
           quote:quote_id(quote_number)
         `, withCount ? { count: 'exact' } : {})
         .eq('status_enhanced', 'awaiting_install_booking')
-        .eq('scheduling_suppressed', false)
-        .order('created_at', { ascending: false });
+        .eq('scheduling_suppressed', false);
+
+      // CRITICAL: Exclude orders with active pending or accepted offers
+      const { data: ordersWithActiveOffers } = await supabase
+        .from('job_offers')
+        .select('order_id')
+        .in('status', ['pending', 'accepted'])
+        .or('status.neq.pending,expires_at.gt.' + new Date().toISOString());
+      
+      if (ordersWithActiveOffers?.length) {
+        query = query.not('id', 'in', `(${ordersWithActiveOffers.map(o => o.order_id).join(',')})`);
+      }
+
+      query = query.order('created_at', { ascending: false });
 
       // Apply search filter across all relevant tables
       if (debouncedSearchTerm) {

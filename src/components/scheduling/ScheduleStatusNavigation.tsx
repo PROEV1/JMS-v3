@@ -145,20 +145,33 @@ export function ScheduleStatusNavigation({ currentStatus }: ScheduleStatusNaviga
       try {
         // Use the exact same logic as the original useScheduleStatusCounts hook
         
+        // Date offered with fallback - use both status and active pending offers
+        const [statusBasedDateOffered, offersBasedDateOffered] = await Promise.all([
+          supabase
+            .from('orders')
+            .select('*', { count: 'exact', head: true })
+            .eq('status_enhanced', 'date_offered')
+            .eq('scheduling_suppressed', false),
+          supabase
+            .from('job_offers')
+            .select('order_id', { count: 'exact', head: true })
+            .eq('status', 'pending')
+            .gt('expires_at', new Date().toISOString())
+        ]);
+
+        const dateOfferedCount = Math.max(
+          statusBasedDateOffered.count || 0,
+          offersBasedDateOffered.count || 0
+        );
+
         // Direct status mappings
         const [
-          dateOfferedResult,
           scheduledResult, 
           onHoldResult, 
           completionPendingResult,
           completedResult,
           cancelledResult
         ] = await Promise.all([
-          supabase
-            .from('orders')
-            .select('*', { count: 'exact', head: true })
-            .eq('status_enhanced', 'date_offered')
-            .eq('scheduling_suppressed', false),
           supabase
             .from('orders')
             .select('*', { count: 'exact', head: true })
@@ -182,12 +195,24 @@ export function ScheduleStatusNavigation({ currentStatus }: ScheduleStatusNaviga
             .eq('status_enhanced', 'cancelled')
         ]);
 
-        // FIXED: No longer exclude based on offers, rely on status_enhanced
-        const { count: needsSchedulingCount } = await supabase
+        // CRITICAL: Must exclude orders with active offers since trigger isn't working
+        const { data: ordersWithActiveOffers } = await supabase
+          .from('job_offers')
+          .select('order_id')
+          .in('status', ['pending', 'accepted'])
+          .or('status.neq.pending,expires_at.gt.' + new Date().toISOString());
+        
+        let needsSchedulingQuery = supabase
           .from('orders')
           .select('*', { count: 'exact', head: true })
           .eq('status_enhanced', 'awaiting_install_booking')
           .eq('scheduling_suppressed', false);
+        
+        if (ordersWithActiveOffers?.length) {
+          needsSchedulingQuery = needsSchedulingQuery.not('id', 'in', `(${ordersWithActiveOffers.map(o => o.order_id).join(',')})`);
+        }
+        
+        const { count: needsSchedulingCount } = await needsSchedulingQuery;
 
         // For ready-to-book, use EXACT same logic as useScheduleStatusCounts
         let readyToBookCount = 0;
@@ -236,7 +261,7 @@ export function ScheduleStatusNavigation({ currentStatus }: ScheduleStatusNaviga
 
         setCounts({
           'needs-scheduling': needsSchedulingCount || 0,
-          'date-offered': dateOfferedResult.count || 0,
+          'date-offered': dateOfferedCount,
           'ready-to-book': readyToBookCount,
           'date-rejected': dateRejectedCount,
           'offer-expired': expiredCount || 0,
