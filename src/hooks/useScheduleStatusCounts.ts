@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { buildSafeUuidInClause } from '@/utils/schedulingUtils';
 
 interface StatusCounts {
   needsScheduling: number;
@@ -12,7 +11,6 @@ interface StatusCounts {
   completed: number;
   cancelled: number;
   onHold: number;
-  
   unavailableEngineers: number;
 }
 
@@ -27,132 +25,44 @@ export function useScheduleStatusCounts() {
     completed: 0,
     cancelled: 0,
     onHold: 0,
-    
     unavailableEngineers: 0
   });
   const [loading, setLoading] = useState(true);
 
   const fetchCounts = async () => {
+    const startTime = performance.now();
     try {
       setLoading(true);
 
-      // Use status_enhanced for consistent counting with list pages
-      const { count: dateOfferedCount } = await supabase
-        .from('orders')
-        .select('*', { count: 'exact', head: true })
-        .eq('status_enhanced', 'date_offered')
-        .eq('scheduling_suppressed', false);
-
-      // For date-rejected, use status_enhanced for consistency
-      const { count: dateRejectedCount } = await supabase
-        .from('orders')
-        .select('*', { count: 'exact', head: true })
-        .eq('status_enhanced', 'date_rejected')
-        .eq('scheduling_suppressed', false);
-
-      // Fetch scheduled today count
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const tomorrow = new Date(today);
-      tomorrow.setDate(today.getDate() + 1);
-
-      const { count: scheduledTodayCount } = await supabase
-        .from('orders')
-        .select('*', { count: 'exact', head: true })
-        .eq('status_enhanced', 'scheduled')
-        .gte('scheduled_install_date', today.toISOString())
-        .lt('scheduled_install_date', tomorrow.toISOString());
-
-      // Fetch new bucket counts
-      const [
-        scheduledResult,
-        completionPendingResult,
-        completedResult,
-        cancelledResult,
-        onHoldResult,
-        unavailableEngineersResult
-      ] = await Promise.all([
-        supabase.from('orders').select('*', { count: 'exact', head: true })
-          .eq('status_enhanced', 'scheduled')
-          .eq('scheduling_suppressed', false),
-        supabase.from('orders').select('*', { count: 'exact', head: true })
-          .eq('status_enhanced', 'install_completed_pending_qa'),
-        supabase.from('orders').select('*', { count: 'exact', head: true })
-          .eq('status_enhanced', 'completed'),
-        supabase.from('orders').select('*', { count: 'exact', head: true })
-          .eq('status_enhanced', 'cancelled'),
-        supabase.from('orders').select('*', { count: 'exact', head: true })
-          .eq('status_enhanced', 'on_hold_parts_docs'),
-        supabase.from('engineers').select('*', { count: 'exact', head: true })
-          .eq('availability', false)
-      ]);
-
-      // For needs-scheduling, get count of ALL orders (assigned and unassigned) with no active offers
-      // Exclude scheduling_suppressed orders
-      let needsSchedulingCount = 0;
-        
-      // Get offers to exclude (both pending and accepted)
-      const { data: offersToExclude } = await supabase
-        .from('job_offers')
-        .select('order_id')
-        .in('status', ['pending', 'accepted']);
-
-      const excludedOrderIds = offersToExclude?.map(offer => offer.order_id) || [];
-
-      // Count ALL orders that need scheduling (regardless of engineer assignment)
-      let query = supabase
-        .from('orders')
-        .select('*', { count: 'exact', head: true })
-        .eq('status_enhanced', 'awaiting_install_booking')
-        .eq('scheduling_suppressed', false);
-
-      // Exclude orders with offers (both pending and accepted)
-      if (excludedOrderIds.length > 0) {
-        const safeIds = buildSafeUuidInClause(excludedOrderIds);
-        if (safeIds) {
-          query = query.not('id', 'in', `(${safeIds})`);
-        }
+      // Use optimized RPC for all counts in one call
+      const { data, error } = await supabase.rpc('get_schedule_status_counts_v2');
+      
+      if (error) {
+        console.error('Error fetching status counts:', error);
+        return;
       }
 
-      const { count } = await query;
-      needsSchedulingCount = count || 0;
-
-      // For ready-to-book, count orders with accepted offers that haven't been scheduled yet
-      // Exclude scheduling_suppressed orders
-      let readyToBookCount = 0;
-      const { data: acceptedOffers } = await supabase
-        .from('job_offers')
-        .select('order_id')
-        .eq('status', 'accepted');
-        
-      if (acceptedOffers?.length) {
-        const { count: ordersWithAcceptedOffersCount } = await supabase
-          .from('orders')
-          .select('*', { count: 'exact', head: true })
-          .eq('status_enhanced', 'awaiting_install_booking')
-          .is('scheduled_install_date', null)
-          .eq('scheduling_suppressed', false)
-          .in('id', acceptedOffers.map(offer => offer.order_id));
-          
-        readyToBookCount = ordersWithAcceptedOffersCount || 0;
+      if (data && typeof data === 'object' && !Array.isArray(data)) {
+        const counts = data as unknown as StatusCounts;
+        setCounts({
+          needsScheduling: counts.needsScheduling || 0,
+          dateOffered: counts.dateOffered || 0,
+          readyToBook: counts.readyToBook || 0,
+          scheduledToday: counts.scheduledToday || 0,
+          scheduled: counts.scheduled || 0,
+          completionPending: counts.completionPending || 0,
+          completed: counts.completed || 0,
+          cancelled: counts.cancelled || 0,
+          onHold: counts.onHold || 0,
+          unavailableEngineers: counts.unavailableEngineers || 0
+        });
       }
-
-      setCounts({
-        needsScheduling: needsSchedulingCount,
-        dateOffered: dateOfferedCount || 0,
-        readyToBook: readyToBookCount,
-        scheduledToday: scheduledTodayCount,
-        scheduled: scheduledResult.count || 0,
-        completionPending: completionPendingResult.count || 0,
-        completed: completedResult.count || 0,
-        cancelled: cancelledResult.count || 0,
-        onHold: onHoldResult.count || 0,
-        unavailableEngineers: unavailableEngineersResult.count || 0
-      });
     } catch (error) {
       console.error('Error fetching status counts:', error);
     } finally {
       setLoading(false);
+      const endTime = performance.now();
+      console.log(`📊 Status counts loaded in ${(endTime - startTime).toFixed(2)}ms`);
     }
   };
 

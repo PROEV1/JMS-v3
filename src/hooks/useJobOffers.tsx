@@ -36,12 +36,28 @@ export function useJobOffers(orderId?: string | string[]) {
   const [error, setError] = useState<string | null>(null);
 
   const fetchOffers = async () => {
+    const startTime = performance.now();
     try {
       setLoading(true);
+      
+      // Select only essential fields for better performance
       let query = supabase
         .from('job_offers')
         .select(`
-          *,
+          id,
+          order_id,
+          engineer_id,
+          offered_date,
+          time_window,
+          status,
+          expires_at,
+          client_token,
+          delivery_channel,
+          rejection_reason,
+          accepted_at,
+          rejected_at,
+          expired_at,
+          created_at,
           order:orders!job_offers_order_id_fkey(
             order_number,
             client_id,
@@ -70,6 +86,8 @@ export function useJobOffers(orderId?: string | string[]) {
       setError(err.message);
     } finally {
       setLoading(false);
+      const endTime = performance.now();
+      console.log(`🎯 Job offers loaded in ${(endTime - startTime).toFixed(2)}ms`);
     }
   };
 
