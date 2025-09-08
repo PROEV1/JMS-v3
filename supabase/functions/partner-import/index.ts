@@ -549,6 +549,14 @@ serve(async (req) => {
         if (estimatedDurationHours && estimatedDurationHours !== '' && estimatedDurationHours !== 'NaN') {
           const durationStr = String(estimatedDurationHours).trim();
           
+          // Special logging for Christopher cases
+          if (clientName && (clientName.includes('Christopher Smith') || clientName.includes('Christopher Vernon'))) {
+            console.log(`=== DEBUG ${clientName} ===`);
+            console.log(`Raw duration value:`, estimatedDurationHours);
+            console.log(`Duration string:`, durationStr);
+            console.log(`Type of duration:`, typeof estimatedDurationHours);
+          }
+          
           console.log(`Row ${rowIndex}: Processing duration '${durationStr}' for external ID ${partnerExternalId}`);
           
           // Try parsing decimal/float format FIRST (most common for simple numbers like "4", "5")
@@ -556,6 +564,10 @@ serve(async (req) => {
           if (!isNaN(parsed) && parsed > 0 && parsed <= 12) {
             parsedEstimatedDurationHours = parsed;
             console.log(`Row ${rowIndex}: Successfully parsed duration as decimal: ${parsed}`);
+            
+            if (clientName && (clientName.includes('Christopher Smith') || clientName.includes('Christopher Vernon'))) {
+              console.log(`=== SUCCESS for ${clientName}: parsed as ${parsed} ===`);
+            }
           }
           
           // Try parsing HH:MM format (e.g., "4:00", "4:30") - Google Sheets time format
@@ -567,6 +579,10 @@ serve(async (req) => {
               if (!isNaN(hours) && !isNaN(minutes) && hours >= 0 && minutes >= 0 && minutes < 60) {
                 parsedEstimatedDurationHours = hours + (minutes / 60);
                 console.log(`Row ${rowIndex}: Successfully parsed duration as time format: ${parsedEstimatedDurationHours}`);
+                
+                if (clientName && (clientName.includes('Christopher Smith') || clientName.includes('Christopher Vernon'))) {
+                  console.log(`=== SUCCESS for ${clientName}: parsed as time ${parsedEstimatedDurationHours} ===`);
+                }
               }
             }
           }
@@ -589,6 +605,10 @@ serve(async (req) => {
                   }
                 }
                 console.log(`Row ${rowIndex}: Successfully parsed duration as text format: ${parsedEstimatedDurationHours}`);
+                
+                if (clientName && (clientName.includes('Christopher Smith') || clientName.includes('Christopher Vernon'))) {
+                  console.log(`=== SUCCESS for ${clientName}: parsed as text ${parsedEstimatedDurationHours} ===`);
+                }
               }
             }
           }
@@ -596,6 +616,11 @@ serve(async (req) => {
           // If parsing failed, log warning and preserve existing value
           if (parsedEstimatedDurationHours === null) {
             console.log(`Row ${rowIndex}: Failed to parse duration '${durationStr}' - will preserve existing DB value`);
+            
+            if (clientName && (clientName.includes('Christopher Smith') || clientName.includes('Christopher Vernon'))) {
+              console.log(`=== FAILED for ${clientName}: could not parse '${durationStr}' ===`);
+            }
+            
             batchWarnings.push({
               row: rowIndex,
               column: 'estimated_duration_hours',
@@ -605,6 +630,10 @@ serve(async (req) => {
           }
         } else {
           console.log(`Row ${rowIndex}: No duration provided - will preserve existing DB value`);
+          
+          if (clientName && (clientName.includes('Christopher Smith') || clientName.includes('Christopher Vernon'))) {
+            console.log(`=== NO DURATION for ${clientName}: value was '${estimatedDurationHours}' ===`);
+          }
         }
         
         // CRITICAL: Do NOT set fallback values here - let the DB preserve existing values
