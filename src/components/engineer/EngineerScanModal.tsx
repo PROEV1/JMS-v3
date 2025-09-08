@@ -72,6 +72,31 @@ export function EngineerScanModal({ open, onOpenChange, vanLocationId, vanLocati
     try {
       setIsScanning(true);
       
+      // First check if camera is available
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Camera not supported on this device/browser');
+      }
+
+      // Check for HTTPS requirement
+      if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+        throw new Error('Camera access requires HTTPS');
+      }
+
+      // Request camera permission first
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { 
+            facingMode: 'environment' // Use back camera if available
+          } 
+        });
+        
+        // Stop the test stream
+        stream.getTracks().forEach(track => track.stop());
+      } catch (permissionError) {
+        console.error('Camera permission error:', permissionError);
+        throw new Error('Camera permission denied. Please allow camera access and try again.');
+      }
+      
       if (!videoRef.current || !readerRef.current) {
         throw new Error('Video element or reader not available');
       }
@@ -114,9 +139,20 @@ export function EngineerScanModal({ open, onOpenChange, vanLocationId, vanLocati
     } catch (error) {
       console.error('Failed to start camera:', error);
       setIsScanning(false);
+      
+      let errorMessage = "Unable to access camera.";
+      
+      if (error.message.includes('permission')) {
+        errorMessage = "Camera permission denied. Please allow camera access in your browser settings and try again.";
+      } else if (error.message.includes('HTTPS')) {
+        errorMessage = "Camera access requires HTTPS. Please use a secure connection.";
+      } else if (error.message.includes('not supported')) {
+        errorMessage = "Camera not supported on this device or browser.";
+      }
+      
       toast({
         title: "Camera Error",
-        description: "Unable to access camera. Please check permissions.",
+        description: errorMessage,
         variant: "destructive"
       });
     }
@@ -349,9 +385,15 @@ export function EngineerScanModal({ open, onOpenChange, vanLocationId, vanLocati
                         <Camera className="h-4 w-4" />
                       </Button>
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      Click camera button to start scanning or type manually
-                    </p>
+                    <div className="text-xs text-muted-foreground space-y-1">
+                      <p>Click camera button to start scanning or type manually</p>
+                      <p className="text-amber-600">
+                        📱 Camera requires permission and works best in good lighting
+                      </p>
+                      <p className="text-blue-600">
+                        💡 If camera fails, try: Enable camera permissions → Refresh page → Try again
+                      </p>
+                    </div>
                   </>
                 )}
               </div>
