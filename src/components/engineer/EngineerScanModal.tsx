@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Scan, Package, PackageCheck, Camera } from 'lucide-react';
+import { Scan, Package, PackageCheck, Camera, X } from 'lucide-react';
+import { BrowserMultiFormatReader } from '@zxing/library';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -25,8 +26,31 @@ export function EngineerScanModal({ open, onOpenChange, vanLocationId, vanLocati
   const [selectedItemId, setSelectedItemId] = useState('');
   const [quantity, setQuantity] = useState('1');
   const [notes, setNotes] = useState('');
+  const [isScanning, setIsScanning] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const readerRef = useRef<BrowserMultiFormatReader>();
+
+  // Initialize barcode scanner
+  useEffect(() => {
+    if (!readerRef.current) {
+      readerRef.current = new BrowserMultiFormatReader();
+    }
+    
+    return () => {
+      if (readerRef.current) {
+        readerRef.current.reset();
+      }
+    };
+  }, []);
+
+  // Cleanup camera when modal closes or scanning stops
+  useEffect(() => {
+    if (!open || !isScanning) {
+      stopScanning();
+    }
+  }, [open, isScanning]);
 
   // Fetch inventory items for manual selection
   const { data: inventoryItems = [] } = useQuery({
@@ -43,6 +67,67 @@ export function EngineerScanModal({ open, onOpenChange, vanLocationId, vanLocati
     },
     enabled: open
   });
+
+  const startScanning = async () => {
+    try {
+      setIsScanning(true);
+      
+      if (!videoRef.current || !readerRef.current) {
+        throw new Error('Video element or reader not available');
+      }
+
+      await readerRef.current.decodeFromVideoDevice(
+        undefined, // Use default camera
+        videoRef.current,
+        (result, error) => {
+          if (result) {
+            // Successfully scanned a barcode
+            const scannedText = result.getText();
+            setScannedCode(scannedText);
+            setIsScanning(false);
+            
+            // Try to find matching item by SKU
+            const matchingItem = inventoryItems.find(item => 
+              item.sku?.toLowerCase() === scannedText.toLowerCase()
+            );
+            
+            if (matchingItem) {
+              setSelectedItemId(matchingItem.id);
+              setScanMode('manual_add');
+              toast({
+                title: "Item Found",
+                description: `Found: ${matchingItem.name}`,
+              });
+            } else {
+              toast({
+                title: "Barcode Scanned",
+                description: `Code: ${scannedText}. No matching item found, please select manually.`,
+              });
+            }
+          }
+          
+          if (error && error.name !== 'NotFoundException') {
+            console.error('Scanning error:', error);
+          }
+        }
+      );
+    } catch (error) {
+      console.error('Failed to start camera:', error);
+      setIsScanning(false);
+      toast({
+        title: "Camera Error",
+        description: "Unable to access camera. Please check permissions.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const stopScanning = () => {
+    if (readerRef.current) {
+      readerRef.current.reset();
+    }
+    setIsScanning(false);
+  };
 
   // Add stock mutation
   const addStockMutation = useMutation({
@@ -127,14 +212,22 @@ export function EngineerScanModal({ open, onOpenChange, vanLocationId, vanLocati
     let reference = '';
 
     if (scanMode === 'receive') {
-      // TODO: In a real implementation, you'd look up the item by barcode/SKU
-      // For now, we'll show an error if no item is selected for manual mode
-      toast({
-        title: "Feature Not Implemented",
-        description: "Barcode scanning is not yet implemented. Please use manual add instead.",
-        variant: "destructive"
-      });
-      return;
+      // Look up item by the scanned code/SKU
+      const matchingItem = inventoryItems.find(item => 
+        item.sku?.toLowerCase() === scannedCode.toLowerCase()
+      );
+      
+      if (!matchingItem) {
+        toast({
+          title: "Item Not Found",
+          description: `No item found with SKU: ${scannedCode}. Please check the code or use manual add.`,
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      itemId = matchingItem.id;
+      reference = `Scanned addition to van - ${vanLocationName} (SKU: ${scannedCode})`;
     } else {
       reference = `Manual addition to van - ${vanLocationName}`;
     }
@@ -213,21 +306,54 @@ export function EngineerScanModal({ open, onOpenChange, vanLocationId, vanLocati
             {scanMode === 'receive' ? (
               <div className="space-y-2">
                 <Label htmlFor="barcode">Barcode / SKU</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="barcode"
-                    value={scannedCode}
-                    onChange={(e) => setScannedCode(e.target.value)}
-                    placeholder="Scan or type barcode..."
-                    className="flex-1"
-                  />
-                  <Button variant="outline" disabled>
-                    <Camera className="h-4 w-4" />
-                  </Button>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Camera scanning not yet implemented
-                </p>
+                {isScanning ? (
+                  <div className="space-y-2">
+                    <div className="relative bg-black rounded-lg overflow-hidden">
+                      <video 
+                        ref={videoRef}
+                        className="w-full h-48 object-cover"
+                        autoPlay
+                        muted
+                        playsInline
+                      />
+                      <div className="absolute inset-0 border-2 border-dashed border-white/50 m-8 rounded-lg pointer-events-none">
+                        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-white text-sm">
+                          Position barcode in center
+                        </div>
+                      </div>
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      onClick={stopScanning}
+                      className="w-full"
+                    >
+                      <X className="h-4 w-4 mr-2" />
+                      Stop Scanning
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex gap-2">
+                      <Input
+                        id="barcode"
+                        value={scannedCode}
+                        onChange={(e) => setScannedCode(e.target.value)}
+                        placeholder="Scan or type barcode..."
+                        className="flex-1"
+                      />
+                      <Button 
+                        variant="outline" 
+                        onClick={startScanning}
+                        disabled={isScanning}
+                      >
+                        <Camera className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Click camera button to start scanning or type manually
+                    </p>
+                  </>
+                )}
               </div>
             ) : (
               <div className="space-y-2">
