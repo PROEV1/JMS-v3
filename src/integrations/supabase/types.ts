@@ -3854,6 +3854,26 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_date_offered_orders: {
+        Args: { p_limit?: number; p_offset?: number }
+        Returns: {
+          client_email: string
+          client_full_name: string
+          client_id: string
+          client_phone: string
+          created_at: string
+          engineer_id: string
+          engineer_name: string
+          id: string
+          offer_expires_at: string
+          offer_id: string
+          offer_offered_date: string
+          order_number: string
+          partner_name: string
+          scheduled_install_date: string
+          status_enhanced: Database["public"]["Enums"]["order_status_enhanced"]
+        }[]
+      }
       get_engineer_daily_time_with_holds: {
         Args: { p_date: string; p_engineer_id: string }
         Returns: number
@@ -3900,6 +3920,10 @@ export type Database = {
       get_partner_user_role: {
         Args: { user_uuid: string }
         Returns: string
+      }
+      get_schedule_status_counts_v2: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
       }
       get_user_role: {
         Args: { user_id: string }
