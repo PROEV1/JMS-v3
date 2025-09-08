@@ -303,48 +303,74 @@ export function EngineerScanModal({ open, onOpenChange, vanLocationId, vanLocati
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Scan className="h-5 w-5" />
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+        <DialogHeader className="space-y-1">
+          <DialogTitle className="flex items-center gap-3 text-xl">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+              <Scan className="h-5 w-5 text-primary" />
+            </div>
             Add Stock to Van
           </DialogTitle>
+          <p className="text-sm text-muted-foreground">
+            Scan barcodes or manually add items to your van inventory
+          </p>
         </DialogHeader>
 
         <div className="space-y-6">
           {/* Mode Selection */}
-          <div className="grid gap-4 md:grid-cols-2">
-            {scanModes.map((mode) => {
-              const IconComponent = mode.icon;
-              return (
-                <div 
-                  key={mode.value}
-                  className={`cursor-pointer p-4 border rounded-lg transition-all ${
-                    scanMode === mode.value 
-                      ? 'ring-2 ring-primary bg-primary/5' 
-                      : 'hover:bg-muted/30'
-                  }`}
-                  onClick={() => setScanMode(mode.value)}
-                >
-                  <div className="flex items-center gap-3 mb-2">
-                    <IconComponent className={`h-5 w-5 ${mode.color}`} />
-                    <span className="font-medium">{mode.label}</span>
+          <div className="space-y-3">
+            <Label className="text-sm font-medium">Select Method</Label>
+            <div className="grid gap-3 md:grid-cols-2">
+              {scanModes.map((mode) => {
+                const IconComponent = mode.icon;
+                const isSelected = scanMode === mode.value;
+                return (
+                  <div 
+                    key={mode.value}
+                    className={`cursor-pointer group relative overflow-hidden rounded-xl border-2 p-4 transition-all hover:shadow-md ${
+                      isSelected 
+                        ? 'border-primary bg-primary/5 shadow-sm' 
+                        : 'border-border hover:border-primary/50 hover:bg-muted/30'
+                    }`}
+                    onClick={() => setScanMode(mode.value)}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${
+                        isSelected ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+                      }`}>
+                        <IconComponent className="h-4 w-4" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className={`font-medium ${isSelected ? 'text-primary' : 'text-foreground'}`}>
+                          {mode.label}
+                        </h3>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {mode.description}
+                        </p>
+                      </div>
+                    </div>
+                    {isSelected && (
+                      <div className="absolute top-2 right-2">
+                        <div className="h-2 w-2 rounded-full bg-primary"></div>
+                      </div>
+                    )}
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    {mode.description}
-                  </p>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
 
-          <div className="space-y-4">
+          {/* Input Section */}
+          <div className="space-y-4 rounded-lg border bg-muted/20 p-4">
             {scanMode === 'receive' ? (
-              <div className="space-y-2">
-                <Label htmlFor="barcode">Barcode / SKU</Label>
+              <div className="space-y-3">
+                <Label htmlFor="barcode" className="flex items-center gap-2">
+                  <Scan className="h-4 w-4 text-primary" />
+                  Barcode / SKU
+                </Label>
                 {isScanning ? (
-                  <div className="space-y-2">
-                    <div className="relative bg-black rounded-lg overflow-hidden">
+                  <div className="space-y-3">
+                    <div className="relative overflow-hidden rounded-lg bg-black">
                       <video 
                         ref={videoRef}
                         className="w-full h-48 object-cover"
@@ -352,19 +378,20 @@ export function EngineerScanModal({ open, onOpenChange, vanLocationId, vanLocati
                         muted
                         playsInline
                       />
-                      <div className="absolute inset-0 border-2 border-dashed border-white/50 m-8 rounded-lg pointer-events-none">
-                        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-white text-sm">
-                          Position barcode in center
+                      <div className="absolute inset-4 border-2 border-dashed border-white/60 rounded-lg pointer-events-none flex items-center justify-center">
+                        <div className="text-center">
+                          <div className="text-white text-sm font-medium mb-1">Position barcode here</div>
+                          <div className="text-white/70 text-xs">Hold steady for scanning</div>
                         </div>
                       </div>
                     </div>
                     <Button 
                       variant="outline" 
                       onClick={stopScanning}
-                      className="w-full"
+                      className="w-full border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
                     >
                       <X className="h-4 w-4 mr-2" />
-                      Stop Scanning
+                      Stop Camera
                     </Button>
                   </div>
                 ) : (
@@ -374,40 +401,49 @@ export function EngineerScanModal({ open, onOpenChange, vanLocationId, vanLocati
                         id="barcode"
                         value={scannedCode}
                         onChange={(e) => setScannedCode(e.target.value)}
-                        placeholder="Scan or type barcode..."
-                        className="flex-1"
+                        placeholder="Type or scan barcode..."
+                        className="flex-1 h-11"
                       />
                       <Button 
                         variant="outline" 
                         onClick={startScanning}
                         disabled={isScanning}
+                        className="h-11 px-4 border-primary text-primary hover:bg-primary hover:text-primary-foreground"
                       >
                         <Camera className="h-4 w-4" />
                       </Button>
                     </div>
-                    <div className="text-xs text-muted-foreground space-y-1">
-                      <p>Click camera button to start scanning or type manually</p>
-                      <p className="text-amber-600">
-                        📱 Camera requires permission and works best in good lighting
-                      </p>
-                      <p className="text-blue-600">
-                        💡 If camera fails, try: Enable camera permissions → Refresh page → Try again
-                      </p>
+                    <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 space-y-2">
+                      <div className="flex items-center gap-2 text-blue-700 text-sm font-medium">
+                        <Camera className="h-4 w-4" />
+                        Camera Tips
+                      </div>
+                      <div className="text-xs text-blue-600 space-y-1">
+                        <p>• Ensure good lighting for best results</p>
+                        <p>• Allow camera permissions when prompted</p>
+                        <p>• Refresh page if camera fails to start</p>
+                      </div>
                     </div>
                   </>
                 )}
               </div>
             ) : (
-              <div className="space-y-2">
-                <Label htmlFor="item">Select Item</Label>
+              <div className="space-y-3">
+                <Label htmlFor="item" className="flex items-center gap-2">
+                  <Package className="h-4 w-4 text-primary" />
+                  Select Item
+                </Label>
                 <Select value={selectedItemId} onValueChange={setSelectedItemId}>
-                  <SelectTrigger>
+                  <SelectTrigger className="h-11">
                     <SelectValue placeholder="Choose an item to add" />
                   </SelectTrigger>
                   <SelectContent className="max-h-[200px]">
                     {inventoryItems.map(item => (
                       <SelectItem key={item.id} value={item.id}>
-                        {item.name} ({item.sku})
+                        <div className="flex flex-col gap-1">
+                          <span>{item.name}</span>
+                          <span className="text-xs text-muted-foreground">{item.sku}</span>
+                        </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -417,57 +453,81 @@ export function EngineerScanModal({ open, onOpenChange, vanLocationId, vanLocati
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="quantity">Quantity</Label>
+                <Label htmlFor="quantity" className="text-sm font-medium">Quantity</Label>
                 <Input
                   id="quantity"
                   type="number"
                   min="1"
                   value={quantity}
                   onChange={(e) => setQuantity(e.target.value)}
+                  className="h-11"
                 />
               </div>
               <div className="space-y-2">
-                <Label>Adding to</Label>
-                <div className="flex items-center gap-2 p-2 bg-muted/30 rounded-md">
-                  <Package className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-medium">{vanLocationName}</span>
+                <Label className="text-sm font-medium">Location</Label>
+                <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <Package className="h-4 w-4 text-green-600" />
+                  <span className="text-sm font-medium text-green-700">{vanLocationName}</span>
                 </div>
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="notes">Notes (optional)</Label>
+              <Label htmlFor="notes" className="text-sm font-medium">Notes (optional)</Label>
               <Input
                 id="notes"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Additional notes..."
+                className="h-11"
               />
             </div>
-
-            <Button 
-              onClick={handleScan} 
-              className="w-full"
-              disabled={addStockMutation.isPending}
-            >
-              {addStockMutation.isPending ? 'Adding...' : `Add to Van Stock`}
-            </Button>
           </div>
 
+          {/* Action Button */}
+          <Button 
+            onClick={handleScan} 
+            className="w-full h-12 text-base font-medium"
+            disabled={addStockMutation.isPending}
+          >
+            {addStockMutation.isPending ? (
+              <>
+                <div className="animate-spin h-4 w-4 mr-2 border-2 border-current border-t-transparent rounded-full" />
+                Adding Stock...
+              </>
+            ) : (
+              <>
+                <PackageCheck className="h-4 w-4 mr-2" />
+                Add to Van Stock
+              </>
+            )}
+          </Button>
+
+          {/* Quick Add Section */}
           {scanMode === 'manual_add' && inventoryItems.length > 0 && (
-            <div className="space-y-3">
-              <Label>Quick Add Common Items</Label>
+            <div className="space-y-4 rounded-lg border bg-gradient-to-br from-blue-50 to-indigo-50 p-4">
+              <div className="flex items-center gap-2">
+                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100">
+                  <Package className="h-3 w-3 text-blue-600" />
+                </div>
+                <Label className="text-sm font-medium text-blue-900">Quick Add Common Items</Label>
+              </div>
               <div className="grid gap-2">
                 {inventoryItems.slice(0, 4).map((item) => (
                   <Button
                     key={item.id}
                     variant="outline"
                     onClick={() => handleQuickAdd(item.id, item.name)}
-                    className="justify-start text-left h-auto p-3"
+                    className="justify-start text-left h-auto p-3 border-blue-200 bg-white hover:bg-blue-50 hover:border-blue-300 transition-colors"
                   >
-                    <div>
-                      <div className="font-medium text-sm">{item.name}</div>
-                      <div className="text-xs text-muted-foreground">{item.sku}</div>
+                    <div className="flex items-center gap-3 w-full">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100">
+                        <Package className="h-4 w-4 text-blue-600" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="font-medium text-sm text-foreground">{item.name}</div>
+                        <div className="text-xs text-muted-foreground">{item.sku}</div>
+                      </div>
                     </div>
                   </Button>
                 ))}
