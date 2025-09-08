@@ -426,8 +426,11 @@ serve(async (req) => {
           console.log(`Raw row data for duration column:`, row[columnMappings.estimated_duration_hours]);
           console.log(`Extracted duration value:`, estimatedDurationHours);
           console.log(`External ID:`, partnerExternalId);
-          console.log(`Full row keys:`, Object.keys(row));
-          console.log(`Full row:`, row);
+          console.log(`All row values:`, Object.values(row));
+          console.log(`Headers vs values comparison:`);
+          Object.keys(row).forEach((key, index) => {
+            console.log(`  [${index}] "${key}" = "${row[key]}"`);
+          });
         }
 
           // Skip if no external ID
