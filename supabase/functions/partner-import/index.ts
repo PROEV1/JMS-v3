@@ -419,6 +419,17 @@ serve(async (req) => {
         // Support both 'job_type' and 'type' column mappings
         const jobType = row[columnMappings.job_type] || row[columnMappings.type] || null
 
+        // Enhanced debugging for Christopher cases
+        if (clientName && (clientName.includes('Christopher Smith') || clientName.includes('Christopher Vernon'))) {
+          console.log(`=== EXTRACTION DEBUG for ${clientName} ===`);
+          console.log(`Duration column mapping: "${columnMappings.estimated_duration_hours}"`);
+          console.log(`Raw row data for duration column:`, row[columnMappings.estimated_duration_hours]);
+          console.log(`Extracted duration value:`, estimatedDurationHours);
+          console.log(`External ID:`, partnerExternalId);
+          console.log(`Full row keys:`, Object.keys(row));
+          console.log(`Full row:`, row);
+        }
+
           // Skip if no external ID
           if (!partnerExternalId) {
             results.skipped++;
