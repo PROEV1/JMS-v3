@@ -37,6 +37,7 @@ export function DateOfferedListPage() {
         scheduled_install_date: order.scheduled_install_date,
         status_enhanced: order.status_enhanced,
         created_at: order.created_at,
+        estimated_duration_hours: order.estimated_duration_hours,
         status: 'pending', // Add required status field
         client: order.client_full_name ? {
           full_name: order.client_full_name,

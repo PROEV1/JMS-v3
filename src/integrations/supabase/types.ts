@@ -3864,6 +3864,7 @@ export type Database = {
           created_at: string
           engineer_id: string
           engineer_name: string
+          estimated_duration_hours: number
           id: string
           offer_expires_at: string
           offer_id: string
