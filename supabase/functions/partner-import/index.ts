@@ -543,24 +543,65 @@ serve(async (req) => {
           });
         }
 
-        // Parse estimated duration hours with job type based defaults
-        let parsedEstimatedDurationHours = 3; // Fallback default
+        // Enhanced duration parsing to handle various formats from Google Sheets
+        let parsedEstimatedDurationHours: number | null = null;
         
         if (estimatedDurationHours && estimatedDurationHours !== '' && estimatedDurationHours !== 'NaN') {
-          // Use provided duration if valid
-          const numDuration = parseFloat(String(estimatedDurationHours).replace(/[^0-9.-]/g, ''));
-          if (!isNaN(numDuration) && numDuration > 0 && numDuration <= 12) {
-            parsedEstimatedDurationHours = numDuration;
-          } else {
+          const durationStr = String(estimatedDurationHours).trim();
+          
+          // Try parsing HH:MM format (e.g., "4:00", "4:30") - common Google Sheets format
+          const timeMatch = durationStr.match(/^(\d{1,2}):(\d{2})$/);
+          if (timeMatch) {
+            const hours = parseInt(timeMatch[1], 10);
+            const minutes = parseInt(timeMatch[2], 10);
+            if (!isNaN(hours) && !isNaN(minutes) && hours >= 0 && minutes >= 0 && minutes < 60) {
+              parsedEstimatedDurationHours = hours + (minutes / 60);
+            }
+          }
+          
+          // Try parsing decimal/float format (e.g., "4.5", "4,5")
+          if (parsedEstimatedDurationHours === null) {
+            const parsed = parseFloat(durationStr.replace(',', '.'));
+            if (!isNaN(parsed) && parsed > 0 && parsed <= 12) {
+              parsedEstimatedDurationHours = parsed;
+            }
+          }
+          
+          // Try parsing "X hours" or "Xh" format (e.g., "4 hours", "4h", "4h 30m")
+          if (parsedEstimatedDurationHours === null) {
+            const hoursMatch = durationStr.match(/(\d+(?:[.,]\d+)?)\s*h(?:ours?)?/i);
+            const minutesMatch = durationStr.match(/(\d+)\s*m(?:in(?:utes?)?)?/i);
+            
+            if (hoursMatch) {
+              const hoursValue = parseFloat(hoursMatch[1].replace(',', '.'));
+              if (!isNaN(hoursValue) && hoursValue >= 0 && hoursValue <= 12) {
+                parsedEstimatedDurationHours = hoursValue;
+                
+                // Add minutes if present
+                if (minutesMatch) {
+                  const minutesValue = parseInt(minutesMatch[1], 10);
+                  if (!isNaN(minutesValue) && minutesValue >= 0) {
+                    parsedEstimatedDurationHours += minutesValue / 60;
+                  }
+                }
+              }
+            }
+          }
+          
+          // If parsing failed, log warning but don't use fallback - let DB preserve existing value
+          if (parsedEstimatedDurationHours === null) {
             batchWarnings.push({
               row: rowIndex,
               column: 'estimated_duration_hours',
-              message: `Invalid duration '${estimatedDurationHours}' - using job type default`,
+              message: `Could not parse duration '${estimatedDurationHours}' - preserving existing DB value`,
               data: { original_duration: estimatedDurationHours }
             });
           }
-        } else {
-          // No duration provided, use job type based defaults
+        }
+        
+        // If no duration provided or parsing failed, use job type defaults for NEW orders only
+        // For existing orders, NULL will preserve the current value in the DB
+        if (parsedEstimatedDurationHours === null) {
           if (jobType) {
             const normalizedJobType = jobType.toLowerCase().replace(/[^a-z0-9]/g, '');
             const defaultDuration = normalizedDefaults.get(normalizedJobType);
@@ -568,6 +609,9 @@ serve(async (req) => {
             if (defaultDuration !== undefined) {
               parsedEstimatedDurationHours = defaultDuration;
             }
+          } else {
+            // Final fallback for completely new orders without job type
+            parsedEstimatedDurationHours = 3;
           }
         }
 
@@ -599,13 +643,12 @@ serve(async (req) => {
           });
           
           // Prepare order data
-          const orderData = {
+          const orderData: any = {
             partner_external_id: partnerExternalId,
             partner_status: mappedStatus,
             scheduled_install_date: parsedInstallDate,
             engineer_id: engineerId,
             total_amount: parsedQuoteAmount,
-            estimated_duration_hours: parsedEstimatedDurationHours,
             job_type: mappedJobType,
             email: normalizedEmail, // Use this to match with client after bulk upsert
             is_partner_job: true,
@@ -616,6 +659,12 @@ serve(async (req) => {
             status: 'active',
             survey_required: profile.partners?.client_survey_required ?? true
           };
+          
+          // Only include estimated_duration_hours if we successfully parsed it
+          // This allows the DB function to preserve existing values for updates
+          if (parsedEstimatedDurationHours !== null) {
+            orderData.estimated_duration_hours = parsedEstimatedDurationHours;
+          }
           
           // Apply status actions if defined in profile
           if (partnerStatus) {
