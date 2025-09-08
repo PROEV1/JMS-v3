@@ -546,7 +546,7 @@ serve(async (req) => {
         // Enhanced duration parsing to handle various formats from Google Sheets
         let parsedEstimatedDurationHours: number | null = null;
         
-        if (estimatedDurationHours && estimatedDurationHours !== '' && estimatedDurationHours !== 'NaN') {
+        if (estimatedDurationHours !== null && estimatedDurationHours !== undefined && estimatedDurationHours !== '' && String(estimatedDurationHours).trim() !== '' && String(estimatedDurationHours) !== 'NaN') {
           const durationStr = String(estimatedDurationHours).trim();
           
           // Special logging for Christopher cases
