@@ -549,21 +549,25 @@ serve(async (req) => {
         if (estimatedDurationHours && estimatedDurationHours !== '' && estimatedDurationHours !== 'NaN') {
           const durationStr = String(estimatedDurationHours).trim();
           
-          // Try parsing HH:MM format (e.g., "4:00", "4:30") - common Google Sheets format
-          const timeMatch = durationStr.match(/^(\d{1,2}):(\d{2})$/);
-          if (timeMatch) {
-            const hours = parseInt(timeMatch[1], 10);
-            const minutes = parseInt(timeMatch[2], 10);
-            if (!isNaN(hours) && !isNaN(minutes) && hours >= 0 && minutes >= 0 && minutes < 60) {
-              parsedEstimatedDurationHours = hours + (minutes / 60);
-            }
+          console.log(`Row ${rowIndex}: Processing duration '${durationStr}' for external ID ${partnerExternalId}`);
+          
+          // Try parsing decimal/float format FIRST (most common for simple numbers like "4", "5")
+          const parsed = parseFloat(durationStr.replace(',', '.'));
+          if (!isNaN(parsed) && parsed > 0 && parsed <= 12) {
+            parsedEstimatedDurationHours = parsed;
+            console.log(`Row ${rowIndex}: Successfully parsed duration as decimal: ${parsed}`);
           }
           
-          // Try parsing decimal/float format (e.g., "4.5", "4,5")
+          // Try parsing HH:MM format (e.g., "4:00", "4:30") - Google Sheets time format
           if (parsedEstimatedDurationHours === null) {
-            const parsed = parseFloat(durationStr.replace(',', '.'));
-            if (!isNaN(parsed) && parsed > 0 && parsed <= 12) {
-              parsedEstimatedDurationHours = parsed;
+            const timeMatch = durationStr.match(/^(\d{1,2}):(\d{2})$/);
+            if (timeMatch) {
+              const hours = parseInt(timeMatch[1], 10);
+              const minutes = parseInt(timeMatch[2], 10);
+              if (!isNaN(hours) && !isNaN(minutes) && hours >= 0 && minutes >= 0 && minutes < 60) {
+                parsedEstimatedDurationHours = hours + (minutes / 60);
+                console.log(`Row ${rowIndex}: Successfully parsed duration as time format: ${parsedEstimatedDurationHours}`);
+              }
             }
           }
           
@@ -584,12 +588,14 @@ serve(async (req) => {
                     parsedEstimatedDurationHours += minutesValue / 60;
                   }
                 }
+                console.log(`Row ${rowIndex}: Successfully parsed duration as text format: ${parsedEstimatedDurationHours}`);
               }
             }
           }
           
-          // If parsing failed, log warning but don't use fallback - let DB preserve existing value
+          // If parsing failed, log warning and preserve existing value
           if (parsedEstimatedDurationHours === null) {
+            console.log(`Row ${rowIndex}: Failed to parse duration '${durationStr}' - will preserve existing DB value`);
             batchWarnings.push({
               row: rowIndex,
               column: 'estimated_duration_hours',
@@ -597,23 +603,11 @@ serve(async (req) => {
               data: { original_duration: estimatedDurationHours }
             });
           }
+        } else {
+          console.log(`Row ${rowIndex}: No duration provided - will preserve existing DB value`);
         }
         
-        // If no duration provided or parsing failed, use job type defaults for NEW orders only
-        // For existing orders, NULL will preserve the current value in the DB
-        if (parsedEstimatedDurationHours === null) {
-          if (jobType) {
-            const normalizedJobType = jobType.toLowerCase().replace(/[^a-z0-9]/g, '');
-            const defaultDuration = normalizedDefaults.get(normalizedJobType);
-            
-            if (defaultDuration !== undefined) {
-              parsedEstimatedDurationHours = defaultDuration;
-            }
-          } else {
-            // Final fallback for completely new orders without job type
-            parsedEstimatedDurationHours = 3;
-          }
-        }
+        // CRITICAL: Do NOT set fallback values here - let the DB preserve existing values
 
           // Map job type to normalized values
           let mappedJobType = 'installation'; // Default
