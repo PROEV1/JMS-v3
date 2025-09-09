@@ -40,7 +40,7 @@ export function ReadyToBookListPage() {
           quote:quote_id(quote_number)
         `, withCount ? { count: 'exact' } : {})
         .in('id', uniqueOrderIds)
-        .eq('status_enhanced', 'awaiting_install_booking')
+        .in('status_enhanced', ['awaiting_install_booking', 'date_accepted'])
         .is('scheduled_install_date', null)
         .eq('scheduling_suppressed', false)
         .order('created_at', { ascending: false });
