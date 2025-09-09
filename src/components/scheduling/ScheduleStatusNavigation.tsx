@@ -68,6 +68,14 @@ const statusTiles: StatusTile[] = [
     statusKey: 'completed'
   },
   {
+    id: 'date_rejected',
+    title: 'Date Rejected',
+    icon: XCircle,
+    colorClass: 'bg-gradient-to-br from-pink-50 to-pink-100 border-pink-200 hover:border-pink-300',
+    route: '/admin/schedule/status/date-rejected',
+    statusKey: 'date-rejected'
+  },
+  {
     id: 'cancelled',
     title: 'Cancelled',
     icon: XCircle,
@@ -133,6 +141,7 @@ export function ScheduleStatusNavigation({ currentStatus }: ScheduleStatusNaviga
     'scheduled': counts.scheduled,
     'completion-pending': counts.completionPending,
     'completed': counts.completed,
+    'date-rejected': counts.dateRejected,
     'cancelled': counts.cancelled,
     'on-hold': counts.onHold
   };

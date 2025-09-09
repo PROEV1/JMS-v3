@@ -9,6 +9,7 @@ interface StatusCounts {
   scheduled: number;
   completionPending: number;
   completed: number;
+  dateRejected: number;
   cancelled: number;
   onHold: number;
   unavailableEngineers: number;
@@ -23,6 +24,7 @@ export function useScheduleStatusCounts() {
     scheduled: 0,
     completionPending: 0,
     completed: 0,
+    dateRejected: 0,
     cancelled: 0,
     onHold: 0,
     unavailableEngineers: 0
@@ -52,6 +54,7 @@ export function useScheduleStatusCounts() {
           scheduled: counts.scheduled || 0,
           completionPending: counts.completionPending || 0,
           completed: counts.completed || 0,
+          dateRejected: counts.dateRejected || 0,
           cancelled: counts.cancelled || 0,
           onHold: counts.onHold || 0,
           unavailableEngineers: counts.unavailableEngineers || 0
