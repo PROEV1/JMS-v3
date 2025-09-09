@@ -5,6 +5,8 @@ interface StatusCounts {
   needsScheduling: number;
   dateOffered: number;
   readyToBook: number;
+  dateRejected: number;
+  offerExpired: number;
   scheduledToday: number;
   scheduled: number;
   completionPending: number;
@@ -19,6 +21,8 @@ export function useScheduleStatusCounts() {
     needsScheduling: 0,
     dateOffered: 0,
     readyToBook: 0,
+    dateRejected: 0,
+    offerExpired: 0,
     scheduledToday: 0,
     scheduled: 0,
     completionPending: 0,
@@ -49,6 +53,8 @@ export function useScheduleStatusCounts() {
           needsScheduling: counts.needsScheduling || 0,
           dateOffered: counts.dateOffered || 0,
           readyToBook: counts.readyToBook || 0,
+          dateRejected: counts.dateRejected || 0,
+          offerExpired: counts.offerExpired || 0,
           scheduledToday: counts.scheduledToday || 0,
           scheduled: counts.scheduled || 0,
           completionPending: counts.completionPending || 0,
