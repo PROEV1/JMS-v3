@@ -91,6 +91,10 @@ export function SmartAssignmentModal({
     const loadAvailableDates = async () => {
       setLoadingAvailability(true);
       try {
+        // First fetch scheduling settings to respect advance notice
+        const { getSchedulingSettings } = await import('@/utils/schedulingUtils');
+        const settings = await getSchedulingSettings();
+        
         // Load client blocked dates
         const { data: clientBlockedDates } = await supabase
           .from('client_blocked_dates')
@@ -100,12 +104,14 @@ export function SmartAssignmentModal({
         const blocked = new Set(clientBlockedDates?.map(d => d.blocked_date) || []);
         setBlockedDates(blocked);
 
-        // Calculate available dates for next 60 days
-        const dates: Date[] = [];
-        const today = new Date();
-        const maxDate = new Date(today.getTime() + (60 * 24 * 60 * 60 * 1000)); // 60 days from now
+        // Calculate minimum start date respecting advance notice rule
+        const now = new Date();
+        const minimumStartDate = new Date(now.getTime() + (settings.minimum_advance_hours * 60 * 60 * 1000));
+        const maxDate = new Date(minimumStartDate.getTime() + (60 * 24 * 60 * 60 * 1000)); // 60 days from minimum start date
 
-        for (let d = new Date(today); d <= maxDate; d.setDate(d.getDate() + 1)) {
+        // Calculate available dates starting from minimum advance notice date
+        const dates: Date[] = [];
+        for (let d = new Date(minimumStartDate); d <= maxDate; d.setDate(d.getDate() + 1)) {
           const dateString = d.toISOString().split('T')[0];
           
           // Skip if client blocked date
