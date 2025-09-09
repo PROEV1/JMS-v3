@@ -11,6 +11,8 @@ interface StatusCounts {
   completed: number;
   cancelled: number;
   onHold: number;
+  dateRejected: number;
+  offerExpired: number;
   unavailableEngineers: number;
 }
 
@@ -25,6 +27,8 @@ export function useScheduleStatusCounts() {
     completed: 0,
     cancelled: 0,
     onHold: 0,
+    dateRejected: 0,
+    offerExpired: 0,
     unavailableEngineers: 0
   });
   const [loading, setLoading] = useState(true);
@@ -54,6 +58,8 @@ export function useScheduleStatusCounts() {
           completed: counts.completed || 0,
           cancelled: counts.cancelled || 0,
           onHold: counts.onHold || 0,
+          dateRejected: counts.dateRejected || 0,
+          offerExpired: counts.offerExpired || 0,
           unavailableEngineers: counts.unavailableEngineers || 0
         });
       }
