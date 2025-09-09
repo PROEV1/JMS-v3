@@ -5,8 +5,6 @@ interface StatusCounts {
   needsScheduling: number;
   dateOffered: number;
   readyToBook: number;
-  dateRejected: number;
-  offerExpired: number;
   scheduledToday: number;
   scheduled: number;
   completionPending: number;
@@ -21,8 +19,6 @@ export function useScheduleStatusCounts() {
     needsScheduling: 0,
     dateOffered: 0,
     readyToBook: 0,
-    dateRejected: 0,
-    offerExpired: 0,
     scheduledToday: 0,
     scheduled: 0,
     completionPending: 0,
@@ -47,13 +43,12 @@ export function useScheduleStatusCounts() {
       }
 
       if (data && typeof data === 'object' && !Array.isArray(data)) {
+        console.log('📊 Raw status counts data:', data);
         const counts = data as unknown as StatusCounts;
-        setCounts({
+        const newCounts = {
           needsScheduling: counts.needsScheduling || 0,
           dateOffered: counts.dateOffered || 0,
           readyToBook: counts.readyToBook || 0,
-          dateRejected: counts.dateRejected || 0,
-          offerExpired: counts.offerExpired || 0,
           scheduledToday: counts.scheduledToday || 0,
           scheduled: counts.scheduled || 0,
           completionPending: counts.completionPending || 0,
@@ -61,7 +56,9 @@ export function useScheduleStatusCounts() {
           cancelled: counts.cancelled || 0,
           onHold: counts.onHold || 0,
           unavailableEngineers: counts.unavailableEngineers || 0
-        });
+        };
+        console.log('📊 Processed counts:', newCounts);
+        setCounts(newCounts);
       }
     } catch (error) {
       console.error('Error fetching status counts:', error);

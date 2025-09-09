@@ -146,8 +146,6 @@ export function ScheduleStatusNavigation({ currentStatus }: ScheduleStatusNaviga
     'needs-scheduling': counts.needsScheduling,
     'date-offered': counts.dateOffered,
     'ready-to-book': counts.readyToBook,
-    'date-rejected': counts.dateRejected,
-    'offer-expired': counts.offerExpired,
     'scheduled': counts.scheduled,
     'completion-pending': counts.completionPending,
     'completed': counts.completed,
