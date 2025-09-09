@@ -44,6 +44,22 @@ const statusTiles: StatusTile[] = [
     statusKey: 'ready-to-book'
   },
   {
+    id: 'date_rejected',
+    title: 'Date Rejected',
+    icon: Ban,
+    colorClass: 'bg-gradient-to-br from-pink-50 to-pink-100 border-pink-200 hover:border-pink-300',
+    route: '/admin/schedule/status/date-rejected',
+    statusKey: 'date-rejected'
+  },
+  {
+    id: 'offer_expired',
+    title: 'Expired Offers',
+    icon: Clock,
+    colorClass: 'bg-gradient-to-br from-gray-50 to-gray-100 border-gray-200 hover:border-gray-300',
+    route: '/admin/schedule/status/offer-expired',
+    statusKey: 'offer-expired'
+  },
+  {
     id: 'scheduled',
     title: 'Scheduled',
     icon: Calendar,
@@ -74,22 +90,6 @@ const statusTiles: StatusTile[] = [
     colorClass: 'bg-gradient-to-br from-red-50 to-red-100 border-red-200 hover:border-red-300',
     route: '/admin/schedule/status/cancelled',
     statusKey: 'cancelled'
-  },
-  {
-    id: 'date_rejected',
-    title: 'Date Rejected',
-    icon: Ban,
-    colorClass: 'bg-gradient-to-br from-red-50 to-red-100 border-red-200 hover:border-red-300',
-    route: '/admin/schedule/status/date-rejected',
-    statusKey: 'date-rejected'
-  },
-  {
-    id: 'offer_expired',
-    title: 'Expired Offers',
-    icon: AlertTriangle,
-    colorClass: 'bg-gradient-to-br from-gray-50 to-gray-100 border-gray-200 hover:border-gray-300',
-    route: '/admin/schedule/status/offer-expired',
-    statusKey: 'offer-expired'
   },
   {
     id: 'on_hold',
@@ -146,6 +146,8 @@ export function ScheduleStatusNavigation({ currentStatus }: ScheduleStatusNaviga
     'needs-scheduling': counts.needsScheduling,
     'date-offered': counts.dateOffered,
     'ready-to-book': counts.readyToBook,
+    'date-rejected': counts.dateRejected,
+    'offer-expired': counts.offerExpired,
     'scheduled': counts.scheduled,
     'completion-pending': counts.completionPending,
     'completed': counts.completed,
