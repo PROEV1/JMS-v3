@@ -21,8 +21,8 @@ export function RootRedirect() {
     sessionStorage.removeItem('lastAuthenticatedPath');
     sessionStorage.removeItem('authRedirectPath');
     
-    // Force redirect to admin if we're on the wrong path
-    if (window.location.pathname === '/partner') {
+    // Only redirect if we're on problematic paths, but not auth
+    if (window.location.pathname === '/partner' && user) {
       console.log('🔍 LEE - FORCE REDIRECTING from /partner to /admin');
       window.location.href = '/admin';
       return null;

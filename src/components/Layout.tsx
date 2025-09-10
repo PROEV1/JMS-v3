@@ -129,7 +129,7 @@ export default function Layout({ children }: LayoutProps) {
       shouldBeAdmin: userRole === 'standard_office_user' || userRole === 'admin'
     });
     
-    // Force lee to admin section regardless of other conditions
+    // Force lee to admin section regardless of other conditions, but NOT if on auth routes
     if (currentPath === '/' || currentPath === '/partner') {
       console.log('🔥 LAYOUT - Force redirecting Lee to /admin from:', currentPath);
       return <Navigate to="/admin" replace />;
