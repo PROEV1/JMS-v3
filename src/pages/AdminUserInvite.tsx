@@ -18,7 +18,7 @@ export default function AdminUserInvite() {
   const [formData, setFormData] = useState({
     email: '',
     full_name: '',
-    role: 'client' as 'admin' | 'client' | 'engineer' | 'manager'
+    role: 'client' as 'admin' | 'client' | 'engineer' | 'manager' | 'standard_office_user'
   });
   const [passwordData, setPasswordData] = useState({
     password: '',
@@ -224,6 +224,7 @@ export default function AdminUserInvite() {
                           <SelectContent>
                             <SelectItem value="client">Client</SelectItem>
                             <SelectItem value="engineer">Engineer</SelectItem>
+                            <SelectItem value="standard_office_user">Office User</SelectItem>
                             <SelectItem value="manager">Manager</SelectItem>
                             <SelectItem value="admin">Admin</SelectItem>
                           </SelectContent>
@@ -231,6 +232,7 @@ export default function AdminUserInvite() {
                         <p className="text-sm text-muted-foreground mt-1">
                           {formData.role === 'client' && "Can view their own orders and quotes"}
                           {formData.role === 'engineer' && "Can manage installation jobs and update job status"}
+                          {formData.role === 'standard_office_user' && "Can view and manage office operations"}
                           {formData.role === 'manager' && "Can manage leads, quotes, and orders"}
                           {formData.role === 'admin' && "Full system access and user management"}
                         </p>
@@ -300,6 +302,7 @@ export default function AdminUserInvite() {
                           <SelectContent>
                             <SelectItem value="client">Client</SelectItem>
                             <SelectItem value="engineer">Engineer</SelectItem>
+                            <SelectItem value="standard_office_user">Office User</SelectItem>
                             <SelectItem value="manager">Manager</SelectItem>
                             <SelectItem value="admin">Admin</SelectItem>
                           </SelectContent>
@@ -307,6 +310,7 @@ export default function AdminUserInvite() {
                         <p className="text-sm text-muted-foreground mt-1">
                           {formData.role === 'client' && "Can view their own orders and quotes"}
                           {formData.role === 'engineer' && "Can manage installation jobs and update job status"}
+                          {formData.role === 'standard_office_user' && "Can view and manage office operations"}
                           {formData.role === 'manager' && "Can manage leads, quotes, and orders"}
                           {formData.role === 'admin' && "Full system access and user management"}
                         </p>
