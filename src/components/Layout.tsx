@@ -19,6 +19,16 @@ export default function Layout({ children }: LayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
 
+  // CRITICAL DEBUG: Log every Layout render for Lee
+  console.log('🔥🔥🔥 LAYOUT RENDER:', {
+    email: user?.email,
+    userRole,
+    currentPath: location.pathname,
+    loading,
+    roleLoading,
+    timestamp: new Date().toISOString()
+  });
+
   // Persist current path for redirect after auth (including search params and hash)
   useEffect(() => {
     if (user) {

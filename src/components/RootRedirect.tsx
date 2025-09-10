@@ -43,6 +43,15 @@ export function RootRedirect() {
     return <Navigate to="/auth" replace />;
   }
 
+  // CRITICAL DEBUG: More aggressive logging
+  console.log('🔥🔥🔥 ROOTREDIRECT ABOUT TO REDIRECT:', {
+    email: user?.email,
+    role,
+    userMetadataRole: user?.user_metadata?.role,
+    currentURL: window.location.href,
+    timestamp: new Date().toISOString()
+  });
+
   // Redirect based on user role
   let redirectTo = '/admin'; // Default fallback
   
