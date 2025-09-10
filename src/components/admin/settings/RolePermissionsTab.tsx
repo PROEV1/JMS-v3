@@ -48,8 +48,8 @@ interface PageAccess {
 
 const ACCESS_LEVELS = {
   none: { color: 'destructive', icon: X, label: 'No Access' },
-  read: { color: 'secondary', icon: Eye, label: 'Read Only' },
-  write: { color: 'default', icon: Edit, label: 'Read & Write' },
+  read: { color: 'outline', icon: Eye, label: 'Read Only' },
+  write: { color: 'secondary', icon: Edit, label: 'Read & Write' },
   full: { color: 'default', icon: Check, label: 'Full Access' }
 } as const;
 
@@ -350,7 +350,10 @@ export function RolePermissionsTab() {
     const IconComponent = config.icon;
     
     return (
-      <Badge variant={config.color as any} className="flex items-center gap-1 text-xs">
+      <Badge 
+        variant={config.color as any} 
+        className="flex items-center gap-1.5 text-xs font-medium min-w-[90px] justify-center"
+      >
         <IconComponent className="w-3 h-3" />
         {config.label}
       </Badge>
