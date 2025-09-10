@@ -61,27 +61,23 @@ export function useUserRole() {
         // Apply role precedence: admin/manager first, then partner, then others
         let finalRole: UserRole = null;
 
-        // Check profile role first (admin/manager takes precedence)
+        // Check profile role first - all profile roles take precedence over partner roles
         if (profileData && profileData.status === 'active') {
           const profileRole = profileData.role as UserRole;
           console.log('useUserRole: Found active profile, role:', profileRole);
-          
-          if (profileRole === 'admin' || profileRole === 'manager') {
-            finalRole = profileRole;
-            console.log('useUserRole: Setting high-precedence role:', finalRole);
-          } else {
-            // Store other profile roles as fallback
-            finalRole = profileRole;
-          }
+          finalRole = profileRole;
+          console.log('useUserRole: Setting profile role as final:', finalRole);
         }
 
-        // If no high-precedence profile role, check partner role
-        if (!finalRole || (finalRole !== 'admin' && finalRole !== 'manager')) {
+        // Only check for partner role if no profile role exists
+        if (!finalRole) {
           if (partnerUser && !partnerError) {
             console.log('useUserRole: User is a partner, considering partner role');
             finalRole = 'partner';
           }
         }
+
+        console.log('useUserRole: After partner check, finalRole:', finalRole);
 
         console.log('useUserRole: Final role determined:', finalRole);
         setRole(finalRole);
