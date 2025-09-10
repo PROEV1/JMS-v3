@@ -6,6 +6,8 @@ import { WeeklyCapacityView } from '@/components/scheduling/WeeklyCapacityView';
 import { ProEVLogo } from '@/components/ProEVLogo';
 
 export default function OpsCommandCentre() {
+  console.log('🎯 OpsCommandCentre component is rendering');
+  
   return (
     <div className="container mx-auto py-6 space-y-8">
       {/* Header */}

@@ -4,6 +4,8 @@ import { PartnerAuth } from '@/components/partner/PartnerAuth';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export default function PartnerPortal() {
+  console.log('🚨 PartnerPortal component is rendering - this should NOT happen for lee@proev.co.uk');
+  
   const { partnerUser, loading, isPartnerUser } = usePartnerAuth();
 
   // Remove redirect logic - let component handle auth internally
