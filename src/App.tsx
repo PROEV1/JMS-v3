@@ -20,6 +20,7 @@ import AdminLeads from '@/pages/AdminLeads';
 import AdminProducts from '@/pages/AdminProducts';
 import AdminInventory from '@/pages/AdminInventory';
 import AdminSurveyForms from '@/pages/AdminSurveyForms';
+import AdminSurveyFormEdit from '@/pages/AdminSurveyFormEdit';
 import AdminChargers from '@/pages/AdminChargers';
 import AdminPartners from '@/pages/AdminPartners';
 import AdminPartnerProfiles from '@/pages/AdminPartnerProfiles';
@@ -127,6 +128,7 @@ function App() {
         <Route path="/admin/products" element={<ProtectedRoute><Layout><AdminProducts /></Layout></ProtectedRoute>} />
         <Route path="/admin/inventory" element={<ProtectedRoute><Layout><AdminInventory /></Layout></ProtectedRoute>} />
         <Route path="/admin/survey-forms" element={<ProtectedRoute><Layout><AdminSurveyForms /></Layout></ProtectedRoute>} />
+        <Route path="/admin/survey-forms/:versionId/edit" element={<ProtectedRoute><Layout><AdminSurveyFormEdit /></Layout></ProtectedRoute>} />
         <Route path="/admin/chargers" element={<ProtectedRoute><Layout><AdminChargers /></Layout></ProtectedRoute>} />
         <Route path="/admin/partners" element={<ProtectedRoute><Layout><AdminPartners /></Layout></ProtectedRoute>} />
         <Route path="/admin/partners/:id/users" element={<ProtectedRoute><Layout><AdminPartnerUsers /></Layout></ProtectedRoute>} />
