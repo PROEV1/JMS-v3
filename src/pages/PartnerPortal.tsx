@@ -5,6 +5,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 export default function PartnerPortal() {
   console.log('🚨 PartnerPortal component is rendering - this should NOT happen for lee@proev.co.uk');
+  console.log('🚨 Current URL pathname:', window.location.pathname); 
+  console.log('🚨 Current URL full:', window.location.href);
   
   const { partnerUser, loading, isPartnerUser } = usePartnerAuth();
 

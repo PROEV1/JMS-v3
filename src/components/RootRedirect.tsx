@@ -14,11 +14,19 @@ export function RootRedirect() {
     console.log('🔍 LEE - Role detected:', role);  
     console.log('🔍 LEE - User metadata role:', user?.user_metadata?.role);
     console.log('🔍 LEE - Loading states:', {loading, roleLoading});
+    console.log('🔍 LEE - Current URL:', window.location.href);
     
     // Clear any problematic saved paths
     console.log('🔍 LEE - Clearing potentially problematic saved paths');
     sessionStorage.removeItem('lastAuthenticatedPath');
     sessionStorage.removeItem('authRedirectPath');
+    
+    // Force redirect to admin if we're on the wrong path
+    if (window.location.pathname === '/partner') {
+      console.log('🔍 LEE - FORCE REDIRECTING from /partner to /admin');
+      window.location.href = '/admin';
+      return null;
+    }
   }
 
   if (loading || roleLoading) {
