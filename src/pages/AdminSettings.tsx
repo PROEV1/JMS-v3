@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { BrandPage, BrandContainer, BrandHeading1 } from '@/components/brand';
 import { DesignVersionToggle } from '@/components/admin/DesignVersionToggle';
+import { RolePermissionsTab } from '@/components/admin/settings/RolePermissionsTab';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -322,7 +323,7 @@ export default function AdminSettings() {
           )}
 
           <Tabs defaultValue="quotes" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-9">
+            <TabsList className="grid w-full grid-cols-10">
               <TabsTrigger value="quotes" className="flex items-center space-x-2">
                 <Settings className="h-4 w-4" />
                 <span>Quotes</span>
@@ -354,6 +355,10 @@ export default function AdminSettings() {
               <TabsTrigger value="design" className="flex items-center space-x-2">
                 <Palette className="h-4 w-4" />
                 <span>Design</span>
+              </TabsTrigger>
+              <TabsTrigger value="permissions" className="flex items-center space-x-2">
+                <Shield className="h-4 w-4" />
+                <span>Permissions</span>
               </TabsTrigger>
               <TabsTrigger value="system" className="flex items-center space-x-2">
                 <Settings className="h-4 w-4" />
@@ -980,6 +985,11 @@ export default function AdminSettings() {
             {/* Design Version Control */}
             <TabsContent value="design" className="space-y-6">
               <DesignVersionToggle />
+            </TabsContent>
+
+            {/* Role Permissions */}
+            <TabsContent value="permissions" className="space-y-6">
+              <RolePermissionsTab />
             </TabsContent>
 
             {/* System Settings */}
