@@ -63,9 +63,19 @@ export default function AdminUserInvite() {
 
     } catch (error: any) {
       console.error('Error sending invitation:', error);
+      
+      let errorMessage = "Failed to send invitation";
+      if (error.message?.includes('Missing environment variables')) {
+        errorMessage = "Email service is not configured. Please contact system administrator.";
+      } else if (error.message?.includes('RESEND_API_KEY')) {
+        errorMessage = "Email service is not configured. Please contact system administrator.";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       toast({
         title: "Error",
-        description: error.message || "Failed to send invitation",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -134,9 +144,19 @@ export default function AdminUserInvite() {
 
     } catch (error: any) {
       console.error('Error creating user with password:', error);
+      
+      let errorMessage = "Failed to create user account";
+      if (error.message?.includes('already been registered') || error.message?.includes('email_exists')) {
+        errorMessage = "A user with this email address already exists. Please use a different email or check the existing users.";
+      } else if (error.message?.includes('Invalid email')) {
+        errorMessage = "Please enter a valid email address.";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       toast({
         title: "Error",
-        description: error.message || "Failed to create user account",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
