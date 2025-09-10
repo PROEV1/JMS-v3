@@ -4,13 +4,23 @@ import { Button } from '@/components/ui/button';
 import { SurveyFormBuilder } from '@/components/admin/forms/SurveyFormBuilder';
 import { useSurveyFormVersion, useUpdateSurveyFormVersion, usePublishSurveyFormVersion, useCreateNewDraftVersion } from '@/hooks/useSurveyForms';
 import { useToast } from '@/hooks/use-toast';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 export default function AdminSurveyFormEdit() {
   const { versionId } = useParams<{ versionId: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
   
-  const { data: version, isLoading } = useSurveyFormVersion(versionId!);
+  // Debug logging
+  console.log('AdminSurveyFormEdit: versionId =', versionId);
+  
+  const { data: version, isLoading, error } = useSurveyFormVersion(versionId!);
+  
+  // Debug logging
+  console.log('AdminSurveyFormEdit: version =', version);
+  console.log('AdminSurveyFormEdit: isLoading =', isLoading);
+  console.log('AdminSurveyFormEdit: error =', error);
+  
   const updateVersion = useUpdateSurveyFormVersion();
   const publishVersion = usePublishSurveyFormVersion();
   const createNewDraft = useCreateNewDraftVersion();
@@ -20,7 +30,9 @@ export default function AdminSurveyFormEdit() {
   const [isPublished, setIsPublished] = useState(false);
 
   useEffect(() => {
+    console.log('AdminSurveyFormEdit: useEffect triggered with version:', version);
     if (version?.schema) {
+      console.log('AdminSurveyFormEdit: Setting schema:', version.schema);
       setLocalSchema(version.schema);
       setIsPublished(version.status === 'published');
     } else if (version && !version.schema) {
@@ -32,7 +44,25 @@ export default function AdminSurveyFormEdit() {
         variant: "destructive"
       });
     }
-  }, [version?.schema, version?.status, toast]);
+  }, [version?.schema, version?.status, toast, version]);
+
+  // Show error if query failed
+  if (error) {
+    console.error('AdminSurveyFormEdit: Query error:', error);
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold mb-2">Error Loading Survey Form</h2>
+          <p className="text-muted-foreground mb-4">
+            Failed to load survey form: {error.message}
+          </p>
+          <Button onClick={() => navigate('/admin/survey-forms')}>
+            Back to Survey Forms
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -141,15 +171,17 @@ export default function AdminSurveyFormEdit() {
   };
 
   return (
-    <SurveyFormBuilder
-      schema={localSchema}
-      onSchemaChange={handleSchemaChange}
-      onSave={handleSave}
-      onPublish={handlePublish}
-      canPublish={!isPublished}
-      isPublished={isPublished}
-      saving={updateVersion.isPending}
-      publishing={publishVersion.isPending}
-    />
+    <ErrorBoundary>
+      <SurveyFormBuilder
+        schema={localSchema}
+        onSchemaChange={handleSchemaChange}
+        onSave={handleSave}
+        onPublish={handlePublish}
+        canPublish={!isPublished}
+        isPublished={isPublished}
+        saving={updateVersion.isPending}
+        publishing={publishVersion.isPending}
+      />
+    </ErrorBoundary>
   );
 }

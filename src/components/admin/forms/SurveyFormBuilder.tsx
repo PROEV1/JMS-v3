@@ -31,6 +31,33 @@ export function SurveyFormBuilder({
   saving,
   publishing
 }: SurveyFormBuilderProps) {
+  console.log('SurveyFormBuilder: Rendering with schema:', schema);
+  
+  // Safety check
+  if (!schema) {
+    console.error('SurveyFormBuilder: No schema provided');
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold mb-2">Invalid Schema</h2>
+          <p className="text-muted-foreground mb-4">No schema data provided to form builder.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!schema.steps || !Array.isArray(schema.steps)) {
+    console.error('SurveyFormBuilder: Invalid schema steps:', schema.steps);
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold mb-2">Invalid Schema Format</h2>
+          <p className="text-muted-foreground mb-4">The schema format is invalid or corrupted.</p>
+        </div>
+      </div>
+    );
+  }
+
   const [selectedStepKey, setSelectedStepKey] = useState<string | null>(
     schema.steps.length > 0 ? schema.steps[0].key : null
   );
@@ -38,7 +65,11 @@ export function SurveyFormBuilder({
   const [showFieldPalette, setShowFieldPalette] = useState(false);
   const { toast } = useToast();
 
+  console.log('SurveyFormBuilder: selectedStepKey =', selectedStepKey);
+  console.log('SurveyFormBuilder: schema.steps =', schema.steps);
+
   const selectedStep = schema.steps.find(step => step.key === selectedStepKey);
+  console.log('SurveyFormBuilder: selectedStep =', selectedStep);
 
   const handleStepReorder = (result: DropResult) => {
     if (!result.destination) return;
