@@ -24,6 +24,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
+        
+        // Update last_login when user signs in (not on token refresh or other events)
+        if (event === 'SIGNED_IN' && session?.user) {
+          setTimeout(() => {
+            updateLastLogin(session.user.id);
+          }, 0);
+        }
       }
     );
 
@@ -38,6 +45,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  const updateLastLogin = async (userId: string) => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ last_login: new Date().toISOString() })
+        .eq('user_id', userId);
+      
+      if (error) {
+        console.error('Error updating last login:', error);
+      } else {
+        console.log('Last login updated successfully');
+      }
+    } catch (error) {
+      console.error('Error updating last login:', error);
+    }
+  };
 
   const signOut = async () => {
     console.log('🔴 signOut function called');

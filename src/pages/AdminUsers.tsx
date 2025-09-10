@@ -308,9 +308,11 @@ export default function AdminUsers() {
                       {user.status}
                     </Badge>
                   </TableCell>
-                  <TableCell>
-                    {user.last_login ? format(new Date(user.last_login), 'MMM dd, yyyy') : 'Never'}
-                  </TableCell>
+                   <TableCell>
+                     {user.last_login 
+                       ? format(new Date(user.last_login), 'MMM dd, yyyy h:mm a') 
+                       : 'Never'}
+                   </TableCell>
                   <TableCell>
                     {format(new Date(user.created_at), 'MMM dd, yyyy')}
                   </TableCell>
