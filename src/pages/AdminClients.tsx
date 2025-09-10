@@ -218,6 +218,35 @@ export default function AdminClients() {
             </Button>
           </div>
 
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center space-x-2">
+                  <User className="h-4 w-4 text-primary" />
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Total Clients</p>
+                    <p className="text-2xl font-bold text-primary">{totalCount}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center space-x-2">
+                  <Calendar className="h-4 w-4 text-brand-green" />
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      {searchTerm || dateFilter !== 'all' || clientTypeFilter !== 'all' ? 'Filtered Results' : 'This Month'}
+                    </p>
+                    <p className="text-2xl font-bold text-primary">{thisMonthCount}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
           {/* Search and Filters */}
           <Card>
             <CardHeader>
@@ -276,35 +305,6 @@ export default function AdminClients() {
               </div>
             </CardContent>
           </Card>
-
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center space-x-2">
-                  <User className="h-4 w-4 text-primary" />
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Total Clients</p>
-                    <p className="text-2xl font-bold text-primary">{totalCount}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center space-x-2">
-                  <Calendar className="h-4 w-4 text-brand-green" />
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">
-                      {searchTerm || dateFilter !== 'all' || clientTypeFilter !== 'all' ? 'Filtered Results' : 'This Month'}
-                    </p>
-                    <p className="text-2xl font-bold text-primary">{thisMonthCount}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
 
           {/* Clients List */}
           <Card>
