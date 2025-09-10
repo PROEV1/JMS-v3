@@ -8,10 +8,13 @@ export function RootRedirect() {
 
   console.log('RootRedirect - user:', user?.email, 'user_id:', user?.id, 'role:', role, 'loading:', loading, 'roleLoading:', roleLoading);
   
-  // Add more detailed debugging
-  console.log('RootRedirect - Full user object:', user);
-  console.log('RootRedirect - Auth loading state:', loading);
-  console.log('RootRedirect - Role loading state:', roleLoading);
+  // Add more detailed debugging for lee@proev.co.uk specifically
+  if (user?.email === 'lee@proev.co.uk') {
+    console.log('🔍 LEE DEBUG - Full user object:', user);
+    console.log('🔍 LEE DEBUG - Role detected:', role);
+    console.log('🔍 LEE DEBUG - Auth loading state:', loading);
+    console.log('🔍 LEE DEBUG - Role loading state:', roleLoading);
+  }
 
   if (loading || roleLoading) {
     console.log('RootRedirect - showing loading spinner');
