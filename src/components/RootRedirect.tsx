@@ -14,6 +14,11 @@ export function RootRedirect() {
     console.log('🔍 LEE - Role detected:', role);  
     console.log('🔍 LEE - User metadata role:', user?.user_metadata?.role);
     console.log('🔍 LEE - Loading states:', {loading, roleLoading});
+    
+    // Clear any problematic saved paths
+    console.log('🔍 LEE - Clearing potentially problematic saved paths');
+    sessionStorage.removeItem('lastAuthenticatedPath');
+    sessionStorage.removeItem('authRedirectPath');
   }
 
   if (loading || roleLoading) {

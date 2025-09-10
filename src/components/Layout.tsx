@@ -116,7 +116,7 @@ export default function Layout({ children }: LayoutProps) {
     
     if (userRole === 'partner') {
       redirectTo = '/partner';
-    } else if (userRole === 'admin' || userRole === 'manager') {
+    } else if (userRole === 'admin' || userRole === 'manager' || userRole === 'standard_office_user') {
       redirectTo = '/admin';
     } else if (userRole === 'engineer') {
       redirectTo = '/engineer';
