@@ -7,7 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
-import { Search, User, Mail, Phone, MapPin, Calendar, Plus } from 'lucide-react';
+import { Search, User, Mail, Phone, MapPin, Calendar, Plus, Filter, X } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { BrandPage, BrandContainer, BrandHeading1, BrandLoading } from '@/components/brand';
 import { CreateClientModal } from '@/components/CreateClientModal';
 import { useServerPagination } from '@/hooks/useServerPagination';
@@ -19,14 +20,19 @@ interface Client {
   email: string;
   phone: string | null;
   address: string | null;
+  postcode: string | null;
   created_at: string;
   user_id: string;
+  is_partner_client: boolean | null;
+  partner_id: string | null;
 }
 
 export default function AdminClients() {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [dateFilter, setDateFilter] = useState<string>('all');
+  const [clientTypeFilter, setClientTypeFilter] = useState<string>('all');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
   const [thisMonthCount, setThisMonthCount] = useState(0);
@@ -47,14 +53,22 @@ export default function AdminClients() {
     });
   };
 
-  // Reset to first page when search term changes
+  const clearFilters = () => {
+    setSearchTerm('');
+    setDateFilter('all');
+    setClientTypeFilter('all');
+  };
+
+  const hasActiveFilters = searchTerm || dateFilter !== 'all' || clientTypeFilter !== 'all';
+
+  // Reset to first page when search term or filters change
   useEffect(() => {
     controls.resetToFirstPage();
-  }, [searchTerm]);
+  }, [searchTerm, dateFilter, clientTypeFilter]);
 
   useEffect(() => {
     fetchClients();
-  }, [pagination.page, pagination.pageSize, searchTerm]);
+  }, [pagination.page, pagination.pageSize, searchTerm, dateFilter, clientTypeFilter]);
 
   const fetchClients = async () => {
     try {
@@ -69,7 +83,49 @@ export default function AdminClients() {
       // Apply comprehensive search filter if present
       if (searchTerm.trim()) {
         const searchPattern = `%${searchTerm}%`;
-        query = query.or(`full_name.ilike.${searchPattern},email.ilike.${searchPattern},phone.ilike.${searchPattern},address.ilike.${searchPattern}`);
+        query = query.or(`full_name.ilike.${searchPattern},email.ilike.${searchPattern},phone.ilike.${searchPattern},address.ilike.${searchPattern},postcode.ilike.${searchPattern}`);
+      }
+
+      // Apply date filter
+      if (dateFilter !== 'all') {
+        const now = new Date();
+        let dateThreshold: Date;
+
+        switch (dateFilter) {
+          case 'today':
+            dateThreshold = new Date();
+            dateThreshold.setHours(0, 0, 0, 0);
+            break;
+          case 'week':
+            dateThreshold = new Date();
+            dateThreshold.setDate(now.getDate() - 7);
+            break;
+          case 'month':
+            dateThreshold = new Date();
+            dateThreshold.setMonth(now.getMonth() - 1);
+            break;
+          case '3months':
+            dateThreshold = new Date();
+            dateThreshold.setMonth(now.getMonth() - 3);
+            break;
+          case '6months':
+            dateThreshold = new Date();
+            dateThreshold.setMonth(now.getMonth() - 6);
+            break;
+          default:
+            dateThreshold = new Date(0);
+        }
+
+        query = query.gte('created_at', dateThreshold.toISOString());
+      }
+
+      // Apply client type filter
+      if (clientTypeFilter !== 'all') {
+        if (clientTypeFilter === 'partner') {
+          query = query.eq('is_partner_client', true);
+        } else if (clientTypeFilter === 'direct') {
+          query = query.or('is_partner_client.is.null,is_partner_client.eq.false');
+        }
       }
 
       // Apply pagination
@@ -81,8 +137,8 @@ export default function AdminClients() {
       setClients(data || []);
       setTotalCount(count || 0);
 
-      // Fetch this month's count separately (but only if not searching)
-      if (!searchTerm.trim()) {
+      // Fetch this month's count separately (but only if not searching/filtering)
+      if (!searchTerm.trim() && dateFilter === 'all' && clientTypeFilter === 'all') {
         const startOfMonth = new Date();
         startOfMonth.setDate(1);
         startOfMonth.setHours(0, 0, 0, 0);
@@ -95,7 +151,7 @@ export default function AdminClients() {
         if (monthError) throw monthError;
         setThisMonthCount(monthCount || 0);
       } else {
-        // When searching, show the current result count as "this month"
+        // When searching/filtering, show the current result count as "this month"
         setThisMonthCount(count || 0);
       }
 
@@ -162,16 +218,64 @@ export default function AdminClients() {
             </Button>
           </div>
 
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search clients by name, email, phone, or address..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
+          {/* Search and Filters */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Filter className="h-5 w-5" />
+                Search & Filter Clients
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex gap-4 flex-wrap">
+                <div className="relative flex-1 min-w-64">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search clients by name, email, phone, address..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                
+                <Select value={dateFilter} onValueChange={setDateFilter}>
+                  <SelectTrigger className="w-48">
+                    <SelectValue placeholder="Filter by date" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Time</SelectItem>
+                    <SelectItem value="today">Today</SelectItem>
+                    <SelectItem value="week">Last 7 Days</SelectItem>
+                    <SelectItem value="month">Last Month</SelectItem>
+                    <SelectItem value="3months">Last 3 Months</SelectItem>
+                    <SelectItem value="6months">Last 6 Months</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Select value={clientTypeFilter} onValueChange={setClientTypeFilter}>
+                  <SelectTrigger className="w-40">
+                    <SelectValue placeholder="Client type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Clients</SelectItem>
+                    <SelectItem value="direct">Direct Clients</SelectItem>
+                    <SelectItem value="partner">Partner Clients</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {hasActiveFilters && (
+                  <Button 
+                    variant="outline" 
+                    onClick={clearFilters}
+                    className="flex items-center gap-2"
+                  >
+                    <X className="h-4 w-4" />
+                    Clear Filters
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -193,7 +297,7 @@ export default function AdminClients() {
                   <Calendar className="h-4 w-4 text-brand-green" />
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">
-                      {searchTerm ? 'Search Results' : 'This Month'}
+                      {searchTerm || dateFilter !== 'all' || clientTypeFilter !== 'all' ? 'Filtered Results' : 'This Month'}
                     </p>
                     <p className="text-2xl font-bold text-primary">{thisMonthCount}</p>
                   </div>
@@ -211,6 +315,7 @@ export default function AdminClients() {
                   <TableHead>Email</TableHead>
                   <TableHead>Phone</TableHead>
                   <TableHead>Address</TableHead>
+                  <TableHead>Type</TableHead>
                   <TableHead>Joined</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -241,6 +346,11 @@ export default function AdminClients() {
                       <div className="max-w-xs truncate">
                         {client.address || '-'}
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={client.is_partner_client ? "secondary" : "outline"}>
+                        {client.is_partner_client ? "Partner" : "Direct"}
+                      </Badge>
                     </TableCell>
                     <TableCell className="brand-body">
                       {new Date(client.created_at).toLocaleDateString()}
