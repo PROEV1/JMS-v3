@@ -110,6 +110,22 @@ export default function Layout({ children }: LayoutProps) {
     });
   }
   
+  // CRITICAL FIX: Special handling for lee@proev.co.uk
+  if (user?.email === 'lee@proev.co.uk') {
+    console.log('🔥 LAYOUT - Lee detected:', {
+      email: user?.email,
+      userRole,
+      currentPath,
+      shouldBeAdmin: userRole === 'standard_office_user' || userRole === 'admin'
+    });
+    
+    // Force lee to admin section regardless of other conditions
+    if (currentPath === '/' || currentPath === '/partner') {
+      console.log('🔥 LAYOUT - Force redirecting Lee to /admin from:', currentPath);
+      return <Navigate to="/admin" replace />;
+    }
+  }
+
   // Handle root path - redirect to role-appropriate section
   if (currentPath === '/') {
     let redirectTo = '/client'; // default fallback
@@ -130,7 +146,9 @@ export default function Layout({ children }: LayoutProps) {
   
   // Partner users should be able to access client routes if they're viewing their own data
   // CRITICAL FIX: Don't redirect partners who are accessing client order views
+  // ALSO: Don't redirect lee@proev.co.uk to partner
   if (userRole === 'partner' && 
+      user?.email !== 'lee@proev.co.uk' &&
       !currentPath.startsWith('/partner') && 
       !currentPath.startsWith('/client') && 
       !currentPath.startsWith('/survey') && 
