@@ -2,7 +2,8 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from '@/components/ui/toaster';
-import { RootRedirect } from '@/components/RootRedirect';
+import { AuthProvider } from '@/contexts/AuthContext';
+import { RouteGuard } from '@/components/RouteGuard';
 import OpsCommandCentre from '@/pages/OpsCommandCentre';
 import AdminQuotes from '@/pages/AdminQuotes';
 import AdminQuoteCreate from '@/pages/AdminQuoteCreate';
@@ -37,8 +38,7 @@ import AdminMessages from '@/pages/AdminMessages';
 import AdminClientDetail from '@/pages/AdminClientDetail';
 import AdminPartnerQuotes from '@/pages/AdminPartnerQuotes';
 import Auth from '@/pages/Auth';
-import Layout from '@/components/Layout';
-import { ProtectedRoute } from '@/components/ProtectedRoute';
+import Layout from '@/components/SimpleLayout';
 import ClientDashboard from '@/pages/ClientDashboard';
 import ClientQuotes from '@/pages/ClientQuotes';
 import ClientQuoteDetail from '@/pages/ClientQuoteDetail';
@@ -62,11 +62,12 @@ import PartnerPortal from '@/pages/PartnerPortal';
 function App() {
   return (
     <Router>
-      <Toaster />
-      <Routes>
-        <Route path="/" element={<RootRedirect />} />
-        <Route path="/login" element={<Auth />} />
-        <Route path="/auth" element={<Auth />} />
+      <AuthProvider>
+        <Toaster />
+        <Routes>
+          {/* Public routes */}
+          <Route path="/login" element={<Auth />} />
+          <Route path="/auth" element={<Auth />} />
         <Route path="/quote/:token" element={<PublicQuoteView />} />
         <Route path="/offers/:token" element={
           <ErrorBoundaryRoute>
@@ -89,62 +90,66 @@ function App() {
         <Route path="/survey/:orderId/success" element={<SurveySuccess />} />
         <Route path="/survey-view/:orderId" element={<SurveyReadOnlyView />} />
         
+        {/* Root redirect */}
+        <Route path="/" element={<RouteGuard><Layout><OpsCommandCentre /></Layout></RouteGuard>} />
+        
         {/* Client Routes */}
-        <Route path="/client" element={<ProtectedRoute><Layout><ClientDashboard /></Layout></ProtectedRoute>} />
-        <Route path="/client/quotes" element={<ProtectedRoute><Layout><ClientQuotes /></Layout></ProtectedRoute>} />
-        <Route path="/client/quotes/:id" element={<ProtectedRoute><Layout><ClientQuoteDetail /></Layout></ProtectedRoute>} />
-        <Route path="/client/orders" element={<ProtectedRoute><Layout><ClientOrders /></Layout></ProtectedRoute>} />
-        <Route path="/client/orders/:id" element={<ProtectedRoute><Layout><EnhancedClientOrderView /></Layout></ProtectedRoute>} />
-        <Route path="/client/messages" element={<ProtectedRoute><Layout><ClientMessages /></Layout></ProtectedRoute>} />
-        <Route path="/client/payments" element={<ProtectedRoute><Layout><ClientPayments /></Layout></ProtectedRoute>} />
-        <Route path="/client/profile" element={<ProtectedRoute><Layout><ClientProfilePage /></Layout></ProtectedRoute>} />
+        <Route path="/client" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><ClientDashboard /></Layout></RouteGuard>} />
+        <Route path="/client/quotes" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><ClientQuotes /></Layout></RouteGuard>} />
+        <Route path="/client/quotes/:id" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><ClientQuoteDetail /></Layout></RouteGuard>} />
+        <Route path="/client/orders" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><ClientOrders /></Layout></RouteGuard>} />
+        <Route path="/client/orders/:id" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><EnhancedClientOrderView /></Layout></RouteGuard>} />
+        <Route path="/client/messages" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><ClientMessages /></Layout></RouteGuard>} />
+        <Route path="/client/payments" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><ClientPayments /></Layout></RouteGuard>} />
+        <Route path="/client/profile" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><ClientProfilePage /></Layout></RouteGuard>} />
         
         {/* Engineer Routes */}
-        <Route path="/engineer" element={<ProtectedRoute><Layout><EngineerDashboard /></Layout></ProtectedRoute>} />
-        <Route path="/engineer/jobs" element={<ProtectedRoute><Layout><EngineerJobs /></Layout></ProtectedRoute>} />
-        <Route path="/engineer/jobs/:id" element={<ProtectedRoute><Layout><EngineerJobDetail /></Layout></ProtectedRoute>} />
-        <Route path="/engineer/chargers" element={<ProtectedRoute><Layout><EngineerChargers /></Layout></ProtectedRoute>} />
-        <Route path="/engineer/van-stock" element={<ProtectedRoute><Layout><EngineerVanStock /></Layout></ProtectedRoute>} />
-        <Route path="/engineer/stock-requests" element={<ProtectedRoute><Layout><EngineerStockRequests /></Layout></ProtectedRoute>} />
-        <Route path="/engineer/scan" element={<ProtectedRoute><Layout><EngineerScan /></Layout></ProtectedRoute>} />
-        <Route path="/engineer/availability" element={<ProtectedRoute><Layout><EngineerAvailability /></Layout></ProtectedRoute>} />
-        <Route path="/engineer/profile" element={<ProtectedRoute><Layout><EngineerProfile /></Layout></ProtectedRoute>} />
+        <Route path="/engineer" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><EngineerDashboard /></Layout></RouteGuard>} />
+        <Route path="/engineer/jobs" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><EngineerJobs /></Layout></RouteGuard>} />
+        <Route path="/engineer/jobs/:id" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><EngineerJobDetail /></Layout></RouteGuard>} />
+        <Route path="/engineer/chargers" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><EngineerChargers /></Layout></RouteGuard>} />
+        <Route path="/engineer/van-stock" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><EngineerVanStock /></Layout></RouteGuard>} />
+        <Route path="/engineer/stock-requests" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><EngineerStockRequests /></Layout></RouteGuard>} />
+        <Route path="/engineer/scan" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><EngineerScan /></Layout></RouteGuard>} />
+        <Route path="/engineer/availability" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><EngineerAvailability /></Layout></RouteGuard>} />
+        <Route path="/engineer/profile" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><EngineerProfile /></Layout></RouteGuard>} />
         
         {/* Partner Routes */}
-        <Route path="/partner" element={<ProtectedRoute><Layout><PartnerPortal /></Layout></ProtectedRoute>} />
+        <Route path="/partner" element={<RouteGuard allowedRoles={['partner_user']}><Layout><PartnerPortal /></Layout></RouteGuard>} />
         
         {/* Admin Routes */}
-        <Route path="/admin" element={<ProtectedRoute><Layout><OpsCommandCentre /></Layout></ProtectedRoute>} />
-        <Route path="/admin/quotes" element={<ProtectedRoute><Layout><AdminQuotes /></Layout></ProtectedRoute>} />
-        <Route path="/admin/quotes/create" element={<ProtectedRoute><Layout><AdminQuoteCreate /></Layout></ProtectedRoute>} />
-        <Route path="/admin/quotes/:id/edit" element={<ProtectedRoute><Layout><AdminQuoteEdit /></Layout></ProtectedRoute>} />
-        <Route path="/admin/quotes/:id" element={<ProtectedRoute><Layout><AdminQuoteDetail /></Layout></ProtectedRoute>} />
-        <Route path="/admin/orders" element={<ProtectedRoute><Layout><AdminOrders /></Layout></ProtectedRoute>} />
-        <Route path="/admin/orders/:id" element={<ProtectedRoute><Layout><OrderDetail /></Layout></ProtectedRoute>} />
-        <Route path="/orders/:id" element={<ProtectedRoute><Layout><OrderDetail /></Layout></ProtectedRoute>} />
-        <Route path="/admin/clients" element={<ProtectedRoute><Layout><AdminClients /></Layout></ProtectedRoute>} />
-        <Route path="/admin/clients/:id" element={<ProtectedRoute><Layout><AdminClientDetail /></Layout></ProtectedRoute>} />
-        <Route path="/admin/leads" element={<ProtectedRoute><Layout><AdminLeads /></Layout></ProtectedRoute>} />
-        <Route path="/admin/products" element={<ProtectedRoute><Layout><AdminProducts /></Layout></ProtectedRoute>} />
-        <Route path="/admin/inventory" element={<ProtectedRoute><Layout><AdminInventory /></Layout></ProtectedRoute>} />
-        <Route path="/admin/survey-forms" element={<ProtectedRoute><Layout><AdminSurveyForms /></Layout></ProtectedRoute>} />
-        <Route path="/admin/survey-forms/:versionId/edit" element={<ProtectedRoute><Layout><AdminSurveyFormEdit /></Layout></ProtectedRoute>} />
-        <Route path="/admin/chargers" element={<ProtectedRoute><Layout><AdminChargers /></Layout></ProtectedRoute>} />
-        <Route path="/admin/partners" element={<ProtectedRoute><Layout><AdminPartners /></Layout></ProtectedRoute>} />
-        <Route path="/admin/partners/:id/users" element={<ProtectedRoute><Layout><AdminPartnerUsers /></Layout></ProtectedRoute>} />
-        <Route path="/admin/partners/:id/profiles" element={<ProtectedRoute><Layout><AdminPartnerProfiles /></Layout></ProtectedRoute>} />
-        <Route path="/admin/engineers" element={<ProtectedRoute><Layout><AdminEngineers /></Layout></ProtectedRoute>} />
-        <Route path="/admin/engineers/:id" element={<ProtectedRoute><Layout><EngineerProfile /></Layout></ProtectedRoute>} />
-        <Route path="/admin/users" element={<ProtectedRoute><Layout><AdminUsers /></Layout></ProtectedRoute>} />
-        <Route path="/admin/users/new" element={<ProtectedRoute><Layout><AdminUserInvite /></Layout></ProtectedRoute>} />
-        <Route path="/admin/users/:id" element={<ProtectedRoute><Layout><AdminUserDetail /></Layout></ProtectedRoute>} />
-        <Route path="/admin/settings" element={<ProtectedRoute><Layout><AdminSettings /></Layout></ProtectedRoute>} />
-        <Route path="/admin/schedule" element={<ProtectedRoute><Layout><AdminSchedule /></Layout></ProtectedRoute>} />
-        <Route path="/admin/schedule/status/:status" element={<ProtectedRoute><Layout><AdminScheduleStatus /></Layout></ProtectedRoute>} />
-        <Route path="/admin/schedule/engineer/:engineerId" element={<ProtectedRoute><Layout><EngineerAvailability /></Layout></ProtectedRoute>} />
-        <Route path="/admin/messages" element={<ProtectedRoute><Layout><AdminMessages /></Layout></ProtectedRoute>} />
-        <Route path="/ops/quotes" element={<ProtectedRoute><Layout><AdminPartnerQuotes /></Layout></ProtectedRoute>} />
-      </Routes>
+        <Route path="/admin" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><OpsCommandCentre /></Layout></RouteGuard>} />
+        <Route path="/admin/quotes" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><AdminQuotes /></Layout></RouteGuard>} />
+        <Route path="/admin/quotes/create" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><AdminQuoteCreate /></Layout></RouteGuard>} />
+        <Route path="/admin/quotes/:id/edit" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><AdminQuoteEdit /></Layout></RouteGuard>} />
+        <Route path="/admin/quotes/:id" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><AdminQuoteDetail /></Layout></RouteGuard>} />
+        <Route path="/admin/orders" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><AdminOrders /></Layout></RouteGuard>} />
+        <Route path="/admin/orders/:id" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><OrderDetail /></Layout></RouteGuard>} />
+        <Route path="/orders/:id" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><OrderDetail /></Layout></RouteGuard>} />
+        <Route path="/admin/clients" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><AdminClients /></Layout></RouteGuard>} />
+        <Route path="/admin/clients/:id" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><AdminClientDetail /></Layout></RouteGuard>} />
+        <Route path="/admin/leads" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><AdminLeads /></Layout></RouteGuard>} />
+        <Route path="/admin/products" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><AdminProducts /></Layout></RouteGuard>} />
+        <Route path="/admin/inventory" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><AdminInventory /></Layout></RouteGuard>} />
+        <Route path="/admin/survey-forms" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><AdminSurveyForms /></Layout></RouteGuard>} />
+        <Route path="/admin/survey-forms/:versionId/edit" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><AdminSurveyFormEdit /></Layout></RouteGuard>} />
+        <Route path="/admin/chargers" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><AdminChargers /></Layout></RouteGuard>} />
+        <Route path="/admin/partners" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><AdminPartners /></Layout></RouteGuard>} />
+        <Route path="/admin/partners/:id/users" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><AdminPartnerUsers /></Layout></RouteGuard>} />
+        <Route path="/admin/partners/:id/profiles" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><AdminPartnerProfiles /></Layout></RouteGuard>} />
+        <Route path="/admin/engineers" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><AdminEngineers /></Layout></RouteGuard>} />
+        <Route path="/admin/engineers/:id" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><EngineerProfile /></Layout></RouteGuard>} />
+        <Route path="/admin/users" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><AdminUsers /></Layout></RouteGuard>} />
+        <Route path="/admin/users/new" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><AdminUserInvite /></Layout></RouteGuard>} />
+        <Route path="/admin/users/:id" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><AdminUserDetail /></Layout></RouteGuard>} />
+        <Route path="/admin/settings" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><AdminSettings /></Layout></RouteGuard>} />
+        <Route path="/admin/schedule" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><AdminSchedule /></Layout></RouteGuard>} />
+        <Route path="/admin/schedule/status/:status" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><AdminScheduleStatus /></Layout></RouteGuard>} />
+        <Route path="/admin/schedule/engineer/:engineerId" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><EngineerAvailability /></Layout></RouteGuard>} />
+        <Route path="/admin/messages" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><AdminMessages /></Layout></RouteGuard>} />
+        <Route path="/ops/quotes" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><AdminPartnerQuotes /></Layout></RouteGuard>} />
+        </Routes>
+      </AuthProvider>
     </Router>
   );
 }

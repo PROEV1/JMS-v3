@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Plus, Users, FileText, Briefcase, Mail, Eye, Send, Trash2, MessageSquare, Package } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { ProEVLogo } from '@/components/ProEVLogo';
 import { TestPartnerImport } from '@/components/TestPartnerImport';

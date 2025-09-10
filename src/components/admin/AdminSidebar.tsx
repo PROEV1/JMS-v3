@@ -22,8 +22,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { useAuth } from '@/hooks/useAuth';
-import { useUserRole } from '@/hooks/useUserRole';
+import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -59,8 +58,7 @@ const sidebarItems: SidebarItem[] = [
 ];
 
 export function AdminSidebar() {
-  const { user, signOut } = useAuth();
-  const { role } = useUserRole();
+  const { user, finalRole, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -105,7 +103,7 @@ export function AdminSidebar() {
                   <div className="space-y-0.5">
                     <p className="text-sm font-medium text-foreground">{user?.email}</p>
                     <p className="text-xs text-muted-foreground">
-                      {role ? role : 'No role'}
+                      {finalRole ? finalRole : 'No role'}
                     </p>
                   </div>
                 </DropdownMenuLabel>

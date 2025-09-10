@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/contexts/AuthContext';
 import { showErrorToast, showSuccessToast } from '@/utils/apiErrorHandler';
 import { markMessagesAsRead } from '@/utils/messageUtils';
 import { MessageCircle, User, Mail, Phone, MapPin } from 'lucide-react';

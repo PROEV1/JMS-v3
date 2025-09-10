@@ -5,8 +5,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/hooks/useAuth';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { ProEVLogo } from '@/components/ProEVLogo';
 import { BrandPage, BrandContainer, BrandLoading } from '@/components/brand/BrandLayout';
 import { BrandButton } from '@/components/brand/BrandButton';
@@ -18,16 +18,25 @@ export default function Auth() {
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, finalRole } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    console.log('Auth useEffect triggered:', { user: user?.email, authLoading });
+    console.log('Auth: Checking authentication state:', { 
+      hasUser: !!user, 
+      email: user?.email, 
+      authLoading, 
+      finalRole 
+    });
     
-    if (user && !authLoading) {
-      console.log('Auth: User authenticated, preparing redirect', { userId: user.id, email: user.email });
+    if (user && !authLoading && finalRole) {
+      console.log('Auth: User authenticated with role, redirecting', { 
+        userId: user.id, 
+        email: user.email, 
+        finalRole 
+      });
       
-      // Check for explicit redirect path only
+      // Check for explicit redirect path
       const explicitRedirect = sessionStorage.getItem('authRedirectPath');
       
       if (explicitRedirect) {
@@ -35,15 +44,16 @@ export default function Auth() {
         sessionStorage.removeItem('authRedirectPath');
         navigate(explicitRedirect, { replace: true });
       } else {
-        // Default redirect to admin for authenticated users
-        console.log('Auth: No explicit redirect, going to admin');
-        navigate('/admin', { replace: true });
+        // Default redirect based on role
+        const defaultPath = finalRole === 'partner_user' ? '/partner' : '/admin';
+        console.log('Auth: Using default redirect for role:', defaultPath);
+        navigate(defaultPath, { replace: true });
       }
     }
-  }, [user, authLoading, navigate]);
+  }, [user, authLoading, finalRole, navigate]);
 
-  // Show loading while auth is checking or redirecting
-  if (authLoading || user) {
+  // Show loading while auth is resolving
+  if (authLoading || (user && finalRole)) {
     return <BrandLoading />;
   }
 
