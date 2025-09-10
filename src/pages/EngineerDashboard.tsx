@@ -6,7 +6,7 @@ import { Calendar, Clock, MapPin, Package, User, Plus, Eye, Play, ArrowRight, Fi
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';  
+import { useAuth } from '@/contexts/AuthContext';  
 import { StockRequestButton } from '@/components/engineer/StockRequestButton';
 import { IncorrectStockButton } from '@/components/engineer/IncorrectStockButton';
 import { useStockRequests } from '@/hooks/useStockRequests';

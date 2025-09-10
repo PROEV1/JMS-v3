@@ -2,15 +2,14 @@ import React from 'react';
 import { BrandPage, BrandContainer, BrandHeading1, BrandLoading } from '@/components/brand';
 import { StockRequestButton } from '@/components/engineer/StockRequestButton';
 import { StockRequestHistory } from '@/components/engineer/StockRequestHistory';
-import { useUserRole } from '@/hooks/useUserRole';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/contexts/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Plus, Package, ShieldAlert } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 
 export default function EngineerStockRequests() {
-  const { role: userRole, loading } = useUserRole();
+  const { finalRole: userRole, loading } = useAuth();
   const { user } = useAuth();
 
   // Get engineer profile
@@ -41,7 +40,7 @@ export default function EngineerStockRequests() {
     );
   }
 
-  if (userRole !== 'engineer') {
+  if (userRole !== 'standard_office_user' && userRole !== 'admin') {
     return (
       <BrandPage>
         <BrandContainer>

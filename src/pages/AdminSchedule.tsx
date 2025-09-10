@@ -2,14 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { WeekViewCalendar } from '@/components/scheduling/WeekViewCalendar';
 import { SchedulingSettingsPanel } from '@/components/admin/SchedulingSettingsPanel';
 import { SchedulingHub } from '@/components/scheduling/SchedulingHub';
-import { useUserRole } from '@/hooks/useUserRole';
+import { useAuth } from '@/contexts/AuthContext';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
 export default function AdminSchedule() {
-  const { role: userRole, loading } = useUserRole();
+  const { finalRole: userRole, loading } = useAuth();
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState('hub');
@@ -96,7 +96,7 @@ export default function AdminSchedule() {
     );
   }
 
-  if (userRole !== 'admin' && userRole !== 'manager') {
+  if (userRole !== 'admin' && userRole !== 'standard_office_user') {
     return (
       <div className="text-center py-12">
         <h1 className="text-2xl font-bold text-destructive mb-4">Access Denied</h1>

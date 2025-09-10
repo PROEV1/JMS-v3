@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useUserRole } from '@/hooks/useUserRole';
+import { useAuth } from '@/contexts/AuthContext';
 import { BrandPage, BrandContainer, BrandHeading1, BrandLoading } from '@/components/brand';
 import { OrderStickyHeader } from '@/components/admin/OrderStickyHeader';
 import { OrderActionBar } from '@/components/admin/OrderActionBar';
@@ -125,7 +125,7 @@ export default function OrderDetail() {
   const { id: orderId } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { role: userRole, loading: roleLoading } = useUserRole();
+  const { finalRole: userRole, loading: roleLoading } = useAuth();
   const [order, setOrder] = useState<Order | null>(null);
   const [paymentConfig, setPaymentConfig] = useState<PaymentConfig | null>(null);
   const [loading, setLoading] = useState(true);
@@ -874,12 +874,9 @@ export default function OrderDetail() {
     );
   }
 
-  // For client users, redirect to the enhanced client order view
-  if (userRole === 'client') {
-    redirectToClientView();
-    return <BrandLoading />;
-  }
-
+  // Note: With the new role system (admin, standard_office_user, partner_user),
+  // client users are handled through different routing mechanisms
+  
   // Default fallback for unknown roles
   return (
     <BrandPage>

@@ -3,11 +3,11 @@ import { useLocation } from "react-router-dom";
 import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Home } from "lucide-react";
-import { useUserRole } from "@/hooks/useUserRole";
+import { useAuth } from "@/contexts/AuthContext";
 
 const NotFound = () => {
   const location = useLocation();
-  const { loading: roleLoading } = useUserRole();
+  const { loading: roleLoading } = useAuth();
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {

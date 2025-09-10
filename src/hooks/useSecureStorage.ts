@@ -6,7 +6,7 @@ import {
   generateSecureFilePath,
   SecureFileUpload
 } from '@/utils/secureStorage';
-import { useAuth } from './useAuth';
+import { useAuth } from '@/contexts/AuthContext';
 import { showErrorToast, showSuccessToast } from '@/utils/apiErrorHandler';
 
 export interface UseSecureStorageResult {

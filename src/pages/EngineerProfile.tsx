@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { BrandPage, BrandContainer, BrandHeading1, BrandLoading } from '@/components/brand';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';

@@ -1,32 +1,30 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from './useAuth';
-import { useUserRole } from './useUserRole';
+import { useAuth } from '@/contexts/AuthContext';
 
 export function usePermissions() {
-  const { user } = useAuth();
-  const { role, loading: roleLoading } = useUserRole();
+  const { user, finalRole, loading: authLoading } = useAuth();
   const [permissions, setPermissions] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchPermissions = async () => {
-      console.log('usePermissions: Starting fetch', { userId: user?.id, role, roleLoading });
+      console.log('usePermissions: Starting fetch', { userId: user?.id, finalRole, authLoading });
       
-      if (roleLoading) {
+      if (authLoading) {
         console.log('usePermissions: Role still loading, waiting...');
         return;
       }
       
-      if (!user?.id || !role) {
-        console.log('usePermissions: Missing user or role', { userId: user?.id, role });
+      if (!user?.id || !finalRole) {
+        console.log('usePermissions: Missing user or role', { userId: user?.id, finalRole });
         setPermissions({});
         setLoading(false);
         return;
       }
 
       // Handle partner role separately - partners have their own access control through partner_users table
-      if (role === 'partner') {
+      if (finalRole === 'partner_user') {
         console.log('usePermissions: User is partner, setting basic partner permissions');
         setPermissions({
           'partner.view': true,
@@ -37,13 +35,13 @@ export function usePermissions() {
         return;
       }
 
-      console.log('usePermissions: Fetching permissions for role:', role);
+      console.log('usePermissions: Fetching permissions for role:', finalRole);
 
       try {
         const { data, error } = await supabase
           .from('user_permissions')
           .select('permission_key, can_access')
-          .eq('role', role);
+          .eq('role', finalRole);
 
         if (error) throw error;
 
@@ -65,7 +63,7 @@ export function usePermissions() {
     };
 
     fetchPermissions();
-  }, [user?.id, role, roleLoading]);
+  }, [user?.id, finalRole, authLoading]);
 
   const hasPermission = (permissionKey: string): boolean => {
     return permissions[permissionKey] === true;

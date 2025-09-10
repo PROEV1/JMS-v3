@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { FileText, Wrench, CreditCard, Calendar, Eye, Download, MessageCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface DashboardStats {
   quotes: number;

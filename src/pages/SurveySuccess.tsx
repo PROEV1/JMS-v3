@@ -4,8 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { CheckCircle, Clock, ArrowRight } from 'lucide-react';
 import { DualBrandHeader } from '@/components/survey/DualBrandHeader';
 import { Button } from '@/components/ui/button';
-import { useUserRole } from '@/hooks/useUserRole';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface SurveySuccessProps {
   orderNumber?: string;
@@ -20,12 +19,12 @@ export default function SurveySuccess() {
   const location = useLocation();
   const { orderId } = useParams();
   const navigate = useNavigate();
-  const { role } = useUserRole();
+  const { finalRole: role } = useAuth();
   const { user } = useAuth();
   const { orderNumber, partnerBrand } = location.state || {};
 
   const getReturnUrl = () => {
-    if (role === 'partner') {
+    if (role === 'partner_user') {
       return '/partner';
     }
     if (orderId) {

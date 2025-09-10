@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import { useUserRole } from '@/hooks/useUserRole';
+import { useAuth } from '@/contexts/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2, Settings, AlertCircle } from 'lucide-react';
@@ -78,7 +78,7 @@ export default function AdminPartnerQuotes() {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
-  const { role } = useUserRole();
+  const { finalRole: role } = useAuth();
   const { canManageQuotes, canManageOrders, loading: permissionsLoading } = usePermissions();
   
   // Extract partner ID from URL query parameter
