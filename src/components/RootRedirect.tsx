@@ -6,14 +6,14 @@ export function RootRedirect() {
   const { user, loading } = useAuth();
   const { role, loading: roleLoading } = useUserRole();
 
-  console.log('RootRedirect - user:', user?.email, 'user_id:', user?.id, 'role:', role, 'loading:', loading, 'roleLoading:', roleLoading);
+  console.log('🔍 ROOTREDIRECT - user:', user?.email, 'role:', role, 'loading:', loading, 'roleLoading:', roleLoading);
   
-  // Add more detailed debugging for lee@proev.co.uk specifically
+  // Add specific debugging for lee@proev.co.uk
   if (user?.email === 'lee@proev.co.uk') {
-    console.log('🔍 LEE DEBUG - Full user object:', user);
-    console.log('🔍 LEE DEBUG - Role detected:', role);
-    console.log('🔍 LEE DEBUG - Auth loading state:', loading);
-    console.log('🔍 LEE DEBUG - Role loading state:', roleLoading);
+    console.log('🔍 LEE - RootRedirect triggered');
+    console.log('🔍 LEE - Role detected:', role);  
+    console.log('🔍 LEE - User metadata role:', user?.user_metadata?.role);
+    console.log('🔍 LEE - Loading states:', {loading, roleLoading});
   }
 
   if (loading || roleLoading) {
@@ -53,6 +53,12 @@ export function RootRedirect() {
       redirectTo = '/admin';
   }
   
-  console.log('RootRedirect - redirecting to:', redirectTo);
+  console.log('🔍 ROOTREDIRECT - redirecting to:', redirectTo, 'for user:', user?.email);
+  
+  // Extra logging for lee@proev.co.uk
+  if (user?.email === 'lee@proev.co.uk') {
+    console.log('🔍 LEE - About to redirect to:', redirectTo);
+  }
+  
   return <Navigate to={redirectTo} replace />;
 }

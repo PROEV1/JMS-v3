@@ -142,9 +142,9 @@ export default function Layout({ children }: LayoutProps) {
     return <Navigate to="/partner" replace />;
   }
   
-  // Protect admin routes (including /orders/:id) - only admin/manager can access
+  // Protect admin routes (including /orders/:id) - only admin/manager/standard_office_user can access
   if (currentPath.startsWith('/admin') || currentPath.match(/^\/orders\/[^\/]+$/)) {
-    if (userRole !== 'admin' && userRole !== 'manager') {
+    if (userRole !== 'admin' && userRole !== 'manager' && userRole !== 'standard_office_user') {
       const redirectTo = userRole === 'engineer' ? '/engineer' : userRole === 'partner' ? '/partner' : '/client';
       console.log(`Layout: ${userRole} accessing admin route, redirecting to ${redirectTo}`);
       return <Navigate to={redirectTo} replace />;
