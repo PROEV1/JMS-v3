@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
 import { Plus, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
 interface CreateRMAModalProps {
@@ -37,6 +37,7 @@ export function CreateRMAModal({ open, onOpenChange }: CreateRMAModalProps) {
   ]);
 
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   // Generate RMA number when modal opens
   useEffect(() => {
@@ -199,6 +200,10 @@ export function CreateRMAModal({ open, onOpenChange }: CreateRMAModalProps) {
         title: 'Success',
         description: `${rmaRecords.length} RMA record(s) created successfully`,
       });
+
+      // Invalidate queries to refresh the data
+      queryClient.invalidateQueries({ queryKey: ['returns-rmas'] });
+      queryClient.invalidateQueries({ queryKey: ['rma-metrics'] });
 
       onOpenChange(false);
       // Reset form
