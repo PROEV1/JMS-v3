@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 
-type UserRole = 'admin' | 'standard_office_user' | 'partner_user';
+type UserRole = 'admin' | 'standard_office_user' | 'partner_user' | 'engineer';
 
 interface AuthState {
   user: User | null;

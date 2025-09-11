@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 
 interface RouteGuardProps {
   children: ReactNode;
-  allowedRoles?: Array<'admin' | 'standard_office_user' | 'partner_user'>;
+  allowedRoles?: Array<'admin' | 'standard_office_user' | 'partner_user' | 'engineer'>;
   redirectTo?: string;
 }
 
