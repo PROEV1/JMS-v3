@@ -189,9 +189,14 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
       // Handle special values
       const finalEngineerId = engineerId === 'unassigned' ? null : engineerId;
       
-      // Find or create engineer van location
+      // Determine status and location based on assignment
+      let status = 'available';
       let finalLocationId = null;
+      
       if (finalEngineerId && finalEngineerId !== 'unassigned') {
+        // Assigned to engineer
+        status = 'dispatched';
+        
         // Get engineer's van location or create one
         const { data: existingLocation } = await supabase
           .from('inventory_locations')
@@ -220,7 +225,7 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
           finalLocationId = newLocation.id;
         }
         
-        // Update existing location address if provided
+        // Update existing van location address if provided
         if (address && finalLocationId) {
           const engineer = engineers.find(e => e.id === finalEngineerId);
           await supabase
@@ -231,12 +236,26 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
             })
             .eq('id', finalLocationId);
         }
-      }
-      
-      // Determine status based on assignment
-      let status = 'available';
-      if (finalEngineerId) {
-        status = 'dispatched'; // Assigned to engineer
+      } else if (orderId && orderId !== 'none') {
+        // Assigned to job without engineer
+        status = 'assigned';
+        
+        // Create or find job-specific location if address is provided
+        if (address) {
+          const { data: jobLocation, error: jobLocationError } = await supabase
+            .from('inventory_locations')
+            .insert({
+              name: `Job Location - ${address}`,
+              type: 'job_site',
+              address: address
+            })
+            .select()
+            .single();
+
+          if (!jobLocationError) {
+            finalLocationId = jobLocation.id;
+          }
+        }
       }
 
       // Update the charger_inventory record with the engineer, location, and order assignment
