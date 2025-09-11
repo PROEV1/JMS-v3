@@ -151,7 +151,7 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
       if (error) throw error;
       return data as Order[];
     },
-    enabled: (searchPostcode && searchPostcode.length >= 2) || (searchEngineerId && searchEngineerId !== '')
+    enabled: Boolean((searchPostcode && searchPostcode.length >= 2) || (searchEngineerId && searchEngineerId !== ''))
   });
 
   const assignChargerMutation = useMutation({
