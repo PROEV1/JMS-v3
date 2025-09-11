@@ -33,7 +33,7 @@ export function EngineerMaterialsUsed({ orderId, engineerId }: EngineerMaterials
   // Multi-select mode state
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
-  const [multiSelectQuantity, setMultiSelectQuantity] = useState(1);
+  const [itemQuantities, setItemQuantities] = useState<Record<string, number>>({});
   const [multiSelectLocationId, setMultiSelectLocationId] = useState<string>("");
   const [multiSelectNotes, setMultiSelectNotes] = useState("");
   const [multiSelectDeductStock, setMultiSelectDeductStock] = useState(true);
@@ -158,9 +158,19 @@ export function EngineerMaterialsUsed({ orderId, engineerId }: EngineerMaterials
   const handleMultiSelectToggle = (itemId: string, checked: boolean) => {
     if (checked) {
       setSelectedItems(prev => [...prev, itemId]);
+      setItemQuantities(prev => ({ ...prev, [itemId]: 1 })); // Default quantity of 1
     } else {
       setSelectedItems(prev => prev.filter(id => id !== itemId));
+      setItemQuantities(prev => {
+        const newQuantities = { ...prev };
+        delete newQuantities[itemId];
+        return newQuantities;
+      });
     }
+  };
+
+  const handleQuantityChange = (itemId: string, quantity: number) => {
+    setItemQuantities(prev => ({ ...prev, [itemId]: Math.max(1, quantity) }));
   };
 
   const handleMultiSelectSubmit = async () => {
@@ -170,13 +180,15 @@ export function EngineerMaterialsUsed({ orderId, engineerId }: EngineerMaterials
       const item = inventoryItems.find(i => i.id === itemId);
       if (!item) return Promise.resolve();
 
+      const quantity = itemQuantities[itemId] || 1;
+
       return new Promise((resolve, reject) => {
         recordMaterialMutation.mutate({
           orderId,
           engineerId,
           itemId,
           itemName: item.name,
-          quantity: multiSelectQuantity,
+          quantity,
           serialNumber: undefined, // Multi-select doesn't support individual serial numbers
           locationId: multiSelectLocationId || undefined,
           notes: multiSelectNotes || undefined,
@@ -192,7 +204,7 @@ export function EngineerMaterialsUsed({ orderId, engineerId }: EngineerMaterials
       await Promise.all(promises);
       // Reset multi-select form
       setSelectedItems([]);
-      setMultiSelectQuantity(1);
+      setItemQuantities({});
       setMultiSelectLocationId("");
       setMultiSelectNotes("");
       setMultiSelectDeductStock(true);
@@ -471,20 +483,39 @@ export function EngineerMaterialsUsed({ orderId, engineerId }: EngineerMaterials
                   </div>
                 </div>
 
-                {/* Bulk Settings */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="multi-quantity">Quantity (per item)</Label>
-                    <Input
-                      id="multi-quantity"
-                      type="number"
-                      min="1"
-                      value={multiSelectQuantity}
-                      onChange={(e) => setMultiSelectQuantity(parseInt(e.target.value) || 1)}
-                      className="text-sm"
-                    />
+                {/* Individual Quantity Settings */}
+                <div className="space-y-4">
+                  <Label className="text-sm font-medium">Set Quantities</Label>
+                  <div className="space-y-3 max-h-32 overflow-y-auto">
+                    {selectedItems.map(itemId => {
+                      const item = inventoryItems.find(i => i.id === itemId);
+                      if (!item) return null;
+                      
+                      return (
+                        <div key={itemId} className="flex items-center justify-between p-2 bg-muted/30 rounded">
+                          <div className="flex-1">
+                            <div className="text-sm font-medium">{item.name}</div>
+                            <div className="text-xs text-muted-foreground">{item.sku}</div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Label htmlFor={`qty-${itemId}`} className="text-xs">Qty:</Label>
+                            <Input
+                              id={`qty-${itemId}`}
+                              type="number"
+                              min="1"
+                              value={itemQuantities[itemId] || 1}
+                              onChange={(e) => handleQuantityChange(itemId, parseInt(e.target.value) || 1)}
+                              className="w-16 h-8 text-xs"
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
+                </div>
 
+                {/* Common Settings */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="multi-location">Location</Label>
                     <Select value={multiSelectLocationId} onValueChange={setMultiSelectLocationId}>
