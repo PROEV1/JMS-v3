@@ -116,6 +116,8 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
     queryFn: async () => {
       if ((!searchPostcode || searchPostcode.length < 2) && !searchEngineerId) return [];
       
+      console.log('Searching with postcode:', searchPostcode, 'engineer:', searchEngineerId);
+      
       let query = supabase
         .from('orders')
         .select(`
@@ -136,9 +138,11 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
         .order('created_at', { ascending: false })
         .limit(10);
 
-      // Filter by postcode if provided
+      // Filter by postcode if provided - make search more flexible
       if (searchPostcode && searchPostcode.length >= 2) {
-        query = query.or(`clients.postcode.ilike.%${searchPostcode}%,clients.address.ilike.%${searchPostcode}%`);
+        const cleanPostcode = searchPostcode.replace(/\s+/g, '').toUpperCase();
+        const postcodeStart = cleanPostcode.substring(0, Math.min(4, cleanPostcode.length));
+        query = query.or(`clients.postcode.ilike.%${searchPostcode}%,clients.address.ilike.%${searchPostcode}%,clients.postcode.ilike.%${postcodeStart}%`);
       }
 
       // Filter by engineer if provided
@@ -148,7 +152,12 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
 
       const { data, error } = await query;
       
-      if (error) throw error;
+      if (error) {
+        console.error('Order search error:', error);
+        throw error;
+      }
+      
+      console.log('Found orders:', data);
       return data as Order[];
     },
     enabled: Boolean((searchPostcode && searchPostcode.length >= 2) || (searchEngineerId && searchEngineerId !== '' && searchEngineerId !== 'all'))
@@ -381,6 +390,9 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
               />
               {isSearchingOrders && ((searchPostcode.length >= 2) || searchEngineerId) && (
                 <p className="text-sm text-muted-foreground">Searching orders...</p>
+              )}
+              {!isSearchingOrders && ((searchPostcode.length >= 2) || (searchEngineerId && searchEngineerId !== 'all')) && searchedOrders.length === 0 && (
+                <p className="text-sm text-muted-foreground">No orders found for this search</p>
               )}
             </div>
 
