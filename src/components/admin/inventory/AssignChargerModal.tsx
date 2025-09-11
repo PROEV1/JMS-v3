@@ -67,6 +67,7 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
   const [locationAddress, setLocationAddress] = useState<string>('');
   const [selectedOrderId, setSelectedOrderId] = useState<string>('');
   const [searchPostcode, setSearchPostcode] = useState<string>('');
+  const [searchEngineerId, setSearchEngineerId] = useState<string>('');
 
   // Reset form when modal opens
   React.useEffect(() => {
@@ -75,6 +76,7 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
       setLocationAddress(charger.location_name || '');
       setSelectedOrderId(charger.assigned_order_id || '');
       setSearchPostcode('');
+      setSearchEngineerId('');
     }
   }, [open, charger]);
 
@@ -110,11 +112,11 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
 
   // Search orders by postcode
   const { data: searchedOrders = [], isLoading: isSearchingOrders } = useQuery({
-    queryKey: ['orders-search', searchPostcode],
+    queryKey: ['orders-search', searchPostcode, searchEngineerId],
     queryFn: async () => {
-      if (!searchPostcode || searchPostcode.length < 2) return [];
+      if ((!searchPostcode || searchPostcode.length < 2) && !searchEngineerId) return [];
       
-      const { data, error } = await supabase
+      let query = supabase
         .from('orders')
         .select(`
           id,
@@ -130,15 +132,26 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
             phone
           )
         `)
-        .or(`clients.postcode.ilike.%${searchPostcode}%,clients.address.ilike.%${searchPostcode}%`)
         .in('status_enhanced', ['awaiting_install_booking', 'scheduled', 'date_accepted'])
         .order('created_at', { ascending: false })
         .limit(10);
+
+      // Filter by postcode if provided
+      if (searchPostcode && searchPostcode.length >= 2) {
+        query = query.or(`clients.postcode.ilike.%${searchPostcode}%,clients.address.ilike.%${searchPostcode}%`);
+      }
+
+      // Filter by engineer if provided
+      if (searchEngineerId && searchEngineerId !== '') {
+        query = query.eq('engineer_id', searchEngineerId);
+      }
+
+      const { data, error } = await query;
       
       if (error) throw error;
       return data as Order[];
     },
-    enabled: searchPostcode.length >= 2
+    enabled: (searchPostcode && searchPostcode.length >= 2) || (searchEngineerId && searchEngineerId !== '')
   });
 
   const assignChargerMutation = useMutation({
@@ -261,6 +274,29 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
 
   const selectedEngineer = engineers.find(e => e.id === selectedEngineerId);
 
+  // Handle order selection to auto-populate address
+  const handleOrderSelection = (orderId: string) => {
+    setSelectedOrderId(orderId);
+    
+    if (orderId) {
+      const selectedOrder = searchedOrders.find(o => o.id === orderId);
+      if (selectedOrder && selectedOrder.clients) {
+        // Build full address from client data
+        const addressParts = [];
+        if (selectedOrder.clients.address) {
+          addressParts.push(selectedOrder.clients.address);
+        }
+        if (selectedOrder.clients.postcode) {
+          addressParts.push(selectedOrder.clients.postcode);
+        }
+        
+        if (addressParts.length > 0) {
+          setLocationAddress(addressParts.join(', '));
+        }
+      }
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
@@ -310,6 +346,27 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
               </Select>
             </div>
 
+            {/* Engineer Search */}
+            <div className="space-y-2">
+              <Label htmlFor="engineer-search">
+                <User className="w-4 h-4 inline mr-2" />
+                Search by Engineer
+              </Label>
+              <Select value={searchEngineerId} onValueChange={setSearchEngineerId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select engineer to see their orders..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All Engineers</SelectItem>
+                  {engineers.map((engineer) => (
+                    <SelectItem key={engineer.id} value={engineer.id}>
+                      {engineer.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Postcode Search for Orders */}
             <div className="space-y-2">
               <Label htmlFor="postcode-search">
@@ -322,7 +379,7 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
                 placeholder="Enter postcode to find nearby orders..."
                 className="w-full"
               />
-              {isSearchingOrders && searchPostcode.length >= 2 && (
+              {isSearchingOrders && ((searchPostcode.length >= 2) || searchEngineerId) && (
                 <p className="text-sm text-muted-foreground">Searching orders...</p>
               )}
             </div>
@@ -334,7 +391,7 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
                   <Package className="w-4 h-4 inline mr-2" />
                   Assign to Order (Optional)
                 </Label>
-                <Select value={selectedOrderId} onValueChange={setSelectedOrderId}>
+                <Select value={selectedOrderId} onValueChange={handleOrderSelection}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select order..." />
                   </SelectTrigger>
