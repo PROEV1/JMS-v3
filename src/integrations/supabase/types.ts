@@ -97,6 +97,7 @@ export type Database = {
       }
       charger_inventory: {
         Row: {
+          assigned_order_id: string | null
           charger_item_id: string
           created_at: string
           engineer_id: string | null
@@ -108,6 +109,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          assigned_order_id?: string | null
           charger_item_id: string
           created_at?: string
           engineer_id?: string | null
@@ -119,6 +121,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          assigned_order_id?: string | null
           charger_item_id?: string
           created_at?: string
           engineer_id?: string | null
@@ -130,6 +133,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "charger_inventory_assigned_order_id_fkey"
+            columns: ["assigned_order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "charger_inventory_charger_item_id_fkey"
             columns: ["charger_item_id"]

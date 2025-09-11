@@ -1,9 +1,16 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Clock, MapPin, Package, Phone, Play, Navigation, CheckCircle, Upload } from 'lucide-react';
+import { Clock, MapPin, Package, Phone, Play, Navigation, CheckCircle, Upload, Zap } from 'lucide-react';
 import { formatTimeSlot, formatDateOnly } from '@/utils/dateUtils';
 import { OrderStatusEnhanced } from '@/components/admin/EnhancedJobStatusBadge';
+
+interface ChargerInfo {
+  id: string;
+  serial_number: string;
+  status: string;
+  charger_model?: string;
+}
 
 interface JobStatusCardProps {
   job: {
@@ -18,6 +25,7 @@ interface JobStatusCardProps {
     engineer_signed_off_at: string | null;
     upload_count?: number;
     job_type?: 'installation' | 'assessment' | 'service_call';
+    assigned_chargers?: ChargerInfo[];
   };
   onActionClick: (jobId: string, action: 'start' | 'continue' | 'upload' | 'view') => void;
 }
@@ -124,6 +132,22 @@ export function JobStatusCard({ job, onActionClick }: JobStatusCardProps) {
               {job.product_details}
             </span>
           </div>
+
+          {/* Assigned Chargers */}
+          {job.assigned_chargers && job.assigned_chargers.length > 0 && (
+            <div className="flex items-center gap-2 text-sm">
+              <Zap className="h-4 w-4 text-blue-600" />
+              <div className="flex gap-1 flex-wrap">
+                {job.assigned_chargers.map((charger) => (
+                  <Badge key={charger.id} variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                    <Zap className="h-3 w-3 mr-1" />
+                    {charger.serial_number}
+                    {charger.charger_model && ` (${charger.charger_model})`}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

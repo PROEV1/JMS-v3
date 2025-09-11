@@ -2,18 +2,26 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, UserPlus, UserMinus, Calendar, ExternalLink, CheckCircle } from 'lucide-react';
+import { MoreHorizontal, UserPlus, UserMinus, Calendar, ExternalLink, CheckCircle, Zap } from 'lucide-react';
 import { PartnerJobBadge } from '@/components/admin/PartnerJobBadge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Database } from '@/integrations/supabase/types';
 import { getOrderEstimatedMinutes, isDefaultEstimatedHours } from '@/utils/schedulingUtils';
 import { getJobTypeLabel } from '@/utils/jobTypeUtils';
 
+interface ChargerInfo {
+  id: string;
+  serial_number: string;
+  status: string;
+  charger_model?: string;
+}
+
 type Order = Database['public']['Tables']['orders']['Row'] & {
   clients?: { name?: string; full_name?: string; email: string; phone: string; };
   quotes?: { products?: any[]; };
   engineer?: { name: string; email: string; region?: string; };
   partners?: { name: string; };
+  assigned_chargers?: ChargerInfo[];
 };
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -216,6 +224,25 @@ export function EnhancedJobCard({ order, onAssignEngineer, onUnassign, onSchedul
             )}
           </div>
         </div>
+        
+        {/* Assigned Chargers */}
+        {order.assigned_chargers && order.assigned_chargers.length > 0 && (
+          <div className="space-y-1 text-sm border-t pt-2">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Zap className="h-4 w-4 text-blue-600" />
+              <span className="font-medium">Assigned Chargers:</span>
+            </div>
+            <div className="flex gap-1 flex-wrap ml-6">
+              {order.assigned_chargers.map((charger) => (
+                <Badge key={charger.id} variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                  <Zap className="h-3 w-3 mr-1" />
+                  {charger.serial_number}
+                  {charger.charger_model && ` (${charger.charger_model})`}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
         
         {order.partner_status && (
           <div className="text-xs text-muted-foreground border-t pt-2">

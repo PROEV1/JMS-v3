@@ -8,7 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { User, MapPin, Zap } from "lucide-react";
+import { User, MapPin, Zap, Search, Package } from "lucide-react";
+import { getBestPostcode } from "@/lib/utils/postcode";
 
 interface Engineer {
   id: string;
@@ -34,6 +35,22 @@ interface ChargerUnit {
   engineer_name: string | null;
   location_id: string | null;
   location_name: string | null;
+  assigned_order_id?: string | null;
+}
+
+interface Order {
+  id: string;
+  order_number: string;
+  scheduled_install_date?: string | null;
+  status_enhanced: string;
+  client_id: string;
+  engineer_id?: string | null;
+  clients?: {
+    full_name: string;
+    address?: string;
+    postcode?: string;
+    phone?: string;
+  };
 }
 
 interface AssignChargerModalProps {
@@ -48,12 +65,16 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
   const queryClient = useQueryClient();
   const [selectedEngineerId, setSelectedEngineerId] = useState<string>('');
   const [locationAddress, setLocationAddress] = useState<string>('');
+  const [selectedOrderId, setSelectedOrderId] = useState<string>('');
+  const [searchPostcode, setSearchPostcode] = useState<string>('');
 
   // Reset form when modal opens
   React.useEffect(() => {
     if (open && charger) {
       setSelectedEngineerId(charger.engineer_id || '');
       setLocationAddress(charger.location_name || '');
+      setSelectedOrderId(charger.assigned_order_id || '');
+      setSearchPostcode('');
     }
   }, [open, charger]);
 
@@ -87,8 +108,41 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
     }
   });
 
+  // Search orders by postcode
+  const { data: searchedOrders = [], isLoading: isSearchingOrders } = useQuery({
+    queryKey: ['orders-search', searchPostcode],
+    queryFn: async () => {
+      if (!searchPostcode || searchPostcode.length < 2) return [];
+      
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          id,
+          order_number,
+          scheduled_install_date,
+          status_enhanced,
+          client_id,
+          engineer_id,
+          clients!inner (
+            full_name,
+            address,
+            postcode,
+            phone
+          )
+        `)
+        .or(`clients.postcode.ilike.%${searchPostcode}%,clients.address.ilike.%${searchPostcode}%`)
+        .in('status_enhanced', ['awaiting_install_booking', 'scheduled', 'date_accepted'])
+        .order('created_at', { ascending: false })
+        .limit(10);
+      
+      if (error) throw error;
+      return data as Order[];
+    },
+    enabled: searchPostcode.length >= 2
+  });
+
   const assignChargerMutation = useMutation({
-    mutationFn: async ({ engineerId, address }: { engineerId: string; address: string }) => {
+    mutationFn: async ({ engineerId, address, orderId }: { engineerId: string; address: string; orderId?: string }) => {
       if (!charger) throw new Error('No charger selected');
 
       // Handle special values
@@ -144,12 +198,13 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
         status = 'dispatched'; // Assigned to engineer
       }
 
-      // Update the charger_inventory record with the engineer and location assignment
+      // Update the charger_inventory record with the engineer, location, and order assignment
       const { data, error } = await supabase
         .from('charger_inventory')
         .update({
           engineer_id: finalEngineerId,
           location_id: finalLocationId,
+          assigned_order_id: orderId || null,
           status: status,
           updated_at: new Date().toISOString()
         })
@@ -197,7 +252,8 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
     
     assignChargerMutation.mutate({
       engineerId: selectedEngineerId,
-      address: locationAddress
+      address: locationAddress,
+      orderId: selectedOrderId
     });
   };
 
@@ -254,6 +310,60 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
               </Select>
             </div>
 
+            {/* Postcode Search for Orders */}
+            <div className="space-y-2">
+              <Label htmlFor="postcode-search">
+                <Search className="w-4 h-4 inline mr-2" />
+                Search Orders by Postcode
+              </Label>
+              <Input
+                value={searchPostcode}
+                onChange={(e) => setSearchPostcode(e.target.value)}
+                placeholder="Enter postcode to find nearby orders..."
+                className="w-full"
+              />
+              {isSearchingOrders && searchPostcode.length >= 2 && (
+                <p className="text-sm text-muted-foreground">Searching orders...</p>
+              )}
+            </div>
+
+            {/* Order Selection */}
+            {searchedOrders.length > 0 && (
+              <div className="space-y-2">
+                <Label htmlFor="order">
+                  <Package className="w-4 h-4 inline mr-2" />
+                  Assign to Order (Optional)
+                </Label>
+                <Select value={selectedOrderId} onValueChange={setSelectedOrderId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select order..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">No specific order</SelectItem>
+                    {searchedOrders.map((order) => {
+                      const postcode = getBestPostcode(
+                        order.clients?.address,
+                        order.clients?.postcode
+                      );
+                      return (
+                        <SelectItem key={order.id} value={order.id}>
+                          <div className="flex flex-col">
+                            <span className="font-medium">
+                              {order.order_number} - {order.clients?.full_name}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {postcode} • {order.status_enhanced}
+                              {order.scheduled_install_date && ` • ${new Date(order.scheduled_install_date).toLocaleDateString()}`}
+                            </span>
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             {/* Location Address Input */}
             <div className="space-y-2">
               <Label htmlFor="location">
@@ -272,13 +382,19 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
             </div>
 
             {/* Assignment Preview */}
-            {(selectedEngineer || locationAddress) && (
+            {(selectedEngineer || locationAddress || selectedOrderId) && (
               <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg space-y-1">
                 <p className="text-sm font-medium">Assignment Preview:</p>
                 {selectedEngineer && (
                   <p className="text-sm">
                     <User className="w-3 h-3 inline mr-1" />
                     Engineer: {selectedEngineer.name}
+                  </p>
+                )}
+                {selectedOrderId && (
+                  <p className="text-sm">
+                    <Package className="w-3 h-3 inline mr-1" />
+                    Order: {searchedOrders.find(o => o.id === selectedOrderId)?.order_number}
                   </p>
                 )}
                 {locationAddress && (
