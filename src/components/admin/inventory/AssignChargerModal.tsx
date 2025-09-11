@@ -67,36 +67,7 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
   const [locationAddress, setLocationAddress] = useState<string>('');
   const [selectedOrderId, setSelectedOrderId] = useState<string>('');
   const [searchPostcode, setSearchPostcode] = useState<string>('');
-  // Removed engineer search functionality
-
-  // Quick admin login for testing
-  const quickAdminLogin = async () => {
-    try {
-      // Try to log in as an admin user (using one of the admin user IDs we found earlier)
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: 'admin@test.com', // Replace with actual admin email
-        password: 'admin123' // Replace with actual admin password
-      });
-      
-      if (error) {
-        console.error('Login error:', error);
-        toast({
-          variant: "destructive",
-          title: "Login Failed",
-          description: "Please check with admin for login credentials",
-        });
-      } else {
-        toast({
-          title: "Success",
-          description: "Logged in successfully. Try searching again.",
-        });
-        // Refresh the page to get proper auth context
-        window.location.reload();
-      }
-    } catch (error) {
-      console.error('Login error:', error);
-    }
-  };
+  // Removed engineer search functionality and admin requirements
 
   // Reset form when modal opens
   React.useEffect(() => {
@@ -147,16 +118,7 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
       console.log('Searching with postcode:', searchPostcode);
       
       try {
-        // Check authentication first
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-        console.log('Current user:', user, 'Auth error:', authError);
-        
-        if (!user) {
-          console.error('No authenticated user found');
-          throw new Error('Authentication required. Please log in again.');
-        }
-
-        // Try direct query first
+        // Direct query without authentication checks - accessible to all users
         const { data, error } = await supabase
           .from('orders')
           .select(`
@@ -174,7 +136,7 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
             )
           `)
           .order('created_at', { ascending: false })
-          .limit(50); // Get more results to filter client-side
+          .limit(100); // Get more results to filter client-side
 
         if (error) {
           console.error('Orders query error:', error);
@@ -184,7 +146,7 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
         console.log('Raw orders data:', data);
         
         if (!data || data.length === 0) {
-          console.log('No orders found at all - this might be an RLS issue');
+          console.log('No orders found');
           return [];
         }
 
@@ -316,17 +278,9 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!selectedEngineerId || selectedEngineerId === '') {
-      toast({
-        variant: "destructive",
-        title: "Error", 
-        description: "Please select an engineer",
-      });
-      return;
-    }
-    
+    // Engineer assignment is now optional - can proceed without selecting an engineer
     assignChargerMutation.mutate({
-      engineerId: selectedEngineerId,
+      engineerId: selectedEngineerId || 'unassigned',
       address: locationAddress,
       orderId: selectedOrderId === 'none' ? null : selectedOrderId
     });
@@ -391,7 +345,7 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
             <div className="space-y-2">
               <Label htmlFor="engineer">
                 <User className="w-4 h-4 inline mr-2" />
-                Assign to Engineer
+                Assign to Engineer (Optional)
               </Label>
               <Select value={selectedEngineerId} onValueChange={setSelectedEngineerId}>
                 <SelectTrigger>
@@ -414,9 +368,6 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
                 <Search className="w-4 h-4 inline mr-2" />
                 Search Orders by Postcode
               </Label>
-              <div className="text-xs text-muted-foreground mb-2">
-                Note: You need to be logged in as an admin to search orders
-              </div>
               <Input
                 value={searchPostcode}
                 onChange={(e) => setSearchPostcode(e.target.value)}
@@ -433,19 +384,6 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
                 <div className="text-sm text-destructive">
                   <p className="font-medium">Search Error:</p>
                   <p>{searchError.message}</p>
-                  {searchError.message.includes('Authentication') && (
-                    <div className="mt-2 space-y-2">
-                      <p className="text-xs">You need to be logged in as an admin to search orders.</p>
-                      <Button 
-                        type="button"
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => window.location.href = '/auth'}
-                      >
-                        Go to Login
-                      </Button>
-                    </div>
-                  )}
                 </div>
               )}
             </div>
