@@ -110,101 +110,81 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
   });
 
   // Search orders by postcode
-  const { data: searchedOrders = [], isLoading: isSearchingOrders } = useQuery({
+  const { data: searchedOrders = [], isLoading: isSearchingOrders, error: searchError } = useQuery({
     queryKey: ['orders-search', searchPostcode],
     queryFn: async () => {
       if (!searchPostcode || searchPostcode.length < 2) return [];
       
       console.log('Searching with postcode:', searchPostcode);
-      console.log('Current user admin status check...');
       
-      // Test RLS by checking user auth status
-      const { data: userCheck } = await supabase.auth.getUser();
-      console.log('Current user:', userCheck);
-      
-      // First test basic orders access
-      const { data: testOrders, error: testError } = await supabase
-        .from('orders')
-        .select('id, order_number, status_enhanced, client_id')
-        .limit(3);
-      
-      console.log('Basic orders test:', testOrders, testError);
-      
-      // Test with specific order
-      const { data: specificOrder, error: specificError } = await supabase
-        .from('orders')
-        .select(`
-          id, order_number, status_enhanced, client_id,
-          clients (full_name, address, postcode, phone)
-        `)
-        .eq('order_number', 'ORD2025-040112');
+      try {
+        // Check authentication first
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        console.log('Current user:', user, 'Auth error:', authError);
         
-      console.log('Specific order test:', specificOrder, specificError);
-      
-      let query = supabase
-        .from('orders')
-        .select(`
-          id,
-          order_number,
-          scheduled_install_date,
-          status_enhanced,
-          client_id,
-          engineer_id,
-          clients (
-            full_name,
-            address,
-            postcode,
-            phone
-          )
-        `)
-        // Temporarily removing status filter to debug
-        // .in('status_enhanced', ['awaiting_install_booking', 'scheduled', 'date_accepted', 'in_progress', 'payment_received', 'agreement_signed'])
-        .order('created_at', { ascending: false })
-        .limit(10);
+        if (!user) {
+          console.error('No authenticated user found');
+          throw new Error('Authentication required. Please log in again.');
+        }
 
-      // Filter by postcode - make search more flexible
-      const cleanPostcode = searchPostcode.replace(/\s+/g, '').toUpperCase();
-      const postcodeStart = cleanPostcode.substring(0, Math.min(4, cleanPostcode.length));
-      
-      // Use a different approach for postcode filtering
-      const { data: allData, error: allError } = await query;
-      
-      if (allError) {
-        console.error('Order search error:', allError);
-        throw allError;
-      }
-      
-      console.log('All orders before filtering:', allData);
-      
-      // Filter in JavaScript instead of SQL for debugging
-      const filteredData = allData?.filter(order => {
-        if (!order.clients) return false;
-        const orderPostcode = order.clients.postcode || '';
-        const orderAddress = order.clients.address || '';
+        // Try direct query first
+        const { data, error } = await supabase
+          .from('orders')
+          .select(`
+            id,
+            order_number,
+            scheduled_install_date,
+            status_enhanced,
+            client_id,
+            engineer_id,
+            clients (
+              full_name,
+              address,
+              postcode,
+              phone
+            )
+          `)
+          .order('created_at', { ascending: false })
+          .limit(50); // Get more results to filter client-side
+
+        if (error) {
+          console.error('Orders query error:', error);
+          throw error;
+        }
         
-        return orderPostcode.toLowerCase().includes(searchPostcode.toLowerCase()) ||
-               orderAddress.toLowerCase().includes(searchPostcode.toLowerCase()) ||
-               orderPostcode.toLowerCase().includes(postcodeStart.toLowerCase());
-      }) || [];
-      
-      console.log('Filtered orders:', filteredData);
-      return filteredData as Order[];
+        console.log('Raw orders data:', data);
+        
+        if (!data || data.length === 0) {
+          console.log('No orders found at all - this might be an RLS issue');
+          return [];
+        }
 
-      /* Old SQL filtering approach - commented out for debugging
-      query = query.or(`clients.postcode.ilike.%${searchPostcode}%,clients.address.ilike.%${searchPostcode}%,clients.postcode.ilike.%${postcodeStart}%`);
-
-      const { data, error } = await query;
-      
-      if (error) {
-        console.error('Order search error:', error);
+        // Filter client-side for postcode match
+        const filteredOrders = data.filter(order => {
+          if (!order.clients) return false;
+          
+          const orderPostcode = (order.clients.postcode || '').toLowerCase();
+          const orderAddress = (order.clients.address || '').toLowerCase();
+          const searchTerm = searchPostcode.toLowerCase();
+          const cleanPostcode = searchPostcode.replace(/\s+/g, '').toLowerCase();
+          const postcodeStart = cleanPostcode.substring(0, Math.min(4, cleanPostcode.length));
+          
+          return orderPostcode.includes(searchTerm) ||
+                 orderAddress.includes(searchTerm) ||
+                 orderPostcode.includes(postcodeStart) ||
+                 orderPostcode.replace(/\s+/g, '').includes(cleanPostcode);
+        });
+        
+        console.log('Filtered orders:', filteredOrders);
+        return filteredOrders as Order[];
+        
+      } catch (error) {
+        console.error('Search error:', error);
         throw error;
       }
-      
-      console.log('Found orders:', data);
-      return data as Order[];
-      */
     },
-    enabled: Boolean(searchPostcode && searchPostcode.length >= 2)
+    enabled: Boolean(searchPostcode && searchPostcode.length >= 2),
+    retry: 1
   });
 
   const assignChargerMutation = useMutation({
@@ -414,8 +394,17 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
               {isSearchingOrders && (searchPostcode.length >= 2) && (
                 <p className="text-sm text-muted-foreground">Searching orders...</p>
               )}
-              {!isSearchingOrders && (searchPostcode.length >= 2) && searchedOrders.length === 0 && (
+              {!isSearchingOrders && (searchPostcode.length >= 2) && searchedOrders.length === 0 && !searchError && (
                 <p className="text-sm text-muted-foreground">No orders found for this search</p>
+              )}
+              {searchError && (
+                <div className="text-sm text-destructive">
+                  <p className="font-medium">Search Error:</p>
+                  <p>{searchError.message}</p>
+                  {searchError.message.includes('Authentication') && (
+                    <p className="mt-1 text-xs">Please refresh the page and log in again.</p>
+                  )}
+                </div>
               )}
             </div>
 
