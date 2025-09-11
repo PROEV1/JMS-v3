@@ -67,7 +67,6 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
   const [locationAddress, setLocationAddress] = useState<string>('');
   const [selectedOrderId, setSelectedOrderId] = useState<string>('');
   const [searchPostcode, setSearchPostcode] = useState<string>('');
-  const [searchEngineerId, setSearchEngineerId] = useState<string>('');
 
   // Reset form when modal opens
   React.useEffect(() => {
@@ -76,7 +75,6 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
       setLocationAddress(charger.location_name || '');
       setSelectedOrderId(charger.assigned_order_id || 'none');
       setSearchPostcode('');
-      setSearchEngineerId('all');
     }
   }, [open, charger]);
 
@@ -112,11 +110,11 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
 
   // Search orders by postcode
   const { data: searchedOrders = [], isLoading: isSearchingOrders } = useQuery({
-    queryKey: ['orders-search', searchPostcode, searchEngineerId],
+    queryKey: ['orders-search', searchPostcode],
     queryFn: async () => {
-      if ((!searchPostcode || searchPostcode.length < 2) && !searchEngineerId) return [];
+      if (!searchPostcode || searchPostcode.length < 2) return [];
       
-      console.log('Searching with postcode:', searchPostcode, 'engineer:', searchEngineerId);
+      console.log('Searching with postcode:', searchPostcode);
       
       let query = supabase
         .from('orders')
@@ -138,17 +136,10 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
         .order('created_at', { ascending: false })
         .limit(10);
 
-      // Filter by postcode if provided - make search more flexible
-      if (searchPostcode && searchPostcode.length >= 2) {
-        const cleanPostcode = searchPostcode.replace(/\s+/g, '').toUpperCase();
-        const postcodeStart = cleanPostcode.substring(0, Math.min(4, cleanPostcode.length));
-        query = query.or(`clients.postcode.ilike.%${searchPostcode}%,clients.address.ilike.%${searchPostcode}%,clients.postcode.ilike.%${postcodeStart}%`);
-      }
-
-      // Filter by engineer if provided
-      if (searchEngineerId && searchEngineerId !== '' && searchEngineerId !== 'all') {
-        query = query.eq('engineer_id', searchEngineerId);
-      }
+      // Filter by postcode - make search more flexible
+      const cleanPostcode = searchPostcode.replace(/\s+/g, '').toUpperCase();
+      const postcodeStart = cleanPostcode.substring(0, Math.min(4, cleanPostcode.length));
+      query = query.or(`clients.postcode.ilike.%${searchPostcode}%,clients.address.ilike.%${searchPostcode}%,clients.postcode.ilike.%${postcodeStart}%`);
 
       const { data, error } = await query;
       
@@ -160,7 +151,7 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
       console.log('Found orders:', data);
       return data as Order[];
     },
-    enabled: Boolean((searchPostcode && searchPostcode.length >= 2) || (searchEngineerId && searchEngineerId !== '' && searchEngineerId !== 'all'))
+    enabled: Boolean(searchPostcode && searchPostcode.length >= 2)
   });
 
   const assignChargerMutation = useMutation({
@@ -355,27 +346,6 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
               </Select>
             </div>
 
-            {/* Engineer Search */}
-            <div className="space-y-2">
-              <Label htmlFor="engineer-search">
-                <User className="w-4 h-4 inline mr-2" />
-                Search by Engineer
-              </Label>
-              <Select value={searchEngineerId} onValueChange={setSearchEngineerId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select engineer to see their orders..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Engineers</SelectItem>
-                  {engineers.map((engineer) => (
-                    <SelectItem key={engineer.id} value={engineer.id}>
-                      {engineer.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
             {/* Postcode Search for Orders */}
             <div className="space-y-2">
               <Label htmlFor="postcode-search">
@@ -388,10 +358,10 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
                 placeholder="Enter postcode to find nearby orders..."
                 className="w-full"
               />
-              {isSearchingOrders && ((searchPostcode.length >= 2) || searchEngineerId) && (
+              {isSearchingOrders && (searchPostcode.length >= 2) && (
                 <p className="text-sm text-muted-foreground">Searching orders...</p>
               )}
-              {!isSearchingOrders && ((searchPostcode.length >= 2) || (searchEngineerId && searchEngineerId !== 'all')) && searchedOrders.length === 0 && (
+              {!isSearchingOrders && (searchPostcode.length >= 2) && searchedOrders.length === 0 && (
                 <p className="text-sm text-muted-foreground">No orders found for this search</p>
               )}
             </div>
