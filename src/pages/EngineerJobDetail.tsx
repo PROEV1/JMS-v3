@@ -32,6 +32,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import JobStatusUpdater from '@/components/engineer/JobStatusUpdater';
 import CompletionChecklist from '@/components/engineer/CompletionChecklist';
 import { EngineerMaterialsUsed } from '@/components/engineer/EngineerMaterialsUsed';
+import { ChargerSection } from '@/components/engineer/ChargerSection';
 
 interface JobDetails {
   id: string;
@@ -692,6 +693,14 @@ export default function EngineerJobDetail() {
           {/* Materials Used */}
           {!job.engineer_signed_off_at && (
             <EngineerMaterialsUsed 
+              orderId={job.id} 
+              engineerId={job.engineer_id || ""} 
+            />
+          )}
+
+          {/* Charger Section */}
+          {!job.engineer_signed_off_at && (
+            <ChargerSection
               orderId={job.id} 
               engineerId={job.engineer_id || ""} 
             />
