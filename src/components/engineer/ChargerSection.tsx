@@ -71,9 +71,14 @@ export function ChargerSection({ orderId, engineerId }: ChargerSectionProps) {
         `)
         .or(`engineer_id.eq.${engineerId},assigned_order_id.eq.${orderId}`)
         .in('status', ['assigned', 'dispatched'])
-        .order('assigned_order_id DESC, serial_number');
+        .order('serial_number');
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching chargers:', error);
+        throw error;
+      }
+      
+      console.log('Fetched chargers:', data);
       return data as AssignedCharger[];
     }
   });
@@ -109,6 +114,11 @@ export function ChargerSection({ orderId, engineerId }: ChargerSectionProps) {
 
   // Get assigned charger for this specific order (if any)
   const orderAssignedCharger = assignedChargers.find(c => c.assigned_order_id === orderId);
+  
+  console.log('All assigned chargers:', assignedChargers);
+  console.log('Order assigned charger:', orderAssignedCharger);
+  console.log('Order ID:', orderId);
+  console.log('Engineer ID:', engineerId);
 
   // Set initial selection to order-assigned charger
   useEffect(() => {
@@ -233,7 +243,7 @@ export function ChargerSection({ orderId, engineerId }: ChargerSectionProps) {
                   description: `Serial number: ${scannedText}`,
                 });
               }
-              if (error && error.name !== 'NotFoundException') {
+              if (error && error.name !== 'NotFoundException' && error.name !== 'NotFoundException2') {
                 console.error('Barcode scanning error:', error);
               }
             }
