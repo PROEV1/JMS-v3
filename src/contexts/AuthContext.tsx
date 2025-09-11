@@ -65,6 +65,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const { data: profileData, error: profileError } = profileResult;
         const { data: partnerData, error: partnerError } = partnerResult;
 
+        console.log('🔍 Profile resolution data:', { 
+          profileData, 
+          profileError, 
+          partnerData, 
+          partnerError,
+          userEmail: user.email 
+        });
+
         if (profileError) {
           console.error('Profile fetch error:', profileError);
           throw profileError;
