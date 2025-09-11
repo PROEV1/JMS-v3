@@ -470,30 +470,6 @@ export function EngineerMaterialsUsed({ orderId, engineerId }: EngineerMaterials
               <>
                 <Separator />
                 
-                {/* Selected Items Summary */}
-                <div className="space-y-4">
-                  <Label className="text-base font-semibold">Selected Items ({selectedItems.length})</Label>
-                  <div className="grid gap-3">
-                    {selectedItems.map(itemId => {
-                      const item = inventoryItems.find(i => i.id === itemId);
-                      return item ? (
-                        <div key={itemId} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border">
-                          <div className="flex-1">
-                            <div className="font-medium text-foreground">{item.name}</div>
-                            <div className="text-sm text-muted-foreground">{item.sku}</div>
-                          </div>
-                          <button 
-                            onClick={() => handleMultiSelectToggle(itemId, false)}
-                            className="ml-3 p-1 hover:bg-destructive/10 hover:text-destructive rounded transition-colors"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        </div>
-                      ) : null;
-                    })}
-                  </div>
-                </div>
-
                 {/* Individual Quantity Settings */}
                 <div className="space-y-4">
                   <Label className="text-base font-semibold">Set Quantities</Label>
