@@ -17,6 +17,7 @@ interface MaterialUsed {
   inventory_items?: {
     name: string;
     sku: string;
+    is_charger?: boolean;
   };
   inventory_locations?: {
     name: string;
@@ -46,14 +47,30 @@ export function useMaterialsUsed(orderId?: string) {
         .from('engineer_materials_used')
         .select(`
           *,
-          inventory_items(name, sku),
+          inventory_items(name, sku, is_charger),
           inventory_locations(name, code)
         `)
         .eq('order_id', orderId)
         .order('used_at', { ascending: false });
 
       if (error) throw error;
-      return data as MaterialUsed[];
+      
+      // Filter out chargers from materials list since they have their own dedicated section
+      const filteredData = (data as MaterialUsed[]).filter(material => {
+        // Filter out items marked as chargers in inventory
+        if (material.inventory_items?.is_charger) {
+          return false;
+        }
+        
+        // Filter out items with charger-related names (fallback for custom entries)
+        const chargerKeywords = ['charger', 'easee', 'epod', 'ohme', 'wallbox', 'pod'];
+        const itemNameLower = material.item_name.toLowerCase();
+        const hasChargerKeyword = chargerKeywords.some(keyword => itemNameLower.includes(keyword));
+        
+        return !hasChargerKeyword;
+      });
+      
+      return filteredData;
     },
     enabled: !!orderId
   });
