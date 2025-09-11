@@ -109,7 +109,7 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
     }
   });
 
-  // Search orders by postcode
+  // Search orders by postcode - using RPC to bypass RLS
   const { data: searchedOrders = [], isLoading: isSearchingOrders, error: searchError } = useQuery({
     queryKey: ['orders-search', searchPostcode],
     queryFn: async () => {
@@ -118,56 +118,56 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
       console.log('Searching with postcode:', searchPostcode);
       
       try {
-        // Direct query without authentication checks - accessible to all users
-        const { data, error } = await supabase
-          .from('orders')
-          .select(`
-            id,
-            order_number,
-            scheduled_install_date,
-            status_enhanced,
-            client_id,
-            engineer_id,
-            clients (
-              full_name,
-              address,
-              postcode,
-              phone
-            )
-          `)
-          .order('created_at', { ascending: false })
-          .limit(100); // Get more results to filter client-side
+        // Use RPC function to search orders (bypasses RLS for search)
+        const { data, error } = await supabase.rpc('search_orders_for_charger_assignment', {
+          search_postcode: searchPostcode
+        });
 
         if (error) {
-          console.error('Orders query error:', error);
-          throw error;
-        }
-        
-        console.log('Raw orders data:', data);
-        
-        if (!data || data.length === 0) {
-          console.log('No orders found');
-          return [];
-        }
+          console.error('Orders search RPC error:', error);
+          // Fallback to direct query with RLS
+          const { data: fallbackData, error: fallbackError } = await supabase
+            .from('orders')
+            .select(`
+              id,
+              order_number,
+              scheduled_install_date,
+              status_enhanced,
+              client_id,
+              engineer_id,
+              clients (
+                full_name,
+                address,
+                postcode,
+                phone
+              )
+            `)
+            .order('created_at', { ascending: false })
+            .limit(100);
 
-        // Filter client-side for postcode match
-        const filteredOrders = data.filter(order => {
-          if (!order.clients) return false;
+          if (fallbackError) throw fallbackError;
           
-          const orderPostcode = (order.clients.postcode || '').toLowerCase();
-          const orderAddress = (order.clients.address || '').toLowerCase();
-          const searchTerm = searchPostcode.toLowerCase();
-          const cleanPostcode = searchPostcode.replace(/\s+/g, '').toLowerCase();
-          const postcodeStart = cleanPostcode.substring(0, Math.min(4, cleanPostcode.length));
+          // Filter client-side for postcode match
+          const filteredOrders = (fallbackData || []).filter(order => {
+            if (!order.clients) return false;
+            
+            const orderPostcode = (order.clients.postcode || '').toLowerCase();
+            const orderAddress = (order.clients.address || '').toLowerCase();
+            const searchTerm = searchPostcode.toLowerCase();
+            const cleanPostcode = searchPostcode.replace(/\s+/g, '').toLowerCase();
+            const postcodeStart = cleanPostcode.substring(0, Math.min(4, cleanPostcode.length));
+            
+            return orderPostcode.includes(searchTerm) ||
+                   orderAddress.includes(searchTerm) ||
+                   orderPostcode.includes(postcodeStart) ||
+                   orderPostcode.replace(/\s+/g, '').includes(cleanPostcode);
+          });
           
-          return orderPostcode.includes(searchTerm) ||
-                 orderAddress.includes(searchTerm) ||
-                 orderPostcode.includes(postcodeStart) ||
-                 orderPostcode.replace(/\s+/g, '').includes(cleanPostcode);
-        });
+          return filteredOrders as Order[];
+        }
         
-        console.log('Filtered orders:', filteredOrders);
-        return filteredOrders as Order[];
+        console.log('Orders from RPC:', data);
+        return data as Order[];
         
       } catch (error) {
         console.error('Search error:', error);
