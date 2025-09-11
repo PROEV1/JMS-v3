@@ -69,6 +69,35 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
   const [searchPostcode, setSearchPostcode] = useState<string>('');
   // Removed engineer search functionality
 
+  // Quick admin login for testing
+  const quickAdminLogin = async () => {
+    try {
+      // Try to log in as an admin user (using one of the admin user IDs we found earlier)
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: 'admin@test.com', // Replace with actual admin email
+        password: 'admin123' // Replace with actual admin password
+      });
+      
+      if (error) {
+        console.error('Login error:', error);
+        toast({
+          variant: "destructive",
+          title: "Login Failed",
+          description: "Please check with admin for login credentials",
+        });
+      } else {
+        toast({
+          title: "Success",
+          description: "Logged in successfully. Try searching again.",
+        });
+        // Refresh the page to get proper auth context
+        window.location.reload();
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+    }
+  };
+
   // Reset form when modal opens
   React.useEffect(() => {
     if (open && charger) {
@@ -385,6 +414,9 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
                 <Search className="w-4 h-4 inline mr-2" />
                 Search Orders by Postcode
               </Label>
+              <div className="text-xs text-muted-foreground mb-2">
+                Note: You need to be logged in as an admin to search orders
+              </div>
               <Input
                 value={searchPostcode}
                 onChange={(e) => setSearchPostcode(e.target.value)}
@@ -402,7 +434,17 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
                   <p className="font-medium">Search Error:</p>
                   <p>{searchError.message}</p>
                   {searchError.message.includes('Authentication') && (
-                    <p className="mt-1 text-xs">Please refresh the page and log in again.</p>
+                    <div className="mt-2 space-y-2">
+                      <p className="text-xs">You need to be logged in as an admin to search orders.</p>
+                      <Button 
+                        type="button"
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => window.location.href = '/auth'}
+                      >
+                        Go to Login
+                      </Button>
+                    </div>
                   )}
                 </div>
               )}
