@@ -118,13 +118,28 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
       console.log('Searching with postcode:', searchPostcode);
       console.log('Current user admin status check...');
       
-      // First test if we can see any orders at all
+      // Test RLS by checking user auth status
+      const { data: userCheck } = await supabase.auth.getUser();
+      console.log('Current user:', userCheck);
+      
+      // First test basic orders access
       const { data: testOrders, error: testError } = await supabase
         .from('orders')
-        .select('id, order_number, status_enhanced')
-        .limit(5);
+        .select('id, order_number, status_enhanced, client_id')
+        .limit(3);
       
-      console.log('Test orders query result:', testOrders, testError);
+      console.log('Basic orders test:', testOrders, testError);
+      
+      // Test with specific order
+      const { data: specificOrder, error: specificError } = await supabase
+        .from('orders')
+        .select(`
+          id, order_number, status_enhanced, client_id,
+          clients (full_name, address, postcode, phone)
+        `)
+        .eq('order_number', 'ORD2025-040112');
+        
+      console.log('Specific order test:', specificOrder, specificError);
       
       let query = supabase
         .from('orders')
