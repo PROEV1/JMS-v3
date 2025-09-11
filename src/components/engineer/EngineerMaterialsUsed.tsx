@@ -5,7 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Package, Plus, X, AlertCircle } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Separator } from "@/components/ui/separator";
+import { Package, Plus, X, AlertCircle, List, CheckSquare } from "lucide-react";
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useMaterialsUsed, useRecordMaterialUsage, useRevokeMaterialUsage } from '@/hooks/useMaterialsUsed';
@@ -19,14 +21,22 @@ interface EngineerMaterialsUsedProps {
 export function EngineerMaterialsUsed({ orderId, engineerId }: EngineerMaterialsUsedProps) {
   console.log('EngineerMaterialsUsed: Component mounted with orderId:', orderId, 'engineerId:', engineerId);
   
+  // Single item form state
   const [itemName, setItemName] = useState("");
   const [selectedItemId, setSelectedItemId] = useState<string>("");
-  
   const [quantity, setQuantity] = useState(1);
   const [serialNumber, setSerialNumber] = useState("");
   const [locationId, setLocationId] = useState<string>("");
   const [notes, setNotes] = useState("");
   const [deductStock, setDeductStock] = useState(true);
+
+  // Multi-select mode state
+  const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
+  const [selectedItems, setSelectedItems] = useState<string[]>([]);
+  const [multiSelectQuantity, setMultiSelectQuantity] = useState(1);
+  const [multiSelectLocationId, setMultiSelectLocationId] = useState<string>("");
+  const [multiSelectNotes, setMultiSelectNotes] = useState("");
+  const [multiSelectDeductStock, setMultiSelectDeductStock] = useState(true);
 
   const { data: materialsUsed = [], isLoading } = useMaterialsUsed(orderId);
   const recordMaterialMutation = useRecordMaterialUsage();
@@ -145,6 +155,52 @@ export function EngineerMaterialsUsed({ orderId, engineerId }: EngineerMaterials
     }
   };
 
+  const handleMultiSelectToggle = (itemId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedItems(prev => [...prev, itemId]);
+    } else {
+      setSelectedItems(prev => prev.filter(id => id !== itemId));
+    }
+  };
+
+  const handleMultiSelectSubmit = async () => {
+    if (selectedItems.length === 0) return;
+
+    const promises = selectedItems.map(itemId => {
+      const item = inventoryItems.find(i => i.id === itemId);
+      if (!item) return Promise.resolve();
+
+      return new Promise((resolve, reject) => {
+        recordMaterialMutation.mutate({
+          orderId,
+          engineerId,
+          itemId,
+          itemName: item.name,
+          quantity: multiSelectQuantity,
+          serialNumber: undefined, // Multi-select doesn't support individual serial numbers
+          locationId: multiSelectLocationId || undefined,
+          notes: multiSelectNotes || undefined,
+          deductStock: multiSelectDeductStock && !!multiSelectLocationId
+        }, {
+          onSuccess: resolve,
+          onError: reject
+        });
+      });
+    });
+
+    try {
+      await Promise.all(promises);
+      // Reset multi-select form
+      setSelectedItems([]);
+      setMultiSelectQuantity(1);
+      setMultiSelectLocationId("");
+      setMultiSelectNotes("");
+      setMultiSelectDeductStock(true);
+    } catch (error) {
+      console.error('Error submitting multiple materials:', error);
+    }
+  };
+
   const handleSubmit = () => {
     if (!itemName.trim()) return;
 
@@ -205,126 +261,287 @@ export function EngineerMaterialsUsed({ orderId, engineerId }: EngineerMaterials
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Add Material Form */}
-        <div className="border rounded-lg p-4 space-y-4 bg-background/50">
-          <h4 className="font-medium text-sm">Add Material</h4>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="material-select">Van Inventory</Label>
-              <Select value={selectedItemId} onValueChange={handleItemSelect}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose from van stock..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {inventoryItems.length > 0 ? (
-                    <SelectGroup>
-                      <SelectLabel>Available Stock</SelectLabel>
-                      {inventoryItems.map((item) => (
-                        <SelectItem key={item.id} value={item.id}>
-                          {item.name} ({item.sku}) - {item.on_hand} available
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  ) : (
-                    <SelectItem value="none" disabled>
-                      No items in van stock
-                    </SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="material-name">Or Enter Custom Item *</Label>
-              <Input
-                id="material-name"
-                value={itemName}
-                onChange={(e) => setItemName(e.target.value)}
-                placeholder="e.g., Cable (5m), Mounting Kit"
-                className="text-sm"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="quantity">Quantity</Label>
-              <Input
-                id="quantity"
-                type="number"
-                min="1"
-                value={quantity}
-                onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
-                className="text-sm"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="serial">Serial Number</Label>
-              <Input
-                id="serial"
-                value={serialNumber}
-                onChange={(e) => setSerialNumber(e.target.value)}
-                placeholder="If applicable"
-                className="text-sm"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="location">Location</Label>
-              <Select value={locationId} onValueChange={setLocationId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select location..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {locations.map((location) => (
-                    <SelectItem key={location.id} value={location.id}>
-                      {location.name} {location.code && `(${location.code})`}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="notes">Notes</Label>
-            <Input
-              id="notes"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Optional notes"
-              className="text-sm"
-            />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="deduct-stock"
-                checked={deductStock}
-                onChange={(e) => setDeductStock(e.target.checked)}
-                disabled={!locationId}
-                className="rounded border-input"
-              />
-              <Label htmlFor="deduct-stock" className="text-sm">
-                Deduct from inventory
-                {!locationId && <span className="text-muted-foreground"> (requires location)</span>}
-              </Label>
-            </div>
-
-            <Button 
-              onClick={handleSubmit} 
-              disabled={!itemName.trim() || recordMaterialMutation.isPending}
+        {/* Mode Toggle */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button
+              variant={!isMultiSelectMode ? "default" : "outline"}
               size="sm"
+              onClick={() => setIsMultiSelectMode(false)}
             >
               <Plus className="h-4 w-4 mr-2" />
-              Add Material
+              Single Item
+            </Button>
+            <Button
+              variant={isMultiSelectMode ? "default" : "outline"}
+              size="sm"
+              onClick={() => setIsMultiSelectMode(true)}
+            >
+              <CheckSquare className="h-4 w-4 mr-2" />
+              Multi-Select
             </Button>
           </div>
+          {isMultiSelectMode && selectedItems.length > 0 && (
+            <Badge variant="secondary">
+              {selectedItems.length} item{selectedItems.length === 1 ? '' : 's'} selected
+            </Badge>
+          )}
         </div>
+
+        {/* Single Item Form */}
+        {!isMultiSelectMode && (
+          <div className="border rounded-lg p-4 space-y-4 bg-background/50">
+            <h4 className="font-medium text-sm">Add Material</h4>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="material-select">Van Inventory</Label>
+                <Select value={selectedItemId} onValueChange={handleItemSelect}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose from van stock..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {inventoryItems.length > 0 ? (
+                      <SelectGroup>
+                        <SelectLabel>Available Stock</SelectLabel>
+                        {inventoryItems.map((item) => (
+                          <SelectItem key={item.id} value={item.id}>
+                            {item.name} ({item.sku}) - {item.on_hand} available
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    ) : (
+                      <SelectItem value="none" disabled>
+                        No items in van stock
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="material-name">Or Enter Custom Item *</Label>
+                <Input
+                  id="material-name"
+                  value={itemName}
+                  onChange={(e) => setItemName(e.target.value)}
+                  placeholder="e.g., Cable (5m), Mounting Kit"
+                  className="text-sm"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="quantity">Quantity</Label>
+                <Input
+                  id="quantity"
+                  type="number"
+                  min="1"
+                  value={quantity}
+                  onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
+                  className="text-sm"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="serial">Serial Number</Label>
+                <Input
+                  id="serial"
+                  value={serialNumber}
+                  onChange={(e) => setSerialNumber(e.target.value)}
+                  placeholder="If applicable"
+                  className="text-sm"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="location">Location</Label>
+                <Select value={locationId} onValueChange={setLocationId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select location..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {locations.map((location) => (
+                      <SelectItem key={location.id} value={location.id}>
+                        {location.name} {location.code && `(${location.code})`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="notes">Notes</Label>
+              <Input
+                id="notes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Optional notes"
+                className="text-sm"
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="deduct-stock"
+                  checked={deductStock}
+                  onChange={(e) => setDeductStock(e.target.checked)}
+                  disabled={!locationId}
+                  className="rounded border-input"
+                />
+                <Label htmlFor="deduct-stock" className="text-sm">
+                  Deduct from inventory
+                  {!locationId && <span className="text-muted-foreground"> (requires location)</span>}
+                </Label>
+              </div>
+
+              <Button 
+                onClick={handleSubmit} 
+                disabled={!itemName.trim() || recordMaterialMutation.isPending}
+                size="sm"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Material
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Multi-Select Form */}
+        {isMultiSelectMode && (
+          <div className="border rounded-lg p-4 space-y-4 bg-background/50">
+            <h4 className="font-medium text-sm">Select Multiple Materials</h4>
+            
+            {/* Item Selection */}
+            <div className="space-y-2">
+              <Label>Van Inventory Items</Label>
+              {inventoryItems.length > 0 ? (
+                <div className="border rounded p-3 max-h-48 overflow-y-auto space-y-2">
+                  {inventoryItems.map((item) => (
+                    <div key={item.id} className="flex items-center space-x-3 p-2 hover:bg-muted/50 rounded">
+                      <Checkbox
+                        id={`item-${item.id}`}
+                        checked={selectedItems.includes(item.id)}
+                        onCheckedChange={(checked) => handleMultiSelectToggle(item.id, checked as boolean)}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <Label htmlFor={`item-${item.id}`} className="text-sm font-medium cursor-pointer">
+                          {item.name}
+                        </Label>
+                        <div className="text-xs text-muted-foreground">
+                          {item.sku} • {item.on_hand} available
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center p-4 text-muted-foreground text-sm">
+                  No items available in van stock
+                </div>
+              )}
+            </div>
+
+            {selectedItems.length > 0 && (
+              <>
+                <Separator />
+                
+                {/* Selected Items Summary */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Selected Items ({selectedItems.length})</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedItems.map(itemId => {
+                      const item = inventoryItems.find(i => i.id === itemId);
+                      return item ? (
+                        <Badge key={itemId} variant="secondary" className="text-xs">
+                          {item.name}
+                          <button 
+                            onClick={() => handleMultiSelectToggle(itemId, false)}
+                            className="ml-1 hover:text-destructive"
+                          >
+                            ×
+                          </button>
+                        </Badge>
+                      ) : null;
+                    })}
+                  </div>
+                </div>
+
+                {/* Bulk Settings */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="multi-quantity">Quantity (per item)</Label>
+                    <Input
+                      id="multi-quantity"
+                      type="number"
+                      min="1"
+                      value={multiSelectQuantity}
+                      onChange={(e) => setMultiSelectQuantity(parseInt(e.target.value) || 1)}
+                      className="text-sm"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="multi-location">Location</Label>
+                    <Select value={multiSelectLocationId} onValueChange={setMultiSelectLocationId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select location..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {locations.map((location) => (
+                          <SelectItem key={location.id} value={location.id}>
+                            {location.name} {location.code && `(${location.code})`}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="multi-notes">Notes (for all)</Label>
+                    <Input
+                      id="multi-notes"
+                      value={multiSelectNotes}
+                      onChange={(e) => setMultiSelectNotes(e.target.value)}
+                      placeholder="Optional notes"
+                      className="text-sm"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="multi-deduct-stock"
+                      checked={multiSelectDeductStock}
+                      onChange={(e) => setMultiSelectDeductStock(e.target.checked)}
+                      disabled={!multiSelectLocationId}
+                      className="rounded border-input"
+                    />
+                    <Label htmlFor="multi-deduct-stock" className="text-sm">
+                      Deduct from inventory
+                      {!multiSelectLocationId && <span className="text-muted-foreground"> (requires location)</span>}
+                    </Label>
+                  </div>
+
+                  <Button 
+                    onClick={handleMultiSelectSubmit} 
+                    disabled={selectedItems.length === 0 || recordMaterialMutation.isPending}
+                    size="sm"
+                  >
+                    <List className="h-4 w-4 mr-2" />
+                    Add {selectedItems.length} Material{selectedItems.length === 1 ? '' : 's'}
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
 
         {/* Materials List */}
         {materialsUsed.length > 0 && (
