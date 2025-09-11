@@ -133,7 +133,8 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
             phone
           )
         `)
-        .in('status_enhanced', ['awaiting_install_booking', 'scheduled', 'date_accepted'])
+        // Temporarily removing status filter to debug
+        // .in('status_enhanced', ['awaiting_install_booking', 'scheduled', 'date_accepted', 'in_progress', 'payment_received', 'agreement_signed'])
         .order('created_at', { ascending: false })
         .limit(10);
 
