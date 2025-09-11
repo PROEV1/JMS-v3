@@ -40,7 +40,7 @@ export default function EngineerStockRequests() {
     );
   }
 
-  if (userRole !== 'standard_office_user' && userRole !== 'admin') {
+  if (userRole !== 'engineer' && userRole !== 'admin') {
     return (
       <BrandPage>
         <BrandContainer>
