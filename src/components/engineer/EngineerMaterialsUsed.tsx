@@ -273,29 +273,31 @@ export function EngineerMaterialsUsed({ orderId, engineerId }: EngineerMaterials
           Materials Used on Job
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-8">
         {/* Mode Toggle */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+        <div className="flex items-center justify-between p-4 bg-muted/20 rounded-lg border">
+          <div className="flex items-center gap-3">
             <Button
               variant={!isMultiSelectMode ? "default" : "outline"}
-              size="sm"
+              size="default"
               onClick={() => setIsMultiSelectMode(false)}
+              className="font-medium"
             >
               <Plus className="h-4 w-4 mr-2" />
               Single Item
             </Button>
             <Button
               variant={isMultiSelectMode ? "default" : "outline"}
-              size="sm"
+              size="default"
               onClick={() => setIsMultiSelectMode(true)}
+              className="font-medium"
             >
               <CheckSquare className="h-4 w-4 mr-2" />
               Multi-Select
             </Button>
           </div>
           {isMultiSelectMode && selectedItems.length > 0 && (
-            <Badge variant="secondary">
+            <Badge variant="default" className="text-sm px-3 py-1">
               {selectedItems.length} item{selectedItems.length === 1 ? '' : 's'} selected
             </Badge>
           )}
@@ -303,23 +305,26 @@ export function EngineerMaterialsUsed({ orderId, engineerId }: EngineerMaterials
 
         {/* Single Item Form */}
         {!isMultiSelectMode && (
-          <div className="border rounded-lg p-4 space-y-4 bg-background/50">
-            <h4 className="font-medium text-sm">Add Material</h4>
+          <div className="border rounded-lg p-6 space-y-6 bg-card">
+            <h4 className="font-semibold text-lg text-foreground">Add Material</h4>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="material-select">Van Inventory</Label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-3">
+                <Label htmlFor="material-select" className="text-base font-medium">Van Inventory</Label>
                 <Select value={selectedItemId} onValueChange={handleItemSelect}>
-                  <SelectTrigger>
+                  <SelectTrigger className="h-11">
                     <SelectValue placeholder="Choose from van stock..." />
                   </SelectTrigger>
                   <SelectContent>
                     {inventoryItems.length > 0 ? (
                       <SelectGroup>
-                        <SelectLabel>Available Stock</SelectLabel>
+                        <SelectLabel className="text-sm font-semibold">Available Stock</SelectLabel>
                         {inventoryItems.map((item) => (
-                          <SelectItem key={item.id} value={item.id}>
-                            {item.name} ({item.sku}) - {item.on_hand} available
+                          <SelectItem key={item.id} value={item.id} className="py-3">
+                            <div className="flex flex-col">
+                              <span className="font-medium">{item.name}</span>
+                              <span className="text-sm text-muted-foreground">{item.sku} • {item.on_hand} available</span>
+                            </div>
                           </SelectItem>
                         ))}
                       </SelectGroup>
@@ -332,52 +337,53 @@ export function EngineerMaterialsUsed({ orderId, engineerId }: EngineerMaterials
                 </Select>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="material-name">Or Enter Custom Item *</Label>
+              <div className="space-y-3">
+                <Label htmlFor="material-name" className="text-base font-medium">Or Enter Custom Item *</Label>
                 <Input
                   id="material-name"
                   value={itemName}
                   onChange={(e) => setItemName(e.target.value)}
                   placeholder="e.g., Cable (5m), Mounting Kit"
-                  className="text-sm"
+                  className="h-11"
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="quantity">Quantity</Label>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="space-y-3">
+                <Label htmlFor="quantity" className="text-base font-medium">Quantity</Label>
                 <Input
                   id="quantity"
                   type="number"
                   min="1"
                   value={quantity}
                   onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
-                  className="text-sm"
+                  className="h-11 text-base"
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="serial">Serial Number</Label>
+              <div className="space-y-3">
+                <Label htmlFor="serial" className="text-base font-medium">Serial Number</Label>
                 <Input
                   id="serial"
                   value={serialNumber}
                   onChange={(e) => setSerialNumber(e.target.value)}
                   placeholder="If applicable"
-                  className="text-sm"
+                  className="h-11"
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="location">Location</Label>
+              <div className="space-y-3">
+                <Label htmlFor="location" className="text-base font-medium">Location</Label>
                 <Select value={locationId} onValueChange={setLocationId}>
-                  <SelectTrigger>
+                  <SelectTrigger className="h-11">
                     <SelectValue placeholder="Select location..." />
                   </SelectTrigger>
                   <SelectContent>
                     {locations.map((location) => (
-                      <SelectItem key={location.id} value={location.id}>
-                        {location.name} {location.code && `(${location.code})`}
+                      <SelectItem key={location.id} value={location.id} className="py-3">
+                        <span className="font-medium">{location.name}</span>
+                        {location.code && <span className="text-muted-foreground ml-2">({location.code})</span>}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -385,37 +391,36 @@ export function EngineerMaterialsUsed({ orderId, engineerId }: EngineerMaterials
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="notes">Notes</Label>
+            <div className="space-y-3">
+              <Label htmlFor="notes" className="text-base font-medium">Notes</Label>
               <Input
                 id="notes"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Optional notes"
-                className="text-sm"
+                className="h-11"
               />
             </div>
 
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
+            <div className="flex items-center justify-between pt-4 border-t">
+              <div className="flex items-center gap-3">
+                <Checkbox
                   id="deduct-stock"
                   checked={deductStock}
-                  onChange={(e) => setDeductStock(e.target.checked)}
+                  onCheckedChange={(checked) => setDeductStock(checked as boolean)}
                   disabled={!locationId}
-                  className="rounded border-input"
                 />
-                <Label htmlFor="deduct-stock" className="text-sm">
+                <Label htmlFor="deduct-stock" className="text-base cursor-pointer">
                   Deduct from inventory
-                  {!locationId && <span className="text-muted-foreground"> (requires location)</span>}
+                  {!locationId && <span className="text-muted-foreground ml-1">(requires location)</span>}
                 </Label>
               </div>
 
               <Button 
                 onClick={handleSubmit} 
                 disabled={!itemName.trim() || recordMaterialMutation.isPending}
-                size="sm"
+                size="lg"
+                className="px-6"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Add Material
@@ -426,35 +431,37 @@ export function EngineerMaterialsUsed({ orderId, engineerId }: EngineerMaterials
 
         {/* Multi-Select Form */}
         {isMultiSelectMode && (
-          <div className="border rounded-lg p-4 space-y-4 bg-background/50">
-            <h4 className="font-medium text-sm">Select Multiple Materials</h4>
+          <div className="border rounded-lg p-6 space-y-6 bg-card">
+            <h4 className="font-semibold text-lg text-foreground">Select Multiple Materials</h4>
             
             {/* Item Selection */}
-            <div className="space-y-2">
-              <Label>Van Inventory Items</Label>
+            <div className="space-y-4">
+              <Label className="text-base font-medium">Van Inventory Items</Label>
               {inventoryItems.length > 0 ? (
-                <div className="border rounded p-3 max-h-48 overflow-y-auto space-y-2">
+                <div className="border rounded-lg p-4 max-h-64 overflow-y-auto space-y-3 bg-background/50">
                   {inventoryItems.map((item) => (
-                    <div key={item.id} className="flex items-center space-x-3 p-2 hover:bg-muted/50 rounded">
+                    <div key={item.id} className="flex items-center space-x-4 p-3 hover:bg-muted/30 rounded-lg border border-transparent hover:border-border transition-colors">
                       <Checkbox
                         id={`item-${item.id}`}
                         checked={selectedItems.includes(item.id)}
                         onCheckedChange={(checked) => handleMultiSelectToggle(item.id, checked as boolean)}
+                        className="scale-110"
                       />
                       <div className="flex-1 min-w-0">
-                        <Label htmlFor={`item-${item.id}`} className="text-sm font-medium cursor-pointer">
+                        <Label htmlFor={`item-${item.id}`} className="text-base font-medium cursor-pointer text-foreground">
                           {item.name}
                         </Label>
-                        <div className="text-xs text-muted-foreground">
-                          {item.sku} • {item.on_hand} available
+                        <div className="text-sm text-muted-foreground mt-1">
+                          {item.sku} • <span className="font-medium">{item.on_hand} available</span>
                         </div>
                       </div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="text-center p-4 text-muted-foreground text-sm">
-                  No items available in van stock
+                <div className="text-center p-8 text-muted-foreground">
+                  <Package className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p className="text-base">No items available in van stock</p>
                 </div>
               )}
             </div>
@@ -464,21 +471,24 @@ export function EngineerMaterialsUsed({ orderId, engineerId }: EngineerMaterials
                 <Separator />
                 
                 {/* Selected Items Summary */}
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Selected Items ({selectedItems.length})</Label>
-                  <div className="flex flex-wrap gap-2">
+                <div className="space-y-4">
+                  <Label className="text-base font-semibold">Selected Items ({selectedItems.length})</Label>
+                  <div className="grid gap-3">
                     {selectedItems.map(itemId => {
                       const item = inventoryItems.find(i => i.id === itemId);
                       return item ? (
-                        <Badge key={itemId} variant="secondary" className="text-xs">
-                          {item.name}
+                        <div key={itemId} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border">
+                          <div className="flex-1">
+                            <div className="font-medium text-foreground">{item.name}</div>
+                            <div className="text-sm text-muted-foreground">{item.sku}</div>
+                          </div>
                           <button 
                             onClick={() => handleMultiSelectToggle(itemId, false)}
-                            className="ml-1 hover:text-destructive"
+                            className="ml-3 p-1 hover:bg-destructive/10 hover:text-destructive rounded transition-colors"
                           >
-                            ×
+                            <X className="h-4 w-4" />
                           </button>
-                        </Badge>
+                        </div>
                       ) : null;
                     })}
                   </div>
@@ -486,27 +496,28 @@ export function EngineerMaterialsUsed({ orderId, engineerId }: EngineerMaterials
 
                 {/* Individual Quantity Settings */}
                 <div className="space-y-4">
-                  <Label className="text-sm font-medium">Set Quantities</Label>
-                  <div className="space-y-3 max-h-32 overflow-y-auto">
+                  <Label className="text-base font-semibold">Set Quantities</Label>
+                  <div className="space-y-4 max-h-80 overflow-y-auto">
                     {selectedItems.map(itemId => {
                       const item = inventoryItems.find(i => i.id === itemId);
                       if (!item) return null;
                       
                       return (
-                        <div key={itemId} className="flex items-center justify-between p-2 bg-muted/30 rounded">
+                        <div key={itemId} className="flex items-center justify-between p-4 border rounded-lg bg-background/50">
                           <div className="flex-1">
-                            <div className="text-sm font-medium">{item.name}</div>
-                            <div className="text-xs text-muted-foreground">{item.sku}</div>
+                            <div className="font-medium text-base text-foreground">{item.name}</div>
+                            <div className="text-sm text-muted-foreground mt-1">{item.sku} • <span className="font-medium">{item.on_hand} available</span></div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Label htmlFor={`qty-${itemId}`} className="text-xs">Qty:</Label>
+                          <div className="flex items-center gap-3">
+                            <Label htmlFor={`qty-${itemId}`} className="text-base font-medium">Qty:</Label>
                             <Input
                               id={`qty-${itemId}`}
                               type="number"
                               min="1"
+                              max={item.on_hand}
                               value={itemQuantities[itemId] || 1}
                               onChange={(e) => handleQuantityChange(itemId, parseInt(e.target.value) || 1)}
-                              className="w-16 h-8 text-xs"
+                              className="w-24 text-center h-10 text-base font-medium"
                             />
                           </div>
                         </div>
@@ -516,57 +527,57 @@ export function EngineerMaterialsUsed({ orderId, engineerId }: EngineerMaterials
                 </div>
 
                 {/* Common Settings */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="multi-location">Location</Label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <Label htmlFor="multi-location" className="text-base font-medium">Location</Label>
                     <Select value={multiSelectLocationId} onValueChange={setMultiSelectLocationId}>
-                      <SelectTrigger>
+                      <SelectTrigger className="h-11">
                         <SelectValue placeholder="Select location..." />
                       </SelectTrigger>
                       <SelectContent>
                         {locations.map((location) => (
-                          <SelectItem key={location.id} value={location.id}>
-                            {location.name} {location.code && `(${location.code})`}
+                          <SelectItem key={location.id} value={location.id} className="py-3">
+                            <span className="font-medium">{location.name}</span>
+                            {location.code && <span className="text-muted-foreground ml-2">({location.code})</span>}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="multi-notes">Notes (for all)</Label>
+                  <div className="space-y-3">
+                    <Label htmlFor="multi-notes" className="text-base font-medium">Notes (for all)</Label>
                     <Input
                       id="multi-notes"
                       value={multiSelectNotes}
                       onChange={(e) => setMultiSelectNotes(e.target.value)}
                       placeholder="Optional notes"
-                      className="text-sm"
+                      className="h-11"
                     />
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
+                <div className="flex items-center justify-between pt-4 border-t">
+                  <div className="flex items-center gap-3">
+                    <Checkbox
                       id="multi-deduct-stock"
                       checked={multiSelectDeductStock}
-                      onChange={(e) => setMultiSelectDeductStock(e.target.checked)}
+                      onCheckedChange={(checked) => setMultiSelectDeductStock(checked as boolean)}
                       disabled={!multiSelectLocationId}
-                      className="rounded border-input"
                     />
-                    <Label htmlFor="multi-deduct-stock" className="text-sm">
+                    <Label htmlFor="multi-deduct-stock" className="text-base cursor-pointer">
                       Deduct from inventory
-                      {!multiSelectLocationId && <span className="text-muted-foreground"> (requires location)</span>}
+                      {!multiSelectLocationId && <span className="text-muted-foreground ml-1">(requires location)</span>}
                     </Label>
                   </div>
 
                   <Button 
                     onClick={handleMultiSelectSubmit} 
                     disabled={selectedItems.length === 0 || recordMaterialMutation.isPending}
-                    size="sm"
+                    size="lg"
+                    className="px-6"
                   >
-                    <List className="h-4 w-4 mr-2" />
+                    <Plus className="h-4 w-4 mr-2" />
                     Add {selectedItems.length} Material{selectedItems.length === 1 ? '' : 's'}
                   </Button>
                 </div>
@@ -577,27 +588,27 @@ export function EngineerMaterialsUsed({ orderId, engineerId }: EngineerMaterials
 
         {/* Materials List */}
         {materialsUsed.length > 0 && (
-          <div className="space-y-3">
-            <h4 className="font-medium text-sm">Materials Used ({materialsUsed.length})</h4>
-            <div className="space-y-2">
+          <div className="space-y-6">
+            <h4 className="font-semibold text-lg text-foreground">Materials Used ({materialsUsed.length})</h4>
+            <div className="space-y-4">
               {materialsUsed.map((material) => (
-                <div key={material.id} className="flex items-center justify-between p-3 border rounded-lg bg-background/30">
-                  <div className="flex-1 space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-sm">{material.item_name}</span>
+                <div key={material.id} className="flex items-center justify-between p-4 border rounded-lg bg-card shadow-sm">
+                  <div className="flex-1 space-y-2">
+                    <div className="flex items-center gap-3">
+                      <span className="font-semibold text-base text-foreground">{material.item_name}</span>
                       {material.inventory_items && (
-                        <Badge variant="secondary" className="text-xs">
+                        <Badge variant="default" className="text-sm px-2 py-1">
                           {material.inventory_items.sku}
                         </Badge>
                       )}
                     </div>
-                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                      <span>Qty: {material.quantity}</span>
-                      {material.serial_number && <span>Serial: {material.serial_number}</span>}
+                    <div className="flex items-center gap-6 text-sm text-muted-foreground">
+                      <span className="font-medium">Qty: {material.quantity}</span>
+                      {material.serial_number && <span><span className="font-medium">Serial:</span> {material.serial_number}</span>}
                       {material.inventory_locations && (
-                        <span>Location: {material.inventory_locations.name}</span>
+                        <span><span className="font-medium">Location:</span> {material.inventory_locations.name}</span>
                       )}
-                      {material.notes && <span>Notes: {material.notes}</span>}
+                      {material.notes && <span><span className="font-medium">Notes:</span> {material.notes}</span>}
                     </div>
                   </div>
                   
@@ -606,18 +617,18 @@ export function EngineerMaterialsUsed({ orderId, engineerId }: EngineerMaterials
                       <Button 
                         variant="ghost" 
                         size="sm"
-                        className="text-destructive hover:text-destructive"
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
                       >
                         <X className="h-4 w-4" />
                       </Button>
                     </AlertDialogTrigger>
                     <AlertDialogContent>
                       <AlertDialogHeader>
-                        <AlertDialogTitle>Remove Material</AlertDialogTitle>
-                        <AlertDialogDescription>
+                        <AlertDialogTitle className="text-lg">Remove Material</AlertDialogTitle>
+                        <AlertDialogDescription className="text-base">
                           Are you sure you want to remove "{material.item_name}" from this job?
                           {material.location_id && (
-                            <div className="mt-2 p-2 bg-muted rounded text-sm">
+                            <div className="mt-3 p-3 bg-muted rounded text-sm">
                               <strong>Stock restoration:</strong> This material was deducted from inventory. 
                               You can choose to restore the stock or leave it as consumed.
                             </div>
@@ -642,16 +653,16 @@ export function EngineerMaterialsUsed({ orderId, engineerId }: EngineerMaterials
         )}
 
         {/* Info Message */}
-        <div className="bg-primary/5 border border-primary/20 p-4 rounded-lg">
-          <div className="flex items-start gap-2">
-            <AlertCircle className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-            <div className="text-sm">
-              <p className="text-primary font-medium mb-1">Material Tracking</p>
-              <p className="text-muted-foreground">
+        <div className="bg-primary/5 border border-primary/20 p-6 rounded-lg">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-primary font-semibold mb-2 text-base">Material Tracking</p>
+              <p className="text-muted-foreground text-base leading-relaxed">
                 Select items from your van stock or add custom materials. Items from van stock can be automatically deducted when used.
               </p>
               {!engineerLocation && (
-                <p className="text-amber-600 mt-1 font-medium">
+                <p className="text-amber-600 mt-3 font-medium text-base">
                   ⚠️ No van location found - contact admin to set up your van stock location.
                 </p>
               )}
