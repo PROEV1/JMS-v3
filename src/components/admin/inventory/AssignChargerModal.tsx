@@ -74,9 +74,9 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
     if (open && charger) {
       setSelectedEngineerId(charger.engineer_id || '');
       setLocationAddress(charger.location_name || '');
-      setSelectedOrderId(charger.assigned_order_id || '');
+      setSelectedOrderId(charger.assigned_order_id || 'none');
       setSearchPostcode('');
-      setSearchEngineerId('');
+      setSearchEngineerId('all');
     }
   }, [open, charger]);
 
@@ -142,7 +142,7 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
       }
 
       // Filter by engineer if provided
-      if (searchEngineerId && searchEngineerId !== '') {
+      if (searchEngineerId && searchEngineerId !== '' && searchEngineerId !== 'all') {
         query = query.eq('engineer_id', searchEngineerId);
       }
 
@@ -151,7 +151,7 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
       if (error) throw error;
       return data as Order[];
     },
-    enabled: Boolean((searchPostcode && searchPostcode.length >= 2) || (searchEngineerId && searchEngineerId !== ''))
+    enabled: Boolean((searchPostcode && searchPostcode.length >= 2) || (searchEngineerId && searchEngineerId !== '' && searchEngineerId !== 'all'))
   });
 
   const assignChargerMutation = useMutation({
@@ -266,7 +266,7 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
     assignChargerMutation.mutate({
       engineerId: selectedEngineerId,
       address: locationAddress,
-      orderId: selectedOrderId
+      orderId: selectedOrderId === 'none' ? null : selectedOrderId
     });
   };
 
@@ -278,7 +278,7 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
   const handleOrderSelection = (orderId: string) => {
     setSelectedOrderId(orderId);
     
-    if (orderId) {
+    if (orderId && orderId !== 'none') {
       const selectedOrder = searchedOrders.find(o => o.id === orderId);
       if (selectedOrder && selectedOrder.clients) {
         // Build full address from client data
@@ -357,7 +357,7 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
                   <SelectValue placeholder="Select engineer to see their orders..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Engineers</SelectItem>
+                  <SelectItem value="all">All Engineers</SelectItem>
                   {engineers.map((engineer) => (
                     <SelectItem key={engineer.id} value={engineer.id}>
                       {engineer.name}
@@ -396,7 +396,7 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
                     <SelectValue placeholder="Select order..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">No specific order</SelectItem>
+                    <SelectItem value="none">No specific order</SelectItem>
                     {searchedOrders.map((order) => {
                       const postcode = getBestPostcode(
                         order.clients?.address,
@@ -439,7 +439,7 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
             </div>
 
             {/* Assignment Preview */}
-            {(selectedEngineer || locationAddress || selectedOrderId) && (
+            {(selectedEngineer || locationAddress || (selectedOrderId && selectedOrderId !== 'none')) && (
               <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg space-y-1">
                 <p className="text-sm font-medium">Assignment Preview:</p>
                 {selectedEngineer && (
@@ -448,7 +448,7 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
                     Engineer: {selectedEngineer.name}
                   </p>
                 )}
-                {selectedOrderId && (
+                {selectedOrderId && selectedOrderId !== 'none' && (
                   <p className="text-sm">
                     <Package className="w-3 h-3 inline mr-1" />
                     Order: {searchedOrders.find(o => o.id === selectedOrderId)?.order_number}
