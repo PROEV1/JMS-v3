@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 
-type UserRole = 'admin' | 'standard_office_user' | 'partner_user' | 'engineer';
+type UserRole = 'admin' | 'standard_office_user' | 'partner_user' | 'engineer' | 'client';
 
 interface AuthState {
   user: User | null;
@@ -183,6 +183,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (currentPath === '/') {
       if (finalRole === 'partner_user') target = '/partner';
       else if (finalRole === 'engineer') target = '/engineer/dashboard';
+      else if (finalRole === 'client') target = '/auth'; // Clients should stay on auth page or be redirected appropriately
       else target = '/admin';
     }
     
