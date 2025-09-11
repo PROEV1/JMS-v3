@@ -116,6 +116,15 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
       if (!searchPostcode || searchPostcode.length < 2) return [];
       
       console.log('Searching with postcode:', searchPostcode);
+      console.log('Current user admin status check...');
+      
+      // First test if we can see any orders at all
+      const { data: testOrders, error: testError } = await supabase
+        .from('orders')
+        .select('id, order_number, status_enhanced')
+        .limit(5);
+      
+      console.log('Test orders query result:', testOrders, testError);
       
       let query = supabase
         .from('orders')
@@ -126,7 +135,7 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
           status_enhanced,
           client_id,
           engineer_id,
-          clients!inner (
+          clients (
             full_name,
             address,
             postcode,
@@ -141,6 +150,32 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
       // Filter by postcode - make search more flexible
       const cleanPostcode = searchPostcode.replace(/\s+/g, '').toUpperCase();
       const postcodeStart = cleanPostcode.substring(0, Math.min(4, cleanPostcode.length));
+      
+      // Use a different approach for postcode filtering
+      const { data: allData, error: allError } = await query;
+      
+      if (allError) {
+        console.error('Order search error:', allError);
+        throw allError;
+      }
+      
+      console.log('All orders before filtering:', allData);
+      
+      // Filter in JavaScript instead of SQL for debugging
+      const filteredData = allData?.filter(order => {
+        if (!order.clients) return false;
+        const orderPostcode = order.clients.postcode || '';
+        const orderAddress = order.clients.address || '';
+        
+        return orderPostcode.toLowerCase().includes(searchPostcode.toLowerCase()) ||
+               orderAddress.toLowerCase().includes(searchPostcode.toLowerCase()) ||
+               orderPostcode.toLowerCase().includes(postcodeStart.toLowerCase());
+      }) || [];
+      
+      console.log('Filtered orders:', filteredData);
+      return filteredData as Order[];
+
+      /* Old SQL filtering approach - commented out for debugging
       query = query.or(`clients.postcode.ilike.%${searchPostcode}%,clients.address.ilike.%${searchPostcode}%,clients.postcode.ilike.%${postcodeStart}%`);
 
       const { data, error } = await query;
@@ -152,6 +187,7 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
       
       console.log('Found orders:', data);
       return data as Order[];
+      */
     },
     enabled: Boolean(searchPostcode && searchPostcode.length >= 2)
   });
