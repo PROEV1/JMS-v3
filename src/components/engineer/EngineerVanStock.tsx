@@ -24,14 +24,12 @@ import { StockRequestButton } from './StockRequestButton';
 import { EngineerScanModal } from './EngineerScanModal';
 import { EngineerReturnModal } from './EngineerReturnModal';
 import { UseMaterialsModal } from './UseMaterialsModal';
-import { ChargerScanModal } from './ChargerScanModal';
 
 export function EngineerVanStock() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showScanModal, setShowScanModal] = useState(false);
   const [showReturnModal, setShowReturnModal] = useState(false);
   const [showUseMaterialsModal, setShowUseMaterialsModal] = useState(false);
-  const [showChargerScanModal, setShowChargerScanModal] = useState(false);
   const [chargerTypeFilter, setChargerTypeFilter] = useState<string>('all');
 
   // Get engineer's van location
@@ -337,10 +335,6 @@ export function EngineerVanStock() {
           <Scan className="h-4 w-4 mr-2" />
           Scan Item
         </Button>
-        <Button variant="secondary" onClick={() => setShowChargerScanModal(true)}>
-          <Scan className="h-4 w-4 mr-2" />
-          Scan Charger
-        </Button>
         <Button variant="secondary" onClick={() => setShowUseMaterialsModal(true)}>
           <Wrench className="h-4 w-4 mr-2" />
           Use Materials
@@ -452,17 +446,6 @@ export function EngineerVanStock() {
                       </div>
                     </div>
                     
-                    <div className="flex gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="text-xs"
-                        onClick={() => setShowChargerScanModal(true)}
-                      >
-                        <Scan className="h-3 w-3 mr-1" />
-                        Update Status
-                      </Button>
-                    </div>
                   </div>
                 ))}
               </div>
@@ -537,12 +520,6 @@ export function EngineerVanStock() {
             engineerId={engineer.id}
             vanLocationId={vanLocation.id}
             stockItems={regularItems || []}
-          />
-          <ChargerScanModal
-            open={showChargerScanModal}
-            onOpenChange={setShowChargerScanModal}
-            engineerId={engineer.id}
-            vanLocationId={vanLocation.id}
           />
         </>
       )}
