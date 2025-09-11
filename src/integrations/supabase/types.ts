@@ -38,6 +38,80 @@ export type Database = {
         }
         Relationships: []
       }
+      charger_change_log: {
+        Row: {
+          changed_at: string
+          created_at: string
+          created_by: string | null
+          engineer_id: string
+          id: string
+          new_charger_id: string | null
+          new_serial_number: string
+          order_id: string
+          original_charger_id: string | null
+          original_serial_number: string | null
+          reason_category: string
+          reason_description: string | null
+        }
+        Insert: {
+          changed_at?: string
+          created_at?: string
+          created_by?: string | null
+          engineer_id: string
+          id?: string
+          new_charger_id?: string | null
+          new_serial_number: string
+          order_id: string
+          original_charger_id?: string | null
+          original_serial_number?: string | null
+          reason_category: string
+          reason_description?: string | null
+        }
+        Update: {
+          changed_at?: string
+          created_at?: string
+          created_by?: string | null
+          engineer_id?: string
+          id?: string
+          new_charger_id?: string | null
+          new_serial_number?: string
+          order_id?: string
+          original_charger_id?: string | null
+          original_serial_number?: string | null
+          reason_category?: string
+          reason_description?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "charger_change_log_engineer_id_fkey"
+            columns: ["engineer_id"]
+            isOneToOne: false
+            referencedRelation: "engineers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "charger_change_log_new_charger_id_fkey"
+            columns: ["new_charger_id"]
+            isOneToOne: false
+            referencedRelation: "charger_inventory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "charger_change_log_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "charger_change_log_original_charger_id_fkey"
+            columns: ["original_charger_id"]
+            isOneToOne: false
+            referencedRelation: "charger_inventory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       charger_dispatches: {
         Row: {
           charger_item_id: string
@@ -526,6 +600,7 @@ export type Database = {
       }
       engineer_materials_used: {
         Row: {
+          charger_inventory_id: string | null
           created_at: string
           engineer_id: string
           id: string
@@ -540,6 +615,7 @@ export type Database = {
           used_at: string
         }
         Insert: {
+          charger_inventory_id?: string | null
           created_at?: string
           engineer_id: string
           id?: string
@@ -554,6 +630,7 @@ export type Database = {
           used_at?: string
         }
         Update: {
+          charger_inventory_id?: string | null
           created_at?: string
           engineer_id?: string
           id?: string
@@ -568,6 +645,13 @@ export type Database = {
           used_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "engineer_materials_used_charger_inventory_id_fkey"
+            columns: ["charger_inventory_id"]
+            isOneToOne: false
+            referencedRelation: "charger_inventory"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "engineer_materials_used_engineer_id_fkey"
             columns: ["engineer_id"]

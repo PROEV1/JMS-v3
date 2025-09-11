@@ -1,16 +1,17 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Zap, Plus, X, Scan, Camera, CameraOff } from "lucide-react";
-import { useQuery } from '@tanstack/react-query';
+import { Zap, Plus, X, Scan, Camera, CameraOff, AlertTriangle } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import Webcam from 'react-webcam';
 import { BrowserMultiFormatReader } from '@zxing/library';
+import { ChargerChangeModal } from './ChargerChangeModal';
 
 interface ChargerSectionProps {
   orderId: string;
@@ -22,20 +23,37 @@ interface ChargerUsage {
   serial_number: string;
   charger_name: string;
   used_at: string;
+  charger_inventory_id?: string;
+}
+
+interface AssignedCharger {
+  id: string;
+  serial_number: string;
+  status: string;
+  notes: string | null;
+  charger_item_id: string;
+  assigned_order_id: string | null;
+  inventory_items: {
+    name: string;
+    sku: string;
+  };
 }
 
 export function ChargerSection({ orderId, engineerId }: ChargerSectionProps) {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const webcamRef = useRef<Webcam>(null);
+  const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
   const [selectedChargerId, setSelectedChargerId] = useState<string>("");
   const [serialNumber, setSerialNumber] = useState("");
   const [isScanning, setIsScanning] = useState(false);
   const [cameraError, setCameraError] = useState(false);
-  const [chargersUsed, setChargersUsed] = useState<ChargerUsage[]>([]);
+  const [showChangeModal, setShowChangeModal] = useState(false);
+  const [changeModalData, setChangeModalData] = useState<{original: string, new: string}>({original: "", new: ""});
 
-  // Fetch assigned chargers for this engineer
+  // Fetch chargers assigned to this engineer AND this specific order
   const { data: assignedChargers = [] } = useQuery({
-    queryKey: ['assigned-chargers', engineerId],
+    queryKey: ['assigned-chargers', engineerId, orderId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('charger_inventory')
@@ -45,83 +63,240 @@ export function ChargerSection({ orderId, engineerId }: ChargerSectionProps) {
           status,
           notes,
           charger_item_id,
+          assigned_order_id,
           inventory_items:charger_item_id (
             name,
             sku
           )
         `)
-        .eq('engineer_id', engineerId)
+        .or(`engineer_id.eq.${engineerId},assigned_order_id.eq.${orderId}`)
         .in('status', ['assigned', 'dispatched'])
-        .order('serial_number');
+        .order('assigned_order_id DESC, serial_number');
       
       if (error) throw error;
+      return data as AssignedCharger[];
+    }
+  });
+
+  // Fetch existing charger usage records for this order
+  const { data: existingUsage = [] } = useQuery({
+    queryKey: ['charger-usage', orderId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('engineer_materials_used')
+        .select(`
+          id,
+          serial_number,
+          item_name,
+          used_at,
+          charger_inventory_id,
+          notes
+        `)
+        .eq('order_id', orderId)
+        .not('serial_number', 'is', null)
+        .order('used_at', { ascending: false });
+      
+      if (error) throw error;
+      return data.map(item => ({
+        id: item.id,
+        serial_number: item.serial_number || '',
+        charger_name: item.item_name,
+        used_at: item.used_at,
+        charger_inventory_id: item.charger_inventory_id || undefined
+      }));
+    }
+  });
+
+  // Get assigned charger for this specific order (if any)
+  const orderAssignedCharger = assignedChargers.find(c => c.assigned_order_id === orderId);
+
+  // Set initial selection to order-assigned charger
+  useEffect(() => {
+    if (orderAssignedCharger && !selectedChargerId) {
+      setSelectedChargerId(orderAssignedCharger.id);
+      setSerialNumber(orderAssignedCharger.serial_number || "");
+    }
+  }, [orderAssignedCharger, selectedChargerId]);
+
+  // Mutation to save charger usage
+  const saveChargerUsage = useMutation({
+    mutationFn: async ({ chargerInventoryId, serialNumber, chargerName }: { 
+      chargerInventoryId?: string; 
+      serialNumber: string; 
+      chargerName: string; 
+    }) => {
+      const { data, error } = await supabase
+        .from('engineer_materials_used')
+        .insert({
+          order_id: orderId,
+          engineer_id: engineerId,
+          item_name: chargerName,
+          serial_number: serialNumber,
+          charger_inventory_id: chargerInventoryId,
+          quantity: 1,
+          notes: 'EV Charger Installation'
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Update charger status to 'deployed' if we have charger inventory ID
+      if (chargerInventoryId) {
+        await supabase
+          .from('charger_inventory')
+          .update({ 
+            status: 'deployed',
+            notes: `Used on order: ${orderId}`
+          })
+          .eq('id', chargerInventoryId);
+      }
+
       return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['charger-usage', orderId] });
+      queryClient.invalidateQueries({ queryKey: ['assigned-chargers', engineerId, orderId] });
+    }
+  });
+
+  // Mutation to log charger changes
+  const logChargerChange = useMutation({
+    mutationFn: async ({ 
+      originalChargerSerial, 
+      newChargerSerial, 
+      reason, 
+      description 
+    }: {
+      originalChargerSerial: string;
+      newChargerSerial: string; 
+      reason: string;
+      description?: string;
+    }) => {
+      const originalCharger = assignedChargers.find(c => c.serial_number === originalChargerSerial);
+      const newCharger = assignedChargers.find(c => c.serial_number === newChargerSerial);
+
+      const { error } = await supabase
+        .from('charger_change_log')
+        .insert({
+          order_id: orderId,
+          engineer_id: engineerId,
+          original_charger_id: originalCharger?.id,
+          new_charger_id: newCharger?.id,
+          original_serial_number: originalChargerSerial,
+          new_serial_number: newChargerSerial,
+          reason_category: reason,
+          reason_description: description,
+          created_by: (await supabase.auth.getUser()).data.user?.id
+        });
+
+      if (error) throw error;
     }
   });
 
   const startScanning = async () => {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setCameraError(true);
+      toast({
+        title: "Camera not supported",
+        description: "Your device doesn't support camera access.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsScanning(true);
     setCameraError(false);
     
     try {
+      // Request camera permissions first
+      await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: "environment" } 
+      });
+
       const codeReader = new BrowserMultiFormatReader();
+      codeReaderRef.current = codeReader;
       
-      // Start continuous scanning
-      codeReader.decodeFromVideoDevice(
-        undefined, 
-        webcamRef.current?.video || undefined, 
-        (result, error) => {
-          if (result) {
-            setSerialNumber(result.getText());
-            setIsScanning(false);
-            codeReader.reset();
-            toast({
-              title: "Barcode scanned",
-              description: `Serial number: ${result.getText()}`,
-            });
-          }
-          if (error && error.name !== 'NotFoundException') {
-            console.error('Barcode scanning error:', error);
-            setCameraError(true);
-            setIsScanning(false);
-            codeReader.reset();
-            toast({
-              title: "Scanning failed",
-              description: "Unable to scan barcode. Please enter manually.",
-              variant: "destructive",
-            });
-          }
+      // Start continuous scanning with proper error handling
+      setTimeout(() => {
+        if (webcamRef.current?.video) {
+          codeReader.decodeFromVideoDevice(
+            undefined, 
+            webcamRef.current.video, 
+            (result, error) => {
+              if (result) {
+                const scannedText = result.getText();
+                setSerialNumber(scannedText);
+                stopScanning();
+                toast({
+                  title: "Barcode scanned",
+                  description: `Serial number: ${scannedText}`,
+                });
+              }
+              if (error && error.name !== 'NotFoundException') {
+                console.error('Barcode scanning error:', error);
+              }
+            }
+          );
         }
-      );
+      }, 1000); // Give webcam time to initialize
     } catch (error) {
-      console.error('Barcode scanning error:', error);
+      console.error('Camera access error:', error);
       setCameraError(true);
       setIsScanning(false);
       toast({
-        title: "Scanning failed",
-        description: "Unable to scan barcode. Please enter manually.",
+        title: "Camera access denied",
+        description: "Please allow camera access to scan barcodes.",
         variant: "destructive",
       });
     }
   };
 
   const stopScanning = () => {
+    if (codeReaderRef.current) {
+      codeReaderRef.current.reset();
+      codeReaderRef.current = null;
+    }
     setIsScanning(false);
   };
 
   const handleChargerSelect = (chargerId: string) => {
-    setSelectedChargerId(chargerId);
     const selectedCharger = assignedChargers.find(charger => charger.id === chargerId);
+    
+    // Check if this is a different charger than originally assigned to order
+    if (orderAssignedCharger && selectedCharger && 
+        orderAssignedCharger.id !== selectedCharger.id &&
+        orderAssignedCharger.serial_number !== selectedCharger.serial_number) {
+      
+      setChangeModalData({
+        original: `${orderAssignedCharger.inventory_items?.name} (${orderAssignedCharger.serial_number})`,
+        new: `${selectedCharger.inventory_items?.name} (${selectedCharger.serial_number})`
+      });
+      setShowChangeModal(true);
+      return;
+    }
+    
+    setSelectedChargerId(chargerId);
     if (selectedCharger) {
       setSerialNumber(selectedCharger.serial_number || "");
     }
   };
 
-  const handleAddCharger = () => {
+  const handleAddCharger = async () => {
     if (!serialNumber.trim()) {
       toast({
         title: "Serial number required",
         description: "Please enter or scan a charger serial number.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check if this serial number is already used on this order
+    if (existingUsage.some(usage => usage.serial_number === serialNumber)) {
+      toast({
+        title: "Charger already recorded",
+        description: "This charger has already been recorded for this job.",
         variant: "destructive",
       });
       return;
@@ -133,32 +308,89 @@ export function ChargerSection({ orderId, engineerId }: ChargerSectionProps) {
     
     const chargerName = charger?.inventory_items?.name || "EV Charger";
 
-    // Add to used chargers list (in a real implementation, this would be saved to database)
-    const newChargerUsage: ChargerUsage = {
-      id: Date.now().toString(),
-      serial_number: serialNumber,
-      charger_name: chargerName,
-      used_at: new Date().toISOString(),
-    };
+    try {
+      await saveChargerUsage.mutateAsync({
+        chargerInventoryId: charger?.id,
+        serialNumber: serialNumber,
+        chargerName: chargerName
+      });
 
-    setChargersUsed(prev => [...prev, newChargerUsage]);
-    
-    toast({
-      title: "Charger recorded",
-      description: `${chargerName} (${serialNumber}) added to job materials.`,
-    });
+      toast({
+        title: "Charger recorded",
+        description: `${chargerName} (${serialNumber}) saved to job materials.`,
+      });
 
-    // Reset form
-    setSelectedChargerId("");
-    setSerialNumber("");
+      // Reset form
+      setSelectedChargerId("");
+      setSerialNumber("");
+    } catch (error) {
+      console.error('Error saving charger usage:', error);
+      toast({
+        title: "Save failed",
+        description: "Failed to save charger usage. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleRemoveCharger = (id: string) => {
-    setChargersUsed(prev => prev.filter(charger => charger.id !== id));
-    toast({
-      title: "Charger removed",
-      description: "Charger usage has been removed from this job.",
-    });
+  const handleRemoveCharger = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('engineer_materials_used')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      // Refresh the usage data
+      queryClient.invalidateQueries({ queryKey: ['charger-usage', orderId] });
+      
+      toast({
+        title: "Charger removed",
+        description: "Charger usage has been removed from this job.",
+      });
+    } catch (error) {
+      console.error('Error removing charger:', error);
+      toast({
+        title: "Remove failed",
+        description: "Failed to remove charger usage. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleChargerChange = async (reason: string, description?: string) => {
+    const selectedCharger = assignedChargers.find(c => c.id === selectedChargerId) ||
+                           assignedChargers.find(c => c.serial_number === serialNumber);
+    
+    if (!orderAssignedCharger || !selectedCharger) return;
+
+    try {
+      // Log the charger change
+      await logChargerChange.mutateAsync({
+        originalChargerSerial: orderAssignedCharger.serial_number,
+        newChargerSerial: selectedCharger.serial_number || serialNumber,
+        reason,
+        description
+      });
+
+      // Update the selection
+      setSelectedChargerId(selectedCharger.id);
+      setSerialNumber(selectedCharger.serial_number || serialNumber);
+      setShowChangeModal(false);
+
+      toast({
+        title: "Charger change logged",
+        description: "The charger change has been recorded with the reason provided.",
+      });
+    } catch (error) {
+      console.error('Error logging charger change:', error);
+      toast({
+        title: "Change log failed",
+        description: "Failed to log charger change. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -170,30 +402,72 @@ export function ChargerSection({ orderId, engineerId }: ChargerSectionProps) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* Show order-assigned charger if exists */}
+        {orderAssignedCharger && (
+          <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Zap className="h-4 w-4 text-primary" />
+              <span className="font-medium text-sm text-primary">Assigned Charger for this Job</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary">
+                {orderAssignedCharger.inventory_items?.name} - {orderAssignedCharger.serial_number}
+              </Badge>
+              <span className="text-xs text-muted-foreground">
+                Status: {orderAssignedCharger.status}
+              </span>
+            </div>
+            {orderAssignedCharger.notes && (
+              <p className="text-xs text-muted-foreground mt-1">{orderAssignedCharger.notes}</p>
+            )}
+          </div>
+        )}
+
         {/* Add Charger Form */}
         <div className="border rounded-lg p-4 space-y-4 bg-background/50">
           <h4 className="font-medium text-sm">Record Charger Usage</h4>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="charger-select">Assigned Chargers</Label>
+              <Label htmlFor="charger-select">Available Chargers</Label>
               <Select value={selectedChargerId} onValueChange={handleChargerSelect}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Choose assigned charger..." />
+                  <SelectValue placeholder="Choose charger..." />
                 </SelectTrigger>
                 <SelectContent>
                   {assignedChargers.length > 0 ? (
-                    <SelectGroup>
-                      <SelectLabel>Your Chargers</SelectLabel>
-                      {assignedChargers.map((charger) => (
-                        <SelectItem key={charger.id} value={charger.id}>
-                          {charger.inventory_items?.name || "EV Charger"} - {charger.serial_number}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
+                    <>
+                      {/* Order-assigned chargers first */}
+                      {assignedChargers.filter(c => c.assigned_order_id === orderId).length > 0 && (
+                        <SelectGroup>
+                          <SelectLabel>🎯 Assigned to this Job</SelectLabel>
+                          {assignedChargers
+                            .filter(c => c.assigned_order_id === orderId)
+                            .map((charger) => (
+                              <SelectItem key={charger.id} value={charger.id}>
+                                {charger.inventory_items?.name || "EV Charger"} - {charger.serial_number}
+                              </SelectItem>
+                            ))}
+                        </SelectGroup>
+                      )}
+                      
+                      {/* Engineer-assigned chargers */}
+                      {assignedChargers.filter(c => c.assigned_order_id !== orderId).length > 0 && (
+                        <SelectGroup>
+                          <SelectLabel>🔧 Your Available Chargers</SelectLabel>
+                          {assignedChargers
+                            .filter(c => c.assigned_order_id !== orderId)
+                            .map((charger) => (
+                              <SelectItem key={charger.id} value={charger.id}>
+                                {charger.inventory_items?.name || "EV Charger"} - {charger.serial_number}
+                              </SelectItem>
+                            ))}
+                        </SelectGroup>
+                      )}
+                    </>
                   ) : (
                     <SelectItem value="none" disabled>
-                      No chargers assigned
+                      No chargers available
                     </SelectItem>
                   )}
                 </SelectContent>
@@ -252,21 +526,21 @@ export function ChargerSection({ orderId, engineerId }: ChargerSectionProps) {
           <div className="flex justify-end">
             <Button 
               onClick={handleAddCharger} 
-              disabled={!serialNumber.trim()}
+              disabled={!serialNumber.trim() || saveChargerUsage.isPending}
               size="sm"
             >
               <Plus className="h-4 w-4 mr-2" />
-              Record Charger
+              {saveChargerUsage.isPending ? "Recording..." : "Record Charger"}
             </Button>
           </div>
         </div>
 
         {/* Chargers Used List */}
-        {chargersUsed.length > 0 && (
+        {existingUsage.length > 0 && (
           <div className="space-y-3">
-            <h4 className="font-medium text-sm">Chargers Used ({chargersUsed.length})</h4>
+            <h4 className="font-medium text-sm">Chargers Used ({existingUsage.length})</h4>
             <div className="space-y-2">
-              {chargersUsed.map((charger) => (
+              {existingUsage.map((charger) => (
                 <div key={charger.id} className="flex items-center justify-between p-3 border rounded-lg bg-background/30">
                   <div className="flex-1 space-y-1">
                     <div className="flex items-center gap-2">
@@ -274,6 +548,11 @@ export function ChargerSection({ orderId, engineerId }: ChargerSectionProps) {
                       <Badge variant="secondary" className="text-xs">
                         {charger.serial_number}
                       </Badge>
+                      {charger.charger_inventory_id && (
+                        <Badge variant="outline" className="text-xs">
+                          Tracked
+                        </Badge>
+                      )}
                     </div>
                     <div className="text-xs text-muted-foreground">
                       Recorded: {new Date(charger.used_at).toLocaleString()}
@@ -299,10 +578,20 @@ export function ChargerSection({ orderId, engineerId }: ChargerSectionProps) {
           <div className="text-sm">
             <p className="text-primary font-medium mb-1">Charger Tracking</p>
             <p className="text-muted-foreground">
-              Record which charger was installed on this job. You can select from your assigned chargers or scan the barcode on the charger unit.
+              Record which charger was installed on this job. Chargers assigned to this specific job are shown first. 
+              If you need to use a different charger, you'll be asked to provide a reason for the change.
             </p>
           </div>
         </div>
+
+        {/* Charger Change Modal */}
+        <ChargerChangeModal
+          isOpen={showChangeModal}
+          onClose={() => setShowChangeModal(false)}
+          onConfirm={handleChargerChange}
+          originalCharger={changeModalData.original}
+          newCharger={changeModalData.new}
+        />
       </CardContent>
     </Card>
   );
