@@ -63,3 +63,6 @@ verify_jwt = true
 
 [functions.fix-order-status]
 verify_jwt = true
+
+[functions.search-orders-bypass-rls]
+verify_jwt = false

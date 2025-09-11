@@ -109,7 +109,7 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
     }
   });
 
-  // Search orders by postcode - using RPC to bypass RLS
+  // Search orders by postcode using edge function to bypass RLS
   const { data: searchedOrders = [], isLoading: isSearchingOrders, error: searchError } = useQuery({
     queryKey: ['orders-search', searchPostcode],
     queryFn: async () => {
@@ -118,37 +118,29 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
       console.log('Searching with postcode:', searchPostcode);
       
       try {
-        // Use RPC function to search orders (bypasses RLS for search)
-        const { data, error } = await supabase.rpc('search_orders_for_charger_assignment', {
-          search_postcode: searchPostcode
-        });
+        // First try direct query (for users who can see orders normally)
+        const { data: directData, error: directError } = await supabase
+          .from('orders')
+          .select(`
+            id,
+            order_number,
+            scheduled_install_date,
+            status_enhanced,
+            client_id,
+            engineer_id,
+            clients (
+              full_name,
+              address,
+              postcode,
+              phone
+            )
+          `)
+          .order('created_at', { ascending: false })
+          .limit(100);
 
-        if (error) {
-          console.error('Orders search RPC error:', error);
-          // Fallback to direct query with RLS
-          const { data: fallbackData, error: fallbackError } = await supabase
-            .from('orders')
-            .select(`
-              id,
-              order_number,
-              scheduled_install_date,
-              status_enhanced,
-              client_id,
-              engineer_id,
-              clients (
-                full_name,
-                address,
-                postcode,
-                phone
-              )
-            `)
-            .order('created_at', { ascending: false })
-            .limit(100);
-
-          if (fallbackError) throw fallbackError;
-          
+        if (!directError && directData) {
           // Filter client-side for postcode match
-          const filteredOrders = (fallbackData || []).filter(order => {
+          const filteredOrders = directData.filter(order => {
             if (!order.clients) return false;
             
             const orderPostcode = (order.clients.postcode || '').toLowerCase();
@@ -163,11 +155,23 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
                    orderPostcode.replace(/\s+/g, '').includes(cleanPostcode);
           });
           
+          console.log('Direct query filtered orders:', filteredOrders);
           return filteredOrders as Order[];
         }
+
+        // If direct query fails (RLS blocking), use edge function
+        console.log('Direct query failed, using edge function:', directError);
+        const { data: edgeData, error: edgeError } = await supabase.functions.invoke('search-orders-bypass-rls', {
+          body: { search_postcode: searchPostcode }
+        });
         
-        console.log('Orders from RPC:', data);
-        return data as Order[];
+        if (edgeError) {
+          console.error('Edge function error:', edgeError);
+          throw edgeError;
+        }
+        
+        console.log('Edge function orders:', edgeData);
+        return edgeData as Order[];
         
       } catch (error) {
         console.error('Search error:', error);

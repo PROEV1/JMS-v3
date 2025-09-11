@@ -4052,6 +4052,18 @@ export type Database = {
         Args: { p_restore_stock?: boolean; p_usage_id: string }
         Returns: boolean
       }
+      search_orders_for_charger_assignment: {
+        Args: { search_postcode: string }
+        Returns: {
+          client_data: Json
+          client_id: string
+          engineer_id: string
+          id: string
+          order_number: string
+          scheduled_install_date: string
+          status_enhanced: Database["public"]["Enums"]["order_status_enhanced"]
+        }[]
+      }
       set_limit: {
         Args: { "": number }
         Returns: number
