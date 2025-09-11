@@ -144,14 +144,14 @@ export function CreateRMAModal({ open, onOpenChange }: CreateRMAModalProps) {
       });
     });
     
-    if (!rmaNumber || !supplierId || !reason || lines.some(line => (!line.item_id && !line.item_name) || !line.qty || !line.reason)) {
+    if (!rmaNumber || !supplierId || !reason || lines.some(line => !line.item_id || !line.qty || !line.reason)) {
       const missingFields = [];
       if (!rmaNumber) missingFields.push('RMA Number');
       if (!supplierId) missingFields.push('Supplier');
       if (!reason) missingFields.push('Overall Reason');
       
       lines.forEach((line, index) => {
-        if (!line.item_id && !line.item_name) missingFields.push(`Line ${index + 1}: Item`);
+        if (!line.item_id) missingFields.push(`Line ${index + 1}: Item`);
         if (!line.qty) missingFields.push(`Line ${index + 1}: Quantity`);
         if (!line.reason) missingFields.push(`Line ${index + 1}: Reason`);
       });
@@ -180,11 +180,10 @@ export function CreateRMAModal({ open, onOpenChange }: CreateRMAModalProps) {
             
           rmaRecords.push({
             rma_number: recordNumber,
-            item_id: line.item_id || null, // Use null if custom item
-            custom_item_name: line.item_id ? null : line.item_name, // Store custom name if no item_id
+            item_id: line.item_id,
             supplier_id: supplierId,
             return_reason: `${reason} - ${line.reason} (${line.condition})`,
-            notes: `Type: ${line.item_type}, Condition: ${line.condition}, Item: ${line.item_name || 'Selected from inventory'}`,
+            notes: `Type: ${line.item_type}, Condition: ${line.condition}, Item: ${line.item_name}`,
             created_by: currentUser?.id
           });
         }
@@ -315,61 +314,43 @@ export function CreateRMAModal({ open, onOpenChange }: CreateRMAModalProps) {
                     </div>
 
                      <div className="col-span-3">
-                       <Label>Item</Label>
-                       <div className="space-y-2">
-                         {/* Custom item input */}
-                         <div className="space-y-1">
-                           <Input
-                             value={line.item_name || ''}
-                             onChange={(e) => {
-                               const value = e.target.value;
-                               updateLine(line.id, 'item_name', value);
-                               updateLine(line.id, 'item_id', ''); // Clear item_id when typing custom
-                             }}
-                             placeholder="Type custom part name..."
-                             className="text-sm"
-                           />
-                           <p className="text-xs text-muted-foreground">Or select from inventory below:</p>
-                         </div>
-                         
-                         {/* Inventory dropdown */}
-                         <Select 
-                           value={line.item_id} 
-                           onValueChange={(value) => {
-                             updateLine(line.id, 'item_id', value);
-                             // Find the selected item and set its name
-                             if (line.item_type === 'inventory') {
-                               const selectedItem = inventoryItems.find(item => item.id === value);
-                               if (selectedItem) {
-                                 updateLine(line.id, 'item_name', `${selectedItem.name} (${selectedItem.sku})`);
-                               }
-                             } else {
-                               const selectedCharger = chargers.find(charger => charger.id === value);
-                               if (selectedCharger) {
-                                 updateLine(line.id, 'item_name', `${selectedCharger.inventory_items?.name} - ${selectedCharger.serial_number}`);
-                               }
+                       <Label>Item *</Label>
+                       <Select 
+                         value={line.item_id} 
+                         onValueChange={(value) => {
+                           updateLine(line.id, 'item_id', value);
+                           // Find the selected item and set its name
+                           if (line.item_type === 'inventory') {
+                             const selectedItem = inventoryItems.find(item => item.id === value);
+                             if (selectedItem) {
+                               updateLine(line.id, 'item_name', `${selectedItem.name} (${selectedItem.sku})`);
                              }
-                           }}
-                         >
-                           <SelectTrigger className="bg-background text-sm">
-                             <SelectValue placeholder="Select from inventory..." />
-                           </SelectTrigger>
-                           <SelectContent className="z-[60] bg-background border shadow-lg max-h-[200px]">
-                             {line.item_type === 'inventory' 
-                               ? inventoryItems.map(item => (
-                                   <SelectItem key={item.id} value={item.id}>
-                                     {item.name} ({item.sku})
-                                   </SelectItem>
-                                 ))
-                               : chargers.map(charger => (
-                                   <SelectItem key={charger.id} value={charger.id}>
-                                     {charger.inventory_items?.name} - {charger.serial_number}
-                                   </SelectItem>
-                                 ))
+                           } else {
+                             const selectedCharger = chargers.find(charger => charger.id === value);
+                             if (selectedCharger) {
+                               updateLine(line.id, 'item_name', `${selectedCharger.inventory_items?.name} - ${selectedCharger.serial_number}`);
                              }
-                           </SelectContent>
-                         </Select>
-                       </div>
+                           }
+                         }}
+                       >
+                         <SelectTrigger className="bg-background">
+                           <SelectValue placeholder="Select item from inventory..." />
+                         </SelectTrigger>
+                         <SelectContent className="z-[60] bg-background border shadow-lg max-h-[200px]">
+                           {line.item_type === 'inventory' 
+                             ? inventoryItems.map(item => (
+                                 <SelectItem key={item.id} value={item.id}>
+                                   {item.name} ({item.sku})
+                                 </SelectItem>
+                               ))
+                             : chargers.map(charger => (
+                                 <SelectItem key={charger.id} value={charger.id}>
+                                   {charger.inventory_items?.name} - {charger.serial_number}
+                                 </SelectItem>
+                               ))
+                           }
+                         </SelectContent>
+                       </Select>
                      </div>
 
                     <div className="col-span-2">
