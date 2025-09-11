@@ -20,6 +20,7 @@ interface EngineerMaterialsUsedProps {
 
 export function EngineerMaterialsUsed({ orderId, engineerId }: EngineerMaterialsUsedProps) {
   console.log('EngineerMaterialsUsed: Component mounted with orderId:', orderId, 'engineerId:', engineerId);
+  console.log('DEBUG: Using individual item quantities');
   
   // Single item form state
   const [itemName, setItemName] = useState("");
