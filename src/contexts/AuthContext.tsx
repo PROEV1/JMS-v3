@@ -181,16 +181,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Handle root path redirect
     if (currentPath === '/') {
-      target = finalRole === 'partner_user' ? '/partner' : '/admin';
+      if (finalRole === 'partner_user') target = '/partner';
+      else if (finalRole === 'engineer') target = '/engineer/dashboard';
+      else target = '/admin';
     }
     
     // Block invalid pages
     const onPartnerButNotPartner = currentPath.startsWith('/partner') && finalRole !== 'partner_user';
     const onAdminButPartner = currentPath.startsWith('/admin') && finalRole === 'partner_user';
+    const onEngineerButNotEngineer = currentPath.startsWith('/engineer') && finalRole !== 'engineer';
+    const onAdminButEngineer = currentPath.startsWith('/admin') && finalRole === 'engineer';
     
     if (!target) {
       if (onPartnerButNotPartner) target = '/admin';
       else if (onAdminButPartner) target = '/partner';
+      else if (onEngineerButNotEngineer) target = finalRole === 'partner_user' ? '/partner' : '/admin';
+      else if (onAdminButEngineer) target = '/engineer/dashboard';
     }
 
     if (target && target !== currentPath) {

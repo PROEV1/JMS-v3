@@ -104,15 +104,16 @@ function App() {
         <Route path="/client/profile" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><ClientProfilePage /></Layout></RouteGuard>} />
         
         {/* Engineer Routes */}
-        <Route path="/engineer" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><EngineerDashboard /></Layout></RouteGuard>} />
-        <Route path="/engineer/jobs" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><EngineerJobs /></Layout></RouteGuard>} />
-        <Route path="/engineer/jobs/:id" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><EngineerJobDetail /></Layout></RouteGuard>} />
-        <Route path="/engineer/chargers" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><EngineerChargers /></Layout></RouteGuard>} />
-        <Route path="/engineer/van-stock" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><EngineerVanStock /></Layout></RouteGuard>} />
-        <Route path="/engineer/stock-requests" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><EngineerStockRequests /></Layout></RouteGuard>} />
-        <Route path="/engineer/scan" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><EngineerScan /></Layout></RouteGuard>} />
-        <Route path="/engineer/availability" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><EngineerAvailability /></Layout></RouteGuard>} />
-        <Route path="/engineer/profile" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><EngineerProfile /></Layout></RouteGuard>} />
+        <Route path="/engineer/dashboard" element={<RouteGuard allowedRoles={['engineer']}><Layout><EngineerDashboard /></Layout></RouteGuard>} />
+        <Route path="/engineer" element={<RouteGuard allowedRoles={['engineer']}><Layout><EngineerDashboard /></Layout></RouteGuard>} />
+        <Route path="/engineer/jobs" element={<RouteGuard allowedRoles={['engineer']}><Layout><EngineerJobs /></Layout></RouteGuard>} />
+        <Route path="/engineer/jobs/:id" element={<RouteGuard allowedRoles={['engineer']}><Layout><EngineerJobDetail /></Layout></RouteGuard>} />
+        <Route path="/engineer/chargers" element={<RouteGuard allowedRoles={['engineer']}><Layout><EngineerChargers /></Layout></RouteGuard>} />
+        <Route path="/engineer/van-stock" element={<RouteGuard allowedRoles={['engineer']}><Layout><EngineerVanStock /></Layout></RouteGuard>} />
+        <Route path="/engineer/stock-requests" element={<RouteGuard allowedRoles={['engineer']}><Layout><EngineerStockRequests /></Layout></RouteGuard>} />
+        <Route path="/engineer/scan" element={<RouteGuard allowedRoles={['engineer']}><Layout><EngineerScan /></Layout></RouteGuard>} />
+        <Route path="/engineer/availability" element={<RouteGuard allowedRoles={['engineer']}><Layout><EngineerAvailability /></Layout></RouteGuard>} />
+        <Route path="/engineer/profile" element={<RouteGuard allowedRoles={['engineer']}><Layout><EngineerProfile /></Layout></RouteGuard>} />
         
         {/* Partner Routes */}
         <Route path="/partner" element={<RouteGuard allowedRoles={['partner_user']}><Layout><PartnerPortal /></Layout></RouteGuard>} />
