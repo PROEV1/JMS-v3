@@ -67,6 +67,7 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
   const [locationAddress, setLocationAddress] = useState<string>('');
   const [selectedOrderId, setSelectedOrderId] = useState<string>('');
   const [searchPostcode, setSearchPostcode] = useState<string>('');
+  // Removed engineer search functionality
 
   // Reset form when modal opens
   React.useEffect(() => {
