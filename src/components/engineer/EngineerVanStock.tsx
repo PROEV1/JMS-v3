@@ -24,12 +24,15 @@ import { StockRequestButton } from './StockRequestButton';
 import { EngineerScanModal } from './EngineerScanModal';
 import { EngineerReturnModal } from './EngineerReturnModal';
 import { UseMaterialsModal } from './UseMaterialsModal';
+import { ChargerScanModal } from './ChargerScanModal';
 
 export function EngineerVanStock() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showScanModal, setShowScanModal] = useState(false);
   const [showReturnModal, setShowReturnModal] = useState(false);
   const [showUseMaterialsModal, setShowUseMaterialsModal] = useState(false);
+  const [showChargerScanModal, setShowChargerScanModal] = useState(false);
+  const [chargerTypeFilter, setChargerTypeFilter] = useState<string>('all');
 
   // Get engineer's van location
   const { data: engineer } = useQuery({
@@ -114,84 +117,112 @@ export function EngineerVanStock() {
     enabled: !!vanLocation?.id
   });
 
-  // Get van stock items (including assigned chargers)
-  const { data: stockItems, isLoading } = useQuery({
-    queryKey: ['van-stock-items', vanLocation?.id, engineer?.id, searchQuery],
+  // Get regular inventory items
+  const { data: regularItems, isLoading: regularItemsLoading } = useQuery({
+    queryKey: ['van-regular-items', vanLocation?.id, searchQuery],
     queryFn: async () => {
       if (!vanLocation?.id) return [];
-
-      const allItems = [];
 
       // Get regular inventory stock balances
       const { data: balances } = await supabase.rpc('get_item_location_balances');
       const vanBalances = balances?.filter(b => b.location_id === vanLocation.id && b.on_hand > 0) || [];
 
-      if (vanBalances.length > 0) {
-        // Get regular item details
-        const itemIds = vanBalances.map(b => b.item_id);
-        let query = supabase
-          .from('inventory_items')
-          .select('id, name, sku, unit')
-          .in('id', itemIds);
+      if (vanBalances.length === 0) return [];
 
-        if (searchQuery) {
-          query = query.or(`name.ilike.%${searchQuery}%,sku.ilike.%${searchQuery}%`);
-        }
+      // Get regular item details
+      const itemIds = vanBalances.map(b => b.item_id);
+      let query = supabase
+        .from('inventory_items')
+        .select('id, name, sku, unit')
+        .in('id', itemIds);
 
-        const { data: items } = await query;
-
-        // Combine regular items with balances
-        const regularItems = items?.map(item => ({
-          ...item,
-          on_hand: vanBalances.find(b => b.item_id === item.id)?.on_hand || 0,
-          type: 'regular'
-        })) || [];
-
-        allItems.push(...regularItems);
+      if (searchQuery) {
+        query = query.or(`name.ilike.%${searchQuery}%,sku.ilike.%${searchQuery}%`);
       }
 
-      // Get assigned chargers for this engineer
-      if (engineer?.id) {
-        let chargerQuery = supabase
-          .from('charger_inventory')
+      const { data: items } = await query;
+
+      // Combine regular items with balances
+      return items?.map(item => ({
+        ...item,
+        on_hand: vanBalances.find(b => b.item_id === item.id)?.on_hand || 0,
+        type: 'regular'
+      })) || [];
+    },
+    enabled: !!vanLocation?.id
+  });
+
+  // Get assigned chargers for this engineer
+  const { data: assignedChargers, isLoading: chargersLoading } = useQuery({
+    queryKey: ['van-assigned-chargers', engineer?.id, searchQuery, chargerTypeFilter],
+    queryFn: async () => {
+      if (!engineer?.id) return [];
+
+      let chargerQuery = supabase
+        .from('charger_inventory')
+        .select(`
+          id,
+          serial_number,
+          status,
+          assigned_order_id,
+          inventory_items!charger_item_id(id, name, sku)
+        `)
+        .eq('engineer_id', engineer.id)
+        .in('status', ['assigned', 'dispatched', 'delivered']);
+
+      const { data: chargers } = await chargerQuery;
+
+      if (!chargers?.length) return [];
+
+      let filteredChargers = chargers;
+
+      // Apply charger type filter
+      if (chargerTypeFilter !== 'all') {
+        filteredChargers = chargers.filter(charger => 
+          charger.inventory_items?.name?.toLowerCase().includes(chargerTypeFilter.toLowerCase())
+        );
+      }
+
+      // Apply search filter
+      if (searchQuery) {
+        filteredChargers = filteredChargers.filter(charger => 
+          charger.inventory_items?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          charger.serial_number.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+      }
+
+      // Get order details for assigned chargers
+      const orderIds = filteredChargers
+        .filter(c => c.assigned_order_id)
+        .map(c => c.assigned_order_id);
+      
+      let orderDetails = {};
+      if (orderIds.length > 0) {
+        const { data: orders } = await supabase
+          .from('orders')
           .select(`
             id,
-            serial_number,
-            status,
-            inventory_items!charger_item_id(name, sku)
+            order_number,
+            clients!inner(full_name)
           `)
-          .eq('engineer_id', engineer.id)
-          .in('status', ['dispatched', 'delivered']);
+          .in('id', orderIds);
 
-        const { data: assignedChargers } = await chargerQuery;
-
-        if (assignedChargers?.length > 0) {
-          const chargerItems = assignedChargers.map(charger => ({
-            id: charger.id,
-            name: charger.inventory_items?.name || 'Unknown Charger',
-            sku: charger.serial_number,
-            unit: 'unit',
-            on_hand: 1,
-            type: 'charger',
-            status: charger.status
-          }));
-
-          // Apply search filter to chargers if provided
-          const filteredChargers = searchQuery 
-            ? chargerItems.filter(item => 
-                item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                item.sku.toLowerCase().includes(searchQuery.toLowerCase())
-              )
-            : chargerItems;
-
-          allItems.push(...filteredChargers);
-        }
+        orderDetails = orders?.reduce((acc, order) => ({
+          ...acc,
+          [order.id]: order
+        }), {}) || {};
       }
 
-      return allItems;
+      return filteredChargers.map(charger => ({
+        ...charger,
+        charger_type: charger.inventory_items?.name || 'Unknown',
+        order_details: charger.assigned_order_id ? orderDetails[charger.assigned_order_id] : null
+      }));
     },
-    enabled: !!vanLocation?.id && !!engineer?.id
+    enabled: !!engineer?.id
   });
+
+  const isLoading = regularItemsLoading || chargersLoading;
 
   // Get recent transactions
   const { data: recentTransactions } = useQuery({
@@ -257,13 +288,21 @@ export function EngineerVanStock() {
       </div>
 
       {/* Metrics */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
         <InventoryKpiTile
           title="Items on Hand"
-          value={metrics?.totalItems || 0}
+          value={(regularItems?.length || 0)}
           icon={Package}
           variant="info"
-          subtitle="Items in stock"
+          subtitle="Regular items"
+        />
+        
+        <InventoryKpiTile
+          title="Assigned Chargers"
+          value={assignedChargers?.length || 0}
+          icon={Wrench}
+          variant="success"
+          subtitle="Ready to install"
         />
         
         <InventoryKpiTile
@@ -298,6 +337,10 @@ export function EngineerVanStock() {
           <Scan className="h-4 w-4 mr-2" />
           Scan Item
         </Button>
+        <Button variant="secondary" onClick={() => setShowChargerScanModal(true)}>
+          <Scan className="h-4 w-4 mr-2" />
+          Scan Charger
+        </Button>
         <Button variant="secondary" onClick={() => setShowUseMaterialsModal(true)}>
           <Wrench className="h-4 w-4 mr-2" />
           Use Materials
@@ -308,71 +351,131 @@ export function EngineerVanStock() {
         </Button>
       </div>
 
-      {/* Search */}
-      <div className="relative w-full max-w-sm">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-        <Input
-          placeholder="Search items..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-10"
-        />
+      {/* Search and Filters */}
+      <div className="flex gap-3 flex-wrap">
+        <div className="relative w-full max-w-sm">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+          <Input
+            placeholder="Search items and chargers..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        
+        <select
+          value={chargerTypeFilter}
+          onChange={(e) => setChargerTypeFilter(e.target.value)}
+          className="px-3 py-2 border rounded-md text-sm bg-background"
+        >
+          <option value="all">All Chargers</option>
+          <option value="easee">Easee 7KW</option>
+          <option value="epod">EPOD</option>
+          <option value="ohme epod">Ohme ePod</option>
+          <option value="ohme home pro 5m">Ohme Home Pro 5m</option>
+          <option value="ohme home pro 8m">Ohme Home Pro 8m</option>
+        </select>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Stock Items */}
+        {/* Regular Stock Items */}
         <Card>
           <CardHeader>
             <CardTitle>Current Stock</CardTitle>
           </CardHeader>
           <CardContent>
-            {isLoading ? (
+            {regularItemsLoading ? (
               <div className="space-y-3">
-                {Array.from({ length: 5 }).map((_, i) => (
+                {Array.from({ length: 3 }).map((_, i) => (
                   <Skeleton key={i} className="h-12" />
                 ))}
               </div>
-            ) : stockItems?.length > 0 ? (
+            ) : regularItems?.length > 0 ? (
               <div className="space-y-3">
-                 {stockItems.map((item) => (
-                   <div key={`${item.type}-${item.id}`} className="flex items-center justify-between p-3 border rounded-lg">
-                     <div className="space-y-1">
-                       <div className="font-medium text-sm">
-                         {item.name}
-                         {item.type === 'charger' && (
-                           <Badge variant="secondary" className="ml-2 text-xs">Charger</Badge>
-                         )}
-                       </div>
-                       <div className="text-xs text-muted-foreground">
-                         {item.type === 'charger' ? `Serial: ${item.sku}` : item.sku}
-                       </div>
-                     </div>
-                     <div className="text-right">
-                       <div className="text-sm font-medium">{item.on_hand} {item.unit}</div>
-                       <Badge 
-                         variant={item.type === 'charger' ? 
-                           (item.status === 'delivered' ? 'default' : 'secondary') : 
-                           'outline'
-                         } 
-                         className="text-xs"
-                       >
-                         {item.type === 'charger' ? 
-                           (item.status === 'delivered' ? 'Delivered' : 'Dispatched') : 
-                           'In Stock'
-                         }
-                       </Badge>
-                     </div>
-                   </div>
-                 ))}
+                {regularItems.map((item) => (
+                  <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="space-y-1">
+                      <div className="font-medium text-sm">{item.name}</div>
+                      <div className="text-xs text-muted-foreground">{item.sku}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm font-medium">{item.on_hand} {item.unit}</div>
+                      <Badge variant="outline" className="text-xs">In Stock</Badge>
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : (
               <div className="text-center py-6 text-muted-foreground">
-                {searchQuery ? 'No items found' : 'Van is empty'}
+                {searchQuery ? 'No items found' : 'No regular stock items'}
               </div>
             )}
           </CardContent>
         </Card>
 
+        {/* Assigned Chargers */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Assigned Chargers</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {chargersLoading ? (
+              <div className="space-y-3">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <Skeleton key={i} className="h-16" />
+                ))}
+              </div>
+            ) : assignedChargers?.length > 0 ? (
+              <div className="space-y-3">
+                {assignedChargers.map((charger) => (
+                  <div key={charger.id} className="p-3 border rounded-lg bg-muted/30">
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="space-y-1">
+                        <div className="font-medium text-sm">{charger.charger_type}</div>
+                        <div className="text-xs text-muted-foreground">
+                          Serial: {charger.serial_number}
+                        </div>
+                        {charger.order_details && (
+                          <div className="text-xs text-blue-600">
+                            Order: {charger.order_details.order_number} - {charger.order_details.clients?.full_name}
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <Badge 
+                          variant={charger.status === 'delivered' ? 'default' : 
+                                  charger.status === 'assigned' ? 'secondary' : 'outline'} 
+                          className="text-xs"
+                        >
+                          {charger.status.charAt(0).toUpperCase() + charger.status.slice(1)}
+                        </Badge>
+                      </div>
+                    </div>
+                    
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="text-xs"
+                        onClick={() => setShowChargerScanModal(true)}
+                      >
+                        <Scan className="h-3 w-3 mr-1" />
+                        Update Status
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-6 text-muted-foreground">
+                {searchQuery || chargerTypeFilter !== 'all' ? 'No matching chargers found' : 'No assigned chargers'}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-1">
         {/* Recent Activity */}
         <Card>
           <CardHeader>
@@ -426,14 +529,20 @@ export function EngineerVanStock() {
             onOpenChange={setShowReturnModal}
             vanLocationId={vanLocation.id}
             vanLocationName={vanLocation.name}
-            stockItems={stockItems?.filter(item => item.type === 'regular') || []}
+            stockItems={regularItems || []}
           />
           <UseMaterialsModal
             open={showUseMaterialsModal}
             onOpenChange={setShowUseMaterialsModal}
             engineerId={engineer.id}
             vanLocationId={vanLocation.id}
-            stockItems={stockItems?.filter(item => item.type === 'regular') || []}
+            stockItems={regularItems || []}
+          />
+          <ChargerScanModal
+            open={showChargerScanModal}
+            onOpenChange={setShowChargerScanModal}
+            engineerId={engineer.id}
+            vanLocationId={vanLocation.id}
           />
         </>
       )}
