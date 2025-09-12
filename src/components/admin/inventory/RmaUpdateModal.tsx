@@ -22,6 +22,7 @@ export function RmaUpdateModal({ open, onOpenChange, rma }: RmaUpdateModalProps)
   const [replacementExpectedDate, setReplacementExpectedDate] = useState(rma?.replacement_expected_date || '');
   const [replacementReceivedDate, setReplacementReceivedDate] = useState(rma?.replacement_received_date || '');
   const [replacementSerialNumber, setReplacementSerialNumber] = useState(rma?.replacement_serial_number || '');
+  const [poNumber, setPoNumber] = useState(rma?.po_number || '');
   const [notes, setNotes] = useState(rma?.notes || '');
 
   const { toast } = useToast();
@@ -66,6 +67,7 @@ export function RmaUpdateModal({ open, onOpenChange, rma }: RmaUpdateModalProps)
     if (replacementExpectedDate) updates.replacement_expected_date = replacementExpectedDate;
     if (replacementReceivedDate) updates.replacement_received_date = replacementReceivedDate;
     if (replacementSerialNumber) updates.replacement_serial_number = replacementSerialNumber;
+    if (poNumber) updates.po_number = poNumber;
 
     updateRmaMutation.mutate(updates);
   };
@@ -143,6 +145,17 @@ export function RmaUpdateModal({ open, onOpenChange, rma }: RmaUpdateModalProps)
               value={replacementSerialNumber}
               onChange={(e) => setReplacementSerialNumber(e.target.value)}
               placeholder="Enter replacement serial number"
+            />
+          </div>
+
+          {/* PO Number */}
+          <div className="space-y-2">
+            <Label htmlFor="po_number">PO Number</Label>
+            <Input
+              id="po_number"
+              value={poNumber}
+              onChange={(e) => setPoNumber(e.target.value)}
+              placeholder="Enter PO number reference"
             />
           </div>
 
