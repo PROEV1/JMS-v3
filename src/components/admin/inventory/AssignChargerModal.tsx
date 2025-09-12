@@ -36,6 +36,7 @@ interface ChargerUnit {
   location_id: string | null;
   location_name: string | null;
   assigned_order_id?: string | null;
+  notes?: string | null;
 }
 
 interface Order {
@@ -73,7 +74,14 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
   React.useEffect(() => {
     if (open && charger) {
       setSelectedEngineerId(charger.engineer_id || '');
-      setLocationAddress(charger.location_name || '');
+      
+      // Extract address from notes if available, otherwise use location name
+      let currentAddress = charger.location_name || '';
+      if (charger.notes && (charger.notes.includes('Job Location:') || charger.notes.includes('Van Location:') || charger.notes.includes('Location:'))) {
+        currentAddress = charger.notes.replace(/^.*(?:Job Location|Van Location|Location): /, '');
+      }
+      setLocationAddress(currentAddress);
+      
       setSelectedOrderId(charger.assigned_order_id || 'none');
       setSearchPostcode('');
     }
