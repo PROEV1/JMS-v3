@@ -103,7 +103,9 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
 
           console.log('Inventory data for item', item.name, ':', inventory?.map(i => ({ 
             serial: i.serial_number, 
-            created_at: i.created_at 
+            created_at: i.created_at,
+            notes: i.notes,
+            location_name: i.inventory_locations?.name
           })));
 
           // Create individual units data
@@ -396,10 +398,21 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
                       <div className="flex items-center gap-2">
                         <MapPin className="w-3 h-3 text-muted-foreground" />
                         <span className="text-sm">
-                          {unit.notes && (unit.notes.includes('Job Location:') || unit.notes.includes('Van Location:') || unit.notes.includes('Location:')) ? 
-                            unit.notes.replace(/^.*(?:Job Location|Van Location|Location): /, '') :
-                            unit.location_name || 'Warehouse'
-                          }
+                          {(() => {
+                            console.log('Unit location debug:', {
+                              serial: unit.serial_number,
+                              notes: unit.notes,
+                              location_name: unit.location_name,
+                              hasJobLocation: unit.notes?.includes('Job Location:'),
+                              hasVanLocation: unit.notes?.includes('Van Location:'),
+                              hasLocation: unit.notes?.includes('Location:')
+                            });
+                            
+                            if (unit.notes && (unit.notes.includes('Job Location:') || unit.notes.includes('Van Location:') || unit.notes.includes('Location:'))) {
+                              return unit.notes.replace(/^.*(?:Job Location|Van Location|Location): /, '');
+                            }
+                            return unit.location_name || 'Warehouse';
+                          })()}
                         </span>
                       </div>
                     </TableCell>
