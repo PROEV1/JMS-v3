@@ -242,11 +242,17 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
          // Location remains null - charger is assigned to order but not physically located
        }
 
-       // Prepare notes field - include job address if assigning to order
-       let notes = null;
-       if (orderId && orderId !== 'none' && address && !finalEngineerId) {
-         notes = `Job Location: ${address}`;
-       }
+        // Prepare notes field - include address whenever provided
+        let notes = null;
+        if (address) {
+          if (orderId && orderId !== 'none' && !finalEngineerId) {
+            notes = `Job Location: ${address}`;
+          } else if (finalEngineerId) {
+            notes = `Van Location: ${address}`;
+          } else {
+            notes = `Location: ${address}`;
+          }
+        }
 
        // Update the charger_inventory record with the engineer, location, and order assignment
        const { data, error } = await supabase
