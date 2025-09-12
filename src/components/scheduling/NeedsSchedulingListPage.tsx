@@ -29,6 +29,18 @@ export function NeedsSchedulingListPage() {
     return async (withPagination = true, withCount = true) => {
       console.log('NeedsSchedulingListPage: Building search query...');
       
+      // First, check what orders are in awaiting_install_booking status
+      const { data: allAwaitingOrders, error: awaitingError } = await supabase
+        .from('orders')
+        .select('id, order_number, status_enhanced, scheduling_suppressed')
+        .eq('status_enhanced', 'awaiting_install_booking');
+      
+      console.log('NeedsSchedulingListPage: All awaiting_install_booking orders:', allAwaitingOrders?.length || 0, allAwaitingOrders);
+      
+      if (awaitingError) {
+        console.error('NeedsSchedulingListPage: Error fetching awaiting orders:', awaitingError);
+      }
+      
       // CRITICAL FIX: Exclude orders with active offers since database trigger isn't working
       let query = supabase
         .from('orders')
