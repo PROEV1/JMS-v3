@@ -162,17 +162,17 @@ export function NeedsSchedulingListPage() {
     }
   });
 
-  // FIXED: Centralized refresh system with debouncing
+  // FIXED: Immediate refresh for real-time updates
   useEffect(() => {
     const handleRefresh = () => {
-      console.log('NeedsSchedulingListPage: Received refresh event, using centralized refresh...');
-      debouncedRefresh();
+      console.log('NeedsSchedulingListPage: Received refresh event, refreshing immediately...');
+      refetchOrders();
     };
     
     // Listen for custom refresh events
     window.addEventListener('scheduling:refresh', handleRefresh);
     
-    // Set up real-time subscriptions with debounced refresh
+    // Set up real-time subscriptions with immediate refresh
     const ordersChannel = supabase
       .channel('needs-scheduling-orders')
       .on(
@@ -184,7 +184,8 @@ export function NeedsSchedulingListPage() {
         },
         (payload) => {
           console.log('NeedsSchedulingListPage: Orders real-time update:', payload);
-          debouncedRefresh();
+          // Immediate refresh for orders table changes
+          setTimeout(() => refetchOrders(), 100);
         }
       )
       .on(
@@ -196,7 +197,8 @@ export function NeedsSchedulingListPage() {
         },
         (payload) => {
           console.log('NeedsSchedulingListPage: Job offers real-time update:', payload);
-          debouncedRefresh();
+          // Immediate refresh for job offers changes
+          setTimeout(() => refetchOrders(), 100);
         }
       )
       .subscribe();
@@ -205,7 +207,7 @@ export function NeedsSchedulingListPage() {
       window.removeEventListener('scheduling:refresh', handleRefresh);
       supabase.removeChannel(ordersChannel);
     };
-  }, [debouncedRefresh]);
+  }, [refetchOrders]);
 
   console.log('NeedsSchedulingListPage - Orders count:', orders?.length, 'Engineers count:', engineers?.length);
   
