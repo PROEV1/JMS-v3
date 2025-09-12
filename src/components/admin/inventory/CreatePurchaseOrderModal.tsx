@@ -33,8 +33,8 @@ interface POItem {
 interface ItemComboBoxProps {
   value: string;
   itemId: string;
-  inventoryItems: Array<{ id: string; name: string; sku: string }>;
-  onSelect: (itemName: string, itemId?: string) => void;
+  inventoryItems: Array<{ id: string; name: string; sku: string; default_cost: number }>;
+  onSelect: (itemName: string, itemId?: string, defaultCost?: number) => void;
 }
 
 function ItemComboBox({ value, itemId, inventoryItems, onSelect }: ItemComboBoxProps) {
@@ -56,7 +56,7 @@ function ItemComboBox({ value, itemId, inventoryItems, onSelect }: ItemComboBoxP
     const selectedItem = inventoryItems.find(item => item.id === selectedValue);
     if (selectedItem) {
       setInputValue(selectedItem.name);
-      onSelect(selectedItem.name, selectedItem.id);
+      onSelect(selectedItem.name, selectedItem.id, selectedItem.default_cost);
     }
     setOpen(false);
   };
@@ -188,28 +188,13 @@ export function CreatePurchaseOrderModal({ open, onOpenChange, stockRequest }: C
     generateUniquePONumber();
   }, [open, poNumber]);
 
-  // Pre-populate with stock request data when provided
-  React.useEffect(() => {
-    if (stockRequest && open) {
-      setNotes(`Created from stock request #${stockRequest.id.slice(0, 8)} for ${stockRequest.engineer.name}`);
-      setEngineerId(stockRequest.engineer_id); // Pre-select engineer from stock request
-      const stockRequestItems = stockRequest.lines.map((line, index) => ({
-        id: (index + 1).toString(),
-        item_id: line.item_id,
-        item_name: line.item.name,
-        quantity: line.qty,
-        unit_cost: 0
-      }));
-      setPoItems(stockRequestItems);
-    }
-  }, [stockRequest, open]);
   // Fetch inventory items (excluding chargers)
   const { data: inventoryItems = [] } = useQuery({
     queryKey: ['inventory-items'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('inventory_items')
-        .select('id, name, sku')
+        .select('id, name, sku, default_cost')
         .eq('is_active', true)
         .eq('is_charger', false)  // Exclude chargers
         .order('name');
@@ -217,6 +202,26 @@ export function CreatePurchaseOrderModal({ open, onOpenChange, stockRequest }: C
       return data;
     }
   });
+
+  // Pre-populate with stock request data when provided
+  React.useEffect(() => {
+    if (stockRequest && open && inventoryItems.length > 0) {
+      setNotes(`Created from stock request #${stockRequest.id.slice(0, 8)} for ${stockRequest.engineer.name}`);
+      setEngineerId(stockRequest.engineer_id); // Pre-select engineer from stock request
+      const stockRequestItems = stockRequest.lines.map((line, index) => {
+        // Find the inventory item to get its default cost
+        const inventoryItem = inventoryItems.find(item => item.id === line.item_id);
+        return {
+          id: (index + 1).toString(),
+          item_id: line.item_id,
+          item_name: line.item.name,
+          quantity: line.qty,
+          unit_cost: inventoryItem?.default_cost || 0
+        };
+      });
+      setPoItems(stockRequestItems);
+    }
+  }, [stockRequest, open, inventoryItems]);
 
   const addItem = () => {
     setPoItems([...poItems, { 
@@ -427,10 +432,13 @@ export function CreatePurchaseOrderModal({ open, onOpenChange, stockRequest }: C
                         value={item.item_name}
                         itemId={item.item_id}
                         inventoryItems={inventoryItems}
-                        onSelect={(itemName, itemId) => {
-                          console.log('PO Item changing to:', itemName, 'ID:', itemId);
+                        onSelect={(itemName, itemId, defaultCost) => {
+                          console.log('PO Item changing to:', itemName, 'ID:', itemId, 'Default cost:', defaultCost);
                           updateItem(item.id, "item_name", itemName);
                           updateItem(item.id, "item_id", itemId || '');
+                          if (defaultCost !== undefined) {
+                            updateItem(item.id, "unit_cost", defaultCost);
+                          }
                         }}
                       />
                     </div>
