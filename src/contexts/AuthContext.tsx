@@ -221,7 +221,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     console.log('🔄 Signing out user:', state.user?.email);
     
     try {
-      // Clear local state first
+      // Clear local state and session storage immediately
       setState(prev => ({
         ...prev,
         session: null,
@@ -232,21 +232,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         routed: false
       }));
       
-      // Clear session storage
       sessionStorage.removeItem('authRedirectPath');
       sessionStorage.removeItem('lastAuthenticatedPath');
+      localStorage.removeItem('sb-qvppvstgconmzzjsryna-auth-token');
       
-      // Sign out from Supabase
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        console.log('Supabase sign out error (ignoring):', error);
-      }
+      // Try to sign out from Supabase, but don't wait if it fails
+      supabase.auth.signOut({ scope: 'local' }).catch(error => {
+        console.log('Supabase sign out error (expected for invalid sessions):', error);
+      });
       
-      // Force redirect to auth page
-      window.location.replace('/auth');
     } catch (error) {
       console.error('Sign out error:', error);
-      // Still redirect even if error
+    } finally {
+      // Always redirect regardless of success/failure
+      console.log('🔄 Redirecting to /auth');
       window.location.replace('/auth');
     }
   };
