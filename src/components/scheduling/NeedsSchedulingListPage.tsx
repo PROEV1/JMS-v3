@@ -24,24 +24,12 @@ export function NeedsSchedulingListPage() {
   
   // Always include assigned engineers - no toggle needed
 
-  // Build search query - FIXED: No longer exclude based on offers, rely on status_enhanced
+  // Build search query for orders in awaiting_install_booking status
   const buildSearchQuery = useMemo(() => {
     return async (withPagination = true, withCount = true) => {
       console.log('NeedsSchedulingListPage: Building search query...');
       
-      // First, check what orders are in awaiting_install_booking status
-      const { data: allAwaitingOrders, error: awaitingError } = await supabase
-        .from('orders')
-        .select('id, order_number, status_enhanced, scheduling_suppressed')
-        .eq('status_enhanced', 'awaiting_install_booking');
-      
-      console.log('NeedsSchedulingListPage: All awaiting_install_booking orders:', allAwaitingOrders?.length || 0, allAwaitingOrders);
-      
-      if (awaitingError) {
-        console.error('NeedsSchedulingListPage: Error fetching awaiting orders:', awaitingError);
-      }
-      
-      // CRITICAL FIX: Exclude orders with active offers since database trigger isn't working
+      // Query for orders that need scheduling
       let query = supabase
         .from('orders')
         .select(`
@@ -67,7 +55,6 @@ export function NeedsSchedulingListPage() {
         console.log('NeedsSchedulingListPage: Excluding order IDs:', orderIds);
         query = query.not('id', 'in', `(${orderIds.join(',')})`);
       }
-
       query = query.order('created_at', { ascending: false });
 
       // Apply search filter across all relevant tables
