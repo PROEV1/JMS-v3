@@ -237,25 +237,9 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
             .eq('id', finalLocationId);
         }
       } else if (orderId && orderId !== 'none') {
-        // Assigned to job without engineer
+        // Assigned to job without engineer - don't create job_site locations
         status = 'assigned';
-        
-        // Create or find job-specific location if address is provided
-        if (address) {
-          const { data: jobLocation, error: jobLocationError } = await supabase
-            .from('inventory_locations')
-            .insert({
-              name: `Job Location - ${address}`,
-              type: 'job_site',
-              address: address
-            })
-            .select()
-            .single();
-
-          if (!jobLocationError) {
-            finalLocationId = jobLocation.id;
-          }
-        }
+        // Location remains null - charger is assigned to order but not physically located
       }
 
       // Update the charger_inventory record with the engineer, location, and order assignment
