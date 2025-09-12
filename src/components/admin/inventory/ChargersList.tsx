@@ -26,6 +26,7 @@ interface ChargerUnit {
   engineer_name: string | null;
   location_id: string | null;
   location_name: string | null;
+  notes: string | null;
   order_id: string | null;
   dispatched_at: string | null;
   delivered_at: string | null;
@@ -88,6 +89,7 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
               status,
               engineer_id,
               location_id,
+              notes,
               created_at,
               engineers (
                 name
@@ -114,6 +116,7 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
             engineer_name: unit.engineers?.name || null,
             location_id: unit.location_id || null,
             location_name: unit.inventory_locations?.name || (unit.engineer_id ? `${unit.engineers?.name}'s Van` : 'Warehouse'),
+            notes: unit.notes || null,
             order_id: null,
             dispatched_at: null,
             delivered_at: null,
@@ -393,7 +396,10 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
                       <div className="flex items-center gap-2">
                         <MapPin className="w-3 h-3 text-muted-foreground" />
                         <span className="text-sm">
-                          {unit.location_name || 'Warehouse'}
+                          {unit.notes && (unit.notes.includes('Job Location:') || unit.notes.includes('Van Location:') || unit.notes.includes('Location:')) ? 
+                            unit.notes.replace(/^.*(?:Job Location|Van Location|Location): /, '') :
+                            unit.location_name || 'Warehouse'
+                          }
                         </span>
                       </div>
                     </TableCell>
