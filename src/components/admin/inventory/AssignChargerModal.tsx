@@ -236,22 +236,29 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
             })
             .eq('id', finalLocationId);
         }
-      } else if (orderId && orderId !== 'none') {
-        // Assigned to job without engineer - don't create job_site locations
-        status = 'assigned';
-        // Location remains null - charger is assigned to order but not physically located
-      }
+       } else if (orderId && orderId !== 'none') {
+         // Assigned to job without engineer - save address to notes field
+         status = 'assigned';
+         // Location remains null - charger is assigned to order but not physically located
+       }
 
-      // Update the charger_inventory record with the engineer, location, and order assignment
-      const { data, error } = await supabase
-        .from('charger_inventory')
-        .update({
-          engineer_id: finalEngineerId,
-          location_id: finalLocationId,
-          assigned_order_id: orderId || null,
-          status: status,
-          updated_at: new Date().toISOString()
-        })
+       // Prepare notes field - include job address if assigning to order
+       let notes = null;
+       if (orderId && orderId !== 'none' && address && !finalEngineerId) {
+         notes = `Job Location: ${address}`;
+       }
+
+       // Update the charger_inventory record with the engineer, location, and order assignment
+       const { data, error } = await supabase
+         .from('charger_inventory')
+         .update({
+           engineer_id: finalEngineerId,
+           location_id: finalLocationId,
+           assigned_order_id: orderId || null,
+           status: status,
+           notes: notes,
+           updated_at: new Date().toISOString()
+         })
         .eq('id', charger.id)
         .select()
         .single();
