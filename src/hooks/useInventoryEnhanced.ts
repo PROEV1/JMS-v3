@@ -419,7 +419,7 @@ export function useInventoryEnhanced() {
   // Get detailed low stock information by engineer
   const useLowStockEngineerDetails = () => {
     return useQuery({
-      queryKey: ['low-stock-engineer-details'],
+      queryKey: ['low-stock-engineer-details', Date.now()], // Add timestamp to force refresh
       queryFn: async () => {
         // Get van locations with engineers
         const { data: vanLocations, error: locationsError } = await supabase
@@ -442,6 +442,8 @@ export function useInventoryEnhanced() {
           .select('item_id, location_id, direction, qty, status')
           .in('status', ['pending', 'approved']);
         if (balancesError) throw balancesError;
+        
+        console.log('DEBUG: Raw txns data for low stock calculation:', txnsData?.length || 0);
         
         // Calculate balances manually
         const balancesMap = new Map<string, { item_id: string; location_id: string; on_hand: number }>();
@@ -485,6 +487,16 @@ export function useInventoryEnhanced() {
             
             // Only show if current stock is at or below reorder point
             if (balance.on_hand <= item.reorder_point) {
+              // Debug logging for Tim's Hi Tuf item
+              if (item.sku === '0114-4177' && location.name.includes('Tim')) {
+                console.log('DEBUG Tim Hi Tuf stock:', {
+                  balance: balance.on_hand,
+                  reorder_point: item.reorder_point,
+                  location: location.name,
+                  item_name: item.name
+                });
+              }
+              
               const shortage = Math.max(0, item.reorder_point - balance.on_hand);
               const status = balance.on_hand <= 0 ? 'out_of_stock' : 
                            balance.on_hand < item.reorder_point * 0.5 ? 'critical_low' : 'low_stock';
@@ -515,7 +527,8 @@ export function useInventoryEnhanced() {
           return a.engineer_name.localeCompare(b.engineer_name);
         });
       },
-      staleTime: 60 * 1000, // 1 minute
+      staleTime: 0, // Force fresh data
+      gcTime: 0, // Don't cache
     });
   };
 
