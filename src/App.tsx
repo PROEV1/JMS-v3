@@ -93,15 +93,19 @@ function App() {
         {/* Root redirect */}
         <Route path="/" element={<RouteGuard><Layout><OpsCommandCentre /></Layout></RouteGuard>} />
         
-        {/* Client Routes */}
-        <Route path="/client" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><ClientDashboard /></Layout></RouteGuard>} />
-        <Route path="/client/quotes" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><ClientQuotes /></Layout></RouteGuard>} />
-        <Route path="/client/quotes/:id" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><ClientQuoteDetail /></Layout></RouteGuard>} />
-        <Route path="/client/orders" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><ClientOrders /></Layout></RouteGuard>} />
-        <Route path="/client/orders/:id" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><EnhancedClientOrderView /></Layout></RouteGuard>} />
-        <Route path="/client/messages" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><ClientMessages /></Layout></RouteGuard>} />
-        <Route path="/client/payments" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><ClientPayments /></Layout></RouteGuard>} />
-        <Route path="/client/profile" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><ClientProfilePage /></Layout></RouteGuard>} />
+        {/* Client Management Routes (Admin Only) */}
+        <Route path="/admin/client" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><ClientDashboard /></Layout></RouteGuard>} />
+        <Route path="/admin/client/quotes" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><ClientQuotes /></Layout></RouteGuard>} />
+        <Route path="/admin/client/quotes/:id" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><ClientQuoteDetail /></Layout></RouteGuard>} />
+        <Route path="/admin/client/orders" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><ClientOrders /></Layout></RouteGuard>} />
+        <Route path="/admin/client/orders/:id" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><EnhancedClientOrderView /></Layout></RouteGuard>} />
+        <Route path="/admin/client/messages" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><ClientMessages /></Layout></RouteGuard>} />
+        <Route path="/admin/client/payments" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><ClientPayments /></Layout></RouteGuard>} />
+        <Route path="/admin/client/profile" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><ClientProfilePage /></Layout></RouteGuard>} />
+        
+        {/* Client Portal Routes (Client Access) */}
+        <Route path="/portal" element={<RouteGuard allowedRoles={['client']}><Layout><ClientMessages /></Layout></RouteGuard>} />
+        <Route path="/portal/messages" element={<RouteGuard allowedRoles={['client']}><Layout><ClientMessages /></Layout></RouteGuard>} />
         
         {/* Engineer Routes */}
         <Route path="/engineer/dashboard" element={<RouteGuard allowedRoles={['engineer']}><Layout><EngineerDashboard /></Layout></RouteGuard>} />

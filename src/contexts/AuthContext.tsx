@@ -191,7 +191,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (currentPath === '/') {
       if (finalRole === 'partner_user') target = '/partner';
       else if (finalRole === 'engineer') target = '/engineer/dashboard';
-      else if (finalRole === 'client') target = '/auth'; // Clients should stay on auth page or be redirected appropriately
+      else if (finalRole === 'client') target = '/portal';
       else target = '/admin';
     }
     
@@ -200,12 +200,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const onAdminButPartner = currentPath.startsWith('/admin') && finalRole === 'partner_user';
     const onEngineerButNotEngineer = currentPath.startsWith('/engineer') && finalRole !== 'engineer';
     const onAdminButEngineer = currentPath.startsWith('/admin') && finalRole === 'engineer';
+    const onAdminButClient = currentPath.startsWith('/admin') && finalRole === 'client';
+    const onPortalButNotClient = currentPath.startsWith('/portal') && finalRole !== 'client';
     
     if (!target) {
       if (onPartnerButNotPartner) target = '/admin';
       else if (onAdminButPartner) target = '/partner';
       else if (onEngineerButNotEngineer) target = finalRole === 'partner_user' ? '/partner' : '/admin';
       else if (onAdminButEngineer) target = '/engineer/dashboard';
+      else if (onAdminButClient) target = '/portal';
+      else if (onPortalButNotClient) target = finalRole === 'partner_user' ? '/partner' : finalRole === 'engineer' ? '/engineer/dashboard' : '/admin';
     }
 
     if (target && target !== currentPath) {
