@@ -45,7 +45,16 @@ export default function Auth() {
         navigate(explicitRedirect, { replace: true });
       } else {
         // Default redirect based on role
-        const defaultPath = finalRole === 'partner_user' ? '/partner' : '/admin';
+        let defaultPath;
+        if (finalRole === 'partner_user') {
+          defaultPath = '/partner';
+        } else if (finalRole === 'engineer') {
+          defaultPath = '/engineer/dashboard';
+        } else if (finalRole === 'client') {
+          defaultPath = '/portal';
+        } else {
+          defaultPath = '/admin';
+        }
         console.log('Auth: Using default redirect for role:', defaultPath);
         navigate(defaultPath, { replace: true });
       }
