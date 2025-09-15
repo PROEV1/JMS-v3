@@ -69,10 +69,13 @@ export function useInventoryEnhanced() {
           const key = `${txn.item_id}-${txn.location_id}`;
           const current = balances.get(key) || { item_id: txn.item_id, location_id: txn.location_id, on_hand: 0 };
           
-          if (txn.direction === 'in' || txn.direction === 'adjust') {
+          if (txn.direction === 'in') {
             current.on_hand += txn.qty;
-          } else {
+          } else if (txn.direction === 'out') {
             current.on_hand -= txn.qty;
+          } else if (txn.direction === 'adjust') {
+            // For adjustments, qty can be positive (adding) or negative (removing)
+            current.on_hand += txn.qty;
           }
           
           balances.set(key, current);
@@ -346,10 +349,13 @@ export function useInventoryEnhanced() {
           const key = `${txn.item_id}-${txn.location_id}`;
           const current = balances.get(key) || { item_id: txn.item_id, location_id: txn.location_id, on_hand: 0 };
           
-          if (txn.direction === 'in' || txn.direction === 'adjust') {
+          if (txn.direction === 'in') {
             current.on_hand += txn.qty;
-          } else {
+          } else if (txn.direction === 'out') {
             current.on_hand -= txn.qty;
+          } else if (txn.direction === 'adjust') {
+            // For adjustments, qty can be positive (adding) or negative (removing)
+            current.on_hand += txn.qty;
           }
           
           balances.set(key, current);
@@ -450,10 +456,13 @@ export function useInventoryEnhanced() {
           const key = `${txn.item_id}-${txn.location_id}`;
           const current = balancesMap.get(key) || { item_id: txn.item_id, location_id: txn.location_id, on_hand: 0 };
           
-          if (txn.direction === 'in' || txn.direction === 'adjust') {
+          if (txn.direction === 'in') {
             current.on_hand += txn.qty;
-          } else {
+          } else if (txn.direction === 'out') {
             current.on_hand -= txn.qty;
+          } else if (txn.direction === 'adjust') {
+            // For adjustments, qty can be positive (adding) or negative (removing)
+            current.on_hand += txn.qty;
           }
           
           balancesMap.set(key, current);
@@ -539,10 +548,12 @@ function calculateCurrentStock(transactions: any[]): number {
   return transactions.reduce((total, txn) => {
     switch (txn.direction) {
       case 'in':
-      case 'adjust':
         return total + txn.qty;
       case 'out':
         return total - txn.qty;
+      case 'adjust':
+        // For adjustments, qty can be positive (adding) or negative (removing)
+        return total + txn.qty;
       default:
         return total;
     }
