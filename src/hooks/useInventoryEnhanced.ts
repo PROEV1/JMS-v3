@@ -477,11 +477,11 @@ export function useInventoryEnhanced() {
           // Get balances for this location (if any)
           const locationBalances = balances.filter((b: any) => b.location_id === location.id);
           
-          // Process each item to check if it's low stock at this location
-          items.forEach(item => {
-            // Find balance for this item at this location, default to 0 if no transactions
-            const balance = locationBalances.find((b: any) => b.item_id === item.id) || 
-                           { item_id: item.id, location_id: location.id, on_hand: 0 };
+          // Only process items that have actually had transactions at this van location
+          // This ensures we only show items that are supposed to be at this location
+          locationBalances.forEach(balance => {
+            const item = items.find(i => i.id === balance.item_id);
+            if (!item) return;
             
             // Only show if current stock is at or below reorder point
             if (balance.on_hand <= item.reorder_point) {
