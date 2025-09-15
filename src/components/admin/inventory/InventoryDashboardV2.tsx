@@ -52,18 +52,21 @@ export function InventoryDashboardV2({ onSwitchTab }: InventoryDashboardV2Props)
       // Calculate balances manually to match the low stock detection logic
       const balancesMap = new Map<string, { item_id: string; location_id: string; on_hand: number }>();
       
-      txnsData?.forEach(txn => {
-        const key = `${txn.item_id}-${txn.location_id}`;
-        const current = balancesMap.get(key) || { item_id: txn.item_id, location_id: txn.location_id, on_hand: 0 };
-        
-        if (txn.direction === 'in' || txn.direction === 'adjust') {
-          current.on_hand += txn.qty;
-        } else {
-          current.on_hand -= txn.qty;
-        }
-        
-        balancesMap.set(key, current);
-      });
+       txnsData?.forEach(txn => {
+         const key = `${txn.item_id}-${txn.location_id}`;
+         const current = balancesMap.get(key) || { item_id: txn.item_id, location_id: txn.location_id, on_hand: 0 };
+         
+         if (txn.direction === 'in') {
+           current.on_hand += txn.qty;
+         } else if (txn.direction === 'out') {
+           current.on_hand -= txn.qty;
+         } else if (txn.direction === 'adjust') {
+           // For adjustments, qty can be positive or negative
+           current.on_hand += txn.qty;
+         }
+         
+         balancesMap.set(key, current);
+       });
       
       const balances = Array.from(balancesMap.values());
 

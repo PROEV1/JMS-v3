@@ -419,7 +419,7 @@ export function useInventoryEnhanced() {
   // Get detailed low stock information by engineer
   const useLowStockEngineerDetails = () => {
     return useQuery({
-      queryKey: ['low-stock-engineer-details', Date.now()], // Add timestamp to force refresh
+      queryKey: ['low-stock-engineer-details'],
       queryFn: async () => {
         // Get van locations with engineers
         const { data: vanLocations, error: locationsError } = await supabase
@@ -443,23 +443,24 @@ export function useInventoryEnhanced() {
           .in('status', ['pending', 'approved']);
         if (balancesError) throw balancesError;
         
-        console.log('DEBUG: Raw txns data for low stock calculation:', txnsData?.length || 0);
-        
         // Calculate balances manually
         const balancesMap = new Map<string, { item_id: string; location_id: string; on_hand: number }>();
         
-        txnsData?.forEach(txn => {
-          const key = `${txn.item_id}-${txn.location_id}`;
-          const current = balancesMap.get(key) || { item_id: txn.item_id, location_id: txn.location_id, on_hand: 0 };
-          
-          if (txn.direction === 'in' || txn.direction === 'adjust') {
-            current.on_hand += txn.qty;
-          } else {
-            current.on_hand -= txn.qty;
-          }
-          
-          balancesMap.set(key, current);
-        });
+         txnsData?.forEach(txn => {
+           const key = `${txn.item_id}-${txn.location_id}`;
+           const current = balancesMap.get(key) || { item_id: txn.item_id, location_id: txn.location_id, on_hand: 0 };
+           
+           if (txn.direction === 'in') {
+             current.on_hand += txn.qty;
+           } else if (txn.direction === 'out') {
+             current.on_hand -= txn.qty;
+           } else if (txn.direction === 'adjust') {
+             // For adjustments, qty can be positive or negative
+             current.on_hand += txn.qty;
+           }
+           
+           balancesMap.set(key, current);
+         });
         
         const balances = Array.from(balancesMap.values());
 
@@ -487,16 +488,6 @@ export function useInventoryEnhanced() {
             
             // Only show if current stock is at or below reorder point
             if (balance.on_hand <= item.reorder_point) {
-              // Debug logging for Tim's Hi Tuf item
-              if (item.sku === '0114-4177' && location.name.includes('Tim')) {
-                console.log('DEBUG Tim Hi Tuf stock:', {
-                  balance: balance.on_hand,
-                  reorder_point: item.reorder_point,
-                  location: location.name,
-                  item_name: item.name
-                });
-              }
-              
               const shortage = Math.max(0, item.reorder_point - balance.on_hand);
               const status = balance.on_hand <= 0 ? 'out_of_stock' : 
                            balance.on_hand < item.reorder_point * 0.5 ? 'critical_low' : 'low_stock';
@@ -527,8 +518,7 @@ export function useInventoryEnhanced() {
           return a.engineer_name.localeCompare(b.engineer_name);
         });
       },
-      staleTime: 0, // Force fresh data
-      gcTime: 0, // Don't cache
+      staleTime: 60 * 1000, // 1 minute
     });
   };
 
@@ -550,15 +540,15 @@ export function useInventoryEnhanced() {
 // Helper function to calculate current stock
 function calculateCurrentStock(transactions: any[]): number {
   return transactions.reduce((total, txn) => {
-    switch (txn.direction) {
-      case 'in':
-      case 'adjust':
-        return total + txn.qty;
-      case 'out':
-        return total - txn.qty;
-      default:
-        return total;
+    if (txn.direction === 'in') {
+      return total + txn.qty;
+    } else if (txn.direction === 'out') {
+      return total - txn.qty;
+    } else if (txn.direction === 'adjust') {
+      // For adjustments, qty can be positive or negative
+      return total + txn.qty;
     }
+    return total;
   }, 0);
 }
 
