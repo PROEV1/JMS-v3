@@ -56,23 +56,26 @@ export function useInventoryEnhanced() {
 
         if (!data) return [];
 
-        // Get stock balances using direct query
+        // Get stock balances using direct query - ONLY approved transactions
         const { data: txnsData } = await supabase
           .from('inventory_txns')
           .select('item_id, location_id, direction, qty, status')
           .eq('status', 'approved');
         
-        // Calculate balances manually
+        // Calculate balances manually with proper adjust handling
         const balances = new Map<string, { item_id: string; location_id: string; on_hand: number }>();
         
         txnsData?.forEach(txn => {
           const key = `${txn.item_id}-${txn.location_id}`;
           const current = balances.get(key) || { item_id: txn.item_id, location_id: txn.location_id, on_hand: 0 };
           
-          if (txn.direction === 'in' || txn.direction === 'adjust') {
+          if (txn.direction === 'in') {
             current.on_hand += txn.qty;
-          } else {
+          } else if (txn.direction === 'out') {
             current.on_hand -= txn.qty;
+          } else if (txn.direction === 'adjust') {
+            // For adjustments, qty is already positive or negative as intended
+            current.on_hand += txn.qty;
           }
           
           balances.set(key, current);
@@ -320,7 +323,7 @@ export function useInventoryEnhanced() {
       queryKey: ['item-location-balances', itemId],
       queryFn: async () => {
         console.log('useItemLocationBalances: Fetching inventory transactions...');
-        // Use direct query instead of RLS-protected function for broader access
+        // Use direct query - ONLY approved transactions
         const { data, error } = await supabase
           .from('inventory_txns')
           .select(`
@@ -339,17 +342,20 @@ export function useInventoryEnhanced() {
         
         console.log('useItemLocationBalances: Raw transactions:', data?.length || 0);
         
-        // Calculate balances manually
+        // Calculate balances manually with proper adjust handling
         const balances = new Map<string, { item_id: string; location_id: string; on_hand: number }>();
         
         data?.forEach(txn => {
           const key = `${txn.item_id}-${txn.location_id}`;
           const current = balances.get(key) || { item_id: txn.item_id, location_id: txn.location_id, on_hand: 0 };
           
-          if (txn.direction === 'in' || txn.direction === 'adjust') {
+          if (txn.direction === 'in') {
             current.on_hand += txn.qty;
-          } else {
+          } else if (txn.direction === 'out') {
             current.on_hand -= txn.qty;
+          } else if (txn.direction === 'adjust') {
+            // For adjustments, qty is already positive or negative as intended
+            current.on_hand += txn.qty;
           }
           
           balances.set(key, current);
@@ -436,14 +442,14 @@ export function useInventoryEnhanced() {
 
         if (locationsError) throw locationsError;
 
-        // Get stock balances using direct query (include pending and approved)
+        // Get stock balances using direct query - ONLY approved transactions
         const { data: txnsData, error: balancesError } = await supabase
           .from('inventory_txns')
           .select('item_id, location_id, direction, qty, status')
-          .in('status', ['pending', 'approved']);
+          .eq('status', 'approved');
         if (balancesError) throw balancesError;
         
-        // Calculate balances manually
+        // Calculate balances manually with proper adjust handling
         const balancesMap = new Map<string, { item_id: string; location_id: string; on_hand: number }>();
         
          txnsData?.forEach(txn => {
@@ -455,7 +461,7 @@ export function useInventoryEnhanced() {
            } else if (txn.direction === 'out') {
              current.on_hand -= txn.qty;
            } else if (txn.direction === 'adjust') {
-             // For adjustments, qty can be positive or negative
+             // For adjustments, qty is already positive or negative as intended
              current.on_hand += txn.qty;
            }
            
