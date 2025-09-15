@@ -90,8 +90,8 @@ function App() {
         <Route path="/survey/:orderId/success" element={<SurveySuccess />} />
         <Route path="/survey-view/:orderId" element={<SurveyReadOnlyView />} />
         
-        {/* Root redirect */}
-        <Route path="/" element={<RouteGuard><Layout><OpsCommandCentre /></Layout></RouteGuard>} />
+        {/* Root redirect - Admin/Office Users Only */}
+        <Route path="/" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><OpsCommandCentre /></Layout></RouteGuard>} />
         
         {/* Client Management Routes (Admin Only) */}
         <Route path="/admin/client" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><ClientDashboard /></Layout></RouteGuard>} />
