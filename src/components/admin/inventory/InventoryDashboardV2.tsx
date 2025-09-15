@@ -56,13 +56,10 @@ export function InventoryDashboardV2({ onSwitchTab }: InventoryDashboardV2Props)
         const key = `${txn.item_id}-${txn.location_id}`;
         const current = balancesMap.get(key) || { item_id: txn.item_id, location_id: txn.location_id, on_hand: 0 };
         
-        if (txn.direction === 'in') {
+        if (txn.direction === 'in' || txn.direction === 'adjust') {
           current.on_hand += txn.qty;
-        } else if (txn.direction === 'out') {
+        } else {
           current.on_hand -= txn.qty;
-        } else if (txn.direction === 'adjust') {
-          // For adjustments, qty can be positive (adding) or negative (removing)
-          current.on_hand += txn.qty;
         }
         
         balancesMap.set(key, current);
