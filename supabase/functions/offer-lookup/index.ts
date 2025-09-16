@@ -51,6 +51,7 @@ serve(async (req) => {
       try {
         const body = await req.json();
         token = body.token;
+        // Ignore cache_bust parameter - it's just for cache invalidation
         console.log('Token from POST body:', token);
       } catch (e) {
         console.log('No JSON body or parse error:', e);

@@ -28,9 +28,6 @@ interface OfferDetails {
     };
     is_partner_job: boolean;
   };
-  engineer: {
-    name: string;
-  };
   already_responded?: boolean;
   expired?: boolean;
 }
@@ -73,8 +70,11 @@ export default function ClientOfferViewPublic() {
             setError('This offer has expired');
           }
         } else if (response.data) {
-          setOffer(response.data);
-          console.log('Offer loaded successfully:', response.data);
+          // Safety filter to remove any engineer data from cached responses
+          const cleanedData = { ...response.data };
+          delete cleanedData.engineer;
+          setOffer(cleanedData);
+          console.log('Offer loaded successfully:', cleanedData);
         } else {
           setError('Invalid offer data received');
         }
@@ -366,13 +366,6 @@ export default function ClientOfferViewPublic() {
                   <label className="text-sm font-medium text-muted-foreground">Time Window</label>
                   <p className="font-semibold">
                     {offer.time_window || 'To be confirmed'}
-                  </p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Engineer</label>
-                  <p className="font-semibold flex items-center gap-2">
-                    <User className="w-4 h-4" />
-                    {offer.engineer.name}
                   </p>
                 </div>
                 <div>
