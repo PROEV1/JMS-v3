@@ -52,6 +52,25 @@ export function EngineerScanModal({ open, onOpenChange, vanLocationId, vanLocati
     }
   }, [open, isScanning]);
 
+  // Get current engineer
+  const { data: engineer } = useQuery({
+    queryKey: ['engineer-profile'],
+    queryFn: async () => {
+      const { data: user } = await supabase.auth.getUser();
+      if (!user.user) return null;
+
+      const { data, error } = await supabase
+        .from('engineers')
+        .select('id, name')
+        .eq('user_id', user.user.id)
+        .maybeSingle();
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: open
+  });
+
   // Fetch inventory items for manual selection
   const { data: inventoryItems = [] } = useQuery({
     queryKey: ['inventory-items-for-scan'],
@@ -66,6 +85,29 @@ export function EngineerScanModal({ open, onOpenChange, vanLocationId, vanLocati
       return data;
     },
     enabled: open
+  });
+
+  // Fetch assigned chargers for this engineer
+  const { data: assignedChargers = [] } = useQuery({
+    queryKey: ['engineer-assigned-chargers-for-scan', engineer?.id],
+    queryFn: async () => {
+      if (!engineer?.id) return [];
+
+      const { data, error } = await supabase
+        .from('charger_inventory')
+        .select(`
+          id,
+          serial_number,
+          status,
+          inventory_items!charger_item_id(id, name, sku, unit)
+        `)
+        .eq('engineer_id', engineer.id)
+        .in('status', ['assigned', 'dispatched', 'delivered']);
+
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: open && !!engineer?.id
   });
 
   const startScanning = async () => {
@@ -116,17 +158,29 @@ export function EngineerScanModal({ open, onOpenChange, vanLocationId, vanLocati
               item.sku?.toLowerCase() === scannedText.toLowerCase()
             );
             
+            // Try to find matching charger by serial number
+            const matchingCharger = assignedChargers.find(charger => 
+              charger.serial_number?.toLowerCase() === scannedText.toLowerCase()
+            );
+            
             if (matchingItem) {
-              setSelectedItemId(matchingItem.id);
+              setSelectedItemId(`item_${matchingItem.id}`);
               setScanMode('manual_add');
               toast({
                 title: "Item Found",
                 description: `Found: ${matchingItem.name}`,
               });
+            } else if (matchingCharger && matchingCharger.inventory_items) {
+              setSelectedItemId(`charger_${matchingCharger.id}`);
+              setScanMode('manual_add');
+              toast({
+                title: "Charger Found",
+                description: `Found: ${matchingCharger.inventory_items.name} (${matchingCharger.serial_number})`,
+              });
             } else {
               toast({
                 title: "Barcode Scanned",
-                description: `Code: ${scannedText}. No matching item found, please select manually.`,
+                description: `Code: ${scannedText}. No matching item or charger found, please select manually.`,
               });
             }
           }
@@ -165,7 +219,7 @@ export function EngineerScanModal({ open, onOpenChange, vanLocationId, vanLocati
     setIsScanning(false);
   };
 
-  // Add stock mutation
+  // Add stock mutation for regular items
   const addStockMutation = useMutation({
     mutationFn: async ({ itemId, qty, reference, scanNotes }: {
       itemId: string;
@@ -193,17 +247,8 @@ export function EngineerScanModal({ open, onOpenChange, vanLocationId, vanLocati
         description: `Added ${quantity} units to van inventory`,
       });
 
-      // Invalidate queries to refresh van stock
-      queryClient.invalidateQueries({ queryKey: ['van-stock-items'] });
-      queryClient.invalidateQueries({ queryKey: ['van-stock-metrics'] });
-      queryClient.invalidateQueries({ queryKey: ['van-recent-transactions'] });
-
-      // Reset form
-      setScannedCode('');
-      setSelectedItemId('');
-      setQuantity('1');
-      setNotes('');
-      onOpenChange(false);
+      // Reset form and close modal
+      resetForm();
     },
     onError: (error) => {
       console.error('Error adding stock:', error);
@@ -214,6 +259,59 @@ export function EngineerScanModal({ open, onOpenChange, vanLocationId, vanLocati
       });
     }
   });
+
+  // Add charger mutation for chargers
+  const addChargerMutation = useMutation({
+    mutationFn: async ({ chargerId, reference, scanNotes }: {
+      chargerId: string;
+      reference: string;
+      scanNotes: string;
+    }) => {
+      // Update charger location to the van
+      const { error } = await supabase
+        .from('charger_inventory')
+        .update({
+          location_id: vanLocationId,
+          status: 'assigned',
+          notes: scanNotes
+        })
+        .eq('id', chargerId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Charger Added Successfully",
+        description: "Charger added to van inventory",
+      });
+
+      // Reset form and close modal
+      resetForm();
+    },
+    onError: (error) => {
+      console.error('Error adding charger:', error);
+      toast({
+        title: "Error Adding Charger",
+        description: "Failed to add charger. Please try again.",
+        variant: "destructive"
+      });
+    }
+  });
+
+  const resetForm = () => {
+    // Invalidate queries to refresh van stock
+    queryClient.invalidateQueries({ queryKey: ['van-stock-items'] });
+    queryClient.invalidateQueries({ queryKey: ['van-stock-metrics'] });
+    queryClient.invalidateQueries({ queryKey: ['van-recent-transactions'] });
+    queryClient.invalidateQueries({ queryKey: ['van-assigned-chargers'] });
+
+    // Reset form
+    setScannedCode('');
+    setSelectedItemId('');
+    setQuantity('1');
+    setNotes('');
+    onOpenChange(false);
+  };
 
   const handleScan = () => {
     if (scanMode === 'receive' && !scannedCode.trim()) {
@@ -228,24 +326,15 @@ export function EngineerScanModal({ open, onOpenChange, vanLocationId, vanLocati
     if (scanMode === 'manual_add' && !selectedItemId) {
       toast({
         title: "No item selected",
-        description: "Please select an item to add",
+        description: "Please select an item or charger to add",
         variant: "destructive"
       });
       return;
     }
 
-    const qty = parseInt(quantity);
-    if (!qty || qty <= 0) {
-      toast({
-        title: "Invalid quantity",
-        description: "Please enter a valid quantity",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    let itemId = selectedItemId;
-    let reference = '';
+    // Determine if it's a charger or regular item
+    const isCharger = selectedItemId.startsWith('charger_');
+    const isRegularItem = selectedItemId.startsWith('item_');
 
     if (scanMode === 'receive') {
       // Look up item by the scanned code/SKU
@@ -253,27 +342,81 @@ export function EngineerScanModal({ open, onOpenChange, vanLocationId, vanLocati
         item.sku?.toLowerCase() === scannedCode.toLowerCase()
       );
       
-      if (!matchingItem) {
+      const matchingCharger = assignedChargers.find(charger => 
+        charger.serial_number?.toLowerCase() === scannedCode.toLowerCase()
+      );
+      
+      if (matchingItem) {
+        const qty = parseInt(quantity);
+        if (!qty || qty <= 0) {
+          toast({
+            title: "Invalid quantity",
+            description: "Please enter a valid quantity",
+            variant: "destructive"
+          });
+          return;
+        }
+
+        const reference = `Scanned addition to van - ${vanLocationName} (SKU: ${scannedCode})`;
+        addStockMutation.mutate({
+          itemId: matchingItem.id,
+          qty,
+          reference,
+          scanNotes: notes || `Added via scan interface in ${scanMode} mode`
+        });
+      } else if (matchingCharger) {
+        const reference = `Scanned charger to van - ${vanLocationName} (Serial: ${scannedCode})`;
+        addChargerMutation.mutate({
+          chargerId: matchingCharger.id,
+          reference,
+          scanNotes: notes || `Added via scan interface in ${scanMode} mode`
+        });
+      } else {
         toast({
           title: "Item Not Found",
-          description: `No item found with SKU: ${scannedCode}. Please check the code or use manual add.`,
+          description: `No item or charger found with code: ${scannedCode}. Please check the code or use manual add.`,
           variant: "destructive"
         });
         return;
       }
-      
-      itemId = matchingItem.id;
-      reference = `Scanned addition to van - ${vanLocationName} (SKU: ${scannedCode})`;
     } else {
-      reference = `Manual addition to van - ${vanLocationName}`;
-    }
+      // Manual add mode
+      if (isCharger) {
+        const chargerId = selectedItemId.replace('charger_', '');
+        const reference = `Manual charger addition to van - ${vanLocationName}`;
+        addChargerMutation.mutate({
+          chargerId,
+          reference,
+          scanNotes: notes || `Added via scan interface in ${scanMode} mode`
+        });
+      } else if (isRegularItem) {
+        const qty = parseInt(quantity);
+        if (!qty || qty <= 0) {
+          toast({
+            title: "Invalid quantity",
+            description: "Please enter a valid quantity",
+            variant: "destructive"
+          });
+          return;
+        }
 
-    addStockMutation.mutate({
-      itemId,
-      qty,
-      reference,
-      scanNotes: notes || `Added via scan interface in ${scanMode} mode`
-    });
+        const itemId = selectedItemId.replace('item_', '');
+        const reference = `Manual addition to van - ${vanLocationName}`;
+        addStockMutation.mutate({
+          itemId,
+          qty,
+          reference,
+          scanNotes: notes || `Added via scan interface in ${scanMode} mode`
+        });
+      } else {
+        toast({
+          title: "Invalid selection",
+          description: "Please select a valid item or charger",
+          variant: "destructive"
+        });
+        return;
+      }
+    }
   };
 
   const handleQuickAdd = (itemId: string, itemName: string) => {
@@ -281,6 +424,10 @@ export function EngineerScanModal({ open, onOpenChange, vanLocationId, vanLocati
     setQuantity('1');
     setNotes(`Quick add: ${itemName}`);
   };
+
+  // Helper to check if selected item is a charger
+  const isChargerSelected = selectedItemId.startsWith('charger_');
+  const isPending = addStockMutation.isPending || addChargerMutation.isPending;
 
   const scanModes = [
     {
@@ -435,17 +582,61 @@ export function EngineerScanModal({ open, onOpenChange, vanLocationId, vanLocati
                 </Label>
                 <Select value={selectedItemId} onValueChange={setSelectedItemId}>
                   <SelectTrigger className="h-11">
-                    <SelectValue placeholder="Choose an item to add" />
+                    <SelectValue placeholder="Choose an item or charger to add" />
                   </SelectTrigger>
                   <SelectContent className="max-h-[200px]">
-                    {inventoryItems.map(item => (
-                      <SelectItem key={item.id} value={item.id}>
-                        <div className="flex flex-col gap-1">
-                          <span>{item.name}</span>
-                          <span className="text-xs text-muted-foreground">{item.sku}</span>
+                    {/* Regular Inventory Items */}
+                    {inventoryItems.length > 0 && (
+                      <>
+                        <div className="px-2 py-1 text-xs font-medium text-muted-foreground">
+                          Inventory Items
                         </div>
-                      </SelectItem>
-                    ))}
+                        {inventoryItems.map(item => (
+                          <SelectItem key={`item_${item.id}`} value={`item_${item.id}`}>
+                            <div className="flex items-center gap-2">
+                              <Package className="h-4 w-4 text-blue-500" />
+                              <div className="flex flex-col gap-1">
+                                <span>{item.name}</span>
+                                <span className="text-xs text-muted-foreground">{item.sku}</span>
+                              </div>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </>
+                    )}
+                    
+                    {/* Assigned Chargers */}
+                    {assignedChargers.length > 0 && (
+                      <>
+                        {inventoryItems.length > 0 && (
+                          <div className="border-t mx-2 my-1" />
+                        )}
+                        <div className="px-2 py-1 text-xs font-medium text-muted-foreground">
+                          Assigned Chargers
+                        </div>
+                        {assignedChargers.map(charger => (
+                          charger.inventory_items && (
+                            <SelectItem key={`charger_${charger.id}`} value={`charger_${charger.id}`}>
+                              <div className="flex items-center gap-2">
+                                <Scan className="h-4 w-4 text-green-500" />
+                                <div className="flex flex-col gap-1">
+                                  <span>{charger.inventory_items.name}</span>
+                                  <span className="text-xs text-muted-foreground">
+                                    Serial: {charger.serial_number}
+                                  </span>
+                                </div>
+                              </div>
+                            </SelectItem>
+                          )
+                        ))}
+                      </>
+                    )}
+                    
+                    {inventoryItems.length === 0 && assignedChargers.length === 0 && (
+                      <div className="px-2 py-4 text-center text-sm text-muted-foreground">
+                        No items or chargers available
+                      </div>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -453,13 +644,16 @@ export function EngineerScanModal({ open, onOpenChange, vanLocationId, vanLocati
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="quantity" className="text-sm font-medium">Quantity</Label>
+                <Label htmlFor="quantity" className="text-sm font-medium">
+                  Quantity {isChargerSelected && <span className="text-xs text-muted-foreground">(Chargers are always qty 1)</span>}
+                </Label>
                 <Input
                   id="quantity"
                   type="number"
                   min="1"
-                  value={quantity}
+                  value={isChargerSelected ? '1' : quantity}
                   onChange={(e) => setQuantity(e.target.value)}
+                  disabled={isChargerSelected}
                   className="h-11"
                 />
               </div>
@@ -488,17 +682,17 @@ export function EngineerScanModal({ open, onOpenChange, vanLocationId, vanLocati
           <Button 
             onClick={handleScan} 
             className="w-full h-12 text-base font-medium"
-            disabled={addStockMutation.isPending}
+            disabled={isPending}
           >
-            {addStockMutation.isPending ? (
+            {isPending ? (
               <>
                 <div className="animate-spin h-4 w-4 mr-2 border-2 border-current border-t-transparent rounded-full" />
-                Adding Stock...
+                {isChargerSelected ? 'Adding Charger...' : 'Adding Stock...'}
               </>
             ) : (
               <>
                 <PackageCheck className="h-4 w-4 mr-2" />
-                Add to Van Stock
+                {isChargerSelected ? 'Add Charger to Van' : 'Add to Van Stock'}
               </>
             )}
           </Button>
@@ -517,7 +711,7 @@ export function EngineerScanModal({ open, onOpenChange, vanLocationId, vanLocati
                   <Button
                     key={item.id}
                     variant="outline"
-                    onClick={() => handleQuickAdd(item.id, item.name)}
+                    onClick={() => handleQuickAdd(`item_${item.id}`, item.name)}
                     className="justify-start text-left h-auto p-3 border-blue-200 bg-white hover:bg-blue-50 hover:border-blue-300 transition-colors"
                   >
                     <div className="flex items-center gap-3 w-full">
