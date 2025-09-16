@@ -189,6 +189,8 @@ export const updateOrderAssignment = async (orderId: string, engineerId: string 
       // Handle both Date objects and strings
       const dateToUpdate = scheduledDate instanceof Date ? scheduledDate.toISOString() : scheduledDate;
       updateData.scheduled_install_date = dateToUpdate;
+      // Set status to scheduled when both engineer and date are provided
+      updateData.status_enhanced = 'scheduled';
     }
 
     const { error } = await supabase
