@@ -458,7 +458,7 @@ export function ChargerSection({ orderId, engineerId }: ChargerSectionProps) {
                   {chargerTypes.length > 0 ? (
                     chargerTypes.map((chargerType) => (
                       <SelectItem key={chargerType.id} value={chargerType.id}>
-                        {chargerType.name} ({chargerType.sku})
+                        {chargerType.name}
                       </SelectItem>
                     ))
                   ) : (
