@@ -21,8 +21,27 @@ export const buildSafeUuidInClause = (ids: string[]): string => {
 };
 
 export const getOrderEstimatedHours = (order: Order): number => {
-  // Return 3 hours as default if not specified
-  return order.estimated_duration_hours || DEFAULT_JOB_DURATION_HOURS;
+  // If estimated duration is already set, use it
+  if (order.estimated_duration_hours) {
+    return order.estimated_duration_hours;
+  }
+  
+  // Default job type durations based on common industry standards
+  const DEFAULT_JOB_TYPE_DURATIONS: Record<string, number> = {
+    'installation': 3,    // EV charger installation
+    'assessment': 0.5,    // Site assessment/survey
+    'service_call': 1,    // Maintenance/repair visit
+    'commissioning': 2,   // Setup and testing
+    'upgrade': 2.5,       // System upgrades
+  };
+  
+  // Use job type specific default if available
+  if (order.job_type && DEFAULT_JOB_TYPE_DURATIONS[order.job_type]) {
+    return DEFAULT_JOB_TYPE_DURATIONS[order.job_type];
+  }
+  
+  // Fallback to global default
+  return DEFAULT_JOB_DURATION_HOURS;
 };
 
 export const getOrderEstimatedMinutes = (order: Order): number => {
@@ -57,7 +76,7 @@ export interface Order {
   partner_status?: string;
   sub_partner?: string;
   partner_external_url?: string;
-  job_type?: 'installation' | 'assessment' | 'service_call'; // Updated to match enum
+  job_type?: 'installation' | 'assessment' | 'service_call' | string; // Updated to allow any string
   created_at?: string; // Added created_at field
   client?: {
     full_name: string;

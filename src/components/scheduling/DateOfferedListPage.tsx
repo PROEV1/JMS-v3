@@ -38,13 +38,14 @@ export function DateOfferedListPage() {
         status_enhanced: order.status_enhanced,
         created_at: order.created_at,
         estimated_duration_hours: order.estimated_duration_hours,
+        job_type: order.job_type as 'installation' | 'assessment' | 'service_call' | string,
         status: 'pending', // Add required status field
         client: order.client_full_name ? {
           full_name: order.client_full_name,
           email: order.client_email,
           phone: order.client_phone,
-          postcode: null,
-          address: null
+          postcode: order.client_postcode,
+          address: order.client_address
         } : null,
         engineer: order.engineer_name ? {
           name: order.engineer_name,

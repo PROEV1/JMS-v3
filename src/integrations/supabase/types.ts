@@ -3951,15 +3951,18 @@ export type Database = {
       get_date_offered_orders: {
         Args: { p_limit?: number; p_offset?: number }
         Returns: {
+          client_address: string
           client_email: string
           client_full_name: string
           client_id: string
           client_phone: string
+          client_postcode: string
           created_at: string
           engineer_id: string
           engineer_name: string
           estimated_duration_hours: number
           id: string
+          job_type: string
           offer_expires_at: string
           offer_id: string
           offer_offered_date: string
