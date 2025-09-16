@@ -135,6 +135,51 @@ export function ChargerSection({ orderId, engineerId }: ChargerSectionProps) {
       serialNumber: string; 
       chargerName: string; 
     }) => {
+      let finalChargerInventoryId = chargerInventoryId;
+
+      // If no chargerInventoryId provided, check if charger exists in inventory by serial number
+      if (!chargerInventoryId) {
+        const { data: existingCharger } = await supabase
+          .from('charger_inventory')
+          .select('id, charger_item_id')
+          .eq('serial_number', serialNumber)
+          .single();
+
+        if (existingCharger) {
+          finalChargerInventoryId = existingCharger.id;
+        } else {
+          // Create new charger in inventory if it doesn't exist
+          // First get a default charger item ID (Ohme ePod)
+          const { data: chargerItem } = await supabase
+            .from('inventory_items')
+            .select('id')
+            .eq('is_charger', true)
+            .eq('id', 'd253e44e-569a-4aec-941c-4fb147a2216c') // Ohme ePod
+            .single();
+
+          if (chargerItem) {
+            const { data: newCharger, error: createError } = await supabase
+              .from('charger_inventory')
+              .insert({
+                charger_item_id: chargerItem.id,
+                serial_number: serialNumber,
+                status: 'deployed',
+                engineer_id: engineerId,
+                notes: `Auto-created from job scan. Used on order: ${orderId}`
+              })
+              .select('id')
+              .single();
+
+            if (createError) {
+              console.error('Failed to create charger in inventory:', createError);
+              // Continue without charger_inventory_id - just record the usage
+            } else {
+              finalChargerInventoryId = newCharger.id;
+            }
+          }
+        }
+      }
+
       const { data, error } = await supabase
         .from('engineer_materials_used')
         .insert({
@@ -142,7 +187,7 @@ export function ChargerSection({ orderId, engineerId }: ChargerSectionProps) {
           engineer_id: engineerId,
           item_name: chargerName,
           serial_number: serialNumber,
-          charger_inventory_id: chargerInventoryId,
+          charger_inventory_id: finalChargerInventoryId,
           quantity: 1,
           notes: 'EV Charger Installation'
         })
@@ -152,14 +197,15 @@ export function ChargerSection({ orderId, engineerId }: ChargerSectionProps) {
       if (error) throw error;
 
       // Update charger status to 'deployed' if we have charger inventory ID
-      if (chargerInventoryId) {
+      if (finalChargerInventoryId) {
         await supabase
           .from('charger_inventory')
           .update({ 
             status: 'deployed',
-            notes: `Used on order: ${orderId}`
+            notes: `Used on order: ${orderId}`,
+            assigned_order_id: orderId
           })
-          .eq('id', chargerInventoryId);
+          .eq('id', finalChargerInventoryId);
       }
 
       return data;
