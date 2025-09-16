@@ -779,7 +779,16 @@ export function ScheduleStatusListPage({
   };
 
   const handleAssignment = async (engineerId: string, date: string, action: 'send_offer' | 'confirm_book') => {
-    if (!selectedOrder) return;
+    console.log('🚀 ScheduleStatusListPage: handleAssignment called');
+    console.log('🚀 Engineer ID:', engineerId);
+    console.log('🚀 Date:', date);
+    console.log('🚀 Action:', action);
+    console.log('🚀 Selected Order:', selectedOrder?.order_number);
+    
+    if (!selectedOrder) {
+      console.log('❌ No selected order');
+      return;
+    }
 
     try {
       if (action === 'send_offer') {
@@ -832,6 +841,9 @@ export function ScheduleStatusListPage({
         toast.success('Offer sent to client successfully');
 
       } else if (action === 'confirm_book') {
+        console.log('🚀 ScheduleStatusListPage: Processing confirm_book action');
+        console.log('🚀 Updating order:', selectedOrder.id, 'with engineer:', engineerId, 'and date:', date);
+        
         // Direct booking - update order
         const { error: updateError } = await supabase
           .from('orders')
@@ -843,8 +855,11 @@ export function ScheduleStatusListPage({
           .eq('id', selectedOrder.id);
 
         if (updateError) {
-          throw new Error('Failed to book installation');
+          console.error('❌ Database update error:', updateError);
+          throw new Error(`Failed to book installation: ${updateError.message}`);
         }
+        
+        console.log('✅ Order updated successfully to scheduled status');
 
         // Log activity
         await supabase.rpc('log_order_activity', {

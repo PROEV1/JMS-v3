@@ -265,7 +265,12 @@ export function SmartAssignmentModal({
   };
 
   const handleConfirmAndBook = async () => {
+    console.log('🚀 Smart Assignment Modal: handleConfirmAndBook called');
+    console.log('🚀 Selected engineer:', selectedEngineerId);
+    console.log('🚀 Selected date:', selectedDate);
+    
     if (!selectedEngineerId || !selectedDate) {
+      console.log('❌ Missing engineer or date');
       toast.error('Please select both an engineer and date');
       return;
     }
@@ -274,8 +279,12 @@ export function SmartAssignmentModal({
     try {
       // Send as date string to avoid timezone issues
       const dateString = selectedDate.toISOString().split('T')[0]; // YYYY-MM-DD format
-      console.log('🚀 Smart Assignment: Confirming and booking for engineer', selectedEngineerId, 'on date', dateString);
+      console.log('🚀 Smart Assignment Modal: Confirming and booking for engineer', selectedEngineerId, 'on date', dateString);
+      console.log('🚀 Smart Assignment Modal: Calling onAssign with action confirm_book');
+      
       await onAssign(selectedEngineerId, dateString, 'confirm_book');
+      
+      console.log('🚀 Smart Assignment Modal: onAssign completed successfully');
       
       // Trigger global refresh to update all status counts and lists
       window.dispatchEvent(new CustomEvent('scheduling:refresh'));
@@ -283,7 +292,7 @@ export function SmartAssignmentModal({
       toast.success('Installation booked successfully');
       onClose();
     } catch (error: any) {
-      console.error('Error booking installation:', error);
+      console.error('❌ Smart Assignment Modal: Error booking installation:', error);
       toast.error(error.message || 'Failed to book installation');
     } finally {
       setProcessing(false);
