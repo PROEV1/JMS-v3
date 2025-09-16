@@ -231,6 +231,7 @@ export default function AdminPartnerProfiles() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showDeleteProfileDialog, setShowDeleteProfileDialog] = useState<string | null>(null);
   const [showAuditDialog, setShowAuditDialog] = useState<string | null>(null);
   const [showHistoryDialog, setShowHistoryDialog] = useState<string | null>(null);
   const [showPerformanceDialog, setShowPerformanceDialog] = useState(false);
@@ -362,6 +363,25 @@ export default function AdminPartnerProfiles() {
     },
     onError: (error) => {
       toast({ title: 'Error updating profile', description: error.message, variant: 'destructive' });
+    }
+  });
+
+  const deleteProfileMutation = useMutation({
+    mutationFn: async (profileId: string) => {
+      const { error } = await supabase
+        .from('partner_import_profiles')
+        .delete()
+        .eq('id', profileId);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['partner-profiles', partnerId] });
+      setShowDeleteProfileDialog(null);
+      toast({ title: 'Import profile deleted successfully' });
+    },
+    onError: (error) => {
+      toast({ title: 'Error deleting profile', description: error.message, variant: 'destructive' });
     }
   });
 
@@ -797,6 +817,15 @@ export default function AdminPartnerProfiles() {
                   <Edit className="h-4 w-4" />
                   Edit
                 </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowDeleteProfileDialog(profile.id)}
+                  className="text-destructive hover:text-destructive"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Delete
+                </Button>
                 <ImportProfileActions 
                   profile={profile} 
                   onUpdate={() => {
@@ -859,6 +888,37 @@ export default function AdminPartnerProfiles() {
           partnerName={partner.name}
         />
       )}
+
+      {/* Delete Profile Confirmation Dialog */}
+      <Dialog open={!!showDeleteProfileDialog} onOpenChange={() => setShowDeleteProfileDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Import Profile</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-muted-foreground">
+              Are you sure you want to delete the profile "{profiles?.find(p => p.id === showDeleteProfileDialog)?.name}"? 
+              This action cannot be undone.
+            </p>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setShowDeleteProfileDialog(null)}>
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive"
+              onClick={() => {
+                if (showDeleteProfileDialog) {
+                  deleteProfileMutation.mutate(showDeleteProfileDialog);
+                }
+              }}
+              disabled={deleteProfileMutation.isPending}
+            >
+              {deleteProfileMutation.isPending ? 'Deleting...' : 'Delete Profile'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Performance Metrics Modal */}
       <Dialog open={showPerformanceDialog} onOpenChange={setShowPerformanceDialog}>
