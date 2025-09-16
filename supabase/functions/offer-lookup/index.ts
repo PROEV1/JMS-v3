@@ -118,23 +118,7 @@ serve(async (req) => {
       }, 404, requestId);
     }
 
-    // Get the engineer details
-    const { data: engineer, error: engineerError } = await supabase
-      .from('engineers')
-      .select('*')
-      .eq('id', jobOffer.engineer_id)
-      .single();
-
-    if (engineerError || !engineer) {
-      console.log('Engineer not found for offer:', engineerError);
-      return json({ 
-        ok: false,
-        error: 'Engineer not found',
-        expired: true
-      }, 404, requestId);
-    }
-
-    console.log('Offer lookup successful:', { offerId: jobOffer.id, orderId: order.id, engineerId: engineer.id });
+    console.log('Offer lookup successful:', { offerId: jobOffer.id, orderId: order.id });
 
     // Check if offer has expired
     const now = new Date();
@@ -184,9 +168,6 @@ serve(async (req) => {
             email: order.client.email
           },
           is_partner_job: order.is_partner_job
-        },
-        engineer: {
-          name: engineer.name
         }
       }
     }, 200, requestId);
