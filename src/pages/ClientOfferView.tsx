@@ -29,9 +29,6 @@ interface OfferDetails {
     };
     is_partner_job: boolean;
   };
-  engineer: {
-    name: string;
-  };
   already_responded?: boolean;
   expired?: boolean;
 }
