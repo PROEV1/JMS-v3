@@ -23,6 +23,7 @@ import { useJobOffers } from '@/hooks/useJobOffers';
 import { getBestPostcode } from '@/utils/postcodeUtils';
 import { Paginator } from '@/components/ui/Paginator';
 import { useSchedulingRefresh } from '@/hooks/useSchedulingRefresh';
+import { useDebounceCallback } from '@/hooks/useDebounceCallback';
 import { useQueryClient } from '@tanstack/react-query';
 
 interface ScheduleStatusListPageProps {
@@ -60,6 +61,7 @@ export function ScheduleStatusListPage({
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { refreshSchedulingData } = useSchedulingRefresh();
+  
   const [searchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState(externalSearchTerm || '');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -417,18 +419,26 @@ export function ScheduleStatusListPage({
     }
   };
 
+  const [processing, setProcessing] = useState<Record<string, boolean>>({});
+  
   const handleAcceptOffer = async (orderId: string) => {
     const activeOffer = getActiveOfferForOrder(orderId);
-    if (!activeOffer) return;
+    if (!activeOffer) {
+      toast.error('No active offer found');
+      return;
+    }
 
-    console.log('Accepting offer:', { orderId, activeOffer });
+    // Prevent multiple simultaneous requests for the same order
+    if (processing[orderId]) {
+      console.log('🔄 Accept already in progress for order:', orderId);
+      return;
+    }
 
-    // OPTIMISTIC UPDATE: Move order from current list since it will change status
-    console.log('🚀 Starting optimistic UI update for offer acceptance...');
+    setProcessing(prev => ({ ...prev, [orderId]: true }));
+    console.log('🚀 Accepting offer:', { orderId, activeOffer });
     
     try {
-      // Use the atomic transaction function to handle offer acceptance
-      console.log('🔧 Using transaction function for offer acceptance - Fixed timeout issue');
+      // Use the improved transaction function with better capacity checking
       const { error } = await supabase.rpc('accept_job_offer_transaction', {
         p_offer_id: activeOffer.id,
         p_order_id: orderId,
@@ -437,52 +447,82 @@ export function ScheduleStatusListPage({
         p_response_time: new Date().toISOString()
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Transaction error:', error);
+        
+        // Enhanced error handling with user-friendly messages
+        if (error.message?.includes('capacity')) {
+          const match = error.message.match(/Engineer (.*?) is at capacity \((\d+) \+ 1 would exceed (\d+) jobs\)/);
+          if (match) {
+            const [, engineerName, current, max] = match;
+            toast.error(`${engineerName} is at capacity (${current}/${max} jobs on this date). Please try a different date or engineer.`);
+          } else {
+            toast.error('Engineer is at capacity. Please try a different date or engineer.');
+          }
+        } else if (error.message?.includes('no longer available')) {
+          toast.error('This offer is no longer available. It may have been accepted or expired.');
+        } else {
+          toast.error(error.message || 'Failed to accept offer. Please try again.');
+        }
+        return;
+      }
 
-      console.log('Offer accepted successfully, refreshing data...');
+      console.log('✅ Offer accepted successfully');
       toast.success('Offer accepted - job moved to Ready to Book');
       
-      // Force a more aggressive refresh to ensure UI updates
-      console.log('🔄 Force refreshing all scheduling data after offer acceptance...');
-      await queryClient.invalidateQueries({ queryKey: ['orders'] });
-      await queryClient.invalidateQueries({ queryKey: ['job-offers'] });
-      await queryClient.refetchQueries({ queryKey: ['orders'] });
-      await queryClient.refetchQueries({ queryKey: ['job-offers'] });
+      // Efficient refresh strategy
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['orders'] }),
+        queryClient.invalidateQueries({ queryKey: ['job-offers'] }),
+        refreshSchedulingData()
+      ]);
       
-      // Use centralized refresh
-      await refreshSchedulingData();
       if (onUpdate) onUpdate();
       
       // Dispatch refresh event to update status counts and other components
       window.dispatchEvent(new CustomEvent('scheduling:refresh'));
       
-      // Force navigation refresh if we're in the date offered view
-      if (window.location.pathname.includes('date-offered')) {
-        console.log('🔄 Triggering page refresh for better UX...');
-        window.location.reload();
-      }
-    } catch (error) {
-      console.error('Failed to accept offer:', error);
-      toast.error('Failed to accept offer');
+    } catch (error: any) {
+      console.error('❌ Failed to accept offer:', error);
+      toast.error(error.message || 'Failed to accept offer. Please try again.');
+    } finally {
+      setProcessing(prev => ({ ...prev, [orderId]: false }));
     }
   };
 
   const handleRejectOffer = async (orderId: string) => {
     const activeOffer = getActiveOfferForOrder(orderId);
-    if (!activeOffer) return;
+    if (!activeOffer) {
+      toast.error('No active offer found');
+      return;
+    }
+
+    // Prevent multiple simultaneous requests for the same order
+    if (processing[orderId]) {
+      console.log('🔄 Reject already in progress for order:', orderId);
+      return;
+    }
+
+    setProcessing(prev => ({ ...prev, [orderId]: true }));
+    console.log('🚀 Rejecting offer:', { orderId, activeOffer });
 
     try {
-      // Update the job offer status to rejected
+      // Update the job offer status to rejected atomically
       const { error: offerError } = await supabase
         .from('job_offers')
         .update({
           status: 'rejected',
           rejected_at: new Date().toISOString(),
-          rejection_reason: 'Rejected by admin'
+          rejection_reason: 'Rejected by admin',
+          updated_at: new Date().toISOString()
         })
-        .eq('id', activeOffer.id);
+        .eq('id', activeOffer.id)
+        .eq('status', 'pending'); // Ensure it's still pending
 
-      if (offerError) throw offerError;
+      if (offerError) {
+        console.error('❌ Failed to reject offer:', offerError);
+        throw offerError;
+      }
 
       // Log the activity
       await supabase.rpc('log_order_activity', {
@@ -498,19 +538,32 @@ export function ScheduleStatusListPage({
         }
       });
 
-      toast.success('Offer rejected');
+      console.log('✅ Offer rejected successfully');
+      toast.success('Offer rejected successfully');
       
-      // Use centralized refresh
-      await refreshSchedulingData();
+      // Efficient refresh strategy
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['orders'] }),
+        queryClient.invalidateQueries({ queryKey: ['job-offers'] }),
+        refreshSchedulingData()
+      ]);
+      
       if (onUpdate) onUpdate();
       
       // Dispatch refresh event to update status counts and other components
       window.dispatchEvent(new CustomEvent('scheduling:refresh'));
-    } catch (error) {
-      console.error('Failed to reject offer:', error);
-      toast.error('Failed to reject offer');
+      
+    } catch (error: any) {
+      console.error('❌ Failed to reject offer:', error);
+      toast.error(error.message || 'Failed to reject offer. Please try again.');
+    } finally {
+      setProcessing(prev => ({ ...prev, [orderId]: false }));
     }
   };
+
+  // Debounced action handlers to prevent rapid clicking
+  const debouncedAcceptOffer = useDebounceCallback(handleAcceptOffer, 300);
+  const debouncedRejectOffer = useDebounceCallback(handleRejectOffer, 300);
 
   const handleConfirmAndSchedule = async (orderId: string) => {
     console.log('Confirming and scheduling order:', orderId);
@@ -1129,22 +1182,22 @@ export function ScheduleStatusListPage({
                                      Expires: {timeRemaining}
                                    </div>
                                     <div className="flex gap-2">
-                                       <Button
-                                         size="sm"
-                                         onClick={() => order?.id && handleAcceptOffer(order.id)}
-                                         className="text-xs px-3 py-1 h-8 bg-green-600 hover:bg-green-700"
-                                         disabled={!order?.id}
-                                       >
-                                         Accept
-                                       </Button>
-                                       <Button
-                                         size="sm"
-                                         variant="destructive"
-                                         onClick={() => order?.id && handleRejectOffer(order.id)}
-                                         className="text-xs px-3 py-1 h-8"
-                                         disabled={!order?.id}
-                                       >
-                                         Reject
+                                        <Button
+                                          size="sm"
+                                          onClick={() => order?.id && debouncedAcceptOffer(order.id)}
+                                          className="text-xs px-3 py-1 h-8 bg-green-600 hover:bg-green-700"
+                                          disabled={!order?.id || processing[order?.id || ''] || false}
+                                        >
+                                          {processing[order?.id || ''] ? 'Accepting...' : 'Accept'}
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant="destructive"
+                                          onClick={() => order?.id && debouncedRejectOffer(order.id)}
+                                          className="text-xs px-3 py-1 h-8"
+                                          disabled={!order?.id || processing[order?.id || ''] || false}
+                                        >
+                                          {processing[order?.id || ''] ? 'Rejecting...' : 'Reject'}
                                        </Button>
                                        <Button
                                          size="sm"
@@ -1369,22 +1422,22 @@ export function ScheduleStatusListPage({
                                        Expires in: {timeRemaining}
                                      </div>
                                    </div>
-                                    <Button
-                                      onClick={() => order?.id && handleAcceptOffer(order.id)}
-                                      size="sm"
-                                      className="flex-1 text-xs h-7 bg-green-600 hover:bg-green-700"
-                                      disabled={!order?.id}
-                                    >
-                                      Accept
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="destructive"
-                                      onClick={() => order?.id && handleRejectOffer(order.id)}
-                                      className="flex-1 text-xs h-7"
-                                      disabled={!order?.id}
-                                    >
-                                      Reject
+                                     <Button
+                                       onClick={() => order?.id && debouncedAcceptOffer(order.id)}
+                                       size="sm"
+                                       className="flex-1 text-xs h-7 bg-green-600 hover:bg-green-700"
+                                       disabled={!order?.id || processing[order?.id || ''] || false}
+                                     >
+                                       {processing[order?.id || ''] ? 'Accepting...' : 'Accept'}
+                                     </Button>
+                                     <Button
+                                       size="sm"
+                                       variant="destructive"
+                                       onClick={() => order?.id && debouncedRejectOffer(order.id)}
+                                       className="flex-1 text-xs h-7"
+                                       disabled={!order?.id || processing[order?.id || ''] || false}
+                                     >
+                                       {processing[order?.id || ''] ? 'Rejecting...' : 'Reject'}
                                     </Button>
                                     <Button
                                       size="sm"
