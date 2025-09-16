@@ -357,13 +357,6 @@ export default function ClientOfferView() {
                   </p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-muted-foreground">Engineer</label>
-                  <p className="font-semibold flex items-center gap-2">
-                    <User className="w-4 h-4" />
-                    {offer.engineer.name}
-                  </p>
-                </div>
-                <div>
                   <label className="text-sm font-medium text-muted-foreground">Offer Status</label>
                   <div className="flex items-center gap-2">
                     <Badge variant={
