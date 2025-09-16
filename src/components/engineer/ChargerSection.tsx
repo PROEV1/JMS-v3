@@ -46,13 +46,10 @@ export function ChargerSection({ orderId, engineerId }: ChargerSectionProps) {
   const webcamRef = useRef<Webcam>(null);
   const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
   const [selectedChargerId, setSelectedChargerId] = useState<string>("");
+  const [selectedChargerTypeId, setSelectedChargerTypeId] = useState<string>("");
   const [serialNumber, setSerialNumber] = useState("");
   const [isScanning, setIsScanning] = useState(false);
   const [cameraError, setCameraError] = useState(false);
-  const [showChangeModal, setShowChangeModal] = useState(false);
-  const [changeModalData, setChangeModalData] = useState<{original: string, new: string}>({original: "", new: ""});
-  const [showChargerTypeModal, setShowChargerTypeModal] = useState(false);
-  const [pendingChargerData, setPendingChargerData] = useState<{serialNumber: string, chargerName: string} | null>(null);
 
   // Fetch chargers assigned to this engineer AND this specific order
   const { data: assignedChargers = [] } = useQuery({
@@ -138,13 +135,15 @@ export function ChargerSection({ orderId, engineerId }: ChargerSectionProps) {
   console.log('Order ID:', orderId);
   console.log('Engineer ID:', engineerId);
 
-  // Set initial selection to order-assigned charger
+  // Set initial selection to default charger type (Ohme ePod) if available
   useEffect(() => {
-    if (orderAssignedCharger && !selectedChargerId) {
-      setSelectedChargerId(orderAssignedCharger.id);
-      setSerialNumber(orderAssignedCharger.serial_number || "");
+    if (chargerTypes.length > 0 && !selectedChargerTypeId) {
+      const defaultCharger = chargerTypes.find(ct => ct.name.toLowerCase().includes('epod')) || chargerTypes[0];
+      if (defaultCharger) {
+        setSelectedChargerTypeId(defaultCharger.id);
+      }
     }
-  }, [orderAssignedCharger, selectedChargerId]);
+  }, [chargerTypes, selectedChargerTypeId]);
 
   // Mutation to save charger usage
   const saveChargerUsage = useMutation({
@@ -330,33 +329,20 @@ export function ChargerSection({ orderId, engineerId }: ChargerSectionProps) {
     setIsScanning(false);
   };
 
-  const handleChargerSelect = (chargerId: string) => {
-    const selectedCharger = assignedChargers.find(charger => charger.id === chargerId);
-    
-    // Check if this is a different charger than originally assigned to order
-    if (orderAssignedCharger && selectedCharger && 
-        orderAssignedCharger.id !== selectedCharger.id &&
-        orderAssignedCharger.serial_number !== selectedCharger.serial_number) {
-      
-      setChangeModalData({
-        original: `${orderAssignedCharger.inventory_items?.name} (${orderAssignedCharger.serial_number})`,
-        new: `${selectedCharger.inventory_items?.name} (${selectedCharger.serial_number})`
-      });
-      setShowChangeModal(true);
-      return;
-    }
-    
-    setSelectedChargerId(chargerId);
-    if (selectedCharger) {
-      setSerialNumber(selectedCharger.serial_number || "");
-    }
-  };
-
   const handleAddCharger = async () => {
     if (!serialNumber.trim()) {
       toast({
         title: "Serial number required",
         description: "Please enter or scan a charger serial number.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!selectedChargerTypeId) {
+      toast({
+        title: "Charger type required",
+        description: "Please select a charger type.",
         variant: "destructive",
       });
       return;
@@ -372,76 +358,25 @@ export function ChargerSection({ orderId, engineerId }: ChargerSectionProps) {
       return;
     }
 
-    // Find the charger details
-    const charger = assignedChargers.find(c => c.serial_number === serialNumber) || 
-                   assignedChargers.find(c => c.id === selectedChargerId);
-    
-    const chargerName = charger?.inventory_items?.name || "EV Charger";
-
-    // Check if charger exists in inventory
-    if (!charger) {
-      const { data: existingCharger } = await supabase
-        .from('charger_inventory')
-        .select('id')
-        .eq('serial_number', serialNumber)
-        .single();
-
-      if (!existingCharger) {
-        // New charger - prompt for type selection
-        setPendingChargerData({ serialNumber, chargerName });
-        setShowChargerTypeModal(true);
-        return;
-      }
-    }
-
-    try {
-      await saveChargerUsage.mutateAsync({
-        chargerInventoryId: charger?.id,
-        serialNumber: serialNumber,
-        chargerName: chargerName
-      });
-
-      toast({
-        title: "Charger recorded",
-        description: `${chargerName} (${serialNumber}) saved to job materials.`,
-      });
-
-      // Reset form
-      setSelectedChargerId("");
-      setSerialNumber("");
-    } catch (error) {
-      console.error('Error saving charger usage:', error);
-      toast({
-        title: "Save failed",
-        description: "Failed to save charger usage. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleChargerTypeSelection = async (chargerItemId: string) => {
-    if (!pendingChargerData) return;
-
-    const selectedChargerType = chargerTypes.find(ct => ct.id === chargerItemId);
+    // Get selected charger type details
+    const selectedChargerType = chargerTypes.find(ct => ct.id === selectedChargerTypeId);
     const chargerTypeName = selectedChargerType?.name || "EV Charger";
 
     try {
       await saveChargerUsage.mutateAsync({
-        serialNumber: pendingChargerData.serialNumber,
+        serialNumber: serialNumber,
         chargerName: chargerTypeName,
-        chargerItemId: chargerItemId
+        chargerItemId: selectedChargerTypeId
       });
 
       toast({
         title: "Charger recorded",
-        description: `${chargerTypeName} (${pendingChargerData.serialNumber}) saved to job materials.`,
+        description: `${chargerTypeName} (${serialNumber}) saved to job materials.`,
       });
 
       // Reset form
-      setSelectedChargerId("");
+      setSelectedChargerTypeId("");
       setSerialNumber("");
-      setShowChargerTypeModal(false);
-      setPendingChargerData(null);
     } catch (error) {
       console.error('Error saving charger usage:', error);
       toast({
@@ -473,40 +408,6 @@ export function ChargerSection({ orderId, engineerId }: ChargerSectionProps) {
       toast({
         title: "Remove failed",
         description: "Failed to remove charger usage. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleChargerChange = async (reason: string, description?: string) => {
-    const selectedCharger = assignedChargers.find(c => c.id === selectedChargerId) ||
-                           assignedChargers.find(c => c.serial_number === serialNumber);
-    
-    if (!orderAssignedCharger || !selectedCharger) return;
-
-    try {
-      // Log the charger change
-      await logChargerChange.mutateAsync({
-        originalChargerSerial: orderAssignedCharger.serial_number,
-        newChargerSerial: selectedCharger.serial_number || serialNumber,
-        reason,
-        description
-      });
-
-      // Update the selection
-      setSelectedChargerId(selectedCharger.id);
-      setSerialNumber(selectedCharger.serial_number || serialNumber);
-      setShowChangeModal(false);
-
-      toast({
-        title: "Charger change logged",
-        description: "The charger change has been recorded with the reason provided.",
-      });
-    } catch (error) {
-      console.error('Error logging charger change:', error);
-      toast({
-        title: "Change log failed",
-        description: "Failed to log charger change. Please try again.",
         variant: "destructive",
       });
     }
@@ -548,45 +449,21 @@ export function ChargerSection({ orderId, engineerId }: ChargerSectionProps) {
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="charger-select">Available Chargers</Label>
-              <Select value={selectedChargerId} onValueChange={handleChargerSelect}>
+              <Label htmlFor="charger-type-select">Charger Type</Label>
+              <Select value={selectedChargerTypeId} onValueChange={setSelectedChargerTypeId}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Choose charger..." />
+                  <SelectValue placeholder="Choose charger type..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {assignedChargers.length > 0 ? (
-                    <>
-                      {/* Order-assigned chargers first */}
-                      {assignedChargers.filter(c => c.assigned_order_id === orderId).length > 0 && (
-                        <SelectGroup>
-                          <SelectLabel>🎯 Assigned to this Job</SelectLabel>
-                          {assignedChargers
-                            .filter(c => c.assigned_order_id === orderId)
-                            .map((charger) => (
-                              <SelectItem key={charger.id} value={charger.id}>
-                                {charger.inventory_items?.name || "EV Charger"} - {charger.serial_number}
-                              </SelectItem>
-                            ))}
-                        </SelectGroup>
-                      )}
-                      
-                      {/* Engineer-assigned chargers */}
-                      {assignedChargers.filter(c => c.assigned_order_id !== orderId).length > 0 && (
-                        <SelectGroup>
-                          <SelectLabel>🔧 Your Available Chargers</SelectLabel>
-                          {assignedChargers
-                            .filter(c => c.assigned_order_id !== orderId)
-                            .map((charger) => (
-                              <SelectItem key={charger.id} value={charger.id}>
-                                {charger.inventory_items?.name || "EV Charger"} - {charger.serial_number}
-                              </SelectItem>
-                            ))}
-                        </SelectGroup>
-                      )}
-                    </>
+                  {chargerTypes.length > 0 ? (
+                    chargerTypes.map((chargerType) => (
+                      <SelectItem key={chargerType.id} value={chargerType.id}>
+                        {chargerType.name} ({chargerType.sku})
+                      </SelectItem>
+                    ))
                   ) : (
                     <SelectItem value="none" disabled>
-                      No chargers available
+                      No charger types available
                     </SelectItem>
                   )}
                 </SelectContent>
@@ -645,7 +522,7 @@ export function ChargerSection({ orderId, engineerId }: ChargerSectionProps) {
           <div className="flex justify-end">
             <Button 
               onClick={handleAddCharger} 
-              disabled={!serialNumber.trim() || saveChargerUsage.isPending}
+              disabled={!serialNumber.trim() || !selectedChargerTypeId || saveChargerUsage.isPending}
               size="sm"
             >
               <Plus className="h-4 w-4 mr-2" />
@@ -697,63 +574,10 @@ export function ChargerSection({ orderId, engineerId }: ChargerSectionProps) {
           <div className="text-sm">
             <p className="text-primary font-medium mb-1">Charger Tracking</p>
             <p className="text-muted-foreground">
-              Record which charger was installed on this job. Chargers assigned to this specific job are shown first. 
-              If you need to use a different charger, you'll be asked to provide a reason for the change.
+              Select the charger type and scan or enter the serial number to record which charger was installed on this job.
             </p>
           </div>
         </div>
-
-        {/* Charger Change Modal */}
-        <ChargerChangeModal
-          isOpen={showChangeModal}
-          onClose={() => setShowChangeModal(false)}
-          onConfirm={handleChargerChange}
-          originalCharger={changeModalData.original}
-          newCharger={changeModalData.new}
-        />
-
-        {/* Charger Type Selection Modal */}
-        <Dialog open={showChargerTypeModal} onOpenChange={setShowChargerTypeModal}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Select Charger Type</DialogTitle>
-              <DialogDescription>
-                This charger serial number is not in our inventory. Please select the charger type to create a new inventory record.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Serial Number: <strong>{pendingChargerData?.serialNumber}</strong></Label>
-              </div>
-              <div className="space-y-2">
-                <Label>Select Charger Type</Label>
-                <Select onValueChange={handleChargerTypeSelection}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Choose charger type..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {chargerTypes.map((chargerType) => (
-                      <SelectItem key={chargerType.id} value={chargerType.id}>
-                        {chargerType.name} ({chargerType.sku})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button 
-                  variant="outline" 
-                  onClick={() => {
-                    setShowChargerTypeModal(false);
-                    setPendingChargerData(null);
-                  }}
-                >
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
       </CardContent>
     </Card>
   );
