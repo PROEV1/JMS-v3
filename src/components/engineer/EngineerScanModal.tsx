@@ -27,6 +27,8 @@ export function EngineerScanModal({ open, onOpenChange, vanLocationId, vanLocati
   const [quantity, setQuantity] = useState('1');
   const [notes, setNotes] = useState('');
   const [isScanning, setIsScanning] = useState(false);
+  const [showNewChargerDialog, setShowNewChargerDialog] = useState(false);
+  const [newChargerType, setNewChargerType] = useState('');
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -80,6 +82,22 @@ export function EngineerScanModal({ open, onOpenChange, vanLocationId, vanLocati
         .select('id, name, sku, unit')
         .eq('is_active', true)
         .eq('is_charger', false)
+        .order('name');
+      if (error) throw error;
+      return data;
+    },
+    enabled: open
+  });
+
+  // Fetch available charger types for creating new chargers
+  const { data: chargerTypes = [] } = useQuery({
+    queryKey: ['charger-types-for-scan'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('inventory_items')
+        .select('id, name, sku, unit')
+        .eq('is_active', true)
+        .eq('is_charger', true)
         .order('name');
       if (error) throw error;
       return data;
@@ -178,10 +196,8 @@ export function EngineerScanModal({ open, onOpenChange, vanLocationId, vanLocati
                 description: `Found: ${matchingCharger.inventory_items.name} (${matchingCharger.serial_number})`,
               });
             } else {
-              toast({
-                title: "Barcode Scanned",
-                description: `Code: ${scannedText}. No matching item or charger found, please select manually.`,
-              });
+              // Check for duplicates first
+              checkForDuplicateAndPromptNewCharger(scannedText);
             }
           }
           
@@ -217,6 +233,39 @@ export function EngineerScanModal({ open, onOpenChange, vanLocationId, vanLocati
       readerRef.current.reset();
     }
     setIsScanning(false);
+  };
+
+  // Check for duplicate charger and prompt for new charger creation
+  const checkForDuplicateAndPromptNewCharger = async (serialNumber: string) => {
+    try {
+      // Check if charger with this serial number already exists
+      const { data: existingCharger, error } = await supabase
+        .from('charger_inventory')
+        .select('id, serial_number, charger_item_id, engineer_id, inventory_items!charger_item_id(name)')
+        .eq('serial_number', serialNumber)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (existingCharger) {
+        toast({
+          title: "Duplicate Charger",
+          description: `Charger with serial ${serialNumber} already exists in the system.`,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // No duplicate found, prompt for charger type selection
+      setShowNewChargerDialog(true);
+    } catch (error) {
+      console.error('Error checking for duplicate:', error);
+      toast({
+        title: "Error",
+        description: "Failed to check for duplicates. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   // Add stock mutation for regular items
@@ -255,6 +304,46 @@ export function EngineerScanModal({ open, onOpenChange, vanLocationId, vanLocati
       toast({
         title: "Error Adding Stock",
         description: "Failed to add stock. Please try again.",
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Create new charger mutation
+  const createChargerMutation = useMutation({
+    mutationFn: async ({ serialNumber, chargerTypeId }: {
+      serialNumber: string;
+      chargerTypeId: string;
+    }) => {
+      if (!engineer?.id) throw new Error('Engineer not found');
+
+      const { error } = await supabase
+        .from('charger_inventory')
+        .insert({
+          serial_number: serialNumber,
+          charger_item_id: chargerTypeId,
+          engineer_id: engineer.id,
+          location_id: vanLocationId,
+          status: 'assigned',
+          notes: 'Created via scan interface - new charger'
+        });
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({
+        title: "New Charger Added",
+        description: `Charger ${scannedCode} has been added to your assigned chargers`,
+      });
+
+      // Reset form and close modal
+      resetForm();
+    },
+    onError: (error) => {
+      console.error('Error creating charger:', error);
+      toast({
+        title: "Error Creating Charger",
+        description: "Failed to create new charger. Please try again.",
         variant: "destructive"
       });
     }
@@ -331,7 +420,26 @@ export function EngineerScanModal({ open, onOpenChange, vanLocationId, vanLocati
     setSelectedItemId('');
     setQuantity('1');
     setNotes('');
+    setShowNewChargerDialog(false);
+    setNewChargerType('');
     onOpenChange(false);
+  };
+
+  // Handle creating new charger
+  const handleCreateNewCharger = () => {
+    if (!newChargerType || !scannedCode) {
+      toast({
+        title: "Missing Information",
+        description: "Please select a charger type",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    createChargerMutation.mutate({
+      serialNumber: scannedCode,
+      chargerTypeId: newChargerType
+    });
   };
 
   const handleScan = () => {
@@ -464,7 +572,7 @@ export function EngineerScanModal({ open, onOpenChange, vanLocationId, vanLocati
 
   // Helper to check if selected item is a charger
   const isChargerSelected = selectedItemId.startsWith('charger_');
-  const isPending = addStockMutation.isPending || addChargerMutation.isPending;
+  const isPending = addStockMutation.isPending || addChargerMutation.isPending || createChargerMutation.isPending;
 
   const scanModes = [
     {
@@ -766,6 +874,63 @@ export function EngineerScanModal({ open, onOpenChange, vanLocationId, vanLocati
             </div>
           )}
         </div>
+
+        {/* New Charger Creation Dialog */}
+        <Dialog open={showNewChargerDialog} onOpenChange={setShowNewChargerDialog}>
+          <DialogContent className="sm:max-w-[400px]">
+            <DialogHeader>
+              <DialogTitle>Create New Charger</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="text-sm text-muted-foreground">
+                Scanned serial number: <span className="font-mono font-medium">{scannedCode}</span>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="chargerType">Select Charger Type</Label>
+                <Select value={newChargerType} onValueChange={setNewChargerType}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose charger type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {chargerTypes.map(type => (
+                      <SelectItem key={type.id} value={type.id}>
+                        <div className="flex flex-col gap-1">
+                          <span>{type.name}</span>
+                          <span className="text-xs text-muted-foreground">{type.sku}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex gap-2 pt-4">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowNewChargerDialog(false)}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleCreateNewCharger}
+                  disabled={createChargerMutation.isPending || !newChargerType}
+                  className="flex-1"
+                >
+                  {createChargerMutation.isPending ? (
+                    <>
+                      <div className="animate-spin h-4 w-4 mr-2 border-2 border-current border-t-transparent rounded-full" />
+                      Creating...
+                    </>
+                  ) : (
+                    'Create Charger'
+                  )}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </DialogContent>
     </Dialog>
   );
