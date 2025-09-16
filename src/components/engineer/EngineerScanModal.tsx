@@ -378,7 +378,7 @@ export function EngineerScanModal({ open, onOpenChange, vanLocationId, vanLocati
           return;
         }
 
-        const reference = `Scanned addition to van - ${vanLocationName} (SKU: ${scannedCode})`;
+        const reference = `Scanned addition to van - Van Stock (SKU: ${scannedCode})`;
         addStockMutation.mutate({
           itemId: matchingItem.id,
           qty,
@@ -386,7 +386,7 @@ export function EngineerScanModal({ open, onOpenChange, vanLocationId, vanLocati
           scanNotes: notes || `Added via scan interface in ${scanMode} mode`
         });
       } else if (matchingCharger) {
-        const reference = `Scanned charger to van - ${vanLocationName} (Serial: ${scannedCode})`;
+        const reference = `Scanned charger to van - Van Stock (Serial: ${scannedCode})`;
         addChargerMutation.mutate({
           chargerId: matchingCharger.id,
           reference,
@@ -394,9 +394,13 @@ export function EngineerScanModal({ open, onOpenChange, vanLocationId, vanLocati
           serialNumber: matchingCharger.serial_number
         });
       } else {
+        // Show more helpful error with available options
+        const availableSkus = inventoryItems.slice(0, 3).map(item => item.sku).join(', ');
+        const availableSerials = assignedChargers.slice(0, 3).map(charger => charger.serial_number).join(', ');
+        
         toast({
           title: "Item Not Found",
-          description: `No item or charger found with code: ${scannedCode}. Please check the code or use manual add.`,
+          description: `No item or charger found with code: ${scannedCode}. Available SKUs: ${availableSkus}. Available Serial Numbers: ${availableSerials}. Please use manual add to select from the list.`,
           variant: "destructive"
         });
         return;
@@ -415,7 +419,7 @@ export function EngineerScanModal({ open, onOpenChange, vanLocationId, vanLocati
           return;
         }
         
-        const reference = `Manual charger addition to van - ${vanLocationName}`;
+        const reference = `Manual charger addition to van - Van Stock`;
         addChargerMutation.mutate({
           chargerId,
           reference,
@@ -434,7 +438,7 @@ export function EngineerScanModal({ open, onOpenChange, vanLocationId, vanLocati
         }
 
         const itemId = selectedItemId.replace('item_', '');
-        const reference = `Manual addition to van - ${vanLocationName}`;
+        const reference = `Manual addition to van - Van Stock`;
         addStockMutation.mutate({
           itemId,
           qty,
@@ -694,7 +698,7 @@ export function EngineerScanModal({ open, onOpenChange, vanLocationId, vanLocati
                 <Label className="text-sm font-medium">Location</Label>
                 <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
                   <Package className="h-4 w-4 text-green-600" />
-                  <span className="text-sm font-medium text-green-700">{vanLocationName}</span>
+                  <span className="text-sm font-medium text-green-700">Van Stock</span>
                 </div>
               </div>
             </div>
