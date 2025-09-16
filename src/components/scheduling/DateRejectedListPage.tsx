@@ -32,8 +32,18 @@ export function DateRejectedListPage() {
         .gt('expires_at', new Date().toISOString());
 
       const ordersWithActiveOffers = new Set(activeOffers?.map(offer => offer.order_id) || []);
+      
+      // Also exclude orders that are already scheduled/completed/cancelled
+      const { data: scheduledOrders } = await supabase
+        .from('orders')
+        .select('id')
+        .in('status_enhanced', ['scheduled', 'in_progress', 'install_completed_pending_qa', 'completed', 'cancelled'])
+        .in('id', [...new Set(rejectedOffers.map(offer => offer.order_id))]);
+
+      const scheduledOrderIds = new Set(scheduledOrders?.map(order => order.id) || []);
+      
       const uniqueRejectedOrderIds = [...new Set(rejectedOffers.map(offer => offer.order_id))]
-        .filter(orderId => !ordersWithActiveOffers.has(orderId));
+        .filter(orderId => !ordersWithActiveOffers.has(orderId) && !scheduledOrderIds.has(orderId));
 
       if (!uniqueRejectedOrderIds.length) return { data: [], count: 0 };
 
@@ -124,8 +134,18 @@ export function DateRejectedListPage() {
                 .gt('expires_at', new Date().toISOString());
 
               const ordersWithActiveOffers = new Set(activeOffers?.map(offer => offer.order_id) || []);
+              
+              // Also exclude orders that are already scheduled/completed/cancelled
+              const { data: scheduledOrders } = await supabase
+                .from('orders')
+                .select('id')
+                .in('status_enhanced', ['scheduled', 'in_progress', 'install_completed_pending_qa', 'completed', 'cancelled'])
+                .in('id', [...new Set(rejectedOffers.map(offer => offer.order_id))]);
+
+              const scheduledOrderIds = new Set(scheduledOrders?.map(order => order.id) || []);
+              
               const uniqueRejectedOrderIds = [...new Set(rejectedOffers.map(offer => offer.order_id))]
-                .filter(orderId => !ordersWithActiveOffers.has(orderId));
+                .filter(orderId => !ordersWithActiveOffers.has(orderId) && !scheduledOrderIds.has(orderId));
 
               if (!uniqueRejectedOrderIds.length) return [];
 
