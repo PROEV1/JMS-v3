@@ -1,6 +1,25 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.52.1';
-import { corsHeaders, json } from '../_shared/cors.ts';
+
+// CORS headers with cache-busting
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Cache-Control': 'no-cache, no-store, must-revalidate',
+  'Pragma': 'no-cache',
+  'Expires': '0'
+};
+
+const json = (data: any, status = 200, requestId = 'unknown') => {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: {
+      ...corsHeaders,
+      'Content-Type': 'application/json',
+      'X-Request-ID': requestId,
+    },
+  });
+};
 
 serve(async (req) => {
   const requestId = crypto.randomUUID();
@@ -152,7 +171,7 @@ serve(async (req) => {
       }, 200, requestId);
     }
 
-    // Return offer details
+    // Return offer details - NO ENGINEER DATA
     return json({
       ok: true,
       data: {

@@ -54,7 +54,10 @@ export default function ClientOfferView() {
 
       try {
         const { data, error } = await supabase.functions.invoke('offer-lookup', {
-          body: { token }
+          body: { 
+            token,
+            cache_bust: Date.now() // Force cache invalidation
+          }
         });
 
         if (error || !data || data?.error) {
@@ -63,7 +66,10 @@ export default function ClientOfferView() {
             setError('This offer has expired');
           }
         } else if (data?.data) {
-          setOffer(data.data);
+          // Safety filter to remove any engineer data from cached responses
+          const cleanedData = { ...data.data };
+          delete cleanedData.engineer;
+          setOffer(cleanedData);
         } else {
           setError('Invalid offer data received');
         }
