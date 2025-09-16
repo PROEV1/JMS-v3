@@ -262,27 +262,58 @@ export function EngineerScanModal({ open, onOpenChange, vanLocationId, vanLocati
 
   // Add charger mutation for chargers
   const addChargerMutation = useMutation({
-    mutationFn: async ({ chargerId, reference, scanNotes }: {
+    mutationFn: async ({ chargerId, reference, scanNotes, serialNumber }: {
       chargerId: string;
       reference: string;
       scanNotes: string;
+      serialNumber: string;
     }) => {
+      // Get the charger details first
+      const { data: charger, error: chargerError } = await supabase
+        .from('charger_inventory')
+        .select(`
+          id,
+          serial_number,
+          charger_item_id,
+          inventory_items!charger_item_id(id, name, sku)
+        `)
+        .eq('id', chargerId)
+        .single();
+
+      if (chargerError) throw chargerError;
+      if (!charger.inventory_items) throw new Error('Charger item not found');
+
+      // Create inventory transaction for tracking
+      const { error: txnError } = await supabase
+        .from('inventory_txns')
+        .insert({
+          item_id: charger.charger_item_id,
+          location_id: vanLocationId,
+          direction: 'in',
+          qty: 1, // Chargers are always qty 1
+          reference: `${reference} - Serial: ${serialNumber}`,
+          notes: `${scanNotes} | Charger Serial: ${serialNumber}`,
+          status: 'approved' // Engineers can approve their own van additions
+        });
+
+      if (txnError) throw txnError;
+
       // Update charger location to the van
-      const { error } = await supabase
+      const { error: updateError } = await supabase
         .from('charger_inventory')
         .update({
           location_id: vanLocationId,
           status: 'assigned',
-          notes: scanNotes
+          notes: `${scanNotes} | Added to van via scan interface`
         })
         .eq('id', chargerId);
 
-      if (error) throw error;
+      if (updateError) throw updateError;
     },
     onSuccess: () => {
       toast({
         title: "Charger Added Successfully",
-        description: "Charger added to van inventory",
+        description: "Charger added to van inventory with serial number tracking",
       });
 
       // Reset form and close modal
@@ -369,7 +400,8 @@ export function EngineerScanModal({ open, onOpenChange, vanLocationId, vanLocati
         addChargerMutation.mutate({
           chargerId: matchingCharger.id,
           reference,
-          scanNotes: notes || `Added via scan interface in ${scanMode} mode`
+          scanNotes: notes || `Added via scan interface in ${scanMode} mode`,
+          serialNumber: matchingCharger.serial_number
         });
       } else {
         toast({
@@ -383,11 +415,22 @@ export function EngineerScanModal({ open, onOpenChange, vanLocationId, vanLocati
       // Manual add mode
       if (isCharger) {
         const chargerId = selectedItemId.replace('charger_', '');
+        const selectedCharger = assignedChargers.find(c => c.id === chargerId);
+        if (!selectedCharger) {
+          toast({
+            title: "Charger not found",
+            description: "Selected charger not found in assigned chargers",
+            variant: "destructive"
+          });
+          return;
+        }
+        
         const reference = `Manual charger addition to van - ${vanLocationName}`;
         addChargerMutation.mutate({
           chargerId,
           reference,
-          scanNotes: notes || `Added via scan interface in ${scanMode} mode`
+          scanNotes: notes || `Added via scan interface in ${scanMode} mode`,
+          serialNumber: selectedCharger.serial_number
         });
       } else if (isRegularItem) {
         const qty = parseInt(quantity);
