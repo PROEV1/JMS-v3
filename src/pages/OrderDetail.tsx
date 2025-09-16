@@ -21,6 +21,7 @@ import { SurveySection } from '@/components/admin/sections/SurveySection';
 import { SurveyReviewSection } from '@/components/admin/sections/SurveyReviewSection';
 import { ClientBlockedDatesSection } from '@/components/admin/sections/ClientBlockedDatesSection';
 import { OrderQuotesSection } from '@/components/admin/sections/OrderQuotesSection';
+import { EngineerMaterialsSection } from '@/components/admin/sections/EngineerMaterialsSection';
 import { OrderStatusEnhanced } from '@/components/admin/EnhancedJobStatusBadge';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -864,6 +865,15 @@ export default function OrderDetail() {
             {order && (
               <EngineerUploadsSection 
                 order={order} 
+                onUpdate={fetchOrder}
+              />
+            )}
+
+            {/* Materials & Equipment Used */}
+            {order && (
+              <EngineerMaterialsSection 
+                orderId={order.id}
+                engineerId={order.engineer_id}
                 onUpdate={fetchOrder}
               />
             )}
