@@ -260,7 +260,7 @@ export function EngineerScanModal({ open, onOpenChange, vanLocationId, vanLocati
     }
   });
 
-  // Add charger mutation for chargers
+  // Add charger mutation for chargers - only updates notes, doesn't move to van stock
   const addChargerMutation = useMutation({
     mutationFn: async ({ chargerId, reference, scanNotes, serialNumber }: {
       chargerId: string;
@@ -283,28 +283,11 @@ export function EngineerScanModal({ open, onOpenChange, vanLocationId, vanLocati
       if (chargerError) throw chargerError;
       if (!charger.inventory_items) throw new Error('Charger item not found');
 
-      // Create inventory transaction for tracking
-      const { error: txnError } = await supabase
-        .from('inventory_txns')
-        .insert({
-          item_id: charger.charger_item_id,
-          location_id: vanLocationId,
-          direction: 'in',
-          qty: 1, // Chargers are always qty 1
-          reference: `${reference} - Serial: ${serialNumber}`,
-          notes: `${scanNotes} | Charger Serial: ${serialNumber}`,
-          status: 'approved' // Engineers can approve their own van additions
-        });
-
-      if (txnError) throw txnError;
-
-      // Update charger location to the van
+      // Only update charger notes, keep it in assigned chargers (don't move to van stock)
       const { error: updateError } = await supabase
         .from('charger_inventory')
         .update({
-          location_id: vanLocationId,
-          status: 'assigned',
-          notes: `${scanNotes} | Added to van via scan interface`
+          notes: `${scanNotes} | Scanned via scan interface - Serial: ${serialNumber}`
         })
         .eq('id', chargerId);
 
@@ -312,33 +295,33 @@ export function EngineerScanModal({ open, onOpenChange, vanLocationId, vanLocati
     },
     onSuccess: () => {
       toast({
-        title: "Charger Added Successfully",
-        description: "Charger added to van inventory with serial number tracking",
+        title: "Charger Scanned Successfully",
+        description: "Charger remains in assigned chargers list",
       });
 
       // Reset form and close modal
       resetForm();
     },
     onError: (error) => {
-      console.error('Error adding charger:', error);
+      console.error('Error scanning charger:', error);
       toast({
-        title: "Error Adding Charger",
-        description: "Failed to add charger. Please try again.",
+        title: "Error Scanning Charger",
+        description: "Failed to scan charger. Please try again.",
         variant: "destructive"
       });
     }
   });
 
   const resetForm = () => {
-    // Invalidate queries to refresh van stock - use partial matching for chargers
+    // Invalidate queries to refresh regular van stock items only
     queryClient.invalidateQueries({ queryKey: ['van-stock-items'] });
     queryClient.invalidateQueries({ queryKey: ['van-stock-metrics'] });
     queryClient.invalidateQueries({ queryKey: ['van-recent-transactions'] });
-    // Use partial invalidation to match all van-assigned-chargers queries regardless of filters
+    
+    // Invalidate assigned chargers queries since we update charger notes
     queryClient.invalidateQueries({ 
       predicate: (query) => query.queryKey[0] === 'van-assigned-chargers'
     });
-    // Also invalidate the engineer-assigned-chargers-for-scan query
     queryClient.invalidateQueries({ 
       predicate: (query) => query.queryKey[0] === 'engineer-assigned-chargers-for-scan'
     });
