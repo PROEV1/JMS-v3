@@ -315,12 +315,29 @@ export function ScheduleStatusListPage({
 
   // Helper function to get active offer for an order
   const getActiveOfferForOrder = (orderId: string) => {
+    // First try to find the offer in the embedded job_offers array from RPC (for DateOffered page)
+    const order = filteredAndSortedOrders.find(o => o.id === orderId);
+    if (order && 'job_offers' in order && Array.isArray(order.job_offers) && order.job_offers.length > 0) {
+      const embeddedOffer = order.job_offers.find((offer: any) => 
+        offer.status === 'pending' && 
+        new Date(offer.expires_at) > new Date()
+      );
+      if (embeddedOffer) {
+        console.log('getActiveOfferForOrder (from embedded data):', {
+          orderId,
+          embeddedOffer
+        });
+        return embeddedOffer;
+      }
+    }
+    
+    // Fallback to the separate offers array
     const activeOffer = offers.find(offer => 
       offer.order_id === orderId && 
       offer.status === 'pending' && 
       new Date(offer.expires_at) > new Date()
     );
-    console.log('getActiveOfferForOrder Debug:', {
+    console.log('getActiveOfferForOrder (from separate offers):', {
       orderId,
       activeOffer,
       allOffersForOrder: offers.filter(o => o.order_id === orderId),

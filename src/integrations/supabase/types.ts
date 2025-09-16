@@ -3963,9 +3963,11 @@ export type Database = {
           estimated_duration_hours: number
           id: string
           job_type: string
+          offer_engineer_id: string
           offer_expires_at: string
           offer_id: string
           offer_offered_date: string
+          offer_time_window: string
           order_number: string
           partner_name: string
           scheduled_install_date: string

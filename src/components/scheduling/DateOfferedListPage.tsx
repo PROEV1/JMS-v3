@@ -57,8 +57,13 @@ export function DateOfferedListPage() {
         } : null,
         job_offers: [{
           id: order.offer_id,
+          order_id: order.id,
+          engineer_id: order.offer_engineer_id, // Use the offer's engineer_id, not the order's
+          status: 'pending' as const,
           expires_at: order.offer_expires_at,
-          offered_date: order.offer_offered_date
+          offered_date: order.offer_offered_date,
+          time_window: order.offer_time_window,
+          created_at: order.offer_offered_date
         }]
       })) || [];
 
