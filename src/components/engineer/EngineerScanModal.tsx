@@ -330,11 +330,18 @@ export function EngineerScanModal({ open, onOpenChange, vanLocationId, vanLocati
   });
 
   const resetForm = () => {
-    // Invalidate queries to refresh van stock
+    // Invalidate queries to refresh van stock - use partial matching for chargers
     queryClient.invalidateQueries({ queryKey: ['van-stock-items'] });
     queryClient.invalidateQueries({ queryKey: ['van-stock-metrics'] });
     queryClient.invalidateQueries({ queryKey: ['van-recent-transactions'] });
-    queryClient.invalidateQueries({ queryKey: ['van-assigned-chargers'] });
+    // Use partial invalidation to match all van-assigned-chargers queries regardless of filters
+    queryClient.invalidateQueries({ 
+      predicate: (query) => query.queryKey[0] === 'van-assigned-chargers'
+    });
+    // Also invalidate the engineer-assigned-chargers-for-scan query
+    queryClient.invalidateQueries({ 
+      predicate: (query) => query.queryKey[0] === 'engineer-assigned-chargers-for-scan'
+    });
 
     // Reset form
     setScannedCode('');
