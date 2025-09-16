@@ -80,35 +80,43 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
       // Get individual charger units with their assignments
       const chargerData = await Promise.all(
         items.map(async (item) => {
-          // Get individual charger units from charger_inventory table
+          // Get individual charger units from charger_inventory table with order details
           const { data: inventory } = await supabase
             .from('charger_inventory')
             .select(`
-              id,
-              serial_number,
-              status,
-              engineer_id,
-              location_id,
-              notes,
-              created_at,
-              assigned_order_id,
+              *,
               engineers (
                 name
               ),
               inventory_locations (
                 name
-              ),
-              orders:assigned_order_id (
-                job_address,
-                postcode,
-                clients (
-                  address,
-                  postcode
-                )
               )
             `)
             .eq('charger_item_id', item.id)
             .order('created_at', { ascending: false });
+
+          // Get order details for chargers that have assigned_order_id
+          const inventoryWithOrders = await Promise.all(
+            (inventory || []).map(async (unit) => {
+              if (unit.assigned_order_id) {
+                const { data: orderData } = await supabase
+                  .from('orders')
+                  .select(`
+                    job_address,
+                    postcode,
+                    clients (
+                      address,
+                      postcode
+                    )
+                  `)
+                  .eq('id', unit.assigned_order_id)
+                  .single();
+                
+                return { ...unit, order_details: orderData };
+              }
+              return unit;
+            })
+          );
 
           console.log('Inventory data for item', item.name, ':', inventory?.map(i => ({ 
             serial: i.serial_number, 
@@ -118,16 +126,16 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
           })));
 
           // Create individual units data
-          const individualUnits: ChargerUnit[] = (inventory || []).map(unit => {
+          const individualUnits: ChargerUnit[] = (inventoryWithOrders || []).map(unit => {
             // Get job address if charger is deployed on an order
             let jobAddress = null;
-            if (unit.assigned_order_id && unit.orders) {
-              const order = Array.isArray(unit.orders) ? unit.orders[0] : unit.orders;
-              if (order?.clients) {
+            if ((unit as any).order_details) {
+              const order = (unit as any).order_details;
+              if (order.clients) {
                 const client = Array.isArray(order.clients) ? order.clients[0] : order.clients;
                 jobAddress = `${client.address}, ${client.postcode}`;
-              } else if (order?.job_address && order?.postcode) {
-                jobAddress = `${order.job_address}, ${order.postcode}`;
+              } else if (order.job_address && order.postcode) {
+                jobAddress = `${order.job_address}, ${order.postcode}`;  
               }
             }
 
