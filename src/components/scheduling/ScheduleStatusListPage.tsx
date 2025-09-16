@@ -1545,7 +1545,11 @@ export function ScheduleStatusListPage({
         <AutoScheduleReviewModal
           isOpen={showAutoScheduleModal}
           onClose={() => setShowAutoScheduleModal(false)}
-          orders={orders.filter(order => order.status_enhanced === 'awaiting_install_booking')}
+          orders={orders.filter(order => 
+            order.status_enhanced === 'awaiting_install_booking' || 
+            order.status_enhanced === 'date_rejected' ||
+            order.status_enhanced === 'offer_expired'
+          )}
           engineers={engineers}
           onOffersSubmitted={() => {
             if (onUpdate) onUpdate();

@@ -274,12 +274,17 @@ export function SmartAssignmentModal({
     try {
       // Send as date string to avoid timezone issues
       const dateString = selectedDate.toISOString().split('T')[0]; // YYYY-MM-DD format
+      console.log('🚀 Smart Assignment: Confirming and booking for engineer', selectedEngineerId, 'on date', dateString);
       await onAssign(selectedEngineerId, dateString, 'confirm_book');
+      
+      // Trigger global refresh to update all status counts and lists
+      window.dispatchEvent(new CustomEvent('scheduling:refresh'));
+      
       toast.success('Installation booked successfully');
       onClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error booking installation:', error);
-      toast.error('Failed to book installation');
+      toast.error(error.message || 'Failed to book installation');
     } finally {
       setProcessing(false);
     }

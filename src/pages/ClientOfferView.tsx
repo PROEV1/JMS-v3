@@ -82,10 +82,18 @@ export default function ClientOfferView() {
   }, [token]);
 
   const handleAccept = async () => {
-    if (!token) return;
+    if (!token) {
+      toast({
+        title: "Error",
+        description: 'Invalid offer token',
+        variant: "destructive",
+      });
+      return;
+    }
     
     setResponding(true);
     try {
+      console.log('🔄 Accepting offer with token:', token);
       const { data, error } = await supabase.functions.invoke('offer-respond', {
         body: {
           token,
@@ -93,10 +101,17 @@ export default function ClientOfferView() {
         }
       });
 
-      if (error || data?.error) {
-        throw new Error(data?.error || 'Failed to accept offer');
+      if (error) {
+        console.error('Supabase function error:', error);
+        throw new Error(error.message || 'Failed to accept offer');
       }
 
+      if (data?.error) {
+        console.error('Function returned error:', data.error);
+        throw new Error(data.error);
+      }
+
+      console.log('✅ Offer accepted successfully');
       toast({
         title: "Success",
         description: 'Offer accepted successfully!',
@@ -112,12 +127,12 @@ export default function ClientOfferView() {
       }
 
     } catch (err: any) {
+      console.error('Error accepting offer:', err);
       toast({
         title: "Error",
         description: err.message || 'Failed to accept offer',
         variant: "destructive",
       });
-      console.error('Error accepting offer:', err);
     } finally {
       setResponding(false);
     }
@@ -168,12 +183,19 @@ export default function ClientOfferView() {
         };
       }
 
+      console.log('🔄 Rejecting offer with token:', token, 'and body:', requestBody);
       const { data, error } = await supabase.functions.invoke('offer-respond', {
         body: requestBody
       });
 
-      if (error || data?.error) {
-        throw new Error(data?.error || 'Failed to reject offer');
+      if (error) {
+        console.error('Supabase function error:', error);
+        throw new Error(error.message || 'Failed to reject offer');
+      }
+
+      if (data?.error) {
+        console.error('Function returned error:', data.error);
+        throw new Error(data.error);
       }
 
       toast({
