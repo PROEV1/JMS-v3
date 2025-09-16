@@ -91,11 +91,20 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
               location_id,
               notes,
               created_at,
+              assigned_order_id,
               engineers (
                 name
               ),
               inventory_locations (
                 name
+              ),
+              orders:assigned_order_id (
+                job_address,
+                postcode,
+                clients (
+                  address,
+                  postcode
+                )
               )
             `)
             .eq('charger_item_id', item.id)
@@ -109,21 +118,35 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
           })));
 
           // Create individual units data
-          const individualUnits: ChargerUnit[] = (inventory || []).map(unit => ({
-            id: unit.id,
-            charger_item_id: item.id,
-            serial_number: unit.serial_number || `SN-${unit.id.slice(0, 8)}`,
-            status: unit.status,
-            engineer_id: unit.engineer_id || null,
-            engineer_name: unit.engineers?.name || null,
-            location_id: unit.location_id || null,
-            location_name: unit.inventory_locations?.name || (unit.engineer_id ? `${unit.engineers?.name}'s Van` : 'Warehouse'),
-            notes: unit.notes || null,
-            order_id: null,
-            dispatched_at: null,
-            delivered_at: null,
-            created_at: unit.created_at
-          }));
+          const individualUnits: ChargerUnit[] = (inventory || []).map(unit => {
+            // Get job address if charger is deployed on an order
+            let jobAddress = null;
+            if (unit.assigned_order_id && unit.orders) {
+              const order = Array.isArray(unit.orders) ? unit.orders[0] : unit.orders;
+              if (order?.clients) {
+                const client = Array.isArray(order.clients) ? order.clients[0] : order.clients;
+                jobAddress = `${client.address}, ${client.postcode}`;
+              } else if (order?.job_address && order?.postcode) {
+                jobAddress = `${order.job_address}, ${order.postcode}`;
+              }
+            }
+
+            return {
+              id: unit.id,
+              charger_item_id: item.id,
+              serial_number: unit.serial_number || `SN-${unit.id.slice(0, 8)}`,
+              status: unit.status,
+              engineer_id: unit.engineer_id || null,
+              engineer_name: unit.engineers?.name || null,
+              location_id: unit.location_id || null,
+              location_name: jobAddress || unit.inventory_locations?.name || (unit.engineer_id ? `${unit.engineers?.name}'s Van` : 'Warehouse'),
+              notes: unit.notes || null,
+              order_id: unit.assigned_order_id || null,
+              dispatched_at: null,
+              delivered_at: null,
+              created_at: unit.created_at
+            };
+          });
 
           // Only include charger models that have actual inventory records
           // Don't create placeholder units - only show models with real chargers
