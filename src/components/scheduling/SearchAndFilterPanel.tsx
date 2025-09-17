@@ -72,6 +72,7 @@ export function SearchAndFilterPanel({
   const [isEngineersOpen, setIsEngineersOpen] = useState(false);
   const [isJobTypesOpen, setIsJobTypesOpen] = useState(false);
   const [isStatusOpen, setIsStatusOpen] = useState(false);
+  const [showAllEngineers, setShowAllEngineers] = useState(false);
 
   const updateFilters = (updates: Partial<SearchFilters>) => {
     onFiltersChange({ ...filters, ...updates });
@@ -158,7 +159,7 @@ export function SearchAndFilterPanel({
             </CollapsibleTrigger>
             <CollapsibleContent className="absolute z-[60] mt-1 bg-background border rounded-md shadow-lg p-2 max-w-xs max-h-48 overflow-y-auto min-w-[200px]">
               <div className="grid grid-cols-1 gap-1">
-                {engineers.slice(0, 10).map((engineer) => (
+                {(showAllEngineers ? engineers : engineers.slice(0, 10)).map((engineer) => (
                   <div key={engineer.id} className="flex items-center space-x-2 py-1">
                     <Checkbox
                       id={engineer.id}
@@ -171,10 +172,21 @@ export function SearchAndFilterPanel({
                     </Label>
                   </div>
                 ))}
-                {engineers.length > 10 && (
-                  <div className="text-xs text-muted-foreground px-1 py-1">
+                {engineers.length > 10 && !showAllEngineers && (
+                  <button
+                    onClick={() => setShowAllEngineers(true)}
+                    className="text-xs text-muted-foreground px-1 py-1 hover:text-foreground cursor-pointer text-left"
+                  >
                     +{engineers.length - 10} more...
-                  </div>
+                  </button>
+                )}
+                {showAllEngineers && engineers.length > 10 && (
+                  <button
+                    onClick={() => setShowAllEngineers(false)}
+                    className="text-xs text-muted-foreground px-1 py-1 hover:text-foreground cursor-pointer text-left"
+                  >
+                    Show less...
+                  </button>
                 )}
               </div>
             </CollapsibleContent>
