@@ -53,6 +53,9 @@ export function ItemPickerModal({ open, onOpenChange, location, onItemAdded }: I
 
     setIsApproving(true);
     try {
+      // Get current user for approval
+      const { data: userData } = await supabase.auth.getUser();
+      
       // Use direct Supabase call with auto-approval like LocationStockModal does
       const { data, error } = await supabase
         .from('inventory_txns')
@@ -64,8 +67,9 @@ export function ItemPickerModal({ open, onOpenChange, location, onItemAdded }: I
           reference: `Stock adjustment: ${reason}`,
           notes: notes || `Added ${quantity} units of ${selectedItem.name} to ${location.name}`,
           status: 'approved', // Auto-approve admin stock adjustments
-          approved_by: (await supabase.auth.getUser()).data.user?.id,
-          approved_at: new Date().toISOString()
+          approved_by: userData.user?.id,
+          approved_at: new Date().toISOString(),
+          created_by: userData.user?.id
         })
         .select()
         .single();
