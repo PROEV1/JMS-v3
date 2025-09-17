@@ -2,11 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { WeekViewCalendar } from '@/components/scheduling/WeekViewCalendar';
 import { SchedulingSettingsPanel } from '@/components/admin/SchedulingSettingsPanel';
 import { SchedulingHub } from '@/components/scheduling/SchedulingHub';
+import { SearchAndFilterPanel } from '@/components/scheduling/SearchAndFilterPanel';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useSchedulingFilters } from '@/hooks/useSchedulingFilters';
 
 export default function AdminSchedule() {
   const { finalRole: userRole, loading } = useAuth();
@@ -14,6 +16,7 @@ export default function AdminSchedule() {
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState('hub');
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [showFilters, setShowFilters] = useState(false);
 
   // Fetch orders and engineers for the week view
   const { data: orders = [] } = useQuery({
@@ -76,6 +79,15 @@ export default function AdminSchedule() {
     }
   });
 
+  // Initialize filtering system
+  const {
+    filters,
+    setFilters,
+    resetFilters,
+    filteredOrders,
+    filteredEngineers
+  } = useSchedulingFilters(orders, engineers);
+
   useEffect(() => {
     // Check for tab in URL params or navigation state
     const tabFromUrl = searchParams.get('tab');
@@ -119,16 +131,27 @@ export default function AdminSchedule() {
           <SchedulingHub />
         </TabsContent>
         <TabsContent value="week-view" className="mt-6">
-          <WeekViewCalendar
-            orders={orders}
-            engineers={engineers}
-            onOrderClick={(order) => {
-              // Handle order click if needed
-              console.log('Order clicked:', order);
-            }}
-            currentDate={currentDate}
-            onDateChange={setCurrentDate}
-          />
+          <div className="space-y-4">
+            {/* Search and Filter Panel */}
+            <SearchAndFilterPanel
+              filters={filters}
+              onFiltersChange={setFilters}
+              engineers={engineers}
+              onReset={resetFilters}
+            />
+            
+            {/* Week View Calendar with filtered data */}
+            <WeekViewCalendar
+              orders={filteredOrders}
+              engineers={filteredEngineers}
+              onOrderClick={(order) => {
+                // Handle order click if needed
+                console.log('Order clicked:', order);
+              }}
+              currentDate={currentDate}
+              onDateChange={setCurrentDate}
+            />
+          </div>
         </TabsContent>
         <TabsContent value="settings" className="mt-6">
           <SchedulingSettingsPanel />
