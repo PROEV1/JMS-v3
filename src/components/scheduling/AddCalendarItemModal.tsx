@@ -19,11 +19,26 @@ import {
   Clock
 } from 'lucide-react';
 
+interface CalendarItemData {
+  id?: string;
+  item_type: string;
+  title: string;
+  description?: string;
+  start_date: string;
+  end_date?: string;
+  start_time?: string;
+  end_time?: string;
+  all_day: boolean;
+  color: string;
+  engineer_id: string;
+}
+
 interface AddCalendarItemModalProps {
   isOpen: boolean;
   onClose: () => void;
   engineerId: string;
   selectedDate: Date;
+  editingItem?: CalendarItemData | null;
   onItemAdded?: () => void;
 }
 
@@ -41,6 +56,7 @@ export function AddCalendarItemModal({
   onClose,
   engineerId,
   selectedDate,
+  editingItem,
   onItemAdded
 }: AddCalendarItemModalProps) {
   const { toast } = useToast();
@@ -57,6 +73,35 @@ export function AddCalendarItemModal({
     color: '#3b82f6'
   });
 
+  // Update form data when editing item changes
+  React.useEffect(() => {
+    if (editingItem) {
+      setFormData({
+        item_type: editingItem.item_type,
+        title: editingItem.title,
+        description: editingItem.description || '',
+        start_date: editingItem.start_date,
+        end_date: editingItem.end_date || editingItem.start_date,
+        start_time: editingItem.start_time || '09:00',
+        end_time: editingItem.end_time || '17:00',
+        all_day: editingItem.all_day,
+        color: editingItem.color
+      });
+    } else {
+      setFormData({
+        item_type: '',
+        title: '',
+        description: '',
+        start_date: selectedDate.toISOString().split('T')[0],
+        end_date: selectedDate.toISOString().split('T')[0],
+        start_time: '09:00',
+        end_time: '17:00',
+        all_day: true,
+        color: '#3b82f6'
+      });
+    }
+  }, [editingItem, selectedDate]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -72,27 +117,53 @@ export function AddCalendarItemModal({
     setIsLoading(true);
 
     try {
-      const { error } = await supabase
-        .from('calendar_items')
-        .insert({
-          engineer_id: engineerId,
-          item_type: formData.item_type as any,
-          title: formData.title,
-          description: formData.description || null,
-          start_date: formData.start_date,
-          end_date: formData.end_date,
-          start_time: formData.all_day ? null : formData.start_time,
-          end_time: formData.all_day ? null : formData.end_time,
-          all_day: formData.all_day,
-          color: formData.color,
+      if (editingItem?.id) {
+        // Update existing item
+        const { error } = await supabase
+          .from('calendar_items')
+          .update({
+            item_type: formData.item_type as any,
+            title: formData.title,
+            description: formData.description || null,
+            start_date: formData.start_date,
+            end_date: formData.end_date,
+            start_time: formData.all_day ? null : formData.start_time,
+            end_time: formData.all_day ? null : formData.end_time,
+            all_day: formData.all_day,
+            color: formData.color,
+          })
+          .eq('id', editingItem.id);
+
+        if (error) throw error;
+
+        toast({
+          title: "Success",
+          description: "Calendar item updated successfully",
         });
+      } else {
+        // Insert new item
+        const { error } = await supabase
+          .from('calendar_items')
+          .insert({
+            engineer_id: engineerId,
+            item_type: formData.item_type as any,
+            title: formData.title,
+            description: formData.description || null,
+            start_date: formData.start_date,
+            end_date: formData.end_date,
+            start_time: formData.all_day ? null : formData.start_time,
+            end_time: formData.all_day ? null : formData.end_time,
+            all_day: formData.all_day,
+            color: formData.color,
+          });
 
-      if (error) throw error;
+        if (error) throw error;
 
-      toast({
-        title: "Success",
-        description: "Calendar item added successfully",
-      });
+        toast({
+          title: "Success",
+          description: "Calendar item added successfully",
+        });
+      }
 
       // Reset form
       setFormData({
@@ -136,7 +207,7 @@ export function AddCalendarItemModal({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Calendar className="h-5 w-5" />
-            Add Calendar Item
+            {editingItem ? 'Edit Calendar Item' : 'Add Calendar Item'}
           </DialogTitle>
         </DialogHeader>
 
@@ -272,12 +343,51 @@ export function AddCalendarItemModal({
             >
               Cancel
             </Button>
+            {editingItem && (
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={async () => {
+                  if (!editingItem.id) return;
+                  setIsLoading(true);
+                  try {
+                    const { error } = await supabase
+                      .from('calendar_items')
+                      .delete()
+                      .eq('id', editingItem.id);
+                    
+                    if (error) throw error;
+                    
+                    toast({
+                      title: "Success",
+                      description: "Calendar item deleted successfully",
+                    });
+                    
+                    onItemAdded?.();
+                    onClose();
+                  } catch (error) {
+                    console.error('Error deleting calendar item:', error);
+                    toast({
+                      title: "Error",
+                      description: "Failed to delete calendar item",
+                      variant: "destructive",
+                    });
+                  } finally {
+                    setIsLoading(false);
+                  }
+                }}
+                disabled={isLoading}
+                className="flex-1"
+              >
+                Delete
+              </Button>
+            )}
             <Button
               type="submit"
               disabled={isLoading}
               className="flex-1"
             >
-              {isLoading ? "Adding..." : "Add Item"}
+              {isLoading ? (editingItem ? "Updating..." : "Adding...") : (editingItem ? "Update" : "Add Item")}
             </Button>
           </div>
         </form>

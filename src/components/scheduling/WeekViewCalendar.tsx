@@ -9,9 +9,12 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { AddCalendarItemModal } from './AddCalendarItemModal';
+import { DndProvider, useDrag, useDrop } from 'react-dnd';
+import { HTML5Backend } from 'react-dnd-html5-backend';
 
 interface CalendarItem {
   id: string;
+  engineer_id: string;
   item_type: string;
   title: string;
   description?: string;
@@ -21,6 +24,13 @@ interface CalendarItem {
   end_time?: string;
   all_day: boolean;
   color: string;
+}
+
+interface DragItem {
+  id: string;
+  type: string;
+  engineer_id: string;
+  date: string;
 }
 
 interface WeekViewCalendarProps {
@@ -43,6 +53,7 @@ export function WeekViewCalendar({
   const [addItemModalOpen, setAddItemModalOpen] = useState(false);
   const [selectedEngineer, setSelectedEngineer] = useState<string>('');
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [editingItem, setEditingItem] = useState<CalendarItem | null>(null);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -272,15 +283,139 @@ export function WeekViewCalendar({
   const handleCellClick = (engineerId: string, date: Date) => {
     setSelectedEngineer(engineerId);
     setSelectedDate(date);
+    setEditingItem(null);
+    setAddItemModalOpen(true);
+  };
+
+  const handleItemClick = (item: CalendarItem) => {
+    setSelectedEngineer(item.engineer_id);
+    setSelectedDate(new Date(item.start_date));
+    setEditingItem(item);
     setAddItemModalOpen(true);
   };
 
   const handleItemAdded = () => {
     queryClient.invalidateQueries({ queryKey: ['calendar-items'] });
+    setEditingItem(null);
+  };
+
+  const handleItemDrop = async (draggedItem: DragItem, targetEngineerId: string, targetDate: Date) => {
+    if (draggedItem.engineer_id === targetEngineerId && draggedItem.date === toYMDLocal(targetDate)) {
+      return; // No change needed
+    }
+
+    try {
+      const { error } = await supabase
+        .from('calendar_items')
+        .update({
+          engineer_id: targetEngineerId,
+          start_date: toYMDLocal(targetDate),
+          end_date: toYMDLocal(targetDate)
+        })
+        .eq('id', draggedItem.id);
+
+      if (error) throw error;
+      
+      queryClient.invalidateQueries({ queryKey: ['calendar-items'] });
+    } catch (error) {
+      console.error('Error moving calendar item:', error);
+    }
+  };
+
+  // Draggable Calendar Item Component
+  const DraggableCalendarItem: React.FC<{ item: CalendarItem }> = ({ item }) => {
+    const [{ isDragging }, drag] = useDrag({
+      type: 'CALENDAR_ITEM',
+      item: {
+        id: item.id,
+        type: 'CALENDAR_ITEM',
+        engineer_id: item.engineer_id,
+        date: item.start_date
+      } as DragItem,
+      collect: (monitor) => ({
+        isDragging: monitor.isDragging(),
+      }),
+    });
+
+    return (
+      <div
+        ref={drag}
+        className={`rounded-md p-2 cursor-pointer hover:shadow-md transition-all duration-200 min-h-[40px] flex flex-col justify-between ${
+          isDragging ? 'opacity-50' : ''
+        }`}
+        style={{ 
+          backgroundColor: `${item.color}20`,
+          borderLeft: `3px solid ${item.color}`
+        }}
+        onClick={(e) => {
+          e.stopPropagation();
+          handleItemClick(item);
+        }}
+      >
+        <div className="space-y-1">
+          <div className="text-xs font-medium" style={{ color: item.color }}>
+            {item.title}
+          </div>
+          {item.description && (
+            <div className="text-xs text-muted-foreground truncate">
+              {item.description}
+            </div>
+          )}
+        </div>
+        
+        <div className="flex items-center justify-between mt-1">
+          <Badge 
+            variant="outline" 
+            className="text-xs px-1 py-0.5 capitalize"
+            style={{ 
+              borderColor: `${item.color}40`,
+              color: item.color,
+              backgroundColor: `${item.color}10`
+            }}
+          >
+            {item.item_type.replace('_', ' ')}
+          </Badge>
+          {!item.all_day && item.start_time && (
+            <div className="text-xs text-muted-foreground">
+              {item.start_time}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // Droppable Cell Component
+  const DroppableCell: React.FC<{
+    engineerId: string;
+    date: Date;
+    children: React.ReactNode;
+    className?: string;
+  }> = ({ engineerId, date, children, className }) => {
+    const [{ isOver }, drop] = useDrop({
+      accept: 'CALENDAR_ITEM',
+      drop: (item: DragItem) => {
+        handleItemDrop(item, engineerId, date);
+      },
+      collect: (monitor) => ({
+        isOver: monitor.isOver(),
+      }),
+    });
+
+    return (
+      <td
+        ref={drop}
+        className={`${className} ${isOver ? 'bg-primary/20 border-primary/40' : ''}`}
+        onClick={() => handleCellClick(engineerId, date)}
+      >
+        {children}
+      </td>
+    );
   };
 
   return (
-    <Card>
+    <DndProvider backend={HTML5Backend}>
+      <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
@@ -359,20 +494,21 @@ export function WeekViewCalendar({
                       const isBusy = workload > 1;
                       const isOverCapacity = capacityStatus.isOverCapacity;
                       
-                      return (
-                        <td 
-                          key={dayIndex} 
-                          className={`
-                            p-2 border-r text-center align-top relative cursor-pointer
-                            ${isWeekend(day) ? 'bg-muted/30' : ''}
-                            ${isToday(day) ? 'bg-primary/5' : ''}
-                            ${isOverCapacity ? 'bg-red-100/70 border-red-300' : ''}
-                            ${isOverloaded && !isOverCapacity ? 'bg-red-50/50 border-red-200' : ''}
-                            ${isBusy && !isOverloaded && !isOverCapacity ? 'bg-yellow-50/50 border-yellow-200' : ''}
-                            group hover:bg-muted/50 transition-colors
-                          `}
-                          onClick={() => handleCellClick(engineer.id, day)}
-                        >
+                       return (
+                         <DroppableCell
+                           key={dayIndex}
+                           engineerId={engineer.id}
+                           date={day}
+                           className={`
+                             p-2 border-r text-center align-top relative cursor-pointer
+                             ${isWeekend(day) ? 'bg-muted/30' : ''}
+                             ${isToday(day) ? 'bg-primary/5' : ''}
+                             ${isOverCapacity ? 'bg-red-100/70 border-red-300' : ''}
+                             ${isOverloaded && !isOverCapacity ? 'bg-red-50/50 border-red-200' : ''}
+                             ${isBusy && !isOverloaded && !isOverCapacity ? 'bg-yellow-50/50 border-yellow-200' : ''}
+                             group hover:bg-muted/50 transition-colors
+                           `}
+                         >
                           {/* Add Button (visible on hover) */}
                           <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <Button
@@ -412,50 +548,9 @@ export function WeekViewCalendar({
                             )}
                             
                              {/* Calendar Items */}
-                             {dayCalendarItems.map((item) => (
-                               <div
-                                 key={item.id}
-                                 className="rounded-md p-2 cursor-pointer hover:shadow-md transition-all duration-200 min-h-[40px] flex flex-col justify-between"
-                                 style={{ 
-                                   backgroundColor: `${item.color}20`,
-                                   borderLeft: `3px solid ${item.color}`
-                                 }}
-                                 onClick={(e) => {
-                                   e.stopPropagation();
-                                   // TODO: Add edit/view calendar item functionality
-                                 }}
-                               >
-                                 <div className="space-y-1">
-                                   <div className="text-xs font-medium" style={{ color: item.color }}>
-                                     {item.title}
-                                   </div>
-                                   {item.description && (
-                                     <div className="text-xs text-muted-foreground truncate">
-                                       {item.description}
-                                     </div>
-                                   )}
-                                 </div>
-                                 
-                                 <div className="flex items-center justify-between mt-1">
-                                   <Badge 
-                                     variant="outline" 
-                                     className="text-xs px-1 py-0.5 capitalize"
-                                     style={{ 
-                                       borderColor: item.color,
-                                       color: item.color,
-                                       backgroundColor: `${item.color}10`
-                                     }}
-                                   >
-                                     {item.item_type.replace('_', ' ')}
-                                   </Badge>
-                                   {!item.all_day && item.start_time && (
-                                     <div className="text-xs text-muted-foreground">
-                                       {item.start_time.slice(0, 5)}
-                                     </div>
-                                   )}
-                                 </div>
-                               </div>
-                             ))}
+                              {dayCalendarItems.map((item) => (
+                                <DraggableCalendarItem key={item.id} item={item} />
+                              ))}
 
                              {/* Offer Holds */}
                              {offerHolds.map((offer) => (
@@ -542,8 +637,8 @@ export function WeekViewCalendar({
                                <AlertTriangle className={`h-3 w-3 ${isOverCapacity ? 'text-red-600' : 'text-red-500'}`} />
                              </div>
                            )}
-                         </div>
-                       </td>
+                           </div>
+                         </DroppableCell>
                      );
                    })}
                 </tr>
@@ -586,13 +681,18 @@ export function WeekViewCalendar({
       </CardContent>
 
       {/* Add Calendar Item Modal */}
-      <AddCalendarItemModal
-        isOpen={addItemModalOpen}
-        onClose={() => setAddItemModalOpen(false)}
-        engineerId={selectedEngineer}
-        selectedDate={selectedDate}
-        onItemAdded={handleItemAdded}
-      />
-    </Card>
+        <AddCalendarItemModal
+          isOpen={addItemModalOpen}
+          onClose={() => {
+            setAddItemModalOpen(false);
+            setEditingItem(null);
+          }}
+          engineerId={selectedEngineer}
+          selectedDate={selectedDate}
+          editingItem={editingItem}
+          onItemAdded={handleItemAdded}
+        />
+      </Card>
+    </DndProvider>
   );
 }
