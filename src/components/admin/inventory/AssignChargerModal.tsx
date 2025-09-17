@@ -245,7 +245,7 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
             .eq('id', finalLocationId);
         }
        } else if (orderId && orderId !== 'none') {
-         // Assigned to job without engineer - save address to notes field
+         // Assigned to job without engineer - set status to assigned
          status = 'assigned';
          // Location remains null - charger is assigned to order but not physically located
        }
@@ -261,6 +261,16 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
             notes = `Location: ${address}`;
           }
         }
+
+        console.log('Assignment details:', {
+          charger_id: charger.id,
+          finalEngineerId,
+          finalLocationId,
+          orderId,
+          status,
+          notes,
+          address
+        });
 
        // Update the charger_inventory record with the engineer, location, and order assignment
        const { data, error } = await supabase
@@ -334,10 +344,15 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
           addressParts.push(selectedOrder.clients.postcode);
         }
         
-        if (addressParts.length > 0) {
-          setLocationAddress(addressParts.join(', '));
+        const fullAddress = addressParts.join(', ');
+        console.log('Setting location address from order:', fullAddress);
+        if (fullAddress) {
+          setLocationAddress(fullAddress);
         }
       }
+    } else {
+      // Clear address when no order selected
+      setLocationAddress('');
     }
   };
 
