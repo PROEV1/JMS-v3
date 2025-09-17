@@ -145,6 +145,46 @@ export function ChargerSection({ orderId, engineerId }: ChargerSectionProps) {
     }
   }, [chargerTypes, selectedChargerTypeId]);
 
+  // Auto-select charger type when serial number is entered/scanned
+  useEffect(() => {
+    if (!serialNumber.trim()) return;
+    
+    const lookupChargerType = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('charger_inventory')
+          .select(`
+            charger_item_id,
+            inventory_items:charger_item_id (
+              id,
+              name,
+              sku
+            )
+          `)
+          .eq('serial_number', serialNumber.trim())
+          .single();
+
+        if (!error && data?.charger_item_id) {
+          console.log('Found charger in inventory:', data);
+          setSelectedChargerTypeId(data.charger_item_id);
+          toast({
+            title: "Charger type detected",
+            description: `Auto-selected: ${data.inventory_items?.name}`,
+          });
+        } else {
+          console.log('Charger not found in inventory, keeping current selection');
+        }
+      } catch (error) {
+        console.log('Error looking up charger type:', error);
+        // Don't show error to user - just keep current selection
+      }
+    };
+
+    // Debounce the lookup to avoid too many API calls
+    const timeoutId = setTimeout(lookupChargerType, 500);
+    return () => clearTimeout(timeoutId);
+  }, [serialNumber, toast]);
+
   // Mutation to save charger usage
   const saveChargerUsage = useMutation({
     mutationFn: async ({ 
@@ -449,7 +489,7 @@ export function ChargerSection({ orderId, engineerId }: ChargerSectionProps) {
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="charger-type-select">Charger Type</Label>
+              <Label htmlFor="charger-type-select">Charger Type (Auto-detected from Serial)</Label>
               <Select value={selectedChargerTypeId} onValueChange={setSelectedChargerTypeId}>
                 <SelectTrigger>
                   <SelectValue placeholder="Choose charger type..." />
