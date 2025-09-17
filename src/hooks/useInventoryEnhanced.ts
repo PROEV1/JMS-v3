@@ -164,7 +164,10 @@ export function useInventoryEnhanced() {
           direction: 'adjust',
           qty: quantity,
           reference: `Stock adjustment: ${reason}`,
-          notes
+          notes,
+          status: 'approved',
+          approved_at: new Date().toISOString(),
+          approved_by: (await supabase.auth.getUser()).data.user?.id
         })
         .select()
         .single();
