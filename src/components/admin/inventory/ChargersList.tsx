@@ -32,6 +32,15 @@ interface ChargerUnit {
   delivered_at: string | null;
   created_at?: string;
   charger_name?: string;
+  assigned_order_id?: string | null;
+  order_details?: {
+    job_address?: string;
+    postcode?: string;
+    clients?: {
+      address?: string;
+      postcode?: string;
+    };
+  };
 }
 
 interface ChargerItem {
@@ -434,15 +443,49 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
                               serial: unit.serial_number,
                               notes: unit.notes,
                               location_name: unit.location_name,
+                              order_id: unit.order_id,
+                              status: unit.status,
                               hasJobLocation: unit.notes?.includes('Job Location:'),
                               hasVanLocation: unit.notes?.includes('Van Location:'),
                               hasLocation: unit.notes?.includes('Location:')
                             });
                             
-                            if (unit.notes && (unit.notes.includes('Job Location:') || unit.notes.includes('Van Location:') || unit.notes.includes('Location:'))) {
-                              return unit.notes.replace(/^.*(?:Job Location|Van Location|Location): /, '');
+                            // Priority 1: Extract from notes if available
+                            if (unit.notes) {
+                              if (unit.notes.includes('Job Location:')) {
+                                const jobLocation = unit.notes.replace(/^.*Job Location: /, '');
+                                console.log('Extracted job location:', jobLocation);
+                                return jobLocation;
+                              } else if (unit.notes.includes('Van Location:')) {
+                                const vanLocation = unit.notes.replace(/^.*Van Location: /, '');
+                                console.log('Extracted van location:', vanLocation);
+                                return vanLocation;
+                              } else if (unit.notes.includes('Location:')) {
+                                const location = unit.notes.replace(/^.*Location: /, '');
+                                console.log('Extracted generic location:', location);
+                                return location;
+                              }
                             }
-                            return unit.location_name || 'Warehouse';
+                            
+                            // Priority 2: Use location name if available
+                            if (unit.location_name) {
+                              console.log('Using location name:', unit.location_name);
+                              return unit.location_name;
+                            }
+                            
+                            // Priority 3: If assigned to order but no location info, show order location
+                            if (unit.order_id && unit.order_details) {
+                              const orderAddress = unit.order_details.clients?.address;
+                              const orderPostcode = unit.order_details.clients?.postcode;
+                              if (orderAddress || orderPostcode) {
+                                const fullAddress = [orderAddress, orderPostcode].filter(Boolean).join(', ');
+                                console.log('Using order address:', fullAddress);
+                                return fullAddress;
+                              }
+                            }
+                            
+                            // Default fallback
+                            return 'Warehouse';
                           })()}
                         </span>
                       </div>
