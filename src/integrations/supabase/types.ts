@@ -4100,7 +4100,7 @@ export type Database = {
         }[]
       }
       get_item_location_balances: {
-        Args: Record<PropertyKey, never>
+        Args: Record<PropertyKey, never> | { location_uuid?: string }
         Returns: {
           item_id: string
           location_id: string
