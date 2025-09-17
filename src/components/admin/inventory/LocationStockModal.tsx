@@ -42,13 +42,13 @@ export function LocationStockModal({ open, onOpenChange, location }: LocationSto
       
       // Get stock balances using the inventory function
       const { data: balances, error: balanceError } = await supabase
-        .rpc('get_item_location_balances');
+        .rpc('get_item_location_balances', { location_uuid: location.id });
       
       if (balanceError) throw balanceError;
       
-      // Filter for this location and get items with stock > 0
+      // Filter for items with stock > 0
       const locationBalances = balances?.filter(
-        (balance: any) => balance.location_id === location.id && balance.on_hand > 0
+        (balance: any) => (balance as any).current_stock > 0
       ) || [];
       
       if (locationBalances.length === 0) return [];
@@ -73,7 +73,7 @@ export function LocationStockModal({ open, onOpenChange, location }: LocationSto
           unit: item.unit,
           default_cost: item.default_cost,
           reorder_point: item.reorder_point,
-          current_stock: balance?.on_hand || 0
+          current_stock: (balance as any)?.current_stock || 0
         };
       }) || [];
     },
