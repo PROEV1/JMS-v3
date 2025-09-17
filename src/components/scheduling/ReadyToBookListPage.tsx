@@ -17,19 +17,7 @@ export function ReadyToBookListPage() {
   // Build search query with enhanced search across related tables  
   const buildSearchQuery = useMemo(() => {
     return async (withPagination = true, withCount = true) => {
-      // First get accepted offers
-      const { data: acceptedOffers, error: offersError } = await supabase
-        .from('job_offers')
-        .select('order_id')
-        .eq('status', 'accepted');
-
-      if (offersError) throw offersError;
-      
-      if (!acceptedOffers?.length) return { data: [], count: 0 };
-
-      const uniqueOrderIds = [...new Set(acceptedOffers.map(offer => offer.order_id))];
-      
-      // Fetch orders with accepted offers that haven't been scheduled yet
+      // Fetch orders that are ready to book - either have accepted offers OR status is date_accepted
       let query = supabase
         .from('orders')
         .select(`
@@ -39,9 +27,8 @@ export function ReadyToBookListPage() {
           partner:partner_id(name),
           quote:quote_id(quote_number)
         `, withCount ? { count: 'exact' } : {})
-        .in('id', uniqueOrderIds)
-        .in('status_enhanced', ['awaiting_install_booking', 'date_accepted'])
-        .is('scheduled_install_date', null)
+        .eq('status_enhanced', 'date_accepted')  // Show orders with date_accepted status
+        .is('scheduled_install_date', null)  // But not yet scheduled
         .eq('scheduling_suppressed', false)
         .order('created_at', { ascending: false });
 

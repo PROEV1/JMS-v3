@@ -86,11 +86,6 @@ export function StatusChangeDropdown({ order, onStatusChanged }: StatusChangeDro
       // Dispatch refresh event to update other components
       window.dispatchEvent(new CustomEvent('scheduling:refresh'));
       
-      // Force page refresh to ensure data consistency
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
-      
     } catch (error) {
       console.error('❌ Status change error:', error);
       toast.error('Failed to change status');
