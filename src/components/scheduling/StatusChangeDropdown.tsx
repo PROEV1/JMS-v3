@@ -78,12 +78,18 @@ export function StatusChangeDropdown({ order, onStatusChanged }: StatusChangeDro
       const statusLabel = STATUS_OPTIONS.find(opt => opt.value === newStatus)?.label || newStatus;
       toast.success(`Status changed to: ${statusLabel}`);
       
+      // Trigger comprehensive refresh
       if (onStatusChanged) {
         onStatusChanged();
       }
       
       // Dispatch refresh event to update other components
       window.dispatchEvent(new CustomEvent('scheduling:refresh'));
+      
+      // Force page refresh to ensure data consistency
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
       
     } catch (error) {
       console.error('❌ Status change error:', error);
