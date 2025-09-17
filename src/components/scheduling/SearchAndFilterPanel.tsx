@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -6,7 +6,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Search, Filter, X, RefreshCw } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Search, Filter, X, RefreshCw, ChevronDown, Users, Briefcase, Activity } from 'lucide-react';
 import { Engineer } from '@/utils/schedulingUtils';
 
 interface SearchFilters {
@@ -68,6 +69,10 @@ export function SearchAndFilterPanel({
   onReset,
   className = ''
 }: SearchAndFilterPanelProps) {
+  const [isEngineersOpen, setIsEngineersOpen] = useState(false);
+  const [isJobTypesOpen, setIsJobTypesOpen] = useState(false);
+  const [isStatusOpen, setIsStatusOpen] = useState(false);
+
   const updateFilters = (updates: Partial<SearchFilters>) => {
     onFiltersChange({ ...filters, ...updates });
   };
@@ -109,10 +114,10 @@ export function SearchAndFilterPanel({
 
   return (
     <Card className={`${className}`}>
-      <CardHeader className="pb-4">
+      <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Filter className="h-5 w-5" />
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Filter className="h-4 w-4" />
             Search & Filters
           </CardTitle>
           {hasActiveFilters && (
@@ -120,9 +125,9 @@ export function SearchAndFilterPanel({
               variant="outline"
               size="sm"
               onClick={onReset}
-              className="flex items-center gap-2"
+              className="flex items-center gap-1 h-8 px-2 text-xs"
             >
-              <RefreshCw className="h-4 w-4" />
+              <RefreshCw className="h-3 w-3" />
               Reset
             </Button>
           )}
@@ -130,140 +135,147 @@ export function SearchAndFilterPanel({
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Search Input */}
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">Search</Label>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search by engineer, client, order number, or postcode..."
-              value={filters.searchTerm}
-              onChange={(e) => updateFilters({ searchTerm: e.target.value })}
-              className="pl-10"
-            />
-          </div>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search engineers, clients, orders, postcodes..."
+            value={filters.searchTerm}
+            onChange={(e) => updateFilters({ searchTerm: e.target.value })}
+            className="pl-10 h-9"
+          />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {/* Engineers Filter */}
-          <div className="space-y-2">
-            <Label className="text-sm font-medium">
-              Engineers ({filters.selectedEngineers.length} selected)
-            </Label>
-            <div className="space-y-2 max-h-40 overflow-y-auto border rounded-md p-2">
-              {engineers.map((engineer) => (
-                <div key={engineer.id} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={engineer.id}
-                    checked={filters.selectedEngineers.includes(engineer.id)}
-                    onCheckedChange={() => toggleEngineer(engineer.id)}
-                  />
-                  <Label
-                    htmlFor={engineer.id}
-                    className="text-sm cursor-pointer flex-1"
-                  >
-                    {engineer.name}
-                  </Label>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Job Types Filter */}
-          <div className="space-y-2">
-            <Label className="text-sm font-medium">
-              Job Types ({filters.jobTypes.length} selected)
-            </Label>
-            <div className="space-y-2 border rounded-md p-2">
-              {JOB_TYPES.map((type) => (
-                <div key={type} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={type}
-                    checked={filters.jobTypes.includes(type)}
-                    onCheckedChange={() => toggleJobType(type)}
-                  />
-                  <Label
-                    htmlFor={type}
-                    className="text-sm cursor-pointer flex-1 capitalize"
-                  >
-                    {type}
-                  </Label>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Status Filter */}
-          <div className="space-y-2">
-            <Label className="text-sm font-medium">
-              Status ({filters.statuses.length} selected)
-            </Label>
-            <div className="space-y-2 max-h-40 overflow-y-auto border rounded-md p-2">
-              {ORDER_STATUSES.map((status) => (
-                <div key={status} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={status}
-                    checked={filters.statuses.includes(status)}
-                    onCheckedChange={() => toggleStatus(status)}
-                  />
-                  <Label
-                    htmlFor={status}
-                    className="text-sm cursor-pointer flex-1 capitalize"
-                  >
-                    {status.replace('_', ' ')}
-                  </Label>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Region and Date Range */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label className="text-sm font-medium">Region</Label>
-            <Select value={filters.region} onValueChange={(value) => updateFilters({ region: value })}>
-              <SelectTrigger>
-                <SelectValue placeholder="All Regions" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Regions</SelectItem>
-                {REGIONS.map((region) => (
-                  <SelectItem key={region} value={region}>
-                    {region.charAt(0).toUpperCase() + region.slice(1)}
-                  </SelectItem>
+        {/* Quick Filters Row */}
+        <div className="flex flex-wrap gap-2">
+          {/* Engineers Collapsible */}
+          <Collapsible open={isEngineersOpen} onOpenChange={setIsEngineersOpen}>
+            <CollapsibleTrigger asChild>
+              <Button variant="outline" size="sm" className="flex items-center gap-1 h-8">
+                <Users className="h-3 w-3" />
+                Engineers ({filters.selectedEngineers.length})
+                <ChevronDown className={`h-3 w-3 transition-transform ${isEngineersOpen ? 'rotate-180' : ''}`} />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="absolute z-[60] mt-1 bg-background border rounded-md shadow-lg p-2 max-w-xs max-h-48 overflow-y-auto min-w-[200px]">
+              <div className="grid grid-cols-1 gap-1">
+                {engineers.slice(0, 10).map((engineer) => (
+                  <div key={engineer.id} className="flex items-center space-x-2 py-1">
+                    <Checkbox
+                      id={engineer.id}
+                      checked={filters.selectedEngineers.includes(engineer.id)}
+                      onCheckedChange={() => toggleEngineer(engineer.id)}
+                      className="h-3 w-3"
+                    />
+                    <Label htmlFor={engineer.id} className="text-xs cursor-pointer flex-1">
+                      {engineer.name}
+                    </Label>
+                  </div>
                 ))}
-              </SelectContent>
-            </Select>
-          </div>
+                {engineers.length > 10 && (
+                  <div className="text-xs text-muted-foreground px-1 py-1">
+                    +{engineers.length - 10} more...
+                  </div>
+                )}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
 
-          <div className="space-y-2">
-            <Label className="text-sm font-medium">Date Range</Label>
-            <Select value={filters.dateRange} onValueChange={(value) => updateFilters({ dateRange: value })}>
-              <SelectTrigger>
-                <SelectValue placeholder="All Dates" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Dates</SelectItem>
-                {DATE_RANGES.map((range) => (
-                  <SelectItem key={range.value} value={range.value}>
-                    {range.label}
-                  </SelectItem>
+          {/* Job Types Collapsible */}
+          <Collapsible open={isJobTypesOpen} onOpenChange={setIsJobTypesOpen}>
+            <CollapsibleTrigger asChild>
+              <Button variant="outline" size="sm" className="flex items-center gap-1 h-8">
+                <Briefcase className="h-3 w-3" />
+                Job Types ({filters.jobTypes.length})
+                <ChevronDown className={`h-3 w-3 transition-transform ${isJobTypesOpen ? 'rotate-180' : ''}`} />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="absolute z-[60] mt-1 bg-background border rounded-md shadow-lg p-2 max-w-xs min-w-[180px]">
+              <div className="grid grid-cols-1 gap-1">
+                {JOB_TYPES.map((type) => (
+                  <div key={type} className="flex items-center space-x-2 py-1">
+                    <Checkbox
+                      id={type}
+                      checked={filters.jobTypes.includes(type)}
+                      onCheckedChange={() => toggleJobType(type)}
+                      className="h-3 w-3"
+                    />
+                    <Label htmlFor={type} className="text-xs cursor-pointer flex-1 capitalize">
+                      {type.replace('_', ' ')}
+                    </Label>
+                  </div>
                 ))}
-              </SelectContent>
-            </Select>
-          </div>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+
+          {/* Status Collapsible */}
+          <Collapsible open={isStatusOpen} onOpenChange={setIsStatusOpen}>
+            <CollapsibleTrigger asChild>
+              <Button variant="outline" size="sm" className="flex items-center gap-1 h-8">
+                <Activity className="h-3 w-3" />
+                Status ({filters.statuses.length})
+                <ChevronDown className={`h-3 w-3 transition-transform ${isStatusOpen ? 'rotate-180' : ''}`} />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="absolute z-[60] mt-1 bg-background border rounded-md shadow-lg p-2 max-w-xs max-h-48 overflow-y-auto min-w-[180px]">
+              <div className="grid grid-cols-1 gap-1">
+                {ORDER_STATUSES.map((status) => (
+                  <div key={status} className="flex items-center space-x-2 py-1">
+                    <Checkbox
+                      id={status}
+                      checked={filters.statuses.includes(status)}
+                      onCheckedChange={() => toggleStatus(status)}
+                      className="h-3 w-3"
+                    />
+                    <Label htmlFor={status} className="text-xs cursor-pointer flex-1 capitalize">
+                      {status.replace('_', ' ')}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+
+          {/* Region Select */}
+          <Select value={filters.region} onValueChange={(value) => updateFilters({ region: value })}>
+            <SelectTrigger className="w-32 h-8">
+              <SelectValue placeholder="Region" />
+            </SelectTrigger>
+            <SelectContent className="z-[60] bg-background border shadow-lg">
+              <SelectItem value="all">All Regions</SelectItem>
+              {REGIONS.map((region) => (
+                <SelectItem key={region} value={region}>
+                  {region.charAt(0).toUpperCase() + region.slice(1)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Date Range Select */}
+          <Select value={filters.dateRange} onValueChange={(value) => updateFilters({ dateRange: value })}>
+            <SelectTrigger className="w-32 h-8">
+              <SelectValue placeholder="Date Range" />
+            </SelectTrigger>
+            <SelectContent className="z-[60] bg-background border shadow-lg">
+              <SelectItem value="all">All Dates</SelectItem>
+              {DATE_RANGES.map((range) => (
+                <SelectItem key={range.value} value={range.value}>
+                  {range.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Active Filters Display */}
         {hasActiveFilters && (
           <div className="space-y-2">
-            <Label className="text-sm font-medium">Active Filters:</Label>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1">
               {filters.searchTerm && (
-                <Badge variant="secondary" className="flex items-center gap-1">
-                  Search: {filters.searchTerm}
+                <Badge variant="secondary" className="flex items-center gap-1 text-xs px-2 py-0.5">
+                  {filters.searchTerm}
                   <X 
-                    className="h-3 w-3 cursor-pointer" 
+                    className="h-3 w-3 cursor-pointer hover:bg-muted rounded" 
                     onClick={() => updateFilters({ searchTerm: '' })}
                   />
                 </Badge>
@@ -271,47 +283,47 @@ export function SearchAndFilterPanel({
               {filters.selectedEngineers.map((engineerId) => {
                 const engineer = engineers.find(e => e.id === engineerId);
                 return engineer ? (
-                  <Badge key={engineerId} variant="secondary" className="flex items-center gap-1">
+                  <Badge key={engineerId} variant="secondary" className="flex items-center gap-1 text-xs px-2 py-0.5">
                     {engineer.name}
                     <X 
-                      className="h-3 w-3 cursor-pointer" 
+                      className="h-3 w-3 cursor-pointer hover:bg-muted rounded" 
                       onClick={() => toggleEngineer(engineerId)}
                     />
                   </Badge>
                 ) : null;
               })}
               {filters.jobTypes.map((type) => (
-                <Badge key={type} variant="secondary" className="flex items-center gap-1 capitalize">
-                  {type}
+                <Badge key={type} variant="secondary" className="flex items-center gap-1 text-xs px-2 py-0.5 capitalize">
+                  {type.replace('_', ' ')}
                   <X 
-                    className="h-3 w-3 cursor-pointer" 
+                    className="h-3 w-3 cursor-pointer hover:bg-muted rounded" 
                     onClick={() => toggleJobType(type)}
                   />
                 </Badge>
               ))}
               {filters.statuses.map((status) => (
-                <Badge key={status} variant="secondary" className="flex items-center gap-1 capitalize">
+                <Badge key={status} variant="secondary" className="flex items-center gap-1 text-xs px-2 py-0.5 capitalize">
                   {status.replace('_', ' ')}
                   <X 
-                    className="h-3 w-3 cursor-pointer" 
+                    className="h-3 w-3 cursor-pointer hover:bg-muted rounded" 
                     onClick={() => toggleStatus(status)}
                   />
                 </Badge>
               ))}
               {filters.region !== 'all' && (
-                <Badge variant="secondary" className="flex items-center gap-1 capitalize">
-                  Region: {filters.region}
+                <Badge variant="secondary" className="flex items-center gap-1 text-xs px-2 py-0.5 capitalize">
+                  {filters.region}
                   <X 
-                    className="h-3 w-3 cursor-pointer" 
+                    className="h-3 w-3 cursor-pointer hover:bg-muted rounded" 
                     onClick={() => updateFilters({ region: 'all' })}
                   />
                 </Badge>
               )}
               {filters.dateRange !== 'all' && (
-                <Badge variant="secondary" className="flex items-center gap-1">
+                <Badge variant="secondary" className="flex items-center gap-1 text-xs px-2 py-0.5">
                   {DATE_RANGES.find(r => r.value === filters.dateRange)?.label || filters.dateRange}
                   <X 
-                    className="h-3 w-3 cursor-pointer" 
+                    className="h-3 w-3 cursor-pointer hover:bg-muted rounded" 
                     onClick={() => updateFilters({ dateRange: 'all' })}
                   />
                 </Badge>
