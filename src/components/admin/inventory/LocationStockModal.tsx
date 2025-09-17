@@ -24,6 +24,8 @@ interface StockItem {
   default_cost: number;
   reorder_point: number;
   current_stock: number;
+  latest_notes?: string;
+  latest_transaction_date?: string;
 }
 
 export function LocationStockModal({ open, onOpenChange, location }: LocationStockModalProps) {
@@ -63,9 +65,20 @@ export function LocationStockModal({ open, onOpenChange, location }: LocationSto
         
       if (itemsError) throw itemsError;
       
+      // Get latest transaction notes for each item
+      const { data: recentTransactions } = await supabase
+        .from('inventory_txns')
+        .select('item_id, notes, created_at')
+        .eq('location_id', location.id)
+        .in('item_id', itemIds)
+        .not('notes', 'is', null)
+        .order('created_at', { ascending: false });
+
       // Combine data
       return items?.map(item => {
         const balance = locationBalances.find((b: any) => b.item_id === item.id);
+        const latestTransaction = recentTransactions?.find(txn => txn.item_id === item.id);
+        
         return {
           item_id: item.id,
           name: item.name,
@@ -73,7 +86,9 @@ export function LocationStockModal({ open, onOpenChange, location }: LocationSto
           unit: item.unit,
           default_cost: item.default_cost,
           reorder_point: item.reorder_point,
-          current_stock: (balance as any)?.current_stock || 0
+          current_stock: (balance as any)?.current_stock || 0,
+          latest_notes: latestTransaction?.notes,
+          latest_transaction_date: latestTransaction?.created_at
         };
       }) || [];
     },
@@ -291,6 +306,17 @@ export function LocationStockModal({ open, onOpenChange, location }: LocationSto
                             <span>Reorder at: {item.reorder_point}</span>
                             <span>Unit: {item.unit}</span>
                           </div>
+                          {item.latest_notes && (
+                            <div className="mt-2 p-2 bg-muted/30 rounded text-sm">
+                              <div className="text-xs text-muted-foreground mb-1">Latest notes:</div>
+                              <div className="text-sm">{item.latest_notes}</div>
+                              {item.latest_transaction_date && (
+                                <div className="text-xs text-muted-foreground mt-1">
+                                  {new Date(item.latest_transaction_date).toLocaleDateString()}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                         
                         <div className="flex items-center gap-3">
