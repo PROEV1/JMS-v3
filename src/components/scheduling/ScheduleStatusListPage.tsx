@@ -19,6 +19,7 @@ import { SendOfferModal } from './SendOfferModal';
 import { SmartAssignmentModal } from './SmartAssignmentModal';
 import { AutoScheduleReviewModal } from './AutoScheduleReviewModal';
 import { OfferStatusBadge } from './OfferStatusBadge';
+import { StatusChangeDropdown } from './StatusChangeDropdown';
 import { useJobOffers } from '@/hooks/useJobOffers';
 import { getBestPostcode } from '@/utils/postcodeUtils';
 import { Paginator } from '@/components/ui/Paginator';
@@ -1148,10 +1149,11 @@ export function ScheduleStatusListPage({
                         </span>
                       </div>
 
-                      {/* Actions - Right Aligned */}
-                      <div className="col-span-2">
-                        <div className="flex gap-2 justify-end">
-                          {(() => {
+                       {/* Actions - Right Aligned */}
+                       <div className="col-span-2">
+                         <div className="flex gap-2 justify-end items-center">
+                           <StatusChangeDropdown order={order} onStatusChanged={onUpdate} />
+                           {(() => {
                             // CRITICAL: Null safety check before accessing order.id
                             if (!order || !order.id) return null;
                             
@@ -1381,10 +1383,12 @@ export function ScheduleStatusListPage({
                             {order.job_address}
                           </div>
                         )}
-                      </div>
+                       </div>
 
-                        <div className="flex gap-2 pt-2 border-t">
-                          {(() => {
+                       <div className="space-y-2">
+                         <StatusChangeDropdown order={order} onStatusChanged={onUpdate} />
+                         <div className="flex gap-2 pt-2 border-t">
+                           {(() => {
                             // CRITICAL: Null safety check before accessing order.id
                             if (!order || !order.id) return null;
                             
@@ -1556,7 +1560,8 @@ export function ScheduleStatusListPage({
                                 </Button>
                               );
                            }
-                         })()}
+                          })()}
+                        </div>
                       </div>
                     </div>
                   </CardContent>
