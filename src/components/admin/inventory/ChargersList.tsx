@@ -439,53 +439,38 @@ export function ChargersList({ onSwitchTab }: ChargersListProps) {
                         <MapPin className="w-3 h-3 text-muted-foreground" />
                         <span className="text-sm">
                           {(() => {
-                            console.log('Unit location debug:', {
-                              serial: unit.serial_number,
-                              notes: unit.notes,
-                              location_name: unit.location_name,
-                              order_id: unit.order_id,
-                              status: unit.status,
-                              hasJobLocation: unit.notes?.includes('Job Location:'),
-                              hasVanLocation: unit.notes?.includes('Van Location:'),
-                              hasLocation: unit.notes?.includes('Location:')
-                            });
-                            
-                            // Priority 1: Extract from notes if available
-                            if (unit.notes) {
-                              if (unit.notes.includes('Job Location:')) {
-                                const jobLocation = unit.notes.replace(/^.*Job Location: /, '');
-                                console.log('Extracted job location:', jobLocation);
-                                return jobLocation;
-                              } else if (unit.notes.includes('Van Location:')) {
-                                const vanLocation = unit.notes.replace(/^.*Van Location: /, '');
-                                console.log('Extracted van location:', vanLocation);
-                                return vanLocation;
-                              } else if (unit.notes.includes('Location:')) {
-                                const location = unit.notes.replace(/^.*Location: /, '');
-                                console.log('Extracted generic location:', location);
-                                return location;
+                            // Get the address to display
+                            const displayAddress = (() => {
+                              // Priority 1: Extract from notes if available
+                              if (unit.notes) {
+                                if (unit.notes.includes('Job Location:')) {
+                                  return unit.notes.replace(/^.*Job Location: /, '');
+                                } else if (unit.notes.includes('Van Location:')) {
+                                  return unit.notes.replace(/^.*Van Location: /, '');
+                                } else if (unit.notes.includes('Location:')) {
+                                  return unit.notes.replace(/^.*Location: /, '');
+                                }
                               }
-                            }
-                            
-                            // Priority 2: Use location name if available
-                            if (unit.location_name) {
-                              console.log('Using location name:', unit.location_name);
-                              return unit.location_name;
-                            }
-                            
-                            // Priority 3: If assigned to order but no location info, show order location
-                            if (unit.order_id && unit.order_details) {
-                              const orderAddress = unit.order_details.clients?.address;
-                              const orderPostcode = unit.order_details.clients?.postcode;
-                              if (orderAddress || orderPostcode) {
-                                const fullAddress = [orderAddress, orderPostcode].filter(Boolean).join(', ');
-                                console.log('Using order address:', fullAddress);
-                                return fullAddress;
+                              
+                              // Priority 2: Use location name if available
+                              if (unit.location_name) {
+                                return unit.location_name;
                               }
-                            }
+                              
+                              // Priority 3: If assigned to order but no location info, show order location
+                              if (unit.order_id && unit.order_details) {
+                                const orderAddress = unit.order_details.clients?.address;
+                                const orderPostcode = unit.order_details.clients?.postcode;
+                                if (orderAddress || orderPostcode) {
+                                  return [orderAddress, orderPostcode].filter(Boolean).join(', ');
+                                }
+                              }
+                              
+                              // Default fallback
+                              return 'Warehouse';
+                            })();
                             
-                            // Default fallback
-                            return 'Warehouse';
+                            return displayAddress;
                           })()}
                         </span>
                       </div>

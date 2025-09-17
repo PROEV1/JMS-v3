@@ -273,19 +273,23 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
         });
 
        // Update the charger_inventory record with the engineer, location, and order assignment
+       const updateData = {
+         engineer_id: finalEngineerId,
+         location_id: finalLocationId,
+         assigned_order_id: (orderId && orderId !== 'none') ? orderId : null,
+         status: status,
+         notes: notes,
+         updated_at: new Date().toISOString()
+       };
+       
+       console.log('Updating charger with data:', updateData);
+       
        const { data, error } = await supabase
          .from('charger_inventory')
-         .update({
-           engineer_id: finalEngineerId,
-           location_id: finalLocationId,
-           assigned_order_id: orderId || null,
-           status: status,
-           notes: notes,
-           updated_at: new Date().toISOString()
-         })
-        .eq('id', charger.id)
-        .select()
-        .single();
+         .update(updateData)
+         .eq('id', charger.id)
+         .select()
+         .single();
 
       if (error) {
         console.error('Database error:', error);
@@ -299,9 +303,17 @@ export function AssignChargerModal({ open, onOpenChange, charger, chargerModel }
         title: "Success",
         description: `Charger ${charger?.serial_number} assigned successfully`,
       });
+      // Force a complete refresh of all related queries
       queryClient.invalidateQueries({ queryKey: ["charger-items"] });
       queryClient.invalidateQueries({ queryKey: ["charger-metrics"] });
+      queryClient.invalidateQueries({ queryKey: ["inventory-locations"] });
+      queryClient.refetchQueries({ queryKey: ["charger-items"] });
       onOpenChange(false);
+      
+      // Force page refresh to ensure data is updated
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
     },
     onError: (error: any) => {
       console.error('Error assigning charger:', error);
