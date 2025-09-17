@@ -20,12 +20,17 @@ interface StatusChangeDropdownProps {
 // Define which statuses can be changed and their display names
 const STATUS_OPTIONS = [
   { value: 'awaiting_install_booking', label: 'Needs Scheduling' },
+  { value: 'date_offered', label: 'Date Offered' },
+  { value: 'date_accepted', label: 'Ready to Book' },
+  { value: 'date_rejected', label: 'Date Rejected' },
+  { value: 'offer_expired', label: 'Offer Expired' },
   { value: 'on_hold_parts_docs', label: 'On Hold - Parts/Docs' },
   { value: 'awaiting_payment', label: 'Awaiting Payment' },
   { value: 'awaiting_agreement', label: 'Awaiting Agreement' },
   { value: 'awaiting_survey_submission', label: 'Awaiting Survey' },
   { value: 'awaiting_survey_review', label: 'Survey Under Review' },
   { value: 'survey_rework_requested', label: 'Survey Rework Needed' },
+  { value: 'needs_quote_acceptance', label: 'Needs Quote Acceptance' },
   { value: 'cancelled', label: 'Cancelled' },
 ] as const;
 
@@ -35,22 +40,20 @@ export function StatusChangeDropdown({ order, onStatusChanged }: StatusChangeDro
 
   // Check if this order can have its status changed
   const canChangeStatus = () => {
-    // Don't allow status changes for orders that are:
-    // - Already scheduled/assigned to an engineer
+    // Only block status changes for orders that are:
+    // - Actually scheduled with a date AND assigned to an engineer
     // - Currently in progress or completed
-    // - Have active offers that would conflict
     const blockedStatuses = [
-      'scheduled', 
       'in_progress', 
       'install_completed_pending_qa', 
-      'completed',
-      'date_offered', // Has active offer
-      'date_accepted' // Has accepted offer
+      'completed'
     ];
     
-    return !blockedStatuses.includes(order.status_enhanced || '') && 
-           !order.engineer_id && // Not assigned to engineer
-           !order.scheduled_install_date; // Not scheduled yet
+    // Block if it's a final status OR if it's actually scheduled (has both date and engineer)
+    const isActuallyScheduled = order.scheduled_install_date && order.engineer_id;
+    const hasBlockedStatus = blockedStatuses.includes(order.status_enhanced || '');
+    
+    return !hasBlockedStatus && !isActuallyScheduled;
   };
 
   const handleStatusChange = async (newStatus: string) => {
