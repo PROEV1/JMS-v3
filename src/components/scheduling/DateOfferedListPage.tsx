@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { ScheduleStatusNavigation } from './ScheduleStatusNavigation';
@@ -12,67 +12,28 @@ import { FixOrderStatusButton } from '../admin/FixOrderStatusButton';
 export function DateOfferedListPage() {
   const { pagination, controls } = useServerPagination();
 
-  const { data: ordersResponse = { data: [], count: 0 }, isLoading: ordersLoading } = useQuery({
-    queryKey: ['orders', 'date-offered-optimized', pagination.page, pagination.pageSize],
+  const { data: ordersResponse = { data: [], count: 0 }, isLoading: ordersLoading, refetch: refetchOrders } = useQuery({
+    queryKey: ['orders', 'date-offered', pagination.page, pagination.pageSize],
     queryFn: async () => {
-      const startTime = performance.now();
-      console.log('DateOfferedListPage: Using optimized RPC for date offered orders...');
+      let query = supabase
+        .from('orders')
+        .select(`
+          *,
+          client:client_id(full_name, email, phone, postcode, address),
+          engineer:engineer_id(name, email, region),
+          partner:partner_id(name)
+        `, { count: 'exact' })
+        .eq('status_enhanced', 'date_offered')
+        .eq('scheduling_suppressed', false)
+        .is('scheduled_install_date', null)
+        .order('created_at', { ascending: false });
+
+      query = query.range(pagination.offset, pagination.offset + pagination.pageSize - 1);
+
+      const { data, error, count } = await query;
+      if (error) throw error;
       
-      const { data: ordersData, error } = await supabase.rpc('get_date_offered_orders', {
-        p_limit: pagination.pageSize,
-        p_offset: pagination.offset
-      });
-
-      if (error) {
-        console.error('DateOfferedListPage: Error fetching date offered orders:', error);
-        throw error;
-      }
-
-      // Transform RPC result to match expected format
-      const transformedOrders = ordersData?.map(order => ({
-        id: order.id,
-        order_number: order.order_number,
-        client_id: order.client_id,
-        engineer_id: order.engineer_id,
-        scheduled_install_date: order.scheduled_install_date,
-        status_enhanced: order.status_enhanced,
-        created_at: order.created_at,
-        estimated_duration_hours: order.estimated_duration_hours,
-        job_type: order.job_type as 'installation' | 'assessment' | 'service_call' | string,
-        status: 'pending', // Add required status field
-        client: order.client_full_name ? {
-          full_name: order.client_full_name,
-          email: order.client_email,
-          phone: order.client_phone,
-          postcode: order.client_postcode,
-          address: order.client_address
-        } : null,
-        engineer: order.engineer_name ? {
-          name: order.engineer_name,
-          email: null,
-          region: null
-        } : null,
-        partner: order.partner_name ? {
-          name: order.partner_name
-        } : null,
-        job_offers: [{
-          id: order.offer_id,
-          order_id: order.id,
-          engineer_id: order.offer_engineer_id, // Use the offer's engineer_id, not the order's
-          status: 'pending' as const,
-          expires_at: order.offer_expires_at,
-          offered_date: order.offer_offered_date,
-          time_window: order.offer_time_window,
-          created_at: order.offer_offered_date
-        }]
-      })) || [];
-
-      const endTime = performance.now();
-      console.log(`DateOfferedListPage: Loaded ${transformedOrders.length} orders in ${(endTime - startTime).toFixed(2)}ms`);
-      
-      // For pagination, we'll need to get total count separately or estimate
-      // For now, using the current result length as estimate
-      return { data: transformedOrders, count: transformedOrders.length };
+      return { data: data || [], count: count || 0 };
     },
     placeholderData: keepPreviousData,
   });
@@ -94,6 +55,39 @@ export function DateOfferedListPage() {
     },
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
+
+  // Listen for scheduling refresh events and real-time updates
+  useEffect(() => {
+    const handleRefresh = () => {
+      console.log('DateOfferedListPage: Received refresh event, refetching data...');
+      refetchOrders();
+    };
+    
+    // Listen for custom refresh events
+    window.addEventListener('scheduling:refresh', handleRefresh);
+    
+    // Set up real-time subscriptions for orders
+    const ordersChannel = supabase
+      .channel('date-offered-orders')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'orders'
+        },
+        () => {
+          console.log('DateOfferedListPage: Orders real-time update received');
+          refetchOrders();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      window.removeEventListener('scheduling:refresh', handleRefresh);
+      supabase.removeChannel(ordersChannel);
+    };
+  }, [refetchOrders]);
 
   if (ordersLoading || engineersLoading) {
     return (
@@ -128,7 +122,6 @@ export function DateOfferedListPage() {
             onPageChange={controls.setPage}
             onPageSizeChange={controls.setPageSize}
             exportQueryBuilder={async () => {
-              // For export, use the same direct query logic
               const { data, error } = await supabase
                 .from('orders')
                 .select(`
@@ -136,13 +129,12 @@ export function DateOfferedListPage() {
                   client:client_id(full_name, email, phone, postcode, address),
                   engineer:engineer_id(name, email, region),
                   partner:partner_id(name),
-                  quote:quote_id(quote_number),
-                  job_offers!inner(id, status, offered_date, expires_at)
+                  quote:quote_id(quote_number)
                 `)
-                .eq('job_offers.status', 'pending')
-                .gt('job_offers.expires_at', new Date().toISOString())
+                .eq('status_enhanced', 'date_offered')
+                .eq('scheduling_suppressed', false)
                 .is('scheduled_install_date', null)
-                .order('job_offers.created_at', { ascending: false });
+                .order('created_at', { ascending: false });
               
               if (error) throw error;
               return data || [];

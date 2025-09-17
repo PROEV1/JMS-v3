@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { ScheduleStatusNavigation } from './ScheduleStatusNavigation';
@@ -11,43 +11,9 @@ import { keepPreviousData } from '@tanstack/react-query';
 export function DateRejectedListPage() {
   const { pagination, controls } = useServerPagination();
 
-  const { data: ordersResponse = { data: [], count: 0 }, isLoading: ordersLoading } = useQuery({
+  const { data: ordersResponse = { data: [], count: 0 }, isLoading: ordersLoading, refetch: refetchOrders } = useQuery({
     queryKey: ['orders', 'date-rejected', pagination.page, pagination.pageSize],
     queryFn: async () => {
-      // Get rejected offers
-      const { data: rejectedOffers, error: rejectedError } = await supabase
-        .from('job_offers')
-        .select('order_id')
-        .eq('status', 'rejected');
-
-      if (rejectedError) throw rejectedError;
-      
-      if (!rejectedOffers?.length) return { data: [], count: 0 };
-
-      // Get active offers to exclude orders that have them
-      const { data: activeOffers } = await supabase
-        .from('job_offers')
-        .select('order_id')
-        .in('status', ['pending', 'accepted'])
-        .gt('expires_at', new Date().toISOString());
-
-      const ordersWithActiveOffers = new Set(activeOffers?.map(offer => offer.order_id) || []);
-      
-      // Also exclude orders that are already scheduled/completed/cancelled
-      const { data: scheduledOrders } = await supabase
-        .from('orders')
-        .select('id')
-        .in('status_enhanced', ['scheduled', 'in_progress', 'install_completed_pending_qa', 'completed', 'cancelled'])
-        .in('id', [...new Set(rejectedOffers.map(offer => offer.order_id))]);
-
-      const scheduledOrderIds = new Set(scheduledOrders?.map(order => order.id) || []);
-      
-      const uniqueRejectedOrderIds = [...new Set(rejectedOffers.map(offer => offer.order_id))]
-        .filter(orderId => !ordersWithActiveOffers.has(orderId) && !scheduledOrderIds.has(orderId));
-
-      if (!uniqueRejectedOrderIds.length) return { data: [], count: 0 };
-
-      // Fetch orders with pagination
       let query = supabase
         .from('orders')
         .select(`
@@ -56,7 +22,9 @@ export function DateRejectedListPage() {
           engineer:engineer_id(name, email, region),
           partner:partner_id(name)
         `, { count: 'exact' })
-        .in('id', uniqueRejectedOrderIds)
+        .eq('status_enhanced', 'date_rejected')
+        .eq('scheduling_suppressed', false)
+        .is('scheduled_install_date', null)
         .order('created_at', { ascending: false });
 
       query = query.range(pagination.offset, pagination.offset + pagination.pageSize - 1);
@@ -85,6 +53,39 @@ export function DateRejectedListPage() {
       return data || [];
     }
   });
+
+  // Listen for scheduling refresh events and real-time updates
+  useEffect(() => {
+    const handleRefresh = () => {
+      console.log('DateRejectedListPage: Received refresh event, refetching data...');
+      refetchOrders();
+    };
+    
+    // Listen for custom refresh events
+    window.addEventListener('scheduling:refresh', handleRefresh);
+    
+    // Set up real-time subscriptions for orders
+    const ordersChannel = supabase
+      .channel('date-rejected-orders')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'orders'
+        },
+        () => {
+          console.log('DateRejectedListPage: Orders real-time update received');
+          refetchOrders();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      window.removeEventListener('scheduling:refresh', handleRefresh);
+      supabase.removeChannel(ordersChannel);
+    };
+  }, [refetchOrders]);
 
   if (ordersLoading || engineersLoading) {
     return (
@@ -116,39 +117,6 @@ export function DateRejectedListPage() {
             onPageChange={controls.setPage}
             onPageSizeChange={controls.setPageSize}
             exportQueryBuilder={async () => {
-              // Get rejected offers
-              const { data: rejectedOffers, error: rejectedError } = await supabase
-                .from('job_offers')
-                .select('order_id')
-                .eq('status', 'rejected');
-
-              if (rejectedError) throw rejectedError;
-              
-              if (!rejectedOffers?.length) return [];
-
-              // Get active offers to exclude orders that have them
-              const { data: activeOffers } = await supabase
-                .from('job_offers')
-                .select('order_id')
-                .in('status', ['pending', 'accepted'])
-                .gt('expires_at', new Date().toISOString());
-
-              const ordersWithActiveOffers = new Set(activeOffers?.map(offer => offer.order_id) || []);
-              
-              // Also exclude orders that are already scheduled/completed/cancelled
-              const { data: scheduledOrders } = await supabase
-                .from('orders')
-                .select('id')
-                .in('status_enhanced', ['scheduled', 'in_progress', 'install_completed_pending_qa', 'completed', 'cancelled'])
-                .in('id', [...new Set(rejectedOffers.map(offer => offer.order_id))]);
-
-              const scheduledOrderIds = new Set(scheduledOrders?.map(order => order.id) || []);
-              
-              const uniqueRejectedOrderIds = [...new Set(rejectedOffers.map(offer => offer.order_id))]
-                .filter(orderId => !ordersWithActiveOffers.has(orderId) && !scheduledOrderIds.has(orderId));
-
-              if (!uniqueRejectedOrderIds.length) return [];
-
               const { data, error } = await supabase
                 .from('orders')
                 .select(`
@@ -158,7 +126,9 @@ export function DateRejectedListPage() {
                   partner:partner_id(name),
                   quote:quote_id(quote_number)
                 `)
-                .in('id', uniqueRejectedOrderIds)
+                .eq('status_enhanced', 'date_rejected')
+                .eq('scheduling_suppressed', false)
+                .is('scheduled_install_date', null)
                 .order('created_at', { ascending: false });
               
               if (error) throw error;
