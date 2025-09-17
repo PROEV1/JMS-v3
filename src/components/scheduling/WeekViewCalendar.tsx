@@ -4,10 +4,24 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Order, Engineer, getStatusColor, getOrderEstimatedHours } from '@/utils/schedulingUtils';
 import { getJobTypeLabel } from '@/utils/jobTypeUtils';
-import { ChevronLeft, ChevronRight, User, AlertTriangle, Clock, MapPin, Eye, EyeOff } from 'lucide-react';
+import { ChevronLeft, ChevronRight, User, AlertTriangle, Clock, MapPin, Eye, EyeOff, Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { AddCalendarItemModal } from './AddCalendarItemModal';
+
+interface CalendarItem {
+  id: string;
+  item_type: string;
+  title: string;
+  description?: string;
+  start_date: string;
+  end_date?: string;
+  start_time?: string;
+  end_time?: string;
+  all_day: boolean;
+  color: string;
+}
 
 interface WeekViewCalendarProps {
   orders: Order[];
@@ -26,6 +40,9 @@ export function WeekViewCalendar({
 }: WeekViewCalendarProps) {
   const [weekStart, setWeekStart] = useState<Date>(getWeekStart(currentDate));
   const [showOfferHolds, setShowOfferHolds] = useState<boolean>(true);
+  const [addItemModalOpen, setAddItemModalOpen] = useState(false);
+  const [selectedEngineer, setSelectedEngineer] = useState<string>('');
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -64,14 +81,37 @@ export function WeekViewCalendar({
     enabled: showOfferHolds
   });
 
+  // Fetch calendar items for the current week
+  const { data: calendarItems = [] } = useQuery({
+    queryKey: ['calendar-items', weekStart.toISOString().split('T')[0], weekEnd.toISOString().split('T')[0]],
+    queryFn: async () => {
+      const engineerIds = engineers.map(e => e.id);
+      if (engineerIds.length === 0) return [];
+
+      const { data, error } = await supabase
+        .from('calendar_items')
+        .select('*')
+        .in('engineer_id', engineerIds)
+        .gte('start_date', weekStart.toISOString().split('T')[0])
+        .lte('start_date', weekEnd.toISOString().split('T')[0]);
+
+      if (error) {
+        console.error('Error fetching calendar items:', error);
+        return [];
+      }
+
+      return data || [];
+    }
+  });
+
   useEffect(() => {
     setWeekStart(getWeekStart(currentDate));
   }, [currentDate]);
 
-  // Set up real-time listeners for job offers and orders
+  // Set up real-time listeners for job offers, orders, and calendar items
   useEffect(() => {
-    const jobOffersChannel = supabase
-      .channel('job-offers-changes')
+    const channel = supabase
+      .channel('calendar-changes')
       .on(
         'postgres_changes',
         {
@@ -97,10 +137,22 @@ export function WeekViewCalendar({
           queryClient.invalidateQueries({ queryKey: ['job-offers'] });
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'calendar_items'
+        },
+        () => {
+          // Invalidate calendar items query when changes occur
+          queryClient.invalidateQueries({ queryKey: ['calendar-items'] });
+        }
+      )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(jobOffersChannel);
+      supabase.removeChannel(channel);
     };
   }, [queryClient]);
 
@@ -208,6 +260,25 @@ export function WeekViewCalendar({
     return holds;
   };
 
+  const getCalendarItemsForEngineerAndDate = (engineerId: string, date: Date): CalendarItem[] => {
+    const dateString = toYMDLocal(date);
+    return calendarItems?.filter(item => 
+      item.engineer_id === engineerId &&
+      item.start_date &&
+      item.start_date.slice(0, 10) === dateString
+    ) || [];
+  };
+
+  const handleCellClick = (engineerId: string, date: Date) => {
+    setSelectedEngineer(engineerId);
+    setSelectedDate(date);
+    setAddItemModalOpen(true);
+  };
+
+  const handleItemAdded = () => {
+    queryClient.invalidateQueries({ queryKey: ['calendar-items'] });
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -279,86 +350,150 @@ export function WeekViewCalendar({
                     </div>
                   </td>
                    {weekDays.map((day, dayIndex) => {
-                     const dayOrders = getOrdersForEngineerAndDate(engineer.id, day);
-                     const offerHolds = getOfferHoldsForEngineerAndDate(engineer.id, day);
-                     const workload = getEngineerWorkload(engineer.id, day);
-                     const capacityStatus = getEngineerCapacityStatus(engineer.id, day);
-                     const isOverloaded = workload > 2;
-                     const isBusy = workload > 1;
-                     const isOverCapacity = capacityStatus.isOverCapacity;
-                     
-                     return (
-                       <td 
-                         key={dayIndex} 
-                         className={`
-                           p-2 border-r text-center align-top
-                           ${isWeekend(day) ? 'bg-muted/30' : ''}
-                           ${isToday(day) ? 'bg-primary/5' : ''}
-                           ${isOverCapacity ? 'bg-red-100/70 border-red-300' : ''}
-                           ${isOverloaded && !isOverCapacity ? 'bg-red-50/50 border-red-200' : ''}
-                           ${isBusy && !isOverloaded && !isOverCapacity ? 'bg-yellow-50/50 border-yellow-200' : ''}
-                         `}
-                       >
-                         <div className="space-y-2 min-h-[80px] p-1">
-                           {workload > 0 && (
-                             <div className="flex flex-col items-center justify-center mb-2 gap-1">
-                               <Badge 
-                                 variant="outline" 
-                                 className={`
-                                   text-xs px-2 py-1
-                                   ${isOverCapacity ? 'text-red-700 border-red-400 bg-red-100' : ''}
-                                   ${isOverloaded && !isOverCapacity ? 'text-red-600 border-red-300 bg-red-50' : ''}
-                                   ${isBusy && !isOverloaded && !isOverCapacity ? 'text-yellow-600 border-yellow-300 bg-yellow-50' : ''}
-                                   ${workload === 1 && !isOverCapacity ? 'text-green-600 border-green-300 bg-green-50' : ''}
-                                 `}
+                      const dayOrders = getOrdersForEngineerAndDate(engineer.id, day);
+                      const offerHolds = getOfferHoldsForEngineerAndDate(engineer.id, day);
+                      const dayCalendarItems = getCalendarItemsForEngineerAndDate(engineer.id, day);
+                      const workload = getEngineerWorkload(engineer.id, day);
+                      const capacityStatus = getEngineerCapacityStatus(engineer.id, day);
+                      const isOverloaded = workload > 2;
+                      const isBusy = workload > 1;
+                      const isOverCapacity = capacityStatus.isOverCapacity;
+                      
+                      return (
+                        <td 
+                          key={dayIndex} 
+                          className={`
+                            p-2 border-r text-center align-top relative cursor-pointer
+                            ${isWeekend(day) ? 'bg-muted/30' : ''}
+                            ${isToday(day) ? 'bg-primary/5' : ''}
+                            ${isOverCapacity ? 'bg-red-100/70 border-red-300' : ''}
+                            ${isOverloaded && !isOverCapacity ? 'bg-red-50/50 border-red-200' : ''}
+                            ${isBusy && !isOverloaded && !isOverCapacity ? 'bg-yellow-50/50 border-yellow-200' : ''}
+                            group hover:bg-muted/50 transition-colors
+                          `}
+                          onClick={() => handleCellClick(engineer.id, day)}
+                        >
+                          {/* Add Button (visible on hover) */}
+                          <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 w-6 p-0"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCellClick(engineer.id, day);
+                              }}
+                            >
+                              <Plus className="h-3 w-3" />
+                            </Button>
+                          </div>
+
+                          <div className="space-y-2 min-h-[80px] p-1">
+                            {workload > 0 && (
+                              <div className="flex flex-col items-center justify-center mb-2 gap-1">
+                                <Badge 
+                                  variant="outline" 
+                                  className={`
+                                    text-xs px-2 py-1
+                                    ${isOverCapacity ? 'text-red-700 border-red-400 bg-red-100' : ''}
+                                    ${isOverloaded && !isOverCapacity ? 'text-red-600 border-red-300 bg-red-50' : ''}
+                                    ${isBusy && !isOverloaded && !isOverCapacity ? 'text-yellow-600 border-yellow-300 bg-yellow-50' : ''}
+                                    ${workload === 1 && !isOverCapacity ? 'text-green-600 border-green-300 bg-green-50' : ''}
+                                  `}
+                                >
+                                  {workload} {workload === 1 ? 'job' : 'jobs'}
+                                </Badge>
+                                {isOverCapacity && (
+                                  <Badge variant="outline" className="text-xs px-1 py-0.5 text-red-700 border-red-400 bg-red-100">
+                                    {capacityStatus.totalHours}h / {capacityStatus.workingHours}h
+                                  </Badge>
+                                )}
+                              </div>
+                            )}
+                            
+                             {/* Calendar Items */}
+                             {dayCalendarItems.map((item) => (
+                               <div
+                                 key={item.id}
+                                 className="rounded-md p-2 cursor-pointer hover:shadow-md transition-all duration-200 min-h-[40px] flex flex-col justify-between"
+                                 style={{ 
+                                   backgroundColor: `${item.color}20`,
+                                   borderLeft: `3px solid ${item.color}`
+                                 }}
+                                 onClick={(e) => {
+                                   e.stopPropagation();
+                                   // TODO: Add edit/view calendar item functionality
+                                 }}
                                >
-                                 {workload} {workload === 1 ? 'job' : 'jobs'}
-                               </Badge>
-                               {isOverCapacity && (
-                                 <Badge variant="outline" className="text-xs px-1 py-0.5 text-red-700 border-red-400 bg-red-100">
-                                   {capacityStatus.totalHours}h / {capacityStatus.workingHours}h
-                                 </Badge>
-                               )}
-                             </div>
-                           )}
-                           
-                            {/* Offer Holds */}
-                            {offerHolds.map((offer) => (
-                              <div
-                                key={offer.id}
-                                className="bg-amber-50 border border-dashed border-amber-300 rounded-md p-2 min-h-[50px] flex flex-col justify-between cursor-pointer hover:shadow-md transition-all duration-200 hover:border-amber-400"
-                                onClick={() => offer.order_id && navigate(`/orders/${offer.order_id}`)}
-                                onKeyDown={(e) => {
-                                  if ((e.key === 'Enter' || e.key === ' ') && offer.order_id) {
-                                    e.preventDefault();
-                                    navigate(`/orders/${offer.order_id}`);
-                                  }
-                                }}
-                                role="button"
-                                tabIndex={0}
-                              >
-                               <div className="space-y-1">
-                                 <Badge variant="outline" className="text-xs px-1 py-0.5 text-amber-700 border-amber-400 bg-amber-100 w-fit">
-                                   Offer Hold
-                                 </Badge>
-                                 
-                                 <div className="text-xs text-muted-foreground truncate">
-                                   #{offer.order?.order_number}
+                                 <div className="space-y-1">
+                                   <div className="text-xs font-medium" style={{ color: item.color }}>
+                                     {item.title}
+                                   </div>
+                                   {item.description && (
+                                     <div className="text-xs text-muted-foreground truncate">
+                                       {item.description}
+                                     </div>
+                                   )}
                                  </div>
                                  
-                                 <div className="text-xs text-muted-foreground truncate">
-                                   {offer.order?.client?.full_name}
+                                 <div className="flex items-center justify-between mt-1">
+                                   <Badge 
+                                     variant="outline" 
+                                     className="text-xs px-1 py-0.5 capitalize"
+                                     style={{ 
+                                       borderColor: item.color,
+                                       color: item.color,
+                                       backgroundColor: `${item.color}10`
+                                     }}
+                                   >
+                                     {item.item_type.replace('_', ' ')}
+                                   </Badge>
+                                   {!item.all_day && item.start_time && (
+                                     <div className="text-xs text-muted-foreground">
+                                       {item.start_time.slice(0, 5)}
+                                     </div>
+                                   )}
                                  </div>
                                </div>
-                               
-                               <div className="flex items-center justify-between mt-1">
-                                 {offer.time_window && (
-                                   <div className="text-xs text-amber-600">{offer.time_window}</div>
-                                 )}
-                                 <div className="text-xs text-amber-600 capitalize">{offer.status}</div>
-                               </div>
-                             </div>
-                           ))}
+                             ))}
+
+                             {/* Offer Holds */}
+                             {offerHolds.map((offer) => (
+                               <div
+                                 key={offer.id}
+                                 className="bg-amber-50 border border-dashed border-amber-300 rounded-md p-2 min-h-[50px] flex flex-col justify-between cursor-pointer hover:shadow-md transition-all duration-200 hover:border-amber-400"
+                                 onClick={() => offer.order_id && navigate(`/orders/${offer.order_id}`)}
+                                 onKeyDown={(e) => {
+                                   if ((e.key === 'Enter' || e.key === ' ') && offer.order_id) {
+                                     e.preventDefault();
+                                     navigate(`/orders/${offer.order_id}`);
+                                   }
+                                 }}
+                                 role="button"
+                                 tabIndex={0}
+                               >
+                                <div className="space-y-1">
+                                  <Badge variant="outline" className="text-xs px-1 py-0.5 text-amber-700 border-amber-400 bg-amber-100 w-fit">
+                                    Offer Hold
+                                  </Badge>
+                                  
+                                  <div className="text-xs text-muted-foreground truncate">
+                                    #{offer.order?.order_number}
+                                  </div>
+                                  
+                                  <div className="text-xs text-muted-foreground truncate">
+                                    {offer.order?.client?.full_name}
+                                  </div>
+                                </div>
+                                
+                                <div className="flex items-center justify-between mt-1">
+                                  {offer.time_window && (
+                                    <div className="text-xs text-amber-600">{offer.time_window}</div>
+                                  )}
+                                  <div className="text-xs text-amber-600 capitalize">{offer.status}</div>
+                                </div>
+                              </div>
+                            ))}
                            
                             {/* Scheduled Orders */}
                             {dayOrders.map((order) => (
@@ -449,6 +584,15 @@ export function WeekViewCalendar({
           </div>
         </div>
       </CardContent>
+
+      {/* Add Calendar Item Modal */}
+      <AddCalendarItemModal
+        isOpen={addItemModalOpen}
+        onClose={() => setAddItemModalOpen(false)}
+        engineerId={selectedEngineer}
+        selectedDate={selectedDate}
+        onItemAdded={handleItemAdded}
+      />
     </Card>
   );
 }
