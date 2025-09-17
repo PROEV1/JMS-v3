@@ -37,6 +37,7 @@ const STATUS_OPTIONS = [
 export function StatusChangeDropdown({ order, onStatusChanged }: StatusChangeDropdownProps) {
   const [isChanging, setIsChanging] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState<string>('');
+  const [pendingStatus, setPendingStatus] = useState<string>('');
 
   // Check if this order can have its status changed
   const canChangeStatus = () => {
@@ -90,7 +91,19 @@ export function StatusChangeDropdown({ order, onStatusChanged }: StatusChangeDro
     } finally {
       setIsChanging(false);
       setSelectedStatus('');
+      setPendingStatus('');
     }
+  };
+
+  const handleConfirmChange = () => {
+    if (pendingStatus) {
+      handleStatusChange(pendingStatus);
+    }
+  };
+
+  const handleCancelChange = () => {
+    setSelectedStatus('');
+    setPendingStatus('');
   };
 
   if (!canChangeStatus()) {
@@ -101,36 +114,64 @@ export function StatusChangeDropdown({ order, onStatusChanged }: StatusChangeDro
   const currentStatusLabel = STATUS_OPTIONS.find(opt => opt.value === order.status_enhanced)?.label 
     || order.status_enhanced || 'Unknown';
 
+  const pendingStatusLabel = STATUS_OPTIONS.find(opt => opt.value === pendingStatus)?.label;
+
   return (
-    <Select
-      value={selectedStatus}
-      onValueChange={setSelectedStatus}
-      disabled={isChanging}
-    >
-      <SelectTrigger className="w-36 h-8 text-xs">
-        <SelectValue placeholder="Change Status" />
-        <ChevronDown className="h-3 w-3" />
-      </SelectTrigger>
-      <SelectContent className="z-50">
-        <div className="px-2 py-1 text-xs font-medium text-muted-foreground border-b">
-          Current: {currentStatusLabel}
-        </div>
-        {STATUS_OPTIONS.map((option) => (
-          <SelectItem
-            key={option.value}
-            value={option.value}
-            className="text-xs cursor-pointer"
-            disabled={option.value === order.status_enhanced}
-            onSelect={() => {
-              if (option.value !== order.status_enhanced) {
-                handleStatusChange(option.value);
-              }
-            }}
+    <div className="flex items-center gap-2">
+      <Select
+        value={selectedStatus}
+        onValueChange={(value) => {
+          setSelectedStatus(value);
+          setPendingStatus(value);
+        }}
+        disabled={isChanging}
+      >
+        <SelectTrigger className="w-36 h-8 text-xs">
+          <SelectValue placeholder="Change Status" />
+          <ChevronDown className="h-3 w-3" />
+        </SelectTrigger>
+        <SelectContent className="z-50">
+          <div className="px-2 py-1 text-xs font-medium text-muted-foreground border-b">
+            Current: {currentStatusLabel}
+          </div>
+          {STATUS_OPTIONS.map((option) => (
+            <SelectItem
+              key={option.value}
+              value={option.value}
+              className="text-xs cursor-pointer"
+              disabled={option.value === order.status_enhanced}
+            >
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      {pendingStatus && pendingStatus !== order.status_enhanced && (
+        <div className="flex items-center gap-1">
+          <span className="text-xs text-muted-foreground">
+            → {pendingStatusLabel}
+          </span>
+          <Button
+            size="sm"
+            variant="default"
+            onClick={handleConfirmChange}
+            disabled={isChanging}
+            className="h-6 px-2 text-xs"
           >
-            {option.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+            {isChanging ? 'Changing...' : 'Confirm'}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={handleCancelChange}
+            disabled={isChanging}
+            className="h-6 px-2 text-xs"
+          >
+            Cancel
+          </Button>
+        </div>
+      )}
+    </div>
   );
 }
