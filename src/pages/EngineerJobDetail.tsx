@@ -33,6 +33,7 @@ import JobStatusUpdater from '@/components/engineer/JobStatusUpdater';
 import CompletionChecklist from '@/components/engineer/CompletionChecklist';
 import { EngineerMaterialsUsed } from '@/components/engineer/EngineerMaterialsUsed';
 import { ChargerSection } from '@/components/engineer/ChargerSection';
+import { OrderNotesSection } from '@/components/admin/sections/OrderNotesSection';
 
 interface JobDetails {
   id: string;
@@ -705,6 +706,12 @@ export default function EngineerJobDetail() {
               engineerId={job.engineer_id || ""} 
             />
           )}
+
+          {/* Order Notes */}
+          <OrderNotesSection 
+            orderId={job.id} 
+            onUpdate={fetchJobDetails}
+          />
 
           {/* Engineer Notes & Sign-off */}
           {!job.engineer_signed_off_at && (

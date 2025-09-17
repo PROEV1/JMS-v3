@@ -9,6 +9,7 @@ import { CalendarDays, MapPin, User, Phone, Mail, Package, CreditCard, CheckCirc
 import { format } from 'date-fns';
 import type { Database } from '@/integrations/supabase/types';
 import { AgreementSigningModal } from '@/components/AgreementSigningModal';
+import { OrderNotesSection } from '@/components/admin/sections/OrderNotesSection';
 
 type OrderStatusEnhanced = Database['public']['Enums']['order_status_enhanced'];
 
@@ -689,6 +690,12 @@ export default function EnhancedClientOrderView() {
               )}
             </CardContent>
           </Card>
+
+          {/* Order Notes */}
+          <OrderNotesSection 
+            orderId={order.id} 
+            onUpdate={fetchOrder}
+          />
 
           {/* Payment History */}
           {order.order_payments.length > 0 && (

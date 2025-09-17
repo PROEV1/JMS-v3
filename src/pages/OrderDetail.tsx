@@ -16,6 +16,7 @@ import { PaymentSection } from '@/components/admin/sections/PaymentSection';
 import { AgreementSection } from '@/components/admin/sections/AgreementSection';
 import { JobStatusTimelineSection } from '@/components/admin/sections/JobStatusTimelineSection';
 import { ActivityHistorySection } from '@/components/admin/sections/ActivityHistorySection';
+import { OrderNotesSection } from '@/components/admin/sections/OrderNotesSection';
 import { EngineerUploadsSection } from '@/components/admin/sections/EngineerUploadsSection';
 import { SurveySection } from '@/components/admin/sections/SurveySection';
 import { SurveyReviewSection } from '@/components/admin/sections/SurveyReviewSection';
@@ -829,6 +830,14 @@ export default function OrderDetail() {
             {/* Activity & History */}
             {orderId && (
               <ActivityHistorySection orderId={orderId} />
+            )}
+
+            {/* Order Notes */}
+            {orderId && (
+              <OrderNotesSection 
+                orderId={orderId} 
+                onUpdate={fetchOrder}
+              />
             )}
 
             {/* Client Blocked Dates */}
