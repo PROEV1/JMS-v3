@@ -21,6 +21,7 @@ import { InventoryViewSwitcher, useInventoryView, ViewMode } from './shared/Inve
 import { MobileInventoryCard } from './shared/MobileInventoryCard';
 import { useInventoryEnhanced } from '@/hooks/useInventoryEnhanced';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { ApprovePendingTransactionsButton } from './ApprovePendingTransactionsButton';
 
 
 interface InventoryItem {
@@ -176,10 +177,13 @@ export const InventoryItemsSimple: React.FC<InventoryItemsSimpleProps> = ({ onSw
           <h2 className="text-2xl font-semibold">Inventory Items</h2>
           <p className="text-muted-foreground">Manage your inventory items and stock levels</p>
         </div>
-        <Button onClick={() => setShowAddModal(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Item
-        </Button>
+        <div className="flex gap-2">
+          <ApprovePendingTransactionsButton />
+          <Button onClick={() => setShowAddModal(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Item
+          </Button>
+        </div>
       </div>
 
       {/* Header Metrics */}

@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Search, Package, Plus, Trash2 } from "lucide-react";
 import { useInventoryEnhanced } from '@/hooks/useInventoryEnhanced';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ItemPickerModalProps {
   open: boolean;
@@ -22,6 +23,7 @@ export function ItemPickerModal({ open, onOpenChange, location, onItemAdded }: I
   const [quantity, setQuantity] = useState<number>(1);
   const [reason, setReason] = useState<string>('Stock addition');
   const [notes, setNotes] = useState<string>('');
+  const [isApproving, setIsApproving] = useState<boolean>(false);
 
   const { toast } = useToast();
   const { useInventoryItems, createStockAdjustment, deleteInventoryItem } = useInventoryEnhanced();
@@ -49,14 +51,26 @@ export function ItemPickerModal({ open, onOpenChange, location, onItemAdded }: I
       return;
     }
 
+    setIsApproving(true);
     try {
-      await createStockAdjustment.mutateAsync({
-        itemId: selectedItem.id,
-        locationId: location.id,
-        quantity: quantity,
-        reason,
-        notes: notes || undefined
-      });
+      // Use direct Supabase call with auto-approval like LocationStockModal does
+      const { data, error } = await supabase
+        .from('inventory_txns')
+        .insert({
+          item_id: selectedItem.id,
+          location_id: location.id,
+          direction: 'adjust',
+          qty: quantity,
+          reference: `Stock adjustment: ${reason}`,
+          notes: notes || `Added ${quantity} units of ${selectedItem.name} to ${location.name}`,
+          status: 'approved', // Auto-approve admin stock adjustments
+          approved_by: (await supabase.auth.getUser()).data.user?.id,
+          approved_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
 
       toast({
         title: "Item Added to Stock",
@@ -79,6 +93,8 @@ export function ItemPickerModal({ open, onOpenChange, location, onItemAdded }: I
         description: error.message || "Failed to add item to stock. Please try again.",
         variant: "destructive",
       });
+    } finally {
+      setIsApproving(false);
     }
   };
 
@@ -255,11 +271,11 @@ export function ItemPickerModal({ open, onOpenChange, location, onItemAdded }: I
                 <div className="flex gap-2">
                   <Button 
                     onClick={handleAddToStock}
-                    disabled={createStockAdjustment.isPending || !selectedItem || quantity <= 0}
+                    disabled={isApproving || !selectedItem || quantity <= 0}
                     className="flex items-center gap-2"
                   >
                     <Plus className="h-4 w-4" />
-                    {createStockAdjustment.isPending ? "Adding..." : `Add ${quantity} to Stock`}
+                    {isApproving ? "Adding..." : `Add ${quantity} to Stock`}
                   </Button>
                   <Button variant="outline" onClick={() => setSelectedItem(null)}>
                     Cancel

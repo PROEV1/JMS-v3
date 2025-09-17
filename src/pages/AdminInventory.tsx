@@ -9,6 +9,7 @@ import { AdminStockRequestsBoard } from "@/components/admin/inventory/AdminStock
 import { PurchaseOrdersList } from "@/components/admin/inventory/PurchaseOrdersList";
 import { ReturnsRmasList } from "@/components/admin/inventory/ReturnsRmasList";
 import { useState } from "react";
+import { ApprovePendingTransactionsButton } from "@/components/admin/inventory/ApprovePendingTransactionsButton";
 
 const AdminInventory = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
