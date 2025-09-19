@@ -241,16 +241,16 @@ serve(async (req) => {
 
     // Comprehensive order bucket distribution to ensure all scheduling tiles are populated
     const orderBuckets = [
-      { type: 'needs_scheduling', weight: 15, config: { status_enhanced: 'awaiting_install_booking', scheduling_suppressed: false, no_offers: true } },
+      { type: 'needs_scheduling', weight: 30, config: { status_enhanced: 'awaiting_install_booking', scheduling_suppressed: false, no_offers: true } },
       { type: 'date_offered', weight: 12, config: { status_enhanced: 'date_offered', has_pending_offer: true } },
-      { type: 'ready_to_book', weight: 10, config: { status_enhanced: 'awaiting_install_booking', has_accepted_offer: true } },
-      { type: 'scheduled', weight: 20, config: { status_enhanced: 'scheduled', has_install_date: true, has_engineer: true } },
+      { type: 'ready_to_book', weight: 8, config: { status_enhanced: 'awaiting_install_booking', has_accepted_offer: true } },
+      { type: 'scheduled', weight: 15, config: { status_enhanced: 'scheduled', has_install_date: true, has_engineer: true } },
       { type: 'completion_pending', weight: 8, config: { status_enhanced: 'install_completed_pending_qa', engineer_signed_off: true } },
       { type: 'completed', weight: 5, config: { status_enhanced: 'completed', fully_complete: true } },
-      { type: 'on_hold', weight: 10, config: { scheduling_suppressed: true, partner_status: 'ON_HOLD' } },
-      { type: 'cancelled', weight: 5, config: { partner_status: 'CANCELLED' } },
-      { type: 'date_rejected', weight: 8, config: { has_rejected_offer: true, no_active_offers: true } },
-      { type: 'offer_expired', weight: 7, config: { has_expired_offer: true, no_active_offers: true } }
+      { type: 'on_hold', weight: 8, config: { scheduling_suppressed: true, partner_status: 'ON_HOLD' } },
+      { type: 'cancelled', weight: 4, config: { partner_status: 'CANCELLED' } },
+      { type: 'date_rejected', weight: 6, config: { has_rejected_offer: true, no_active_offers: true } },
+      { type: 'offer_expired', weight: 4, config: { has_expired_offer: true, no_active_offers: true } }
     ];
     
     // Partner statuses for variety
