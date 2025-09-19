@@ -48,6 +48,7 @@ interface PartnerQuoteJob {
   created_at: string;
   total_amount: number;
   partner_id: string;
+  quote_type?: 'standard' | 'custom' | null;
   latest_quote?: {
     id: string;
     amount: number;
@@ -263,6 +264,7 @@ export default function AdminPartnerQuotes() {
           partner_external_id,
           status_enhanced,
           scheduled_install_date,
+          quote_type,
           clients(
             full_name,
             email,
@@ -519,7 +521,7 @@ export default function AdminPartnerQuotes() {
   // Status counts for tabs
   const statusCounts = useMemo(() => {
     const counts = {
-      needs_quotation: getBucketJobs('NEW_JOB', 'AWAITING_QUOTATION').length,
+      needs_quotation: getBucketJobs('NEW_JOB', 'AWAITING_QUOTATION').filter(job => !job.quote_type).length,
       waiting_approval: getBucketJobs('WAITING_FOR_APPROVAL').length,
       review: getBucketJobs('REVIEW').length,
       needs_scheduling: getBucketJobs('NEEDS_SCHEDULING').length,
@@ -543,7 +545,7 @@ export default function AdminPartnerQuotes() {
     let jobs_for_status;
     switch (activeStatus) {
       case 'needs_quotation':
-        jobs_for_status = getBucketJobs('NEW_JOB', 'AWAITING_QUOTATION');
+        jobs_for_status = getBucketJobs('NEW_JOB', 'AWAITING_QUOTATION').filter(job => !job.quote_type);
         break;
       case 'waiting_approval':
         jobs_for_status = getBucketJobs('WAITING_FOR_APPROVAL');
