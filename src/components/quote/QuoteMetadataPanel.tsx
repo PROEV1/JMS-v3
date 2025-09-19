@@ -366,9 +366,9 @@ export const QuoteMetadataPanel: React.FC<QuoteMetadataPanelProps> = ({
           </div>
         )}
 
-        {/* Action Buttons */}
+        {/* Action Buttons - Only Save and Mark as Quoted */}
         {!isReadOnly && (
-          <div className="flex space-x-2 pt-4 border-t">
+          <div className="flex space-x-3 pt-4 border-t">
             <Button
               type="button"
               variant="outline"
@@ -377,7 +377,7 @@ export const QuoteMetadataPanel: React.FC<QuoteMetadataPanelProps> = ({
               className="flex-1"
             >
               <Save className="h-4 w-4 mr-2" />
-              {isSaving ? 'Saving...' : 'Save Quote Details'}
+              {isSaving ? 'Saving...' : 'Save'}
             </Button>
             <Button
               type="button"
@@ -386,7 +386,7 @@ export const QuoteMetadataPanel: React.FC<QuoteMetadataPanelProps> = ({
               className="flex-1"
             >
               <Send className="h-4 w-4 mr-2" />
-              {isSending ? 'Sending...' : 'Mark as Quoted & Send'}
+              {isSending ? 'Sending...' : 'Mark as Quoted'}
             </Button>
           </div>
         )}

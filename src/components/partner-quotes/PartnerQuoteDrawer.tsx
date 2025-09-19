@@ -127,9 +127,34 @@ export function PartnerQuoteDrawer({
     console.log('🔧 Order ID:', order.id);
     
     try {
+      // Check if user is still authenticated
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({
+          title: "Authentication Error",
+          description: "Please log in again to continue",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Ensure all boolean values are properly set (not undefined)
+      const sanitizedMetadata = {
+        quote_type: metadata.quote_type || null,
+        part_required: Boolean(metadata.part_required),
+        groundworks_required: Boolean(metadata.groundworks_required),
+        multiple_engineers_required: Boolean(metadata.multiple_engineers_required),
+        specific_engineer_required: Boolean(metadata.specific_engineer_required),
+        specific_engineer_id: metadata.specific_engineer_required ? metadata.specific_engineer_id : null,
+        expected_duration_days: metadata.expected_duration_days ? parseFloat(metadata.expected_duration_days) : null,
+        charger_model_id: metadata.charger_model_id || null,
+      };
+
+      console.log('🔧 Sanitized metadata:', sanitizedMetadata);
+
       const { data, error } = await supabase
         .from('orders')
-        .update(metadata)
+        .update(sanitizedMetadata)
         .eq('id', order.id)
         .select();
 
@@ -137,12 +162,25 @@ export function PartnerQuoteDrawer({
 
       if (error) {
         console.error('🚨 Database error:', error);
-        toast({
-          title: "Error saving metadata",
-          description: error.message,
-          variant: "destructive",
-        });
+        if (error.message.includes('row-level security') || error.message.includes('permission')) {
+          toast({
+            title: "Permission Error",
+            description: "Session expired. Please refresh the page and try again.",
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Error saving metadata",
+            description: error.message,
+            variant: "destructive",
+          });
+        }
         throw error;
+      }
+      
+      // Update local order state with new data
+      if (data && data[0]) {
+        setOrder(data[0]);
       }
       
       toast({
@@ -150,14 +188,14 @@ export function PartnerQuoteDrawer({
         description: "Quote metadata saved successfully",
       });
       
-      // Refresh order data
+      // Refresh order data and notify parent
       await fetchOrderData();
       onQuoteUpdated();
     } catch (error) {
       console.error('🚨 Error saving order metadata:', error);
       toast({
         title: "Error",
-        description: "Failed to save metadata. Please try again.",
+        description: "Failed to save metadata. Please refresh the page and try again.",
         variant: "destructive",
       });
       throw error;
