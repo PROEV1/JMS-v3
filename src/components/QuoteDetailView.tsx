@@ -11,6 +11,7 @@ import laptopImg from '@/assets/laptop-placeholder.jpg';
 import workspaceImg from '@/assets/workspace-placeholder.jpg';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { QuoteMetadataPanel } from '@/components/quote/QuoteMetadataPanel';
 
 interface Quote {
   id: string;
@@ -36,6 +37,16 @@ interface Quote {
   special_instructions: string;
   is_shareable: boolean;
   share_token: string;
+  // New metadata fields
+  quote_type?: 'standard' | 'custom' | null;
+  part_required?: boolean;
+  groundworks_required?: boolean;
+  multiple_engineers_required?: boolean;
+  specific_engineer_required?: boolean;
+  specific_engineer_id?: string | null;
+  expected_duration_days?: number | null;
+  charger_model_id?: string | null;
+  partner_id?: string | null;
   client: {
     id: string;
     full_name: string;
@@ -88,6 +99,8 @@ export const QuoteDetailView: React.FC<QuoteDetailViewProps> = ({ quote, onBack,
   const [compatibilities, setCompatibilities] = useState<ProductCompatibility[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [savingMetadata, setSavingMetadata] = useState(false);
+  const [sendingQuote, setSendingQuote] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -412,6 +425,65 @@ export const QuoteDetailView: React.FC<QuoteDetailViewProps> = ({ quote, onBack,
     }
   };
 
+  const saveQuoteMetadata = async (metadata: any) => {
+    setSavingMetadata(true);
+    try {
+      const { error } = await supabase
+        .from('quotes')
+        .update({
+          quote_type: metadata.quote_type,
+          part_required: metadata.part_required,
+          groundworks_required: metadata.groundworks_required,
+          multiple_engineers_required: metadata.multiple_engineers_required,
+          specific_engineer_required: metadata.specific_engineer_required,
+          specific_engineer_id: metadata.specific_engineer_id,
+          expected_duration_days: metadata.expected_duration_days,
+          charger_model_id: metadata.charger_model_id,
+        })
+        .eq('id', quote.id);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error saving quote metadata:', error);
+      throw error;
+    } finally {
+      setSavingMetadata(false);
+    }
+  };
+
+  const sendQuoteToClient = async () => {
+    setSendingQuote(true);
+    try {
+      // Update quote status to 'sent'
+      const { error: statusError } = await supabase
+        .from('quotes')
+        .update({ status: 'sent' })
+        .eq('id', quote.id);
+
+      if (statusError) throw statusError;
+
+      // Trigger quote email sending (assuming this edge function exists)
+      try {
+        const { error: emailError } = await supabase.functions.invoke('send-quote', {
+          body: { quoteId: quote.id }
+        });
+        
+        if (emailError) {
+          console.warn('Email sending failed:', emailError);
+          // Don't throw here - status was already updated
+        }
+      } catch (emailError) {
+        console.warn('Email function failed:', emailError);
+        // Don't throw here - status was already updated
+      }
+    } catch (error) {
+      console.error('Error sending quote:', error);
+      throw error;
+    } finally {
+      setSendingQuote(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -615,6 +687,27 @@ export const QuoteDetailView: React.FC<QuoteDetailViewProps> = ({ quote, onBack,
           </CardContent>
         </Card>
       </div>
+
+      {/* Quote Metadata Panel - Only show for admins/internal users */}
+      <QuoteMetadataPanel
+        quoteId={quote.id}
+        initialData={{
+          quote_type: quote.quote_type || null,
+          part_required: quote.part_required || false,
+          groundworks_required: quote.groundworks_required || false,
+          multiple_engineers_required: quote.multiple_engineers_required || false,
+          specific_engineer_required: quote.specific_engineer_required || false,
+          specific_engineer_id: quote.specific_engineer_id || null,
+          expected_duration_days: quote.expected_duration_days || null,
+          charger_model_id: quote.charger_model_id || null,
+          partner_id: quote.partner_id || null,
+        }}
+        onSave={saveQuoteMetadata}
+        onSendQuote={sendQuoteToClient}
+        isReadOnly={quote.status === 'accepted' || quote.status === 'rejected'}
+        isSaving={savingMetadata}
+        isSending={sendingQuote}
+      />
 
       {/* Quote Items */}
       <div className="space-y-6">

@@ -3303,22 +3303,31 @@ export type Database = {
       quotes: {
         Row: {
           accepted_at: string | null
+          charger_model_id: string | null
           client_id: string
           created_at: string
+          expected_duration_days: number | null
           expires_at: string | null
           extras_cost: number
+          groundworks_required: boolean | null
           id: string
           includes_installation: boolean | null
           install_cost: number
           is_shareable: boolean | null
           materials_cost: number
+          multiple_engineers_required: boolean | null
           notes: string | null
           order_id: string | null
+          part_required: boolean | null
+          partner_id: string | null
           product_details: string
           quote_number: string
           quote_template: string | null
+          quote_type: string | null
           share_token: string | null
           special_instructions: string | null
+          specific_engineer_id: string | null
+          specific_engineer_required: boolean | null
           status: string
           total_cost: number
           updated_at: string
@@ -3326,22 +3335,31 @@ export type Database = {
         }
         Insert: {
           accepted_at?: string | null
+          charger_model_id?: string | null
           client_id: string
           created_at?: string
+          expected_duration_days?: number | null
           expires_at?: string | null
           extras_cost?: number
+          groundworks_required?: boolean | null
           id?: string
           includes_installation?: boolean | null
           install_cost?: number
           is_shareable?: boolean | null
           materials_cost?: number
+          multiple_engineers_required?: boolean | null
           notes?: string | null
           order_id?: string | null
+          part_required?: boolean | null
+          partner_id?: string | null
           product_details: string
           quote_number: string
           quote_template?: string | null
+          quote_type?: string | null
           share_token?: string | null
           special_instructions?: string | null
+          specific_engineer_id?: string | null
+          specific_engineer_required?: boolean | null
           status?: string
           total_cost?: number
           updated_at?: string
@@ -3349,22 +3367,31 @@ export type Database = {
         }
         Update: {
           accepted_at?: string | null
+          charger_model_id?: string | null
           client_id?: string
           created_at?: string
+          expected_duration_days?: number | null
           expires_at?: string | null
           extras_cost?: number
+          groundworks_required?: boolean | null
           id?: string
           includes_installation?: boolean | null
           install_cost?: number
           is_shareable?: boolean | null
           materials_cost?: number
+          multiple_engineers_required?: boolean | null
           notes?: string | null
           order_id?: string | null
+          part_required?: boolean | null
+          partner_id?: string | null
           product_details?: string
           quote_number?: string
           quote_template?: string | null
+          quote_type?: string | null
           share_token?: string | null
           special_instructions?: string | null
+          specific_engineer_id?: string | null
+          specific_engineer_required?: boolean | null
           status?: string
           total_cost?: number
           updated_at?: string
@@ -3372,10 +3399,24 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "quotes_charger_model_id_fkey"
+            columns: ["charger_model_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_items"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "quotes_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_specific_engineer_id_fkey"
+            columns: ["specific_engineer_id"]
+            isOneToOne: false
+            referencedRelation: "engineers"
             referencedColumns: ["id"]
           },
         ]

@@ -25,6 +25,16 @@ interface Quote {
   notes: string | null;
   is_shareable: boolean;
   share_token: string | null;
+  // New metadata fields
+  quote_type?: 'standard' | 'custom' | null;
+  part_required?: boolean;
+  groundworks_required?: boolean;
+  multiple_engineers_required?: boolean;
+  specific_engineer_required?: boolean;
+  specific_engineer_id?: string | null;
+  expected_duration_days?: number | null;
+  charger_model_id?: string | null;
+  partner_id?: string | null;
   // Optional fields that might not exist in database
   room_info?: string | null;
   range?: string | null;
@@ -74,8 +84,17 @@ export default function AdminQuoteDetail() {
       if (error) throw error;
       
       // Transform the data to match our interface, providing defaults for missing fields
-      const transformedQuote = {
+      const transformedQuote: Quote = {
         ...data,
+        quote_type: data.quote_type as 'standard' | 'custom' | null,
+        part_required: data.part_required || false,
+        groundworks_required: data.groundworks_required || false,
+        multiple_engineers_required: data.multiple_engineers_required || false,
+        specific_engineer_required: data.specific_engineer_required || false,
+        specific_engineer_id: data.specific_engineer_id || null,
+        expected_duration_days: data.expected_duration_days || null,
+        charger_model_id: data.charger_model_id || null,
+        partner_id: data.partner_id || null,
         room_info: null,
         range: null,
         finish: null,
