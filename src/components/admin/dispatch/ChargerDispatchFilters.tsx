@@ -169,7 +169,7 @@ export function ChargerDispatchFilters({ filters, onFiltersChange }: ChargerDisp
               <SelectContent>
                 <SelectItem value="all">All Statuses</SelectItem>
                 <SelectItem value="pending_dispatch">Pending Dispatch</SelectItem>
-                <SelectItem value="dispatched">Dispatched</SelectItem>
+                <SelectItem value="sent">Dispatched</SelectItem>
                 <SelectItem value="delivered">Delivered</SelectItem>
                 <SelectItem value="issue">Issue / On Hold</SelectItem>
                 <SelectItem value="not_required">Not Required</SelectItem>

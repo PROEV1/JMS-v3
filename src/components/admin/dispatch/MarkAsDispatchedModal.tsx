@@ -58,7 +58,7 @@ export function MarkAsDispatchedModal({ isOpen, onClose, orderId }: MarkAsDispat
         .upsert({
           order_id: orderId,
           charger_item_id: chargerItemId,
-          status: 'dispatched',
+          status: 'sent', // Use 'sent' instead of 'dispatched' to match DB constraint
           dispatched_at: new Date(formData.dispatchedDate + 'T12:00:00Z').toISOString(),
           tracking_number: formData.trackingNumber || null,
           notes: `Courier: ${formData.courierName}\nSent from: ${formData.sentFrom}\n${formData.notes}`.trim(),

@@ -87,7 +87,7 @@ export function useChargerDispatchData({
             break;
           case 'dispatched':
             ordersQuery = ordersQuery.not('charger_dispatches', 'is', null)
-              .eq('charger_dispatches.status', 'dispatched');
+              .eq('charger_dispatches.status', 'sent');
             break;
           case 'issue':
             ordersQuery = ordersQuery.not('charger_dispatches', 'is', null)
@@ -141,7 +141,7 @@ export function useChargerDispatchData({
           urgencyLevel = 'urgent';
         } else if (daysUntilInstall <= 5 && dispatchStatus === 'pending_dispatch') {
           urgencyLevel = 'warning';
-        } else if (dispatchStatus === 'dispatched') {
+        } else if (dispatchStatus === 'sent' || dispatchStatus === 'delivered') {
           urgencyLevel = 'success';
         }
 
@@ -154,13 +154,13 @@ export function useChargerDispatchData({
         };
       });
 
-      // Calculate stats
-      const stats = {
-        pendingDispatch: enrichedOrders.filter(o => o.dispatch_status === 'pending_dispatch').length,
-        dispatched: enrichedOrders.filter(o => o.dispatch_status === 'dispatched').length,
-        urgent: enrichedOrders.filter(o => o.urgency_level === 'urgent').length,
-        issues: enrichedOrders.filter(o => o.dispatch_status === 'issue').length
-      };
+        // Calculate stats
+        const stats = {
+          pendingDispatch: enrichedOrders.filter(o => o.dispatch_status === 'pending_dispatch').length,
+          dispatched: enrichedOrders.filter(o => o.dispatch_status === 'sent').length,
+          urgent: enrichedOrders.filter(o => o.urgency_level === 'urgent').length,
+          issues: enrichedOrders.filter(o => o.dispatch_status === 'issue').length
+        };
 
       return {
         orders: enrichedOrders,

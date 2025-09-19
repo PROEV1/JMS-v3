@@ -77,7 +77,7 @@ export function ChargerDispatchTable({
           return <Badge variant="destructive" className={`${baseClasses} bg-orange-500`}>⏰ Due Soon</Badge>;
         }
         return <Badge variant="outline" className={baseClasses}>Pending</Badge>;
-      case 'dispatched':
+      case 'sent':
         return <Badge variant="default" className={`${baseClasses} bg-green-500`}>✓ Dispatched</Badge>;
       case 'delivered':
         return <Badge variant="default" className={`${baseClasses} bg-blue-500`}>Delivered</Badge>;
@@ -92,7 +92,7 @@ export function ChargerDispatchTable({
     if (urgencyLevel === 'urgent' && dispatchStatus === 'pending_dispatch') {
       return <AlertTriangle className="h-4 w-4 text-red-500" />;
     }
-    if (dispatchStatus === 'dispatched') {
+    if (dispatchStatus === 'sent') {
       return <Truck className="h-4 w-4 text-green-500" />;
     }
     if (dispatchStatus === 'pending_dispatch') {

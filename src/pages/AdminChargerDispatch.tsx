@@ -89,15 +89,18 @@ function AdminChargerDispatchContent() {
 
   const handleBulkStatusChange = async (status: string) => {
     try {
+      // Map frontend status to database status
+      const dbStatus = status === 'dispatched' ? 'sent' : status;
+      
       const { error } = await supabase
         .from('charger_dispatches')
         .upsert(
           selectedOrders.map(orderId => ({
             order_id: orderId,
             charger_item_id: 'default-charger-id', // This should be dynamic in production
-            status,
+            status: dbStatus,
             updated_at: new Date().toISOString(),
-            ...(status === 'dispatched' && { dispatched_at: new Date().toISOString() })
+            ...(dbStatus === 'sent' && { dispatched_at: new Date().toISOString() })
           }))
         );
 
