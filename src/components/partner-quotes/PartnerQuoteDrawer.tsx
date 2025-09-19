@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -21,6 +21,9 @@ import {
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
 import { format } from 'date-fns';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { QuoteMetadataPanel } from '@/components/quote/QuoteMetadataPanel';
 
 interface PartnerQuoteDrawerProps {
   job: {
@@ -78,6 +81,74 @@ export function PartnerQuoteDrawer({
   onMarkAsQuoted,
   onClearOverride
 }: PartnerQuoteDrawerProps) {
+  const { toast } = useToast();
+  const [quote, setQuote] = useState<any>(null);
+  const [loadingQuote, setLoadingQuote] = useState(false);
+
+  // Fetch quote data when drawer opens
+  useEffect(() => {
+    if (open && job.id) {
+      fetchQuoteData();
+    }
+  }, [open, job.id]);
+
+  const fetchQuoteData = async () => {
+    setLoadingQuote(true);
+    try {
+      const { data, error } = await supabase
+        .from('quotes')
+        .select('*')
+        .eq('order_id', job.id)
+        .maybeSingle();
+
+      if (error) throw error;
+      setQuote(data);
+    } catch (error) {
+      console.error('Error fetching quote data:', error);
+    } finally {
+      setLoadingQuote(false);
+    }
+  };
+
+  const handleSaveQuoteMetadata = async (metadata: any) => {
+    if (!quote) return;
+    
+    try {
+      const { error } = await supabase
+        .from('quotes')
+        .update(metadata)
+        .eq('id', quote.id);
+
+      if (error) throw error;
+      
+      // Refresh quote data
+      await fetchQuoteData();
+      onQuoteUpdated();
+    } catch (error) {
+      console.error('Error saving quote metadata:', error);
+      throw error;
+    }
+  };
+
+  const handleSendQuote = async () => {
+    if (!quote) return;
+    
+    try {
+      const { error } = await supabase
+        .from('quotes')
+        .update({ status: 'sent' })
+        .eq('id', quote.id);
+
+      if (error) throw error;
+      
+      // Refresh quote data
+      await fetchQuoteData();
+      onQuoteUpdated();
+    } catch (error) {
+      console.error('Error sending quote:', error);
+      throw error;
+    }
+  };
 
   const getStatusColor = (status: string, override?: any) => {
     // Show override status if present
@@ -187,6 +258,29 @@ export function PartnerQuoteDrawer({
               </div>
             </CardContent>
           </Card>
+
+          {/* Quote Configuration */}
+          {quote && (
+            <QuoteMetadataPanel
+              quoteId={quote.id}
+              initialData={{
+                quote_type: quote.quote_type,
+                part_required: quote.part_required || false,
+                groundworks_required: quote.groundworks_required || false,
+                multiple_engineers_required: quote.multiple_engineers_required || false,
+                specific_engineer_required: quote.specific_engineer_required || false,
+                specific_engineer_id: quote.specific_engineer_id,
+                expected_duration_days: quote.expected_duration_days,
+                charger_model_id: quote.charger_model_id,
+                partner_id: quote.partner_id
+              }}
+              onSave={handleSaveQuoteMetadata}
+              onSendQuote={handleSendQuote}
+              isReadOnly={quote.status === 'approved' || quote.status === 'rejected'}
+              isSaving={false}
+              isSending={false}
+            />
+          )}
 
           {/* Actions */}
           <div className="space-y-3">
