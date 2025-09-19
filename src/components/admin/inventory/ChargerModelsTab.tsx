@@ -42,12 +42,7 @@ export function ChargerModelsTab() {
       console.log('Fetching charger models...');
       const { data: models, error } = await supabase
         .from('inventory_items')
-        .select(`
-          *,
-          inventory_suppliers!supplier_id (
-            name
-          )
-        `)
+        .select('*')
         .eq('is_charger', true)
         .order('name');
 
@@ -82,7 +77,7 @@ export function ChargerModelsTab() {
             description: model.description,
             default_cost: model.default_cost,
             reorder_point: model.reorder_point,
-            supplier_name: (model as any).inventory_suppliers?.name || null,
+            supplier_name: null, // Will be null for now since all supplier_id are null
             is_active: model.is_active,
             units_count: unitsCount,
             available_units: availableUnits,
