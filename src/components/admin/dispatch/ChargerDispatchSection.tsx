@@ -22,13 +22,31 @@ export function ChargerDispatchSection({ orderId }: ChargerDispatchSectionProps)
     queryFn: async () => {
       const { data, error } = await supabase
         .from('charger_dispatches')
-        .select('*')
+        .select('*, dispatched_by')
         .eq('order_id', orderId)
         .single();
 
       if (error && error.code !== 'PGRST116') throw error;
       return data;
     }
+  });
+
+  // Fetch user profile for dispatched_by if available
+  const { data: dispatchedByProfile } = useQuery({
+    queryKey: ['profile', dispatchInfo?.dispatched_by],
+    queryFn: async () => {
+      if (!dispatchInfo?.dispatched_by) return null;
+      
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('user_id', dispatchInfo.dispatched_by)
+        .single();
+
+      if (error) return null;
+      return data;
+    },
+    enabled: !!dispatchInfo?.dispatched_by
   });
 
   const getStatusBadge = (status?: string) => {
@@ -39,7 +57,7 @@ export function ChargerDispatchSection({ orderId }: ChargerDispatchSectionProps)
     switch (status) {
       case 'pending_dispatch':
         return <Badge variant="outline">Pending Dispatch</Badge>;
-      case 'dispatched':
+      case 'sent':
         return <Badge variant="default" className="bg-green-500">Dispatched</Badge>;
       case 'delivered':
         return <Badge variant="default" className="bg-blue-500">Delivered</Badge>;
@@ -52,7 +70,7 @@ export function ChargerDispatchSection({ orderId }: ChargerDispatchSectionProps)
 
   const getStatusIcon = (status?: string) => {
     switch (status) {
-      case 'dispatched':
+      case 'sent':
         return <Truck className="h-4 w-4 text-green-500" />;
       case 'issue':
         return <AlertTriangle className="h-4 w-4 text-red-500" />;
@@ -143,6 +161,15 @@ export function ChargerDispatchSection({ orderId }: ChargerDispatchSectionProps)
                   <label className="text-sm font-medium text-muted-foreground">Dispatched Date</label>
                   <div className="mt-1 text-sm">
                     {format(new Date(dispatchInfo.dispatched_at), 'dd/MM/yyyy HH:mm')}
+                  </div>
+                </div>
+              )}
+
+              {dispatchedByProfile?.full_name && (
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Dispatched By</label>
+                  <div className="mt-1 text-sm">
+                    {dispatchedByProfile.full_name}
                   </div>
                 </div>
               )}
