@@ -215,7 +215,7 @@ export default function OrderDetail() {
             paid_at,
             created_at
           ),
-          engineer:engineers(
+          assigned_engineer:engineers!engineer_id(
             id,
             name,
             email
@@ -274,7 +274,7 @@ export default function OrderDetail() {
         order_number: data.order_number,
         hasClient: !!data.client,
         hasQuote: !!data.quote,
-        hasEngineer: !!data.engineer,
+        hasEngineer: !!data.assigned_engineer,
         hasPartner: !!data.partner,
         surveysCount: data.client_surveys?.length || 0,
         paymentsCount: data.order_payments?.length || 0,
@@ -298,8 +298,8 @@ export default function OrderDetail() {
         console.warn('[OrderDetail] No quote data found');
       }
       
-      if (data.engineer) {
-        console.log('[OrderDetail] Engineer data:', data.engineer);
+      if (data.assigned_engineer) {
+        console.log('[OrderDetail] Engineer data:', data.assigned_engineer);
       } else {
         console.log('[OrderDetail] No engineer assigned');
       }
@@ -316,7 +316,7 @@ export default function OrderDetail() {
         // Ensure all nested objects have defaults
         client: data.client || { id: '', full_name: '', email: '', address: null, postcode: null },
         quote: data.quote || null,
-        engineer: data.engineer || null,
+        engineer: data.assigned_engineer || null,
         partner: data.partner || null,
         order_payments: data.order_payments || [],
         engineer_uploads: data.engineer_uploads || [],
