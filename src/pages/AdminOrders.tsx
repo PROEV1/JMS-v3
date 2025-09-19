@@ -18,6 +18,7 @@ import type { Database } from "@/integrations/supabase/types";
 import { useServerPagination } from '@/hooks/useServerPagination';
 import { Paginator } from '@/components/ui/Paginator';
 import { keepPreviousData } from '@tanstack/react-query';
+import { getJobTypeLabel } from '@/utils/jobTypeUtils';
 import { useDebounce } from '@/hooks/useDebounce';
 
 type OrderStatusEnhanced = Database['public']['Enums']['order_status_enhanced'];
@@ -360,6 +361,7 @@ export default function AdminOrders() {
         'Client Email',
         'Client Phone',
         'Status',
+        'Job Type',
         'Engineer',
         'Scheduled Date',
         'Total Amount',
@@ -380,6 +382,7 @@ export default function AdminOrders() {
           csvEscape(order.clients?.email),
           csvEscape(order.clients?.phone),
           csvEscape(formatStatusText(order.status_enhanced || '')),
+          csvEscape(getJobTypeLabel(order.job_type)),
           csvEscape(order.engineers?.name),
           csvEscape(order.scheduled_install_date ? format(new Date(order.scheduled_install_date), 'yyyy-MM-dd') : ''),
           csvEscape(order.total_amount),
