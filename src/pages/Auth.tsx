@@ -22,44 +22,48 @@ export default function Auth() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    console.log('Auth: Checking authentication state:', { 
+    console.log('Auth: Running redirect check:', { 
       hasUser: !!user, 
       email: user?.email, 
       authLoading, 
-      finalRole 
+      finalRole,
+      currentPath: window.location.pathname 
     });
     
     if (user && !authLoading && finalRole) {
-      console.log('Auth: User authenticated with role, redirecting', { 
+      console.log('Auth: User authenticated with role, starting redirect process', { 
         userId: user.id, 
         email: user.email, 
         finalRole 
       });
       
-      // Check for explicit redirect path
-      const explicitRedirect = sessionStorage.getItem('authRedirectPath');
-      
-      if (explicitRedirect) {
-        console.log('Auth: Using explicit redirect path:', explicitRedirect);
-        sessionStorage.removeItem('authRedirectPath');
-        navigate(explicitRedirect, { replace: true });
-      } else {
-        // Default redirect based on role
-        let defaultPath;
-        if (finalRole === 'partner_user') {
-          defaultPath = '/partner';
-        } else if (finalRole === 'engineer') {
-          defaultPath = '/engineer/dashboard';
-        } else if (finalRole === 'client') {
-          defaultPath = '/portal';
+      // Small delay to ensure all auth states are settled
+      setTimeout(() => {
+        // Check for explicit redirect path first
+        const explicitRedirect = sessionStorage.getItem('authRedirectPath');
+        
+        if (explicitRedirect) {
+          console.log('Auth: Using explicit redirect path:', explicitRedirect);
+          sessionStorage.removeItem('authRedirectPath');
+          window.location.replace(explicitRedirect);
         } else {
-          defaultPath = '/admin';
+          // Default redirect based on role
+          let defaultPath;
+          if (finalRole === 'partner_user') {
+            defaultPath = '/partner';
+          } else if (finalRole === 'engineer') {
+            defaultPath = '/engineer/dashboard';
+          } else if (finalRole === 'client') {
+            defaultPath = '/portal';
+          } else {
+            defaultPath = '/admin';
+          }
+          console.log('Auth: Using default redirect for role:', defaultPath);
+          window.location.replace(defaultPath);
         }
-        console.log('Auth: Using default redirect for role:', defaultPath);
-        navigate(defaultPath, { replace: true });
-      }
+      }, 100);
     }
-  }, [user, authLoading, finalRole, navigate]);
+  }, [user, authLoading, finalRole]);
 
   // Show loading while auth is resolving
   if (authLoading || (user && finalRole)) {
