@@ -66,15 +66,7 @@ export function WeekViewCalendar({
     queryFn: async () => {
       const { data, error } = await supabase
         .from('job_offers')
-        .select(`
-          *,
-          order:orders!fk_job_offers_order_id(
-            id,
-            order_number,
-            scheduled_install_date,
-            client:clients(full_name)
-          )
-        `)
+        .select('*')
         .gte('offered_date', weekStart.toISOString().split('T')[0])
         .lte('offered_date', weekEnd.toISOString().split('T')[0])
         .or(
@@ -86,8 +78,28 @@ export function WeekViewCalendar({
         return [];
       }
 
+      // Fetch order details separately to avoid foreign key issues
+      const offersWithOrders = await Promise.all((data || []).map(async (offer: any) => {
+        const { data: orderData } = await supabase
+          .from('orders')
+          .select(`
+            id,
+            order_number,
+            scheduled_install_date,
+            client_id,
+            client:clients(full_name)
+          `)
+          .eq('id', offer.order_id)
+          .single();
+        
+        return {
+          ...offer,
+          order: orderData
+        };
+      }));
+
       // Filter out offers where the order is already scheduled
-      return data?.filter(offer => !offer.order?.scheduled_install_date) || [];
+      return offersWithOrders?.filter(offer => !offer.order?.scheduled_install_date) || [];
     },
     enabled: showOfferHolds
   });

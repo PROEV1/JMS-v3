@@ -62,10 +62,7 @@ export async function calculateDayFit(
   // Get active job offers for this engineer on this date (soft holds)
   const { data: jobOffers, error: offersError } = await supabase
     .from('job_offers')
-    .select(`
-      *,
-      orders!fk_job_offers_order_id(*)
-    `)
+    .select('*')
     .eq('engineer_id', engineer.id)
     .gte('offered_date', `${dateStr}T00:00:00`)
     .lt('offered_date', `${dateStr}T23:59:59`)
@@ -73,8 +70,22 @@ export async function calculateDayFit(
 
   if (offersError) throw offersError;
 
+  // Fetch order details separately to avoid foreign key ambiguity
+  const offersWithOrders = await Promise.all((jobOffers || []).map(async (offer) => {
+    const { data: orderData } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('id', offer.order_id)
+      .single();
+    
+    return {
+      ...offer,
+      orders: orderData
+    };
+  }));
+
   // Filter valid offers (pending non-expired or accepted non-scheduled)
-  const validOffers = (jobOffers || []).filter(offer => {
+  const validOffers = offersWithOrders.filter(offer => {
     if (offer.status === 'pending' && new Date(offer.expires_at) > new Date()) return true;
     if (offer.status === 'accepted') {
       const order = offer.orders;

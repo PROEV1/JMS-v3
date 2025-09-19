@@ -57,13 +57,7 @@ export function useJobOffers(orderId?: string | string[]) {
           accepted_at,
           rejected_at,
           expired_at,
-          created_at,
-          order:orders!fk_job_offers_order_id(
-            order_number,
-            client_id,
-            client:clients(full_name, email)
-          ),
-          engineer:engineers!fk_job_offers_engineer_id(name, email)
+          created_at
         `)
         .order('created_at', { ascending: false });
 
@@ -79,7 +73,29 @@ export function useJobOffers(orderId?: string | string[]) {
 
       if (error) throw error;
 
-      setOffers(data || []);
+      // Fetch related data separately to avoid foreign key ambiguity
+      const offersWithRelations = await Promise.all((data || []).map(async (offer) => {
+        const [orderData, engineerData] = await Promise.all([
+          supabase
+            .from('orders')
+            .select('order_number, client_id, client:clients(full_name, email)')
+            .eq('id', offer.order_id)
+            .single(),
+          supabase
+            .from('engineers')
+            .select('name, email')
+            .eq('id', offer.engineer_id)
+            .single()
+        ]);
+
+        return {
+          ...offer,
+          order: orderData.data,
+          engineer: engineerData.data
+        };
+      }));
+
+      setOffers(offersWithRelations);
       setError(null);
     } catch (err: any) {
       console.error('Error fetching job offers:', err);
