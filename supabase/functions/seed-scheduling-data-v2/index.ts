@@ -553,13 +553,12 @@ serve(async (req) => {
             case 'needs_scheduling':
                 // Pure needs scheduling - no offers, ready to go
                 // CRITICAL: Ensure all prerequisites are met to bypass survey gating
-                orderStatus = 'needs_scheduling'; // Set correct status for bucket
                 surveyRequired = false;
                 amountPaid = totalCost; // Full payment to bypass payment gating
                 agreementSigned = new Date(now.getTime() - Math.random() * 7 * 24 * 60 * 60 * 1000);
                 manualStatusOverride = true;
                 manualStatusNotes = 'Seeded for needs scheduling bucket - survey disabled, payment complete, agreement signed';
-                console.log(`📋 Needs Scheduling Order Config: status=${orderStatus}, survey_required=${surveyRequired}, amount_paid=${amountPaid}, total_cost=${totalCost}, agreement_signed=${!!agreementSigned}`);
+                console.log(`📋 Needs Scheduling Order Config: survey_required=${surveyRequired}, amount_paid=${amountPaid}, total_cost=${totalCost}, agreement_signed=${!!agreementSigned}`);
                 break;
                 
               case 'date_offered':
@@ -619,6 +618,7 @@ serve(async (req) => {
                 quote_id: quote.id,
                 order_number: `ORD2024-${String(orderSeq).padStart(4, '0')}`,
                 status: orderStatus,
+                status_enhanced: selectedBucket.type === 'needs_scheduling' ? 'awaiting_install_booking' : null,
                 manual_status_override: manualStatusOverride,
                 manual_status_notes: manualStatusNotes,
                 survey_required: surveyRequired,
