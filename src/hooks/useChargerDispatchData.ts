@@ -72,8 +72,11 @@ export function useChargerDispatchData({
         let dispatchStatus = 'pending_dispatch';
         if (order.job_type === 'service_call') {
           dispatchStatus = 'not_required';
-        } else if (dispatchRecord) {
+        } else if (dispatchRecord && dispatchRecord.status) {
           dispatchStatus = dispatchRecord.status;
+        } else if (dispatchRecord && !dispatchRecord.status) {
+          // Has dispatch record but no status means it's pending
+          dispatchStatus = 'pending_dispatch';
         }
 
         // Calculate urgency
@@ -142,7 +145,8 @@ export function useChargerDispatchData({
             ordersQuery = ordersQuery.eq('job_type', 'service_call');
             break;
           case 'pending_dispatch':
-            ordersQuery = ordersQuery.is('charger_dispatches', null);
+            // Include orders with no dispatch record OR dispatch record with null/pending status
+            ordersQuery = ordersQuery.or('charger_dispatches.is.null,charger_dispatches.status.is.null,charger_dispatches.status.eq.pending_dispatch');
             break;
           case 'dispatched':
             ordersQuery = ordersQuery.not('charger_dispatches', 'is', null)
@@ -171,8 +175,11 @@ export function useChargerDispatchData({
         let dispatchStatus = 'pending_dispatch';
         if (order.job_type === 'service_call') {
           dispatchStatus = 'not_required';
-        } else if (dispatchRecord) {
+        } else if (dispatchRecord && dispatchRecord.status) {
           dispatchStatus = dispatchRecord.status;
+        } else if (dispatchRecord && !dispatchRecord.status) {
+          // Has dispatch record but no status means it's pending
+          dispatchStatus = 'pending_dispatch';
         }
 
         // Calculate urgency
