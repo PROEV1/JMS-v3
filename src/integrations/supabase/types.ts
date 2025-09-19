@@ -1419,13 +1419,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "job_offers_engineer_id_fkey"
-            columns: ["engineer_id"]
-            isOneToOne: false
-            referencedRelation: "engineers"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "job_offers_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false

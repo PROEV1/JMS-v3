@@ -33,7 +33,7 @@ export function OrderActionBar({ orderId, order }: OrderActionBarProps) {
         .eq('order_id', orderId)
         .order('created_at', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
       if (error && error.code !== 'PGRST116') {
         throw error;
