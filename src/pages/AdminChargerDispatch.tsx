@@ -1,18 +1,46 @@
-import React, { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Plus, AlertTriangle, Package, Truck, CheckCircle } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { 
+  Truck, 
+  AlertTriangle, 
+  Clock, 
+  CheckCircle,
+  BarChart3,
+  Settings,
+  Smartphone,
+  Monitor,
+  Wifi,
+  WifiOff
+} from 'lucide-react';
 import { ChargerDispatchTable } from '@/components/admin/dispatch/ChargerDispatchTable';
 import { ChargerDispatchFilters } from '@/components/admin/dispatch/ChargerDispatchFilters';
+import { AdvancedDispatchFilters } from '@/components/admin/dispatch/AdvancedDispatchFilters';
+import { BulkActionsBar } from '@/components/admin/dispatch/BulkActionsBar';
 import { MarkAsDispatchedModal } from '@/components/admin/dispatch/MarkAsDispatchedModal';
 import { FlagIssueModal } from '@/components/admin/dispatch/FlagIssueModal';
-import { BulkActionsBar } from '@/components/admin/dispatch/BulkActionsBar';
+import { DispatchAnalytics } from '@/components/admin/dispatch/DispatchAnalytics';
+import { MobileDispatchView } from '@/components/admin/dispatch/MobileDispatchView';
+import { DispatchRealtimeProvider, useDispatchRealtime } from '@/components/admin/dispatch/DispatchRealtimeProvider';
 import { useChargerDispatchData } from '@/hooks/useChargerDispatchData';
 import { useServerPagination } from '@/hooks/useServerPagination';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
-export default function AdminChargerDispatch() {
+function AdminChargerDispatchContent() {
+  const { toast } = useToast();
+  const { isConnected, enableRealtime, disableRealtime } = useDispatchRealtime();
+  const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
+  const [showDispatchModal, setShowDispatchModal] = useState(false);
+  const [showIssueModal, setShowIssueModal] = useState(false);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [isMobileView, setIsMobileView] = useState(false);
+  const [currentTab, setCurrentTab] = useState('overview');
+
   const { pagination, controls } = useServerPagination();
+  const { setPage, setPageSize, resetToFirstPage } = controls;
   const [filters, setFilters] = useState({
     dateFrom: '',
     dateTo: '',
@@ -21,189 +49,396 @@ export default function AdminChargerDispatch() {
     dispatchStatus: 'all',
     jobType: 'all'
   });
-  const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
-  const [showDispatchModal, setShowDispatchModal] = useState(false);
-  const [showIssueModal, setShowIssueModal] = useState(false);
-  const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
 
-  const { data, isLoading, error } = useChargerDispatchData({
+  const { data, isLoading, refetch } = useChargerDispatchData({
     pagination,
     filters
   });
 
-  const orders = data?.orders || [];
-  const totalCount = data?.totalCount || 0;
-  const stats = data?.stats || {
-    pendingDispatch: 0,
-    dispatched: 0,
-    urgent: 0,
-    issues: 0
+  // Detect mobile view
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobileView(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Auto-enable realtime updates
+  useEffect(() => {
+    enableRealtime();
+    return () => disableRealtime();
+  }, [enableRealtime, disableRealtime]);
+
+  const handleFilterChange = (newFilters: typeof filters) => {
+    setFilters(newFilters);
+    resetToFirstPage();
   };
 
-  const handleMarkAsDispatched = (orderId: string) => {
-    setSelectedOrder(orderId);
+  const handleMarkDispatched = (orderId: string) => {
+    setSelectedOrderId(orderId);
     setShowDispatchModal(true);
   };
 
   const handleFlagIssue = (orderId: string) => {
-    setSelectedOrder(orderId);
+    setSelectedOrderId(orderId);
     setShowIssueModal(true);
   };
 
-  const handleBulkDispatch = () => {
-    // For bulk dispatch, we'd need a different modal
-    // For now, just show the regular modal with first selected order
-    if (selectedOrders.length > 0) {
-      setSelectedOrder(selectedOrders[0]);
-      setShowDispatchModal(true);
+  const handleBulkStatusChange = async (status: string) => {
+    try {
+      const { error } = await supabase
+        .from('charger_dispatches')
+        .upsert(
+          selectedOrders.map(orderId => ({
+            order_id: orderId,
+            charger_item_id: 'default-charger-id', // This should be dynamic in production
+            status,
+            updated_at: new Date().toISOString(),
+            ...(status === 'dispatched' && { dispatched_at: new Date().toISOString() })
+          }))
+        );
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: `Updated ${selectedOrders.length} orders to ${status}`,
+      });
+
+      setSelectedOrders([]);
+      refetch();
+    } catch (error) {
+      console.error('Error updating orders:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update orders",
+        variant: "destructive",
+      });
     }
   };
 
-  const handleBulkFlagIssue = () => {
-    if (selectedOrders.length > 0) {
-      setSelectedOrder(selectedOrders[0]);
-      setShowIssueModal(true);
+  const handleAdvancedFilterApply = (advancedFilters: any) => {
+    // Convert advanced filters to standard filters format
+    setFilters({
+      ...filters,
+      dateFrom: advancedFilters.dateRange === 'custom' ? advancedFilters.customDateFrom : '',
+      dateTo: advancedFilters.dateRange === 'custom' ? advancedFilters.customDateTo : '',
+      // Add more advanced filter mappings as needed
+    });
+    resetToFirstPage();
+  };
+
+  const handleExportData = async (exportFilters: any) => {
+    try {
+      const { data: exportData } = await supabase
+        .from('orders')
+        .select(`
+          order_number,
+          scheduled_install_date,
+          status_enhanced,
+          job_type,
+          clients!inner (
+            full_name,
+            postcode,
+            address,
+            phone
+          ),
+          engineers (
+            name,
+            region
+          ),
+          charger_dispatches (
+            status,
+            dispatched_at,
+            delivered_at,
+            tracking_number
+          )
+        `)
+        .not('scheduled_install_date', 'is', null);
+
+      if (exportData) {
+        const csvContent = [
+          ['Order Number', 'Client Name', 'Postcode', 'Install Date', 'Engineer', 'Dispatch Status', 'Dispatched At'],
+          ...exportData.map(order => [
+            order.order_number,
+            order.clients?.full_name || '',
+            order.clients?.postcode || '',
+            order.scheduled_install_date,
+            order.engineers?.name || '',
+            order.charger_dispatches?.[0]?.status || 'pending',
+            order.charger_dispatches?.[0]?.dispatched_at || ''
+          ])
+        ].map(row => row.join(',')).join('\n');
+
+        const blob = new Blob([csvContent], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `dispatch-export-${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+      }
+
+      toast({
+        title: "Export Complete",
+        description: "Dispatch data exported successfully",
+      });
+    } catch (error) {
+      toast({
+        title: "Export Failed",
+        description: "Could not export dispatch data",
+        variant: "destructive",
+      });
     }
   };
 
-  const handleBulkStatusChange = (status: string) => {
-    // Handle bulk status changes here
-    console.log('Bulk status change:', status, selectedOrders);
-  };
+  if (isMobileView) {
+    return (
+      <div className="h-screen flex flex-col">
+        <div className="flex justify-between items-center p-4 border-b bg-background">
+          <div>
+            <h1 className="text-xl font-bold">Dispatch Manager</h1>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <div className="flex items-center gap-1">
+                {isConnected ? <Wifi className="h-3 w-3 text-green-500" /> : <WifiOff className="h-3 w-3 text-red-500" />}
+                <span>{isConnected ? 'Live' : 'Offline'}</span>
+              </div>
+            </div>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsMobileView(false)}
+          >
+            <Monitor className="h-4 w-4" />
+          </Button>
+        </div>
 
-  const handleFilterChange = (newFilters: typeof filters) => {
-    setFilters(newFilters);
-    controls.resetToFirstPage();
-  };
+        <MobileDispatchView
+          orders={data?.orders || []}
+          isLoading={isLoading}
+          onMarkDispatched={handleMarkDispatched}
+          onFlagIssue={handleFlagIssue}
+          onRefresh={refetch}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Charger Dispatch Manager</h1>
-          <p className="text-muted-foreground mt-1">
-            Track and manage EV charger dispatches for scheduled installations
-          </p>
+          <h1 className="text-3xl font-bold">Charger Dispatch Manager</h1>
+          <p className="text-muted-foreground">Track and manage EV charger dispatches</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 text-sm">
+            {isConnected ? <Wifi className="h-4 w-4 text-green-500" /> : <WifiOff className="h-4 w-4 text-red-500" />}
+            <span className="text-muted-foreground">{isConnected ? 'Live Updates' : 'Offline'}</span>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsMobileView(true)}
+            className="md:hidden"
+          >
+            <Smartphone className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="outline"
+            onClick={isConnected ? disableRealtime : enableRealtime}
+          >
+            {isConnected ? <WifiOff className="h-4 w-4 mr-2" /> : <Wifi className="h-4 w-4 mr-2" />}
+            {isConnected ? 'Disable Live' : 'Enable Live'}
+          </Button>
         </div>
       </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending Dispatch</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{stats.pendingDispatch}</div>
-            <p className="text-xs text-muted-foreground">
-              Require charger dispatch
-            </p>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Pending Dispatch</p>
+                <p className="text-2xl font-bold">{data?.stats.pendingDispatch || 0}</p>
+              </div>
+              <Clock className="h-8 w-8 text-orange-500" />
+            </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Dispatched</CardTitle>
-            <Truck className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{stats.dispatched}</div>
-            <p className="text-xs text-muted-foreground">
-              Chargers in transit
-            </p>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Dispatched</p>
+                <p className="text-2xl font-bold">{data?.stats.dispatched || 0}</p>
+              </div>
+              <Truck className="h-8 w-8 text-blue-500" />
+            </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Urgent (48h)</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">{stats.urgent}</div>
-            <p className="text-xs text-muted-foreground">
-              Due within 2 days
-            </p>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Urgent</p>
+                <p className="text-2xl font-bold">{data?.stats.urgent || 0}</p>
+              </div>
+              <AlertTriangle className="h-8 w-8 text-red-500" />
+            </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Issues</CardTitle>
-            <CheckCircle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">{stats.issues}</div>
-            <p className="text-xs text-muted-foreground">
-              Require attention
-            </p>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Issues</p>
+                <p className="text-2xl font-bold">{data?.stats.issues || 0}</p>
+              </div>
+              <CheckCircle className="h-8 w-8 text-green-500" />
+            </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Filters */}
-      <ChargerDispatchFilters 
-        filters={filters}
-        onFiltersChange={handleFilterChange}
-      />
+      {/* Main Content Tabs */}
+      <Tabs value={currentTab} onValueChange={setCurrentTab} className="space-y-6">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="analytics">Analytics</TabsTrigger>
+          <TabsTrigger value="advanced">Advanced</TabsTrigger>
+        </TabsList>
 
-      {/* Main Table */}
-      <Card>
-        <CardHeader>
-          <div className="flex justify-between items-center">
-            <div>
-              <CardTitle>Dispatch Queue</CardTitle>
-              <CardDescription>
-                {totalCount} jobs • Showing page {pagination.page} of {Math.ceil(totalCount / pagination.pageSize)}
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <ChargerDispatchTable
-            orders={orders}
-            isLoading={isLoading}
-            onMarkAsDispatched={handleMarkAsDispatched}
-            onFlagIssue={handleFlagIssue}
-            selectedOrders={selectedOrders}
-            onSelectionChange={setSelectedOrders}
-            pagination={pagination}
-            totalCount={totalCount}
-            onPageChange={controls.setPage}
-            onPageSizeChange={controls.setPageSize}
+        <TabsContent value="overview" className="space-y-6">
+          {/* Filters */}
+          <ChargerDispatchFilters 
+            filters={filters} 
+            onFiltersChange={handleFilterChange} 
           />
-        </CardContent>
-      </Card>
 
-      {/* Bulk Actions Bar */}
-      <BulkActionsBar
-        selectedCount={selectedOrders.length}
-        onClearSelection={() => setSelectedOrders([])}
-        onBulkDispatch={handleBulkDispatch}
-        onBulkFlagIssue={handleBulkFlagIssue}
-        onBulkStatusChange={handleBulkStatusChange}
-      />
+          {/* Bulk Actions */}
+          <BulkActionsBar
+            selectedCount={selectedOrders.length}
+            onClearSelection={() => setSelectedOrders([])}
+            onBulkDispatch={() => setShowDispatchModal(true)}
+            onBulkFlagIssue={() => setShowIssueModal(true)}
+            onBulkStatusChange={handleBulkStatusChange}
+          />
+
+          {/* Dispatch Table */}
+          <ChargerDispatchTable
+            orders={data?.orders || []}
+            isLoading={isLoading}
+            totalCount={data?.totalCount || 0}
+            pagination={pagination}
+            onPaginationChange={updatePagination}
+            selectedOrders={selectedOrders}
+            onOrderSelect={(orderId, selected) => {
+              if (selected) {
+                setSelectedOrders(prev => [...prev, orderId]);
+              } else {
+                setSelectedOrders(prev => prev.filter(id => id !== orderId));
+              }
+            }}
+            onSelectAll={(selected) => {
+              if (selected) {
+                setSelectedOrders(data?.orders.map(o => o.id) || []);
+              } else {
+                setSelectedOrders([]);
+              }
+            }}
+            onMarkDispatched={handleMarkDispatched}
+            onFlagIssue={handleFlagIssue}
+          />
+        </TabsContent>
+
+        <TabsContent value="analytics" className="space-y-6">
+          <DispatchAnalytics 
+            dateRange={{ 
+              from: filters.dateFrom || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+              to: filters.dateTo || new Date().toISOString().split('T')[0]
+            }}
+          />
+        </TabsContent>
+
+        <TabsContent value="advanced" className="space-y-6">
+          <AdvancedDispatchFilters
+            onApplyFilters={handleAdvancedFilterApply}
+            onExportData={handleExportData}
+          />
+          
+          {/* Advanced table view could go here */}
+          <ChargerDispatchTable
+            orders={data?.orders || []}
+            isLoading={isLoading}
+            totalCount={data?.totalCount || 0}
+            pagination={pagination}
+            onPaginationChange={updatePagination}
+            selectedOrders={selectedOrders}
+            onOrderSelect={(orderId, selected) => {
+              if (selected) {
+                setSelectedOrders(prev => [...prev, orderId]);
+              } else {
+                setSelectedOrders(prev => prev.filter(id => id !== orderId));
+              }
+            }}
+            onSelectAll={(selected) => {
+              if (selected) {
+                setSelectedOrders(data?.orders.map(o => o.id) || []);
+              } else {
+                setSelectedOrders([]);
+              }
+            }}
+            onMarkDispatched={handleMarkDispatched}
+            onFlagIssue={handleFlagIssue}
+          />
+        </TabsContent>
+      </Tabs>
 
       {/* Modals */}
       <MarkAsDispatchedModal
         isOpen={showDispatchModal}
         onClose={() => {
           setShowDispatchModal(false);
-          setSelectedOrder(null);
+          setSelectedOrderId(null);
         }}
-        orderId={selectedOrder}
+        orderIds={selectedOrderId ? [selectedOrderId] : selectedOrders}
+        onSuccess={() => {
+          setSelectedOrders([]);
+          setSelectedOrderId(null);
+          refetch();
+        }}
       />
 
       <FlagIssueModal
         isOpen={showIssueModal}
         onClose={() => {
           setShowIssueModal(false);
-          setSelectedOrder(null);
+          setSelectedOrderId(null);
         }}
-        orderId={selectedOrder}
+        orderIds={selectedOrderId ? [selectedOrderId] : selectedOrders}
+        onSuccess={() => {
+          setSelectedOrders([]);  
+          setSelectedOrderId(null);
+          refetch();
+        }}
       />
     </div>
+  );
+}
+
+export default function AdminChargerDispatch() {
+  return (
+    <DispatchRealtimeProvider>
+      <AdminChargerDispatchContent />
+    </DispatchRealtimeProvider>
   );
 }
