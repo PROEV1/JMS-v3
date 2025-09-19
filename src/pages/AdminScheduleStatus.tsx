@@ -14,6 +14,8 @@ import { ReadyToBookListPage } from '@/components/scheduling/ReadyToBookListPage
 import { OnHoldListPage } from '@/components/scheduling/OnHoldListPage';
 import { DateRejectedListPage } from '@/components/scheduling/DateRejectedListPage';
 import { OfferExpiredListPage } from '@/components/scheduling/OfferExpiredListPage';
+import { AwaitingPartsOrderListPage } from '@/components/scheduling/AwaitingPartsOrderListPage';
+import { AwaitingManualSchedulingListPage } from '@/components/scheduling/AwaitingManualSchedulingListPage';
 
 export default function AdminScheduleStatus() {
   const { status } = useParams<{ status: string }>();
@@ -25,6 +27,10 @@ export default function AdminScheduleStatus() {
         switch (status) {
           case 'needs-scheduling':
             return <NeedsSchedulingListPage />;
+          case 'awaiting-parts-order':
+            return <AwaitingPartsOrderListPage />;
+          case 'awaiting-manual-scheduling':
+            return <AwaitingManualSchedulingListPage />;
           case 'date-offered':
             return <DateOfferedListPage />;
           case 'ready-to-book':

@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
-import { Clock, Calendar, CheckCircle, XCircle, AlertTriangle, Package, Ban, FileCheck, Trophy, Eye } from 'lucide-react';
+import { Clock, Calendar, CheckCircle, XCircle, AlertTriangle, Package, Ban, FileCheck, Trophy, Eye, UserCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useScheduleStatusCounts } from '@/hooks/useScheduleStatusCounts';
 
@@ -26,6 +26,22 @@ const statusTiles: StatusTile[] = [
     colorClass: 'bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200 hover:border-orange-300',
     route: '/admin/schedule/status/needs-scheduling',
     statusKey: 'needs-scheduling'
+  },
+  {
+    id: 'awaiting_parts_order',
+    title: 'Awaiting Parts Order',
+    icon: Package,
+    colorClass: 'bg-gradient-to-br from-indigo-50 to-indigo-100 border-indigo-200 hover:border-indigo-300',
+    route: '/admin/schedule/status/awaiting-parts-order',
+    statusKey: 'awaiting-parts-order'
+  },
+  {
+    id: 'awaiting_manual_scheduling',
+    title: 'Manual Scheduling',
+    icon: UserCheck,
+    colorClass: 'bg-gradient-to-br from-violet-50 to-violet-100 border-violet-200 hover:border-violet-300',
+    route: '/admin/schedule/status/awaiting-manual-scheduling',
+    statusKey: 'awaiting-manual-scheduling'
   },
   {
     id: 'date_offered',
@@ -144,6 +160,8 @@ export function ScheduleStatusNavigation({ currentStatus }: ScheduleStatusNaviga
   // Map the counts from the hook to the status keys used in this component
   const statusCounts = {
     'needs-scheduling': counts.needsScheduling,
+    'awaiting-parts-order': counts.awaitingPartsOrder,
+    'awaiting-manual-scheduling': counts.awaitingManualScheduling,
     'date-offered': counts.dateOffered,
     'ready-to-book': counts.readyToBook,
     'date-rejected': counts.dateRejected,

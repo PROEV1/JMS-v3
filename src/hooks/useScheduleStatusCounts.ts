@@ -14,6 +14,8 @@ interface StatusCounts {
   cancelled: number;
   onHold: number;
   unavailableEngineers: number;
+  awaitingPartsOrder: number;
+  awaitingManualScheduling: number;
 }
 
 export function useScheduleStatusCounts() {
@@ -29,7 +31,9 @@ export function useScheduleStatusCounts() {
     completed: 0,
     cancelled: 0,
     onHold: 0,
-    unavailableEngineers: 0
+    unavailableEngineers: 0,
+    awaitingPartsOrder: 0,
+    awaitingManualScheduling: 0
   });
   const [loading, setLoading] = useState(true);
 
@@ -61,7 +65,9 @@ export function useScheduleStatusCounts() {
           completed: counts.completed || 0,
           cancelled: counts.cancelled || 0,
           onHold: counts.onHold || 0,
-          unavailableEngineers: counts.unavailableEngineers || 0
+          unavailableEngineers: counts.unavailableEngineers || 0,
+          awaitingPartsOrder: counts.awaitingPartsOrder || 0,
+          awaitingManualScheduling: counts.awaitingManualScheduling || 0
         };
         console.log('📊 Processed counts:', newCounts);
         setCounts(newCounts);
