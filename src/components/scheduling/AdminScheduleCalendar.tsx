@@ -83,7 +83,7 @@ export function AdminScheduleCalendar() {
         .select(`
           *,
           client:clients(*),
-          engineer:engineers(*)
+          engineer:engineers!engineer_id(*)
         `)
         .order('scheduled_install_date', { ascending: true });
 
@@ -103,7 +103,7 @@ export function AdminScheduleCalendar() {
         .select(`
           *,
           order:orders(*),
-          engineer:engineers(*)
+          engineer:engineers!engineer_id(*)
         `)
         .in('status', ['pending', 'accepted'])
         .gt('expires_at', new Date().toISOString());

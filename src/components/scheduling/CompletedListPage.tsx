@@ -18,9 +18,9 @@ export function CompletedListPage() {
         .from('orders')
         .select(`
           *,
-          client:client_id(full_name, email, phone, postcode, address),
-          engineer:engineer_id(name, email, region),
-          partner:partner_id(name)
+          client:clients!client_id(full_name, email, phone, postcode, address),
+          engineer:engineers!engineer_id(name, email, region),
+          partner:partners!partner_id(name)
         `, { count: 'exact' })
         .eq('status_enhanced', 'completed')
         .order('created_at', { ascending: false });
@@ -86,10 +86,10 @@ export function CompletedListPage() {
                 .from('orders')
                 .select(`
                   *,
-                  client:client_id(full_name, email, phone, postcode, address),
-                  engineer:engineer_id(name, email, region),
-                  partner:partner_id(name),
-                  quote:quote_id(quote_number)
+                  client:clients!client_id(full_name, email, phone, postcode, address),
+                  engineer:engineers!engineer_id(name, email, region),
+                  partner:partners!partner_id(name),
+                  quote:quotes!quote_id(quote_number)
                 `)
                 .eq('status_enhanced', 'completed')
                 .order('created_at', { ascending: false });

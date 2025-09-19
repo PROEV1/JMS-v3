@@ -123,7 +123,7 @@ export function InventoryDashboardV2({ onSwitchTab }: InventoryDashboardV2Props)
         .from('stock_requests')
         .select(`
           id, status, priority, needed_by, created_at,
-          engineers(name),
+          engineers!engineer_id(name),
           inventory_locations(name)
         `)
         .order('created_at', { ascending: false })

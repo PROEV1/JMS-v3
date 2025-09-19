@@ -50,7 +50,7 @@ export function DispatchAnalytics({ dateRange, className }: DispatchAnalyticsPro
           orders!inner (
             scheduled_install_date,
             job_type,
-            engineers (
+            engineers!engineer_id (
               region
             )
           )

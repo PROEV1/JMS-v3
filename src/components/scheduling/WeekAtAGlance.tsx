@@ -41,7 +41,7 @@ export function WeekAtAGlance() {
           id,
           scheduled_install_date,
           status_enhanced,
-          engineer:engineers(name),
+          engineer:engineers!engineer_id(name),
           client:clients(full_name)
         `)
         .eq('status_enhanced', 'scheduled')

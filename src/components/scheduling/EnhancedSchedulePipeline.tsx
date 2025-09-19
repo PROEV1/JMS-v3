@@ -97,7 +97,7 @@ export function EnhancedSchedulePipeline() {
           .select(`
             *,
             client:clients(*),
-            engineer:engineers(*)
+            engineer:engineers!engineer_id(*)
           `)
           .not('status_enhanced', 'in', '("completed")')
           .order('created_at', { ascending: false }),

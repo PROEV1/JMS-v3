@@ -102,7 +102,7 @@ export function ScanChargersModal({ open, onOpenChange }: ScanChargersModalProps
         location_id,
         engineer_id,
         inventory_locations(name),
-        engineers(name)
+        engineers!engineer_id(name)
       `)
       .eq('serial_number', serialNumber)
       .maybeSingle();

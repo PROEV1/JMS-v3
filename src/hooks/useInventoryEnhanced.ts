@@ -438,7 +438,7 @@ export function useInventoryEnhanced() {
             name,
             type,
             engineer_id,
-            engineers(name, email)
+            engineers!engineer_id(name, email)
           `)
           .eq('is_active', true)
           .eq('type', 'van');

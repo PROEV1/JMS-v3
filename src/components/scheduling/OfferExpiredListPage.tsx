@@ -18,9 +18,9 @@ export function OfferExpiredListPage() {
         .from('orders')
         .select(`
           *,
-          client:client_id(full_name, email, phone, postcode, address),
-          engineer:engineer_id(name, email, region),
-          partner:partner_id(name)
+          client:clients!client_id(full_name, email, phone, postcode, address),
+          engineer:engineers!engineer_id(name, email, region),
+          partner:partners!partner_id(name)
         `, { count: 'exact' })
         .eq('status_enhanced', 'offer_expired')
         .eq('scheduling_suppressed', false)

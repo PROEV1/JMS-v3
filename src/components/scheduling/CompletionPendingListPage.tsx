@@ -21,10 +21,10 @@ export function CompletionPendingListPage() {
         .from('orders')
         .select(`
           *,
-          client:client_id(full_name, email, phone, postcode, address),
-          engineer:engineer_id(name, email, region),
-          partner:partner_id(name),
-          quote:quote_id(quote_number)
+          client:clients!client_id(full_name, email, phone, postcode, address),
+          engineer:engineers!engineer_id(name, email, region),
+          partner:partners!partner_id(name),
+          quote:quotes!quote_id(quote_number)
         `, withCount ? { count: 'exact' } : {})
         .eq('status_enhanced', 'install_completed_pending_qa')
         .order('created_at', { ascending: false });

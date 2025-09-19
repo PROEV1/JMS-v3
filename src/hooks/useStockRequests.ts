@@ -19,7 +19,7 @@ export const useStockRequests = (engineerId?: string, limit = 30) => {
             *,
             item:inventory_items(name, sku, unit)
           ),
-          engineer:engineers(name),
+          engineer:engineers!engineer_id(name),
           destination_location:inventory_locations(name),
           order:orders(order_number, client_id)
         `)

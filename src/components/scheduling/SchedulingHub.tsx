@@ -45,7 +45,7 @@ export function SchedulingHub({}: SchedulingHubProps) {
         .select(`
           *,
           client:clients(full_name, email, postcode),
-          engineer:engineers(name, email)
+          engineer:engineers!engineer_id(name, email)
         `)
         .not('scheduled_install_date', 'is', null)
         .order('scheduled_install_date', { ascending: true });
