@@ -57,6 +57,7 @@ interface Order {
   part_required?: boolean;
   part_details?: string | null;
   parts_ordered?: boolean;
+  parts_delivered?: boolean;
   client: {
     id: string;
     full_name: string;

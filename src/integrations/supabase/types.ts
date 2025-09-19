@@ -2001,6 +2001,7 @@ export type Database = {
           partner_metadata: Json
           partner_status: string | null
           partner_status_raw: string | null
+          parts_delivered: boolean | null
           parts_ordered: boolean | null
           postcode: string | null
           quote_id: string | null
@@ -2062,6 +2063,7 @@ export type Database = {
           partner_metadata?: Json
           partner_status?: string | null
           partner_status_raw?: string | null
+          parts_delivered?: boolean | null
           parts_ordered?: boolean | null
           postcode?: string | null
           quote_id?: string | null
@@ -2123,6 +2125,7 @@ export type Database = {
           partner_metadata?: Json
           partner_status?: string | null
           partner_status_raw?: string | null
+          parts_delivered?: boolean | null
           parts_ordered?: boolean | null
           postcode?: string | null
           quote_id?: string | null
