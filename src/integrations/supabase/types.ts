@@ -3167,7 +3167,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
-          item_id: string
+          item_id: string | null
           item_name: string | null
           line_total: number | null
           purchase_order_id: string
@@ -3178,7 +3178,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
-          item_id: string
+          item_id?: string | null
           item_name?: string | null
           line_total?: number | null
           purchase_order_id: string
@@ -3189,7 +3189,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
-          item_id?: string
+          item_id?: string | null
           item_name?: string | null
           line_total?: number | null
           purchase_order_id?: string

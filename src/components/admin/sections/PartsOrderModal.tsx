@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -84,6 +84,13 @@ export function PartsOrderModal({
 
   // Watch for changes to make calculated total reactive
   const calculatedTotal = calculateTotalCost();
+  
+  // Automatically update netCost when calculatedTotal changes
+  useEffect(() => {
+    if (calculatedTotal > 0) {
+      setNetCost(calculatedTotal.toFixed(2));
+    }
+  }, [calculatedTotal]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -352,13 +359,14 @@ export function PartsOrderModal({
                   placeholder="0.00"
                   className="pl-10"
                   required
+                  readOnly
                 />
               </div>
-              <div className="text-sm text-muted-foreground mt-1">
-                Calculated from items: {formatCurrency(calculatedTotal)}
+              <div className="text-sm text-success-foreground mt-1">
+                Automatically calculated from items: {formatCurrency(calculatedTotal)}
                 {calculatedTotal !== parseFloat(netCost || '0') && parseFloat(netCost || '0') > 0 && (
                   <span className="text-amber-600 ml-2">
-                    (Differs from entered total)
+                    (Manual override detected)
                   </span>
                 )}
               </div>
