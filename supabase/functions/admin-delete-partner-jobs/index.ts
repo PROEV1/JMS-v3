@@ -263,6 +263,14 @@ serve(async (req) => {
         
         const batchStartTime = performance.now()
 
+        // First, clear charger assignments to avoid foreign key constraints
+        const chargerClearResult = await supabase
+          .from('charger_inventory')
+          .update({ assigned_order_id: null })
+          .in('assigned_order_id', batch)
+
+        if (chargerClearResult.error) console.error('Charger assignment clear error:', chargerClearResult.error)
+
         // Delete dependent records in parallel batches
         const [
           jobOffersResult,
