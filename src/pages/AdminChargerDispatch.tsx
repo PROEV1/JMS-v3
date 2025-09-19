@@ -66,11 +66,14 @@ function AdminChargerDispatchContent() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Auto-enable realtime updates
+  // Clean up realtime connection on unmount only
   useEffect(() => {
-    enableRealtime();
-    return () => disableRealtime();
-  }, [enableRealtime, disableRealtime]);
+    return () => {
+      if (isConnected) {
+        disableRealtime();
+      }
+    };
+  }, []);
 
   const handleFilterChange = (newFilters: typeof filters) => {
     setFilters(newFilters);

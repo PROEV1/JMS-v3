@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useCallback, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
@@ -25,10 +25,13 @@ export function DispatchRealtimeProvider({ children }: { children: React.ReactNo
   const [recentUpdates, setRecentUpdates] = useState<DispatchUpdate[]>([]);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
-  const enableRealtime = () => {
-    if (isConnected) return;
+  const enableRealtime = useCallback(() => {
+    if (isConnected || channelRef.current) return;
 
+    console.log('🔌 Enabling real-time updates...');
+    
     const channel = supabase
       .channel('charger_dispatches_changes')
       .on(
@@ -39,7 +42,7 @@ export function DispatchRealtimeProvider({ children }: { children: React.ReactNo
           table: 'charger_dispatches'
         },
         async (payload) => {
-          console.log('Dispatch update received:', payload);
+          console.log('📦 Dispatch update received:', payload);
 
           // Get additional order details for the notification
           const orderId = (payload.new as any)?.order_id || (payload.old as any)?.order_id;
@@ -64,11 +67,11 @@ export function DispatchRealtimeProvider({ children }: { children: React.ReactNo
 
           setRecentUpdates(prev => [update, ...prev.slice(0, 9)]);
 
-          // Show toast notification
+          // Show toast notification with correct status mapping
           const getStatusMessage = (status: string, eventType: string) => {
             if (eventType === 'DELETE') return 'Dispatch record removed';
             switch (status) {
-              case 'dispatched': return 'Charger dispatched';
+              case 'sent': return 'Charger dispatched';
               case 'delivered': return 'Charger delivered';
               case 'issue': return 'Dispatch issue flagged';
               default: return 'Dispatch status updated';
@@ -78,7 +81,7 @@ export function DispatchRealtimeProvider({ children }: { children: React.ReactNo
           toast({
             title: "Dispatch Update",
             description: `${getStatusMessage(update.status, payload.eventType)} for ${update.order_number} (${update.client_name})`,
-            duration: 5000,
+            duration: 4000,
           });
 
           // Invalidate relevant queries to refresh data
@@ -86,33 +89,37 @@ export function DispatchRealtimeProvider({ children }: { children: React.ReactNo
         }
       )
       .subscribe((status) => {
+        console.log('📡 Channel status:', status);
         if (status === 'SUBSCRIBED') {
           setIsConnected(true);
           toast({
             title: "Real-time Updates Enabled",
             description: "You'll receive live dispatch notifications",
-            duration: 3000,
+            duration: 2000,
           });
         } else if (status === 'CLOSED') {
           setIsConnected(false);
         }
       });
 
-    return () => {
-      supabase.removeChannel(channel);
-      setIsConnected(false);
-    };
-  };
+    channelRef.current = channel;
+  }, [isConnected, toast, queryClient]);
 
-  const disableRealtime = () => {
-    supabase.removeAllChannels();
+  const disableRealtime = useCallback(() => {
+    console.log('🔌 Disabling real-time updates...');
+    
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+    
     setIsConnected(false);
     toast({
       title: "Real-time Updates Disabled",
       description: "Live notifications turned off",
-      duration: 3000,
+      duration: 2000,
     });
-  };
+  }, [toast]);
 
   return (
     <DispatchRealtimeContext.Provider
