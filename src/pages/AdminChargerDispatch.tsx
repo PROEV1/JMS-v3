@@ -195,6 +195,12 @@ function AdminChargerDispatchContent() {
     }
   };
 
+  const handleModalSuccess = () => {
+    setSelectedOrders([]);
+    setSelectedOrderId(null);
+    refetch();
+  };
+
   if (isMobileView) {
     return (
       <div className="h-screen flex flex-col">
@@ -218,7 +224,19 @@ function AdminChargerDispatchContent() {
         </div>
 
         <MobileDispatchView
-          orders={data?.orders || []}
+          orders={data?.orders?.map(order => ({
+            id: order.id,
+            order_number: order.order_number,
+            client_name: order.clients?.full_name || '',
+            postcode: order.clients?.postcode || '',
+            phone: order.clients?.phone || '',
+            scheduled_install_date: order.scheduled_install_date,
+            engineer_name: order.engineers?.name || 'Unassigned',
+            dispatch_status: order.dispatch_status,
+            urgency_level: order.urgency_level,
+            days_until_install: order.days_until_install,
+            job_type: order.job_type || ''
+          })) || []}
           isLoading={isLoading}
           onMarkDispatched={handleMarkDispatched}
           onFlagIssue={handleFlagIssue}
@@ -339,23 +357,11 @@ function AdminChargerDispatchContent() {
             isLoading={isLoading}
             totalCount={data?.totalCount || 0}
             pagination={pagination}
-            onPaginationChange={updatePagination}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
             selectedOrders={selectedOrders}
-            onOrderSelect={(orderId, selected) => {
-              if (selected) {
-                setSelectedOrders(prev => [...prev, orderId]);
-              } else {
-                setSelectedOrders(prev => prev.filter(id => id !== orderId));
-              }
-            }}
-            onSelectAll={(selected) => {
-              if (selected) {
-                setSelectedOrders(data?.orders.map(o => o.id) || []);
-              } else {
-                setSelectedOrders([]);
-              }
-            }}
-            onMarkDispatched={handleMarkDispatched}
+            onSelectionChange={setSelectedOrders}
+            onMarkAsDispatched={handleMarkDispatched}
             onFlagIssue={handleFlagIssue}
           />
         </TabsContent>
@@ -375,29 +381,17 @@ function AdminChargerDispatchContent() {
             onExportData={handleExportData}
           />
           
-          {/* Advanced table view could go here */}
+          {/* Advanced table view */}
           <ChargerDispatchTable
             orders={data?.orders || []}
             isLoading={isLoading}
             totalCount={data?.totalCount || 0}
             pagination={pagination}
-            onPaginationChange={updatePagination}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
             selectedOrders={selectedOrders}
-            onOrderSelect={(orderId, selected) => {
-              if (selected) {
-                setSelectedOrders(prev => [...prev, orderId]);
-              } else {
-                setSelectedOrders(prev => prev.filter(id => id !== orderId));
-              }
-            }}
-            onSelectAll={(selected) => {
-              if (selected) {
-                setSelectedOrders(data?.orders.map(o => o.id) || []);
-              } else {
-                setSelectedOrders([]);
-              }
-            }}
-            onMarkDispatched={handleMarkDispatched}
+            onSelectionChange={setSelectedOrders}
+            onMarkAsDispatched={handleMarkDispatched}
             onFlagIssue={handleFlagIssue}
           />
         </TabsContent>
@@ -410,12 +404,7 @@ function AdminChargerDispatchContent() {
           setShowDispatchModal(false);
           setSelectedOrderId(null);
         }}
-        orderIds={selectedOrderId ? [selectedOrderId] : selectedOrders}
-        onSuccess={() => {
-          setSelectedOrders([]);
-          setSelectedOrderId(null);
-          refetch();
-        }}
+        orderId={selectedOrderId || (selectedOrders.length === 1 ? selectedOrders[0] : null)}
       />
 
       <FlagIssueModal
@@ -424,12 +413,7 @@ function AdminChargerDispatchContent() {
           setShowIssueModal(false);
           setSelectedOrderId(null);
         }}
-        orderIds={selectedOrderId ? [selectedOrderId] : selectedOrders}
-        onSuccess={() => {
-          setSelectedOrders([]);  
-          setSelectedOrderId(null);
-          refetch();
-        }}
+        orderId={selectedOrderId || (selectedOrders.length === 1 ? selectedOrders[0] : null)}
       />
     </div>
   );
