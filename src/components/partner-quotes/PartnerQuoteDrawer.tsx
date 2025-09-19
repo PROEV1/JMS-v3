@@ -114,21 +114,52 @@ export function PartnerQuoteDrawer({
   };
 
   const handleSaveOrderMetadata = async (metadata: any) => {
-    if (!order) return;
+    if (!order) {
+      toast({
+        title: "Error",
+        description: "No order data available",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    console.log('🔧 Saving order metadata:', metadata);
+    console.log('🔧 Order ID:', order.id);
     
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('orders')
         .update(metadata)
-        .eq('id', order.id);
+        .eq('id', order.id)
+        .select();
 
-      if (error) throw error;
+      console.log('🔧 Update response:', { data, error });
+
+      if (error) {
+        console.error('🚨 Database error:', error);
+        toast({
+          title: "Error saving metadata",
+          description: error.message,
+          variant: "destructive",
+        });
+        throw error;
+      }
+      
+      toast({
+        title: "Success",
+        description: "Quote metadata saved successfully",
+      });
       
       // Refresh order data
       await fetchOrderData();
       onQuoteUpdated();
     } catch (error) {
-      console.error('Error saving order metadata:', error);
+      console.error('🚨 Error saving order metadata:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save metadata. Please try again.",
+        variant: "destructive",
+      });
       throw error;
     }
   };
@@ -219,6 +250,16 @@ export function PartnerQuoteDrawer({
             </Badge>
           </div>
           <SheetDescription>{job.order_number} • {partnerName}</SheetDescription>
+          
+          {/* Open in Partner System - Always visible at top */}
+          <Button
+            className="w-full mt-3"
+            onClick={handleOpenInPartner}
+            size="sm"
+          >
+            <ExternalLink className="h-4 w-4 mr-2" />
+            Open in Partner System
+          </Button>
         </SheetHeader>
 
         <div className="space-y-6 mt-6">
@@ -251,7 +292,7 @@ export function PartnerQuoteDrawer({
               </CardTitle>
             </CardHeader>
             {!clientCollapsed && (
-              <CardContent>
+              <CardContent className="max-h-48 overflow-y-auto">
                 <div className="space-y-2">
                   <div className="font-medium">{job.client.full_name}</div>
                   <div className="text-sm text-muted-foreground">{job.client.email}</div>
@@ -299,14 +340,6 @@ export function PartnerQuoteDrawer({
 
           {/* Actions */}
           <div className="space-y-3">
-            <Button
-              className="w-full"
-              onClick={handleOpenInPartner}
-            >
-              <ExternalLink className="h-4 w-4 mr-2" />
-              Open in Partner System
-            </Button>
-
             {job.quote_override ? (
               <Button
                 variant="outline"
