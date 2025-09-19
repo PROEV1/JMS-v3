@@ -39,29 +39,20 @@ export function OfferLinkWidget({ orderId }: OfferLinkWidgetProps) {
           status,
           offered_date,
           expires_at,
-          engineer_id
+          engineers!job_offers_engineer_id_fkey (
+            name
+          )
         `)
         .eq('order_id', orderId)
         .order('created_at', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
-      // Fetch engineer separately if offer exists
       if (data && !error) {
-        const { data: engineerData } = await supabase
-          .from('engineers')
-          .select('name')
-          .eq('id', data.engineer_id)
-          .single();
-        
-        if (engineerData) {
-          setActiveOffer({
-            ...data,
-            engineer: engineerData
-          });
-        } else {
-          setActiveOffer(null);
-        }
+        setActiveOffer({
+          ...data,
+          engineer: data.engineers || { name: 'Unknown' }
+        });
       } else {
         setActiveOffer(null);
       }

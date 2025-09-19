@@ -56,7 +56,7 @@ export function InstallationManagementSection({
           .from('job_offers')
           .select(`
             *,
-            engineer:engineer_id (
+            engineers!job_offers_engineer_id_fkey (
               id,
               name,
               email
@@ -83,7 +83,7 @@ export function InstallationManagementSection({
   const handleCopyDetails = () => {
     if (!acceptedOffer) return;
     
-    const details = `Engineer: ${acceptedOffer.engineer?.name || 'Unknown'}
+    const details = `Engineer: ${acceptedOffer.engineers?.name || 'Unknown'}
 Date: ${new Date(acceptedOffer.offered_date).toLocaleDateString('en-GB')}
 Time: ${acceptedOffer.time_window || 'All Day'}
 Order: ${order.order_number}`;

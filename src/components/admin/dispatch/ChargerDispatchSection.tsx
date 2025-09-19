@@ -24,7 +24,7 @@ export function ChargerDispatchSection({ orderId }: ChargerDispatchSectionProps)
         .from('charger_dispatches')
         .select('*')
         .eq('order_id', orderId)
-        .single();
+        .maybeSingle();
 
       if (error && error.code !== 'PGRST116') throw error;
       return data;
