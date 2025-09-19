@@ -16,6 +16,9 @@ interface DeleteStats {
   engineer_uploads: number;
   order_payments: number;
   charger_dispatches: number;
+  purchase_order_lines: number;
+  purchase_orders: number;
+  order_parts: number;
   quotes: number;
   clients: number;
 }
@@ -165,6 +168,9 @@ serve(async (req) => {
           engineer_uploads: 0,
           order_payments: 0,
           charger_dispatches: 0,
+          purchase_order_lines: 0,
+          purchase_orders: 0,
+          order_parts: 0,
           quotes: 0,
           clients: 0
         }
@@ -181,6 +187,9 @@ serve(async (req) => {
       engineer_uploads: 0,
       order_payments: 0,
       charger_dispatches: 0,
+      purchase_order_lines: 0,
+      purchase_orders: 0,
+      order_parts: 0,
       quotes: 0,
       clients: 0
     }
@@ -194,6 +203,8 @@ serve(async (req) => {
         uploadsCount,
         paymentsCount,
         chargerDispatchesCount,
+        purchaseOrdersCount,
+        orderPartsCount,
         quotesCount
       ] = await Promise.all([
         supabase.from('job_offers').select('id', { count: 'exact', head: true }).in('order_id', orderIds),
@@ -202,8 +213,21 @@ serve(async (req) => {
         supabase.from('engineer_uploads').select('id', { count: 'exact', head: true }).in('order_id', orderIds),
         supabase.from('order_payments').select('id', { count: 'exact', head: true }).in('order_id', orderIds),
         supabase.from('charger_dispatches').select('id', { count: 'exact', head: true }).in('order_id', orderIds),
+        supabase.from('purchase_orders').select('id', { count: 'exact', head: true }).in('source_order_id', orderIds),
+        supabase.from('order_parts').select('id', { count: 'exact', head: true }).in('order_id', orderIds),
         supabase.from('quotes').select('id', { count: 'exact', head: true }).in('client_id', clientIds)
       ])
+
+      // Get purchase order lines count
+      const { data: purchaseOrderIds } = await supabase
+        .from('purchase_orders')
+        .select('id')
+        .in('source_order_id', orderIds);
+      
+      const poIds = purchaseOrderIds?.map(po => po.id) || [];
+      const purchaseOrderLinesCount = poIds.length > 0 
+        ? await supabase.from('purchase_order_lines').select('id', { count: 'exact', head: true }).in('purchase_order_id', poIds)
+        : { count: 0 };
 
       // Count orphaned clients using two-step approach
       let orphanedClientsCount = 0;
@@ -230,6 +254,9 @@ serve(async (req) => {
         engineer_uploads: uploadsCount.count || 0,
         order_payments: paymentsCount.count || 0,
         charger_dispatches: chargerDispatchesCount.count || 0,
+        purchase_order_lines: purchaseOrderLinesCount.count || 0,
+        purchase_orders: purchaseOrdersCount.count || 0,
+        order_parts: orderPartsCount.count || 0,
         quotes: quotesCount.count || 0,
         clients: totalClientsToDelete
       }
@@ -252,6 +279,9 @@ serve(async (req) => {
       engineer_uploads: 0,
       order_payments: 0,
       charger_dispatches: 0,
+      purchase_order_lines: 0,
+      purchase_orders: 0,
+      order_parts: 0,
       quotes: 0,
       clients: 0
     }
@@ -278,6 +308,23 @@ serve(async (req) => {
 
         if (chargerClearResult.error) console.error('Charger assignment clear error:', chargerClearResult.error)
 
+        // First get purchase order IDs that will be deleted
+        const { data: purchaseOrdersToDelete } = await supabase
+          .from('purchase_orders')
+          .select('id')
+          .in('source_order_id', batch);
+        
+        const poIdsToDelete = purchaseOrdersToDelete?.map(po => po.id) || [];
+
+        // Delete purchase order lines first (they reference purchase_orders)
+        let purchaseOrderLinesResult = { error: null };
+        if (poIdsToDelete.length > 0) {
+          purchaseOrderLinesResult = await supabase
+            .from('purchase_order_lines')
+            .delete()
+            .in('purchase_order_id', poIdsToDelete);
+        }
+
         // Delete dependent records in parallel batches
         const [
           jobOffersResult,
@@ -285,23 +332,37 @@ serve(async (req) => {
           checklistResult,
           uploadsResult,
           paymentsResult,
-          chargerDispatchesResult
+          chargerDispatchesResult,
+          orderPartsResult
         ] = await Promise.all([
           supabase.from('job_offers').delete().in('order_id', batch),
           supabase.from('order_activity').delete().in('order_id', batch),
           supabase.from('order_completion_checklist').delete().in('order_id', batch),
           supabase.from('engineer_uploads').delete().in('order_id', batch),
           supabase.from('order_payments').delete().in('order_id', batch),
-          supabase.from('charger_dispatches').delete().in('order_id', batch)
+          supabase.from('charger_dispatches').delete().in('order_id', batch),
+          supabase.from('order_parts').delete().in('order_id', batch)
         ])
 
+        // Delete purchase orders (now that their lines are deleted)
+        let purchaseOrdersResult = { error: null };
+        if (poIdsToDelete.length > 0) {
+          purchaseOrdersResult = await supabase
+            .from('purchase_orders')
+            .delete()
+            .in('source_order_id', batch);
+        }
+
         // Handle errors
+        if (purchaseOrderLinesResult.error) console.error('Purchase order lines deletion error:', purchaseOrderLinesResult.error)
+        if (purchaseOrdersResult.error) console.error('Purchase orders deletion error:', purchaseOrdersResult.error)
         if (jobOffersResult.error) console.error('Job offers deletion error:', jobOffersResult.error)
         if (activityResult.error) console.error('Activity deletion error:', activityResult.error)
         if (checklistResult.error) console.error('Checklist deletion error:', checklistResult.error)
         if (uploadsResult.error) console.error('Uploads deletion error:', uploadsResult.error)
         if (paymentsResult.error) console.error('Payments deletion error:', paymentsResult.error)
         if (chargerDispatchesResult.error) console.error('Charger dispatches deletion error:', chargerDispatchesResult.error)
+        if (orderPartsResult.error) console.error('Order parts deletion error:', orderPartsResult.error)
 
         // Get client IDs for this batch
         const batchClientIds = orders?.filter(o => batch.includes(o.id)).map(o => o.client_id) || []
@@ -353,6 +414,9 @@ serve(async (req) => {
         totalStats.engineer_uploads += batch.length  // Approximate
         totalStats.order_payments += batch.length  // Approximate
         totalStats.charger_dispatches += batch.length  // Approximate
+        totalStats.purchase_order_lines += poIdsToDelete.length  // Approximate
+        totalStats.purchase_orders += poIdsToDelete.length  // Approximate
+        totalStats.order_parts += batch.length  // Approximate
         totalStats.quotes += batchClientIds.length  // Approximate
 
         const batchTime = performance.now() - batchStartTime
