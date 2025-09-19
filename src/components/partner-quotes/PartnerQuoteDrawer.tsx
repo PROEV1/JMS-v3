@@ -279,8 +279,8 @@ export function PartnerQuoteDrawer({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-lg">
-        <SheetHeader>
+      <SheetContent className="w-full sm:max-w-lg flex flex-col">
+        <SheetHeader className="flex-shrink-0">
           <div className="flex items-center justify-between">
             <SheetTitle>Job Details</SheetTitle>
             <Badge className={getStatusColor(job.partner_status, job.quote_override)}>
@@ -300,7 +300,7 @@ export function PartnerQuoteDrawer({
           </Button>
         </SheetHeader>
 
-        <div className="space-y-6 mt-6">
+        <div className="flex-1 overflow-y-auto space-y-6 mt-6 pr-2">
           {job.quote_override && (
             <Card>
               <CardContent className="pt-4">
