@@ -550,15 +550,16 @@ serve(async (req) => {
             
             // Configure order based on selected bucket
             switch (selectedBucket.type) {
-              case 'needs_scheduling':
+            case 'needs_scheduling':
                 // Pure needs scheduling - no offers, ready to go
                 // CRITICAL: Ensure all prerequisites are met to bypass survey gating
+                orderStatus = 'needs_scheduling'; // Set correct status for bucket
                 surveyRequired = false;
                 amountPaid = totalCost; // Full payment to bypass payment gating
                 agreementSigned = new Date(now.getTime() - Math.random() * 7 * 24 * 60 * 60 * 1000);
                 manualStatusOverride = true;
                 manualStatusNotes = 'Seeded for needs scheduling bucket - survey disabled, payment complete, agreement signed';
-                console.log(`📋 Needs Scheduling Order Config: survey_required=${surveyRequired}, amount_paid=${amountPaid}, total_cost=${totalCost}, agreement_signed=${!!agreementSigned}`);
+                console.log(`📋 Needs Scheduling Order Config: status=${orderStatus}, survey_required=${surveyRequired}, amount_paid=${amountPaid}, total_cost=${totalCost}, agreement_signed=${!!agreementSigned}`);
                 break;
                 
               case 'date_offered':
