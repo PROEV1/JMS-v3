@@ -292,23 +292,23 @@ export function PartnerQuoteDrawer({
               </CardTitle>
             </CardHeader>
             {!clientCollapsed && (
-              <CardContent className="max-h-48 overflow-y-auto">
-                <div className="space-y-2">
-                  <div className="font-medium">{job.client.full_name}</div>
+              <CardContent className="max-h-60 overflow-y-auto scroll-smooth">
+                <div className="space-y-3 pr-2">
+                  <div className="font-medium text-base">{job.client.full_name}</div>
                   <div className="text-sm text-muted-foreground">{job.client.email}</div>
-                  <div className="flex items-center gap-1 text-sm">
-                    <MapPin className="h-4 w-4" />
-                    {job.client.postcode || job.postcode}
+                  <div className="flex items-center gap-2 text-sm">
+                    <MapPin className="h-4 w-4 text-muted-foreground" />
+                    <span>{job.client.postcode || job.postcode}</span>
                   </div>
                   <div className="text-sm">
-                    <span className="font-medium">Job Type:</span> {job.job_type.replace('_', ' ')}
+                    <span className="font-medium">Job Type:</span> <span className="capitalize">{job.job_type.replace('_', ' ')}</span>
                   </div>
                   <div className="text-sm">
-                    <span className="font-medium">Value:</span> £{job.total_amount.toFixed(2)}
+                    <span className="font-medium">Value:</span> <span className="font-mono">£{job.total_amount.toFixed(2)}</span>
                   </div>
-                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Calendar className="h-4 w-4" />
-                    Created: {format(new Date(job.created_at), 'PPp')}
+                    <span>Created: {format(new Date(job.created_at), 'PPp')}</span>
                   </div>
                 </div>
               </CardContent>
@@ -338,9 +338,9 @@ export function PartnerQuoteDrawer({
             />
           )}
 
-          {/* Actions */}
-          <div className="space-y-3">
-            {job.quote_override ? (
+          {/* Actions - Only show Clear Override if override exists */}
+          {job.quote_override && (
+            <div className="pt-4 border-t">
               <Button
                 variant="outline"
                 className="w-full"
@@ -349,25 +349,8 @@ export function PartnerQuoteDrawer({
                 <Undo2 className="h-4 w-4 mr-2" />
                 Clear Override
               </Button>
-            ) : (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="w-full">
-                    <Quote className="h-4 w-4 mr-2" />
-                    Mark as Quoted
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-full">
-                  <DropdownMenuItem onClick={() => onMarkAsQuoted(job, 'custom')}>
-                    Custom Quote
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => onMarkAsQuoted(job, 'standard')}>
-                    Standard Quote
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </SheetContent>
     </Sheet>
