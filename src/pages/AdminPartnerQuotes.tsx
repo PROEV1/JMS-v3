@@ -367,6 +367,7 @@ export default function AdminPartnerQuotes() {
         created_at: job.created_at,
         total_amount: job.total_amount || 0,
         partner_id: job.partner_id,
+        quote_type: job.quote_type, // CRITICAL: Include quote_type in transformed data
         partner_external_url: job.partner_external_url,
         postcode: job.postcode || job.clients?.postcode || '',
         require_file: false,
@@ -378,7 +379,7 @@ export default function AdminPartnerQuotes() {
       setJobs(transformedJobs);
 
       // Console logging for diagnostics
-      console.log('Partner Jobs Fetch Summary:', {
+      console.log('🔍 Partner Jobs Fetch Summary:', {
         partnerId: selectedPartner,
         partnerName: partners.find(p => p.id === selectedPartner)?.name,
         totalCount: count || 0,
@@ -391,8 +392,30 @@ export default function AdminPartnerQuotes() {
           REWORK_REQUESTED: transformedJobs.filter(j => j.partner_status === 'REWORK_REQUESTED').length,
           REJECTED: transformedJobs.filter(j => j.partner_status === 'REJECTED').length,
           scheduled: transformedJobs.filter(j => j.scheduled_install_date).length
+        },
+        quoteTypeBreakdown: {
+          hasQuoteType: transformedJobs.filter(j => j.quote_type).length,
+          standard: transformedJobs.filter(j => j.quote_type === 'standard').length,
+          custom: transformedJobs.filter(j => j.quote_type === 'custom').length,
+          noQuoteType: transformedJobs.filter(j => !j.quote_type).length
         }
       });
+
+      // Debug specific problem orders mentioned by user
+      const problemOrders = ['ORD2025-040530', 'ORD2025-040528', 'ORD2025-040531'];
+      const problemJobs = transformedJobs.filter(j => problemOrders.includes(j.order_number));
+      
+      if (problemJobs.length > 0) {
+        console.log('🚨 DEBUG: Problem Orders Analysis:', problemJobs.map(job => ({
+          order_number: job.order_number,
+          partner_status: job.partner_status,
+          quote_type: job.quote_type,
+          quote_override: job.quote_override,
+          status_enhanced: job.status_enhanced,
+          scheduled_install_date: job.scheduled_install_date,
+          shouldBeInNeedsQuotation: !job.quote_type && !job.quote_override && job.partner_status === 'AWAITING_QUOTATION'
+        })));
+      }
 
     } catch (error) {
       console.error('Error fetching jobs:', error);
@@ -433,10 +456,17 @@ export default function AdminPartnerQuotes() {
     const filteredJobs = jobs.filter(job => {
       const normalizedStatus = normalizePartnerStatus(job.partner_status);
       
+      // DEBUG: Log bucket filtering for problem orders
+      const problemOrders = ['ORD2025-040530', 'ORD2025-040528', 'ORD2025-040531'];
+      const isDebugJob = problemOrders.includes(job.order_number);
+      
       // CRITICAL FIX: Exclude jobs that have been quoted from needs_quotation bucket
       if (statuses.includes('NEW_JOB') || statuses.includes('AWAITING_QUOTATION')) {
         // If job has been quoted (has quote_type), it should not be in needs_quotation bucket
         if (job.quote_type) {
+          if (isDebugJob) {
+            console.log(`🔍 ${job.order_number}: EXCLUDED from needs_quotation because quote_type=${job.quote_type}`);
+          }
           return false;
         }
       }
@@ -486,28 +516,42 @@ export default function AdminPartnerQuotes() {
       }
 
       // Check normalized partner status
-      if (statuses.includes(normalizedStatus)) {
-        return true;
-      }
-
+      const matchesStatus = statuses.includes(normalizedStatus);
+      
       // Check original partner status for backward compatibility
-      if (statuses.includes(job.partner_status)) {
-        return true;
-      }
-
+      const matchesOriginalStatus = statuses.includes(job.partner_status);
+      
       // For needs scheduling bucket, also check status_enhanced
+      let matchesSchedulingLogic = false;
       if (statuses.includes('NEEDS_SCHEDULING')) {
-        return job.status_enhanced === 'awaiting_install_booking' ||
+        matchesSchedulingLogic = job.status_enhanced === 'awaiting_install_booking' ||
                job.partner_status === 'AWAITING_INSTALL_DATE' ||
                job.partner_status === 'INSTALL_DATE_CONFIRMED';
       }
-
-      return false;
+      
+      const finalResult = matchesStatus || matchesOriginalStatus || matchesSchedulingLogic;
+      
+      // DEBUG: Log filtering decision for problem orders
+      if (isDebugJob) {
+        console.log(`🔍 ${job.order_number}: getBucketJobs final decision`, {
+          requestedStatuses: statuses,
+          partner_status: job.partner_status,
+          normalizedStatus,
+          quote_type: job.quote_type,
+          quote_override: job.quote_override,
+          matchesStatus,
+          matchesOriginalStatus,
+          matchesSchedulingLogic,
+          finalResult
+        });
+      }
+      
+      return finalResult;
     });
 
     // Debug logging
     if (statuses.includes('WAITING_FOR_APPROVAL')) {
-      console.log('Waiting for Approval bucket debug:', {
+      console.log('🔍 Waiting for Approval bucket debug:', {
         totalJobs: jobs.length,
         waitingApprovalJobs: filteredJobs.length,
         jobsWithApprovalStatus: jobs.filter(j => 
@@ -516,9 +560,34 @@ export default function AdminPartnerQuotes() {
         reviewJobs: jobs.filter(j => isReview(j)).length,
         filteredJobStatuses: filteredJobs.map(j => ({
           id: j.id,
+          order_number: j.order_number,
           partner_status: j.partner_status,
           status_enhanced: j.status_enhanced,
+          quote_type: j.quote_type,
           isReview: isReview(j)
+        }))
+      });
+    }
+
+    // Debug logging for Needs Quotation bucket
+    if (statuses.includes('NEW_JOB') || statuses.includes('AWAITING_QUOTATION')) {
+      const problemOrders = ['ORD2025-040530', 'ORD2025-040528', 'ORD2025-040531'];
+      const problemJobsInBucket = filteredJobs.filter(j => problemOrders.includes(j.order_number));
+      
+      console.log('🚨 Needs Quotation bucket debug:', {
+        totalJobs: jobs.length,
+        needsQuotationJobs: filteredJobs.length,
+        problemJobsInBucket: problemJobsInBucket.length,
+        problemJobsDetails: problemJobsInBucket.map(j => ({
+          order_number: j.order_number,
+          partner_status: j.partner_status,
+          quote_type: j.quote_type,
+          quote_override: j.quote_override
+        })),
+        allJobsWithQuoteType: jobs.filter(j => j.quote_type).map(j => ({
+          order_number: j.order_number,
+          quote_type: j.quote_type,
+          partner_status: j.partner_status
         }))
       });
     }

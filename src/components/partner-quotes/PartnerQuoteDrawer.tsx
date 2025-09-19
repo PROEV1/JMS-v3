@@ -123,8 +123,15 @@ export function PartnerQuoteDrawer({
       return;
     }
     
-    console.log('🔧 Saving order metadata:', metadata);
-    console.log('🔧 Order ID:', order.id);
+    console.log('🔧 PartnerQuoteDrawer: Saving order metadata:', {
+      orderId: order.id,
+      orderNumber: order.order_number,
+      metadata,
+      beforeUpdate: {
+        quote_type: order.quote_type,
+        partner_status: order.partner_status
+      }
+    });
     
     try {
       // Check if user is still authenticated
@@ -151,7 +158,7 @@ export function PartnerQuoteDrawer({
         charger_model_id: metadata.charger_model_id || null,
       };
 
-      console.log('🔧 Sanitized metadata:', sanitizedMetadata);
+      console.log('🔧 PartnerQuoteDrawer: Sanitized metadata for update:', sanitizedMetadata);
 
       const { data, error } = await supabase
         .from('orders')
@@ -159,10 +166,15 @@ export function PartnerQuoteDrawer({
         .eq('id', order.id)
         .select();
 
-      console.log('🔧 Update response:', { data, error });
+      console.log('🔧 PartnerQuoteDrawer: Update response:', { 
+        success: !error,
+        data: data?.[0], 
+        error,
+        updatedQuoteType: data?.[0]?.quote_type
+      });
 
       if (error) {
-        console.error('🚨 Database error:', error);
+        console.error('🚨 PartnerQuoteDrawer: Database error:', error);
         if (error.message.includes('row-level security') || error.message.includes('permission')) {
           toast({
             title: "Permission Error",
@@ -181,6 +193,7 @@ export function PartnerQuoteDrawer({
       
       // Update local order state with new data
       if (data && data[0]) {
+        console.log('✅ PartnerQuoteDrawer: Updating local order state with:', data[0]);
         setOrder(data[0]);
       }
       
@@ -193,7 +206,7 @@ export function PartnerQuoteDrawer({
       await fetchOrderData();
       onQuoteUpdated();
     } catch (error) {
-      console.error('🚨 Error saving order metadata:', error);
+      console.error('🚨 PartnerQuoteDrawer: Error saving order metadata:', error);
       toast({
         title: "Error",
         description: "Failed to save metadata. Please refresh the page and try again.",
@@ -206,23 +219,44 @@ export function PartnerQuoteDrawer({
   const handleSendQuote = async () => {
     if (!order) return;
     
+    console.log('🚀 PartnerQuoteDrawer: Sending quote', {
+      orderId: order.id,
+      orderNumber: order.order_number,
+      currentQuoteType: order.quote_type,
+      fallbackQuoteType: order.quote_type || 'standard'
+    });
+    
     try {
       // For partner orders, we could update a status or create a quote record
       // For now, just mark as quoted in the order status
-      const { error } = await supabase
+      const updateData = { 
+        quote_type: order.quote_type || 'standard'
+      };
+      
+      console.log('🚀 PartnerQuoteDrawer: Updating order with:', updateData);
+      
+      const { data, error } = await supabase
         .from('orders')
-        .update({ 
-          quote_type: order.quote_type || 'standard'
-        })
-        .eq('id', order.id);
+        .update(updateData)
+        .eq('id', order.id)
+        .select();
+
+      console.log('🚀 PartnerQuoteDrawer: Send quote update response:', {
+        success: !error,
+        data: data?.[0],
+        error,
+        updatedQuoteType: data?.[0]?.quote_type
+      });
 
       if (error) throw error;
+      
+      console.log('✅ PartnerQuoteDrawer: Quote sent successfully');
       
       // Refresh order data
       await fetchOrderData();
       onQuoteUpdated();
     } catch (error) {
-      console.error('Error sending quote:', error);
+      console.error('❌ PartnerQuoteDrawer: Error sending quote:', error);
       throw error;
     }
   };

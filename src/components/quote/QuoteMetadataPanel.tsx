@@ -151,12 +151,25 @@ export const QuoteMetadataPanel: React.FC<QuoteMetadataPanelProps> = ({
         return;
       }
 
+      console.log('🔄 QuoteMetadataPanel: Saving quote metadata', {
+        quoteId,
+        metadata,
+        quote_type: metadata.quote_type
+      });
+
       await onSave(metadata);
+      
+      console.log('✅ QuoteMetadataPanel: Quote metadata saved successfully', {
+        quoteId,
+        quote_type: metadata.quote_type
+      });
+      
       toast({
         title: "Success",
         description: "Quote metadata saved successfully",
       });
     } catch (error) {
+      console.error('❌ QuoteMetadataPanel: Failed to save quote metadata', error);
       toast({
         title: "Error",
         description: "Failed to save quote metadata",
@@ -177,17 +190,31 @@ export const QuoteMetadataPanel: React.FC<QuoteMetadataPanelProps> = ({
         return;
       }
 
+      console.log('🚀 QuoteMetadataPanel: Sending quote', {
+        quoteId,
+        metadata,
+        quote_type: metadata.quote_type
+      });
+
       // Save current metadata first
       await onSave(metadata);
       
+      console.log('✅ QuoteMetadataPanel: Metadata saved before sending quote');
+      
       // Then send the quote
       await onSendQuote();
+      
+      console.log('✅ QuoteMetadataPanel: Quote sent successfully', {
+        quoteId,
+        quote_type: metadata.quote_type
+      });
       
       toast({
         title: "Success",
         description: "Quote marked as quoted and sent to client",
       });
     } catch (error) {
+      console.error('❌ QuoteMetadataPanel: Failed to send quote', error);
       toast({
         title: "Error",
         description: "Failed to send quote",
