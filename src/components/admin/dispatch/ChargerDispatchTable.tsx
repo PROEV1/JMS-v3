@@ -31,6 +31,7 @@ interface DispatchOrder {
     tracking_number?: string;
     dispatched_at?: string;
     notes?: string;
+    dispatched_by_name?: string;
   };
 }
 
@@ -123,6 +124,7 @@ export function ChargerDispatchTable({
             <TableHead className="w-[140px]">Dispatch Status</TableHead>
             <TableHead className="w-[120px]">Courier</TableHead>
             <TableHead className="w-[120px]">Tracking</TableHead>
+            <TableHead className="w-[120px]">Dispatched By</TableHead>
             <TableHead>Engineer</TableHead>
             <TableHead className="w-[100px]">Actions</TableHead>
           </TableRow>
@@ -130,7 +132,7 @@ export function ChargerDispatchTable({
         <TableBody>
           {orders.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+              <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
                 No orders found matching your criteria
               </TableCell>
             </TableRow>
@@ -174,6 +176,17 @@ export function ChargerDispatchTable({
                 <TableCell>
                   <div className="text-sm font-mono">
                     {order.dispatch_record?.tracking_number || '-'}
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="text-sm">
+                    {order.dispatch_record?.dispatched_by_name || '-'}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {order.dispatch_record?.dispatched_at 
+                      ? format(new Date(order.dispatch_record.dispatched_at), 'dd/MM/yyyy')
+                      : ''
+                    }
                   </div>
                 </TableCell>
                 <TableCell>

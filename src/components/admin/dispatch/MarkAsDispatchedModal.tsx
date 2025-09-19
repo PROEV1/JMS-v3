@@ -16,6 +16,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface MarkAsDispatchedModalProps {
   isOpen: boolean;
@@ -25,6 +26,7 @@ interface MarkAsDispatchedModalProps {
 
 export function MarkAsDispatchedModal({ isOpen, onClose, orderId }: MarkAsDispatchedModalProps) {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     dispatchedDate: format(new Date(), 'yyyy-MM-dd'),
     courierName: '',
@@ -60,6 +62,7 @@ export function MarkAsDispatchedModal({ isOpen, onClose, orderId }: MarkAsDispat
           charger_item_id: chargerItemId,
           status: 'sent', // Use 'sent' instead of 'dispatched' to match DB constraint
           dispatched_at: new Date(formData.dispatchedDate + 'T12:00:00Z').toISOString(),
+          dispatched_by: user?.id, // Capture who marked as dispatched
           tracking_number: formData.trackingNumber || null,
           notes: `Courier: ${formData.courierName}\nSent from: ${formData.sentFrom}\n${formData.notes}`.trim(),
         });

@@ -177,6 +177,7 @@ export type Database = {
           created_at: string
           delivered_at: string | null
           dispatched_at: string | null
+          dispatched_by: string | null
           id: string
           notes: string | null
           order_id: string
@@ -190,6 +191,7 @@ export type Database = {
           created_at?: string
           delivered_at?: string | null
           dispatched_at?: string | null
+          dispatched_by?: string | null
           id?: string
           notes?: string | null
           order_id: string
@@ -203,6 +205,7 @@ export type Database = {
           created_at?: string
           delivered_at?: string | null
           dispatched_at?: string | null
+          dispatched_by?: string | null
           id?: string
           notes?: string | null
           order_id?: string

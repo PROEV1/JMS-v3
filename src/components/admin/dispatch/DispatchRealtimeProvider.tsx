@@ -57,6 +57,18 @@ export function DispatchRealtimeProvider({ children }: { children: React.ReactNo
             .eq('id', orderId)
             .single();
 
+          // Get user who dispatched if available
+          const dispatchedBy = (payload.new as any)?.dispatched_by;
+          let dispatchedByName = null;
+          if (dispatchedBy) {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('full_name')
+              .eq('user_id', dispatchedBy)
+              .single();
+            dispatchedByName = profile?.full_name || 'Unknown User';
+          }
+
           const update: DispatchUpdate = {
             id: (payload.new as any)?.id || (payload.old as any)?.id,
             order_id: orderId,
@@ -78,9 +90,12 @@ export function DispatchRealtimeProvider({ children }: { children: React.ReactNo
             }
           };
 
+          const message = `${getStatusMessage(update.status, payload.eventType)} for ${update.order_number} (${update.client_name})`;
+          const byMessage = dispatchedByName ? ` by ${dispatchedByName}` : '';
+
           toast({
             title: "Dispatch Update",
-            description: `${getStatusMessage(update.status, payload.eventType)} for ${update.order_number} (${update.client_name})`,
+            description: `${message}${byMessage}`,
             duration: 4000,
           });
 

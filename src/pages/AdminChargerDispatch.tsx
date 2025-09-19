@@ -27,10 +27,12 @@ import { DispatchRealtimeProvider, useDispatchRealtime } from '@/components/admi
 import { useChargerDispatchData } from '@/hooks/useChargerDispatchData';
 import { useServerPagination } from '@/hooks/useServerPagination';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 
 function AdminChargerDispatchContent() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const { isConnected, enableRealtime, disableRealtime } = useDispatchRealtime();
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const [showDispatchModal, setShowDispatchModal] = useState(false);
@@ -102,6 +104,7 @@ function AdminChargerDispatchContent() {
             order_id: orderId,
             charger_item_id: 'default-charger-id', // This should be dynamic in production
             status: dbStatus,
+            dispatched_by: user?.id, // Capture who performed bulk action
             updated_at: new Date().toISOString(),
             ...(dbStatus === 'sent' && { dispatched_at: new Date().toISOString() })
           }))

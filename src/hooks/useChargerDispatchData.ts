@@ -56,7 +56,8 @@ export function useChargerDispatchData({
             delivered_at,
             tracking_number,
             notes,
-            created_at
+            created_at,
+            dispatched_by
           )
         `)
         .not('scheduled_install_date', 'is', null)
@@ -122,7 +123,7 @@ export function useChargerDispatchData({
       if (error) throw error;
 
       // Calculate dispatch status and urgency for each order
-      const enrichedOrders = orders.map(order => {
+      const enrichedOrders = await Promise.all(orders.map(async order => {
         const dispatchRecord = order.charger_dispatches?.[0];
         const installDate = new Date(order.scheduled_install_date);
         const daysUntilInstall = Math.ceil((installDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
@@ -145,14 +146,28 @@ export function useChargerDispatchData({
           urgencyLevel = 'success';
         }
 
+        // Get dispatched by user profile if available
+        let dispatchedByName = null;
+        if (dispatchRecord?.dispatched_by) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('full_name')
+            .eq('user_id', dispatchRecord.dispatched_by)
+            .single();
+          dispatchedByName = profile?.full_name || null;
+        }
+
         return {
           ...order,
           dispatch_status: dispatchStatus,
           urgency_level: urgencyLevel,
           days_until_install: daysUntilInstall,
-          dispatch_record: dispatchRecord
+          dispatch_record: dispatchRecord ? {
+            ...dispatchRecord,
+            dispatched_by_name: dispatchedByName
+          } : null
         };
-      });
+      }));
 
         // Calculate stats
         const stats = {
