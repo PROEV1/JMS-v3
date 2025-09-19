@@ -170,7 +170,12 @@ export function ChargerDispatchTable({
                 </TableCell>
                 <TableCell>
                   <div className="text-sm">
-                    {order.dispatch_record?.dispatched_at ? 'Courier' : '-'}
+                    {(() => {
+                      if (!order.dispatch_record?.notes) return '-';
+                      // Extract courier name from notes (format: "Courier: [name]\n...")
+                      const courierMatch = order.dispatch_record.notes.match(/^Courier: (.+?)$/m);
+                      return courierMatch ? courierMatch[1] : '-';
+                    })()}
                   </div>
                 </TableCell>
                 <TableCell>
