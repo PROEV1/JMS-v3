@@ -178,6 +178,29 @@ export default function OrderDetail() {
     console.log('[OrderDetail] User role:', userRole);
     
     try {
+      // First try a simple query to test basic access
+      console.log('[OrderDetail] Testing simple query first...');
+      const { data: testData, error: testError } = await supabase
+        .from('orders')
+        .select(`
+          id,
+          order_number,
+          status,
+          client_id,
+          engineer_id
+        `)
+        .eq('id', orderId)
+        .maybeSingle();
+
+      console.log('[OrderDetail] Simple query result:', { testData, testError });
+
+      if (testError) {
+        console.error('[OrderDetail] Simple query failed:', testError);
+        throw testError;
+      }
+
+      console.log('[OrderDetail] Simple query succeeded, trying full query...');
+      
       const { data, error } = await supabase
         .from('orders')
         .select(`
