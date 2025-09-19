@@ -13,8 +13,9 @@ import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Save, Settings, CreditCard, Mail, MessageSquare, Bell, AlertTriangle, Calendar, Shield, Palette } from 'lucide-react';
+import { Save, Settings, CreditCard, Mail, MessageSquare, Bell, AlertTriangle, Calendar, Shield, Palette, Package } from 'lucide-react';
 import { SchedulingSettingsPanel } from '@/components/admin/SchedulingSettingsPanel';
+import { DispatchConfigurationPanel } from '@/components/admin/settings/DispatchConfigurationPanel';
 import { useAdminCommsSetting } from '@/hooks/useAdminCommsSetting';
 
 interface AdminSettings {
@@ -323,7 +324,7 @@ export default function AdminSettings() {
           )}
 
           <Tabs defaultValue="quotes" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-10">
+            <TabsList className="grid w-full grid-cols-11">
               <TabsTrigger value="quotes" className="flex items-center space-x-2">
                 <Settings className="h-4 w-4" />
                 <span>Quotes</span>
@@ -331,6 +332,10 @@ export default function AdminSettings() {
               <TabsTrigger value="scheduling" className="flex items-center space-x-2">
                 <Calendar className="h-4 w-4" />
                 <span>Scheduling</span>
+              </TabsTrigger>
+              <TabsTrigger value="dispatch" className="flex items-center space-x-2">
+                <Package className="h-4 w-4" />
+                <span>Dispatch</span>
               </TabsTrigger>
               <TabsTrigger value="payments" className="flex items-center space-x-2">
                 <CreditCard className="h-4 w-4" />
@@ -424,6 +429,11 @@ export default function AdminSettings() {
             {/* Scheduling Configuration */}
             <TabsContent value="scheduling" className="space-y-6">
               <SchedulingSettingsPanel />
+            </TabsContent>
+
+            {/* Dispatch Configuration */}
+            <TabsContent value="dispatch" className="space-y-6">
+              <DispatchConfigurationPanel />
             </TabsContent>
 
             {/* Payment & Stripe Configuration */}
