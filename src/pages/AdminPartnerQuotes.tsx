@@ -521,7 +521,7 @@ export default function AdminPartnerQuotes() {
   // Status counts for tabs
   const statusCounts = useMemo(() => {
     const counts = {
-      needs_quotation: getBucketJobs('NEW_JOB', 'AWAITING_QUOTATION').filter(job => !job.quote_type).length,
+      needs_quotation: getBucketJobs('NEW_JOB', 'AWAITING_QUOTATION').length,
       waiting_approval: getBucketJobs('WAITING_FOR_APPROVAL').length,
       review: getBucketJobs('REVIEW').length,
       needs_scheduling: getBucketJobs('NEEDS_SCHEDULING').length,
@@ -545,7 +545,7 @@ export default function AdminPartnerQuotes() {
     let jobs_for_status;
     switch (activeStatus) {
       case 'needs_quotation':
-        jobs_for_status = getBucketJobs('NEW_JOB', 'AWAITING_QUOTATION').filter(job => !job.quote_type);
+        jobs_for_status = getBucketJobs('NEW_JOB', 'AWAITING_QUOTATION');
         break;
       case 'waiting_approval':
         jobs_for_status = getBucketJobs('WAITING_FOR_APPROVAL');
