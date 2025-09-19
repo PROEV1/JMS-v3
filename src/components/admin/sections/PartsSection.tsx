@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
 import { PartsOrderModal } from './PartsOrderModal';
+import { ViewPurchaseOrderModal } from '../inventory/ViewPurchaseOrderModal';
 import { formatCurrency } from '@/lib/currency';
 import { Link } from 'react-router-dom';
 
@@ -30,6 +31,8 @@ export function PartsSection({
   const { toast } = useToast();
   const [isUpdating, setIsUpdating] = useState(false);
   const [showPartsOrderModal, setShowPartsOrderModal] = useState(false);
+  const [showViewPOModal, setShowViewPOModal] = useState(false);
+  const [selectedPOId, setSelectedPOId] = useState<string | null>(null);
 
   // Fetch existing parts orders for this order
   const { data: partsOrders = [] } = useQuery({
@@ -244,7 +247,10 @@ export function PartsSection({
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => window.open(`/admin/inventory?tab=purchase-orders`, '_blank')}
+                        onClick={() => {
+                          setSelectedPOId(order.purchase_orders.id);
+                          setShowViewPOModal(true);
+                        }}
                         className="h-8 w-8 p-0"
                       >
                         <ExternalLink className="h-3 w-3" />
@@ -303,6 +309,12 @@ export function PartsSection({
         orderId={orderId}
         partDetails={partDetails}
         onSuccess={onUpdate}
+      />
+
+      <ViewPurchaseOrderModal
+        open={showViewPOModal}
+        onOpenChange={setShowViewPOModal}
+        purchaseOrderId={selectedPOId}
       />
     </Card>
   );
