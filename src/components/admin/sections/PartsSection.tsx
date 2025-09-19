@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Package, Check, Clock, AlertTriangle, Edit, Truck, Calendar, DollarSign } from 'lucide-react';
+import { Package, Check, Clock, AlertTriangle, Edit, Truck, Calendar, PoundSterling, FileText, ExternalLink } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
 import { PartsOrderModal } from './PartsOrderModal';
+import { formatCurrency } from '@/lib/currency';
 
 interface PartsSectionProps {
   orderId: string;
@@ -37,7 +38,8 @@ export function PartsSection({
         .from('order_parts')
         .select(`
           *,
-          inventory_suppliers(name, contact_name, contact_email, contact_phone)
+          inventory_suppliers(name, contact_name, contact_email, contact_phone),
+          purchase_orders(id, po_number, status, total_amount, expected_delivery_date)
         `)
         .eq('order_id', orderId)
         .order('created_at', { ascending: false });
@@ -190,8 +192,8 @@ export function PartsSection({
                   <div>
                     <div className="text-xs text-muted-foreground">Net Cost</div>
                     <div className="font-medium flex items-center gap-1">
-                      <DollarSign className="h-3 w-3" />
-                      £{order.net_cost?.toFixed(2)}
+                      <PoundSterling className="h-3 w-3" />
+                      {formatCurrency(order.net_cost)}
                     </div>
                   </div>
                   <div>
@@ -209,15 +211,47 @@ export function PartsSection({
                   <div className="mt-3 pt-3 border-t">
                     <div className="text-xs text-muted-foreground mb-2">Items</div>
                     <div className="space-y-1">
-                      {order.items_ordered.map((item: any, index: number) => (
-                        <div key={index} className="text-sm flex justify-between">
-                          <span>{item.description}</span>
-                          <span>Qty: {item.quantity} @ £{item.unit_cost?.toFixed(2)}</span>
-                        </div>
-                      ))}
+                       {order.items_ordered.map((item: any, index: number) => (
+                         <div key={index} className="text-sm flex justify-between">
+                           <span>{item.description}</span>
+                           <span>Qty: {item.quantity} @ {formatCurrency(item.unit_cost)}</span>
+                         </div>
+                       ))}
+                    </div>
+                  </div>
+                 )}
+
+                {/* Purchase Order Information */}
+                {order.purchase_orders && (
+                  <div className="mt-3 pt-3 border-t bg-blue-50/50 dark:bg-blue-950/20 rounded p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-blue-600" />
+                        <span className="text-sm font-medium">Purchase Order: {order.purchase_orders.po_number}</span>
+                        <Badge variant={order.purchase_orders.status === 'delivered' ? 'default' : 'secondary'}>
+                          {order.purchase_orders.status}
+                        </Badge>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => window.open(`/admin/inventory?tab=purchase-orders`, '_blank')}
+                        className="h-8 w-8 p-0"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                      </Button>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      PO Total: {formatCurrency(order.purchase_orders.total_amount)}
+                      {order.purchase_orders.expected_delivery_date && (
+                        <span className="ml-3">
+                          Expected: {new Date(order.purchase_orders.expected_delivery_date).toLocaleDateString()}
+                        </span>
+                      )}
                     </div>
                   </div>
                 )}
+
                 {order.notes && (
                   <div className="mt-3 pt-3 border-t">
                     <div className="text-xs text-muted-foreground">Notes</div>
@@ -235,8 +269,8 @@ export function PartsSection({
             <p className="font-medium mb-1">Parts Workflow:</p>
             <ul className="space-y-1">
               <li>1. Review parts requirements above</li>
-              <li>2. Click "Order Parts" to create a detailed parts order</li>
-              <li>3. Track supplier details, costs, and delivery dates</li>
+              <li>2. Click "Order Parts" to create a detailed parts order and official Purchase Order</li>
+              <li>3. Track supplier details, costs, and delivery dates through PO system</li>
               <li>4. Mark as delivered when parts arrive</li>
               <li>5. Job will move to scheduling once parts are confirmed ordered</li>
             </ul>

@@ -8,8 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent } from '@/components/ui/card';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Calendar, Package, DollarSign, Truck } from 'lucide-react';
+import { Calendar, Package, Truck, PoundSterling } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { formatCurrency } from '@/lib/currency';
 
 interface PartsOrderModalProps {
   open: boolean;
@@ -81,6 +82,9 @@ export function PartsOrderModal({
     return partItems.reduce((total, item) => total + (item.quantity * item.unit_cost), 0);
   };
 
+  // Watch for changes to make calculated total reactive
+  const calculatedTotal = calculateTotalCost();
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -96,6 +100,47 @@ export function PartsOrderModal({
     setIsSubmitting(true);
     
     try {
+      const user = await supabase.auth.getUser();
+      
+      // Step 1: Create the official Purchase Order
+      const filteredItems = partItems.filter(item => item.description.trim());
+      const poData = {
+        po_number: `PO${new Date().getFullYear()}-${orderNumber}`,
+        supplier_id: supplierId,
+        expected_delivery_date: expectedDeliveryDate || null,
+        notes: notes || null,
+        total_amount: parseFloat(netCost),
+        status: 'pending' as const,
+        source_order_id: orderId,
+        created_by: user.data.user?.id
+      };
+
+      const { data: purchaseOrder, error: poError } = await supabase
+        .from('purchase_orders')
+        .insert(poData)
+        .select()
+        .single();
+
+      if (poError) throw poError;
+
+      // Step 2: Create purchase order lines
+      const poLines = filteredItems.map(item => ({
+        purchase_order_id: purchaseOrder.id,
+        item_id: null, // Custom items for now
+        item_name: item.description,
+        quantity: item.quantity,
+        unit_cost: item.unit_cost
+      }));
+
+      if (poLines.length > 0) {
+        const { error: linesError } = await supabase
+          .from('purchase_order_lines')
+          .insert(poLines);
+
+        if (linesError) throw linesError;
+      }
+
+      // Step 3: Create the order_parts record linked to the PO
       const { error: partError } = await supabase
         .from('order_parts')
         .insert({
@@ -103,19 +148,20 @@ export function PartsOrderModal({
           supplier_id: supplierId,
           order_number: orderNumber,
           net_cost: parseFloat(netCost),
-          items_ordered: partItems.filter(item => item.description.trim()).map(item => ({
+          items_ordered: filteredItems.map(item => ({
             description: item.description,
             quantity: item.quantity,
             unit_cost: item.unit_cost
           })) as any,
           expected_delivery_date: expectedDeliveryDate || null,
           notes: notes || null,
-          created_by: (await supabase.auth.getUser()).data.user?.id
+          purchase_order_id: purchaseOrder.id,
+          created_by: user.data.user?.id
         });
 
       if (partError) throw partError;
 
-      // Update the order to mark parts as ordered
+      // Step 4: Update the order to mark parts as ordered
       const { error: orderError } = await supabase
         .from('orders')
         .update({ 
@@ -128,7 +174,7 @@ export function PartsOrderModal({
 
       toast({
         title: "Success",
-        description: "Parts order created successfully",
+        description: `Parts order created successfully. Purchase Order ${purchaseOrder.po_number} has been generated.`,
       });
 
       onSuccess?.();
@@ -296,7 +342,7 @@ export function PartsOrderModal({
             <div>
               <Label htmlFor="netCost">Total Net Cost (ex. VAT) *</Label>
               <div className="relative">
-                <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <PoundSterling className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   id="netCost"
                   type="number"
@@ -309,7 +355,12 @@ export function PartsOrderModal({
                 />
               </div>
               <div className="text-sm text-muted-foreground mt-1">
-                Calculated from items: £{calculateTotalCost().toFixed(2)}
+                Calculated from items: {formatCurrency(calculatedTotal)}
+                {calculatedTotal !== parseFloat(netCost || '0') && parseFloat(netCost || '0') > 0 && (
+                  <span className="text-amber-600 ml-2">
+                    (Differs from entered total)
+                  </span>
+                )}
               </div>
             </div>
 

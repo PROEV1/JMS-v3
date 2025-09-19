@@ -1874,6 +1874,7 @@ export type Database = {
           order_id: string
           order_number: string
           ordered_at: string
+          purchase_order_id: string | null
           status: string
           supplier_id: string
           updated_at: string
@@ -1890,6 +1891,7 @@ export type Database = {
           order_id: string
           order_number: string
           ordered_at?: string
+          purchase_order_id?: string | null
           status?: string
           supplier_id: string
           updated_at?: string
@@ -1906,6 +1908,7 @@ export type Database = {
           order_id?: string
           order_number?: string
           ordered_at?: string
+          purchase_order_id?: string | null
           status?: string
           supplier_id?: string
           updated_at?: string
@@ -1916,6 +1919,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_parts_purchase_order_id_fkey"
+            columns: ["purchase_order_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
             referencedColumns: ["id"]
           },
           {
@@ -3217,6 +3227,7 @@ export type Database = {
           notes: string | null
           order_date: string
           po_number: string
+          source_order_id: string | null
           status: Database["public"]["Enums"]["purchase_order_status"]
           stock_request_id: string | null
           supplier_id: string | null
@@ -3235,6 +3246,7 @@ export type Database = {
           notes?: string | null
           order_date?: string
           po_number: string
+          source_order_id?: string | null
           status?: Database["public"]["Enums"]["purchase_order_status"]
           stock_request_id?: string | null
           supplier_id?: string | null
@@ -3253,6 +3265,7 @@ export type Database = {
           notes?: string | null
           order_date?: string
           po_number?: string
+          source_order_id?: string | null
           status?: Database["public"]["Enums"]["purchase_order_status"]
           stock_request_id?: string | null
           supplier_id?: string | null
@@ -3279,6 +3292,13 @@ export type Database = {
             columns: ["engineer_id"]
             isOneToOne: false
             referencedRelation: "engineers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_source_order_id_fkey"
+            columns: ["source_order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
             referencedColumns: ["id"]
           },
           {
