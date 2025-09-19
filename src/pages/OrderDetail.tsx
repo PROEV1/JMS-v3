@@ -9,6 +9,7 @@ import { OrderActionBar } from '@/components/admin/OrderActionBar';
 import { OfferLinkWidget } from '@/components/admin/OfferLinkWidget';
 import { OrderSectionLayout } from '@/components/admin/OrderSectionLayout';
 import { EnhancedAdminOrderOverview } from '@/components/admin/EnhancedAdminOrderOverview';
+import { ChargerDispatchSection } from '@/components/admin/dispatch/ChargerDispatchSection';
 import { ClientDetailsSection } from '@/components/admin/sections/ClientDetailsSection';
 import { ProductSummarySection } from '@/components/admin/sections/ProductSummarySection';
 import { InstallationManagementSection } from '@/components/admin/sections/InstallationManagementSection';
@@ -812,6 +813,11 @@ export default function OrderDetail() {
                 paymentRequired={order.partner?.client_payment_required ?? true}
                 agreementRequired={order.partner?.client_agreement_required ?? true}
               />
+            )}
+
+            {/* Charger Dispatch Status */}
+            {order && orderId && (
+              <ChargerDispatchSection orderId={orderId} />
             )}
 
             {/* Offer Link Widget */}

@@ -38,6 +38,9 @@ interface ChargerDispatchTableProps {
   orders: DispatchOrder[];
   isLoading: boolean;
   onMarkAsDispatched: (orderId: string) => void;
+  onFlagIssue?: (orderId: string) => void;
+  selectedOrders?: string[];
+  onSelectionChange?: (selectedIds: string[]) => void;
   pagination: {
     page: number;
     pageSize: number;
@@ -51,6 +54,9 @@ export function ChargerDispatchTable({
   orders,
   isLoading,
   onMarkAsDispatched,
+  onFlagIssue,
+  selectedOrders = [],
+  onSelectionChange,
   pagination,
   totalCount,
   onPageChange,
@@ -198,6 +204,14 @@ export function ChargerDispatchTable({
                         >
                           <Package className="mr-2 h-4 w-4" />
                           Mark as Dispatched
+                        </DropdownMenuItem>
+                      )}
+                      {onFlagIssue && (
+                        <DropdownMenuItem 
+                          onClick={() => onFlagIssue(order.id)}
+                        >
+                          <AlertTriangle className="mr-2 h-4 w-4" />
+                          Flag Issue
                         </DropdownMenuItem>
                       )}
                       {order.dispatch_status === 'dispatched' && (

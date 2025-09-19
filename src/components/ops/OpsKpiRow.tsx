@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { KpiCard } from '@/components/scheduling/KpiCard';
+import { DispatchKpiTiles } from '@/components/dashboard/DispatchKpiTiles';
 import { useOpsKpis } from '@/hooks/useOpsKpis';
 import { 
   Quote, 
@@ -88,20 +89,29 @@ export function OpsKpiRow() {
   ];
 
   return (
-    <div className="space-y-4">
-      <h2 className="text-xl font-semibold">Key Performance Indicators</h2>
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
-        {kpiTiles.map((tile, index) => (
-          <KpiCard
-            key={index}
-            title={tile.title}
-            value={tile.value}
-            icon={tile.icon}
-            variant={tile.variant}
-            onClick={tile.onClick}
-            subtitle={tile.subtitle}
-          />
-        ))}
+    <div className="space-y-6">
+      {/* Original KPI Row */}
+      <div>
+        <h2 className="text-lg font-semibold mb-4">Operations Overview</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
+          {kpiTiles.map((kpi, index) => (
+            <KpiCard
+              key={index}
+              title={kpi.title}
+              value={kpi.value}
+              icon={kpi.icon}
+              variant={kpi.variant}
+              onClick={kpi.onClick}
+              subtitle={kpi.subtitle}
+            />
+          ))}
+        </div>
+      </div>
+      
+      {/* Dispatch KPIs */}
+      <div>
+        <h2 className="text-lg font-semibold mb-4">Charger Dispatch Status</h2>
+        <DispatchKpiTiles />
       </div>
     </div>
   );

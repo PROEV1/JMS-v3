@@ -6,6 +6,8 @@ import { Plus, AlertTriangle, Package, Truck, CheckCircle } from 'lucide-react';
 import { ChargerDispatchTable } from '@/components/admin/dispatch/ChargerDispatchTable';
 import { ChargerDispatchFilters } from '@/components/admin/dispatch/ChargerDispatchFilters';
 import { MarkAsDispatchedModal } from '@/components/admin/dispatch/MarkAsDispatchedModal';
+import { FlagIssueModal } from '@/components/admin/dispatch/FlagIssueModal';
+import { BulkActionsBar } from '@/components/admin/dispatch/BulkActionsBar';
 import { useChargerDispatchData } from '@/hooks/useChargerDispatchData';
 import { useServerPagination } from '@/hooks/useServerPagination';
 
@@ -21,6 +23,8 @@ export default function AdminChargerDispatch() {
   });
   const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
   const [showDispatchModal, setShowDispatchModal] = useState(false);
+  const [showIssueModal, setShowIssueModal] = useState(false);
+  const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
 
   const { data, isLoading, error } = useChargerDispatchData({
     pagination,
@@ -39,6 +43,32 @@ export default function AdminChargerDispatch() {
   const handleMarkAsDispatched = (orderId: string) => {
     setSelectedOrder(orderId);
     setShowDispatchModal(true);
+  };
+
+  const handleFlagIssue = (orderId: string) => {
+    setSelectedOrder(orderId);
+    setShowIssueModal(true);
+  };
+
+  const handleBulkDispatch = () => {
+    // For bulk dispatch, we'd need a different modal
+    // For now, just show the regular modal with first selected order
+    if (selectedOrders.length > 0) {
+      setSelectedOrder(selectedOrders[0]);
+      setShowDispatchModal(true);
+    }
+  };
+
+  const handleBulkFlagIssue = () => {
+    if (selectedOrders.length > 0) {
+      setSelectedOrder(selectedOrders[0]);
+      setShowIssueModal(true);
+    }
+  };
+
+  const handleBulkStatusChange = (status: string) => {
+    // Handle bulk status changes here
+    console.log('Bulk status change:', status, selectedOrders);
   };
 
   const handleFilterChange = (newFilters: typeof filters) => {
@@ -136,6 +166,9 @@ export default function AdminChargerDispatch() {
             orders={orders}
             isLoading={isLoading}
             onMarkAsDispatched={handleMarkAsDispatched}
+            onFlagIssue={handleFlagIssue}
+            selectedOrders={selectedOrders}
+            onSelectionChange={setSelectedOrders}
             pagination={pagination}
             totalCount={totalCount}
             onPageChange={controls.setPage}
@@ -144,11 +177,29 @@ export default function AdminChargerDispatch() {
         </CardContent>
       </Card>
 
+      {/* Bulk Actions Bar */}
+      <BulkActionsBar
+        selectedCount={selectedOrders.length}
+        onClearSelection={() => setSelectedOrders([])}
+        onBulkDispatch={handleBulkDispatch}
+        onBulkFlagIssue={handleBulkFlagIssue}
+        onBulkStatusChange={handleBulkStatusChange}
+      />
+
       {/* Modals */}
       <MarkAsDispatchedModal
         isOpen={showDispatchModal}
         onClose={() => {
           setShowDispatchModal(false);
+          setSelectedOrder(null);
+        }}
+        orderId={selectedOrder}
+      />
+
+      <FlagIssueModal
+        isOpen={showIssueModal}
+        onClose={() => {
+          setShowIssueModal(false);
           setSelectedOrder(null);
         }}
         orderId={selectedOrder}
