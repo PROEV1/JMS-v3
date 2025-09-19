@@ -27,7 +27,69 @@ export function useChargerDispatchData({
   return useQuery({
     queryKey: ['charger-dispatch-data', pagination, filters],
     queryFn: async () => {
-      // Build the base query for orders that need dispatch management
+      // First, get ALL matching records for stats calculation (without pagination)
+      let statsQuery = supabase
+        .from('orders')
+        .select(`
+          id,
+          job_type,
+          scheduled_install_date,
+          charger_dispatches (
+            status,
+            dispatched_at
+          )
+        `)
+        .not('scheduled_install_date', 'is', null);
+
+      // Apply filters to stats query
+      if (filters.dateFrom) {
+        statsQuery = statsQuery.gte('scheduled_install_date', filters.dateFrom);
+      }
+      if (filters.dateTo) {
+        statsQuery = statsQuery.lte('scheduled_install_date', filters.dateTo);
+      }
+      if (filters.engineer !== 'all') {
+        statsQuery = statsQuery.eq('engineer_id', filters.engineer);
+      }
+
+      const { data: allOrders, error: statsError, count } = await statsQuery;
+      if (statsError) throw statsError;
+
+      // Calculate stats from ALL records
+      const stats = {
+        pendingDispatch: 0,
+        dispatched: 0,
+        urgent: 0,
+        issues: 0
+      };
+
+      allOrders?.forEach(order => {
+        const dispatchRecord = order.charger_dispatches?.[0];
+        const installDate = new Date(order.scheduled_install_date);
+        const daysUntilInstall = Math.ceil((installDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+        
+        // Determine dispatch status
+        let dispatchStatus = 'pending_dispatch';
+        if (order.job_type === 'service_call') {
+          dispatchStatus = 'not_required';
+        } else if (dispatchRecord) {
+          dispatchStatus = dispatchRecord.status;
+        }
+
+        // Calculate urgency
+        let urgencyLevel = 'normal';
+        if (daysUntilInstall <= 2 && dispatchStatus === 'pending_dispatch') {
+          urgencyLevel = 'urgent';
+        }
+
+        // Update stats
+        if (dispatchStatus === 'pending_dispatch') stats.pendingDispatch++;
+        if (dispatchStatus === 'sent') stats.dispatched++;
+        if (urgencyLevel === 'urgent') stats.urgent++;
+        if (dispatchStatus === 'issue') stats.issues++;
+      });
+
+      // Now get paginated data for the table
       let ordersQuery = supabase
         .from('orders')
         .select(`
@@ -63,15 +125,13 @@ export function useChargerDispatchData({
         .not('scheduled_install_date', 'is', null)
         .order('scheduled_install_date', { ascending: true });
 
-      // Apply filters
+      // Apply filters to paginated query
       if (filters.dateFrom) {
         ordersQuery = ordersQuery.gte('scheduled_install_date', filters.dateFrom);
       }
-      
       if (filters.dateTo) {
         ordersQuery = ordersQuery.lte('scheduled_install_date', filters.dateTo);
       }
-
       if (filters.engineer !== 'all') {
         ordersQuery = ordersQuery.eq('engineer_id', filters.engineer);
       }
@@ -79,11 +139,9 @@ export function useChargerDispatchData({
       if (filters.dispatchStatus !== 'all') {
         switch (filters.dispatchStatus) {
           case 'not_required':
-            // Jobs that don't need chargers (could be based on job_type or other rules)
             ordersQuery = ordersQuery.eq('job_type', 'service_call');
             break;
           case 'pending_dispatch':
-            // Jobs with no dispatch record yet
             ordersQuery = ordersQuery.is('charger_dispatches', null);
             break;
           case 'dispatched':
@@ -97,25 +155,6 @@ export function useChargerDispatchData({
         }
       }
 
-      // Get count for pagination (without limit/offset)  
-      const countQuery = supabase
-        .from('orders')
-        .select('*', { count: 'exact', head: true })
-        .not('scheduled_install_date', 'is', null);
-      
-      // Apply same filters for count
-      if (filters.dateFrom) {
-        countQuery.gte('scheduled_install_date', filters.dateFrom);
-      }
-      if (filters.dateTo) {
-        countQuery.lte('scheduled_install_date', filters.dateTo);
-      }
-      if (filters.engineer !== 'all') {
-        countQuery.eq('engineer_id', filters.engineer);
-      }
-      
-      const { count } = await countQuery;
-      
       // Get actual data with pagination
       const { data: orders, error } = await ordersQuery
         .range(pagination.offset, pagination.offset + pagination.pageSize - 1);
@@ -168,14 +207,6 @@ export function useChargerDispatchData({
           } : null
         };
       }));
-
-        // Calculate stats
-        const stats = {
-          pendingDispatch: enrichedOrders.filter(o => o.dispatch_status === 'pending_dispatch').length,
-          dispatched: enrichedOrders.filter(o => o.dispatch_status === 'sent').length,
-          urgent: enrichedOrders.filter(o => o.urgency_level === 'urgent').length,
-          issues: enrichedOrders.filter(o => o.dispatch_status === 'issue').length
-        };
 
       return {
         orders: enrichedOrders,
