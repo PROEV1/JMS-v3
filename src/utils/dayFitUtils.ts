@@ -150,7 +150,7 @@ export async function calculateDayFit(
         survey_token_expires_at: null,
         job_type: 'installation' as any // Default value for mock orders
       };
-      allOrders.push(dbVirtualOrder);
+      allOrders.push(dbVirtualOrder as any);
     }
   });
 
@@ -208,7 +208,7 @@ export async function calculateDayFit(
         survey_token_expires_at: null,
         job_type: (newOrder.job_type as any) || 'installation' // Preserve job_type if present
       };
-      allOrders.push(dbOrder);
+      allOrders.push(dbOrder as any);
     }
 
     if (allOrders.length === 0) {

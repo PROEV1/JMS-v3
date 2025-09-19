@@ -118,7 +118,7 @@ export default function EnhancedClientOrderView() {
             quote_number,
             total_cost
           ),
-          engineers(
+          engineers!engineer_id(
             id,
             name,
             email

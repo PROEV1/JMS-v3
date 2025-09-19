@@ -23,7 +23,7 @@ export function ReadyToBookListPage() {
         .select(`
           *,
           client:client_id(full_name, email, phone, postcode, address),
-          engineer:engineer_id(name, email, region),
+          engineer:engineers!engineer_id(name, email, region),
           partner:partner_id(name),
           quote:quote_id(quote_number)
         `, withCount ? { count: 'exact' } : {})
