@@ -152,6 +152,18 @@ serve(async (req) => {
         .delete()
         .in('order_id', seedOrders.map(o => o.id));
 
+      // Delete charger dispatches (added for seed data cleanup)
+      await supabaseAdmin
+        .from('charger_dispatches')
+        .delete()
+        .in('order_id', seedOrders.map(o => o.id));
+
+      // Delete job offers
+      await supabaseAdmin
+        .from('job_offers')
+        .delete()
+        .in('order_id', seedOrders.map(o => o.id));
+
       // Delete orders
       const { error: ordersError } = await supabaseAdmin
         .from('orders')
@@ -259,20 +271,45 @@ serve(async (req) => {
       }
     }
 
-    // 10. Delete auth users (this should cascade delete remaining references)
+    // 10. Delete auth users (handle non-existent users gracefully)
     if (userIds.length > 0) {
-      console.log(`Deleting ${userIds.length} auth users...`);
+      console.log(`Attempting to delete ${userIds.length} auth users...`);
       
       for (const userId of userIds) {
         try {
+          // First check if user exists
+          const { data: userData, error: getUserError } = await supabaseAdmin.auth.admin.getUserById(userId);
+          
+          if (getUserError && getUserError.status === 404) {
+            // User doesn't exist, skip silently
+            console.log(`User ${userId} already deleted or doesn't exist, skipping...`);
+            continue;
+          }
+          
+          if (getUserError) {
+            console.error(`Error checking user ${userId}:`, getUserError);
+            continue;
+          }
+
+          // User exists, now delete them
           const { error: userError } = await supabaseAdmin.auth.admin.deleteUser(userId);
           if (userError) {
-            console.error(`Error deleting user ${userId}:`, userError);
+            if (userError.status === 404) {
+              console.log(`User ${userId} was already deleted, continuing...`);
+            } else {
+              console.error(`Error deleting user ${userId}:`, userError);
+            }
           } else {
             deletedCounts.users++;
+            console.log(`Successfully deleted user ${userId}`);
           }
         } catch (error) {
-          console.error(`Failed to delete user ${userId}:`, error);
+          // Handle any unexpected errors gracefully
+          if (error.message?.includes('User not found') || error.status === 404) {
+            console.log(`User ${userId} not found, skipping...`);
+          } else {
+            console.error(`Failed to delete user ${userId}:`, error.message);
+          }
         }
       }
     }
