@@ -552,8 +552,13 @@ serve(async (req) => {
             switch (selectedBucket.type) {
               case 'needs_scheduling':
                 // Pure needs scheduling - no offers, ready to go
+                // CRITICAL: Ensure all prerequisites are met to bypass survey gating
+                surveyRequired = false;
+                amountPaid = totalCost; // Full payment to bypass payment gating
+                agreementSigned = new Date(now.getTime() - Math.random() * 7 * 24 * 60 * 60 * 1000);
                 manualStatusOverride = true;
-                manualStatusNotes = 'Seeded for needs scheduling bucket';
+                manualStatusNotes = 'Seeded for needs scheduling bucket - survey disabled, payment complete, agreement signed';
+                console.log(`📋 Needs Scheduling Order Config: survey_required=${surveyRequired}, amount_paid=${amountPaid}, total_cost=${totalCost}, agreement_signed=${!!agreementSigned}`);
                 break;
                 
               case 'date_offered':
@@ -647,7 +652,20 @@ serve(async (req) => {
               continue;
             }
 
-            console.log(`Created order ${order.order_number} for bucket ${selectedBucket.type}`);
+            console.log(`✅ Created order ${order.order_number} for bucket ${selectedBucket.type}`);
+            
+            // Log critical details for debugging bucket assignment
+            if (selectedBucket.type === 'needs_scheduling') {
+              console.log(`🔍 Needs Scheduling Order Details:`, {
+                order_number: order.order_number,
+                survey_required: order.survey_required,
+                amount_paid: order.amount_paid,
+                total_amount: order.total_amount,
+                agreement_signed_at: order.agreement_signed_at,
+                manual_status_override: order.manual_status_override,
+                manual_status_notes: order.manual_status_notes
+              });
+            }
             createdCounts.orders++;
             consecutiveErrors = 0;
             
@@ -707,6 +725,39 @@ serve(async (req) => {
     }
 
     console.log('Seed data creation completed:', createdCounts);
+
+    // Verify order status distribution after creation
+    console.log('🔍 Verifying order status distribution...');
+    const { data: statusCheck } = await supabaseAdmin
+      .from('orders')
+      .select('status_enhanced, survey_required, amount_paid, total_amount, agreement_signed_at, manual_status_notes')
+      .order('created_at', { ascending: false })
+      .limit(50); // Check recent orders
+
+    if (statusCheck) {
+      const statusCounts = {};
+      const needsSchedulingDetails = [];
+      
+      statusCheck.forEach(order => {
+        const status = order.status_enhanced;
+        statusCounts[status] = (statusCounts[status] || 0) + 1;
+        
+        // Collect details for needs scheduling analysis
+        if (order.manual_status_notes?.includes('needs scheduling bucket')) {
+          needsSchedulingDetails.push({
+            status_enhanced: order.status_enhanced,
+            survey_required: order.survey_required,
+            amount_paid: order.amount_paid,
+            total_amount: order.total_amount,
+            has_agreement: !!order.agreement_signed_at,
+            payment_complete: order.amount_paid >= order.total_amount
+          });
+        }
+      });
+      
+      console.log('📊 Recent order status distribution:', statusCounts);
+      console.log('🎯 Needs Scheduling orders analysis:', needsSchedulingDetails);
+    }
 
     // Check if we actually created data
     if (createdCounts.clients === 0) {
