@@ -308,10 +308,18 @@ export const QuoteMetadataPanel: React.FC<QuoteMetadataPanelProps> = ({
               <SelectValue placeholder="Select duration..." />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="0.5">0.5 Days</SelectItem>
-              <SelectItem value="1">1 Day</SelectItem>
-              <SelectItem value="1.5">1.5 Days</SelectItem>
-              <SelectItem value="2">2+ Days</SelectItem>
+              <SelectItem value="0.25">0.5 Hours</SelectItem>
+              <SelectItem value="0.5">1 Hour</SelectItem>
+              <SelectItem value="0.75">1.5 Hours</SelectItem>
+              <SelectItem value="1">2 Hours</SelectItem>
+              <SelectItem value="1.25">2.5 Hours</SelectItem>
+              <SelectItem value="1.5">3 Hours</SelectItem>
+              <SelectItem value="1.75">3.5 Hours</SelectItem>
+              <SelectItem value="2">4 Hours</SelectItem>
+              <SelectItem value="2.5">5 Hours</SelectItem>
+              <SelectItem value="3">6 Hours</SelectItem>
+              <SelectItem value="3.5">7 Hours</SelectItem>
+              <SelectItem value="4">8 Hours (Full Day)</SelectItem>
             </SelectContent>
           </Select>
           <p className="text-xs text-muted-foreground">
