@@ -39,7 +39,7 @@ export function PartsOrderModal({
   
   // Form state
   const [supplierId, setSupplierId] = useState('');
-  const [orderNumber, setOrderNumber] = useState('');
+  const [reference, setReference] = useState('');
   const [netCost, setNetCost] = useState('');
   const [expectedDeliveryDate, setExpectedDeliveryDate] = useState('');
   const [notes, setNotes] = useState('');
@@ -95,7 +95,7 @@ export function PartsOrderModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!supplierId || !orderNumber || !netCost) {
+    if (!supplierId || !netCost) {
       toast({
         title: "Error",
         description: "Please fill in all required fields",
@@ -109,13 +109,23 @@ export function PartsOrderModal({
     try {
       const user = await supabase.auth.getUser();
       
-      // Step 1: Create the official Purchase Order
+      // Step 1: Generate auto PO number using database function
+      const { data: poNumber, error: poNumberError } = await supabase
+        .rpc('generate_sequential_po_number');
+
+      if (poNumberError) {
+        console.error('Error generating PO number:', poNumberError);
+        throw poNumberError;
+      }
+
+      // Step 2: Create the official Purchase Order
       const filteredItems = partItems.filter(item => item.description.trim());
       const poData = {
-        po_number: `PO${new Date().getFullYear()}-${orderNumber}`,
+        po_number: poNumber,
         supplier_id: supplierId,
         expected_delivery_date: expectedDeliveryDate || null,
         notes: notes || null,
+        reference: reference || null,
         total_amount: parseFloat(netCost),
         status: 'pending' as const,
         source_order_id: orderId,
@@ -130,7 +140,7 @@ export function PartsOrderModal({
 
       if (poError) throw poError;
 
-      // Step 2: Create purchase order lines
+      // Step 3: Create purchase order lines
       const poLines = filteredItems.map(item => ({
         purchase_order_id: purchaseOrder.id,
         item_id: null, // Custom items for now
@@ -147,13 +157,13 @@ export function PartsOrderModal({
         if (linesError) throw linesError;
       }
 
-      // Step 3: Create the order_parts record linked to the PO
+      // Step 4: Create the order_parts record linked to the PO
       const { error: partError } = await supabase
         .from('order_parts')
         .insert({
           order_id: orderId,
           supplier_id: supplierId,
-          order_number: orderNumber,
+          order_number: reference || poNumber, // Use reference if provided, otherwise PO number
           net_cost: parseFloat(netCost),
           items_ordered: filteredItems.map(item => ({
             description: item.description,
@@ -168,7 +178,7 @@ export function PartsOrderModal({
 
       if (partError) throw partError;
 
-      // Step 4: Update the order to mark parts as ordered
+      // Step 5: Update the order to mark parts as ordered
       const { error: orderError } = await supabase
         .from('orders')
         .update({ 
@@ -181,7 +191,7 @@ export function PartsOrderModal({
 
       toast({
         title: "Success",
-        description: `Parts order created successfully. Purchase Order ${purchaseOrder.po_number} has been generated.`,
+        description: `Parts order created successfully with Purchase Order ${purchaseOrder.po_number}`,
       });
 
       onSuccess?.();
@@ -189,7 +199,7 @@ export function PartsOrderModal({
       
       // Reset form
       setSupplierId('');
-      setOrderNumber('');
+      setReference('');
       setNetCost('');
       setExpectedDeliveryDate('');
       setNotes('');
@@ -239,14 +249,16 @@ export function PartsOrderModal({
             </div>
 
             <div>
-              <Label htmlFor="orderNumber">Order/Reference Number *</Label>
+              <Label htmlFor="reference">Reference (Optional)</Label>
               <Input
-                id="orderNumber"
-                value={orderNumber}
-                onChange={(e) => setOrderNumber(e.target.value)}
-                placeholder="Enter supplier order number"
-                required
+                id="reference"
+                value={reference}
+                onChange={(e) => setReference(e.target.value)}
+                placeholder="Job/order reference"
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                PO number will be auto-generated (e.g., PO2025-000123)
+              </p>
             </div>
           </div>
 

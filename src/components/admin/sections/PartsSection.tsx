@@ -2,12 +2,13 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Package, Check, Clock, AlertTriangle, Edit, Truck, Calendar, PoundSterling, FileText, ExternalLink } from 'lucide-react';
+import { Package, Check, Clock, AlertTriangle, Edit, Truck, Calendar, PoundSterling, FileText, ExternalLink, Eye } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
 import { PartsOrderModal } from './PartsOrderModal';
 import { formatCurrency } from '@/lib/currency';
+import { Link } from 'react-router-dom';
 
 interface PartsSectionProps {
   orderId: string;
@@ -39,7 +40,7 @@ export function PartsSection({
         .select(`
           *,
           inventory_suppliers(name, contact_name, contact_email, contact_phone),
-          purchase_orders(id, po_number, status, total_amount, expected_delivery_date)
+          purchase_orders(id, po_number, status, total_amount, expected_delivery_date, reference)
         `)
         .eq('order_id', orderId)
         .order('created_at', { ascending: false });
@@ -180,13 +181,13 @@ export function PartsSection({
             <h4 className="font-medium text-sm">Parts Orders</h4>
             {partsOrders.map((order: any) => (
               <Card key={order.id} className="p-4 bg-muted/50">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                   <div>
                     <div className="text-xs text-muted-foreground">Supplier</div>
                     <div className="font-medium">{order.inventory_suppliers?.name}</div>
                   </div>
                   <div>
-                    <div className="text-xs text-muted-foreground">Order Number</div>
+                    <div className="text-xs text-muted-foreground">Reference</div>
                     <div className="font-medium">{order.order_number}</div>
                   </div>
                   <div>
@@ -205,6 +206,14 @@ export function PartsSection({
                         : 'Not specified'
                       }
                     </div>
+                  </div>
+                  <div className="flex items-end justify-end">
+                    <Link to={`/admin/orders/${orderId}`}>
+                      <Button variant="outline" size="sm" className="flex items-center gap-2">
+                        <Eye className="h-3 w-3" />
+                        View Order
+                      </Button>
+                    </Link>
                   </div>
                 </div>
                 {order.items_ordered && Array.isArray(order.items_ordered) && order.items_ordered.length > 0 && (
@@ -241,12 +250,22 @@ export function PartsSection({
                         <ExternalLink className="h-3 w-3" />
                       </Button>
                     </div>
-                    <div className="text-xs text-muted-foreground">
-                      PO Total: {formatCurrency(order.purchase_orders.total_amount)}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                      <div>
+                        <span className="text-muted-foreground">PO Total:</span>
+                        <div className="font-medium">{formatCurrency(order.purchase_orders.total_amount)}</div>
+                      </div>
+                      {order.purchase_orders.reference && (
+                        <div>
+                          <span className="text-muted-foreground">Reference:</span>
+                          <div className="font-medium">{order.purchase_orders.reference}</div>
+                        </div>
+                      )}
                       {order.purchase_orders.expected_delivery_date && (
-                        <span className="ml-3">
-                          Expected: {new Date(order.purchase_orders.expected_delivery_date).toLocaleDateString()}
-                        </span>
+                        <div>
+                          <span className="text-muted-foreground">Expected:</span>
+                          <div className="font-medium">{new Date(order.purchase_orders.expected_delivery_date).toLocaleDateString()}</div>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -269,7 +288,7 @@ export function PartsSection({
             <p className="font-medium mb-1">Parts Workflow:</p>
             <ul className="space-y-1">
               <li>1. Review parts requirements above</li>
-              <li>2. Click "Order Parts" to create a detailed parts order and official Purchase Order</li>
+              <li>2. Click "Order Parts" to create a detailed parts order with auto-generated PO number</li>
               <li>3. Track supplier details, costs, and delivery dates through PO system</li>
               <li>4. Mark as delivered when parts arrive</li>
               <li>5. Job will move to scheduling once parts are confirmed ordered</li>
