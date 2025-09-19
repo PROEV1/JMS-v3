@@ -121,6 +121,7 @@ export function ChargerDispatchTable({
             <TableHead>Client Name</TableHead>
             <TableHead className="w-[100px]">Postcode</TableHead>
             <TableHead className="w-[140px]">Install Date</TableHead>
+            <TableHead className="w-[140px]">Job Status</TableHead>
             <TableHead className="w-[140px]">Dispatch Status</TableHead>
             <TableHead className="w-[120px]">Courier</TableHead>
             <TableHead className="w-[120px]">Tracking</TableHead>
@@ -132,7 +133,7 @@ export function ChargerDispatchTable({
         <TableBody>
           {orders.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
+              <TableCell colSpan={11} className="text-center text-muted-foreground py-8">
                 No orders found matching your criteria
               </TableCell>
             </TableRow>
@@ -164,6 +165,11 @@ export function ChargerDispatchTable({
                       : `${Math.abs(order.days_until_install)} days ago`
                     }
                   </div>
+                </TableCell>
+                <TableCell>
+                  <Badge variant="outline" className="text-xs">
+                    {order.status_enhanced?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Unknown'}
+                  </Badge>
                 </TableCell>
                 <TableCell>
                   {getDispatchStatusBadge(order.dispatch_status, order.urgency_level)}
