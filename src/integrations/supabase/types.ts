@@ -3220,6 +3220,7 @@ export type Database = {
           notes: string | null
           order_date: string
           po_number: string
+          reference: string | null
           source_order_id: string | null
           status: Database["public"]["Enums"]["purchase_order_status"]
           stock_request_id: string | null
@@ -3239,6 +3240,7 @@ export type Database = {
           notes?: string | null
           order_date?: string
           po_number: string
+          reference?: string | null
           source_order_id?: string | null
           status?: Database["public"]["Enums"]["purchase_order_status"]
           stock_request_id?: string | null
@@ -3258,6 +3260,7 @@ export type Database = {
           notes?: string | null
           order_date?: string
           po_number?: string
+          reference?: string | null
           source_order_id?: string | null
           status?: Database["public"]["Enums"]["purchase_order_status"]
           stock_request_id?: string | null
@@ -4186,6 +4189,10 @@ export type Database = {
         Returns: Json
       }
       generate_client_token: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      generate_sequential_po_number: {
         Args: Record<PropertyKey, never>
         Returns: string
       }
