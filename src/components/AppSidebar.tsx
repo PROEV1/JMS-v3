@@ -21,7 +21,8 @@ import {
   FormInput,
   Zap,
   FileCheck,
-  Warehouse
+  Warehouse,
+  Truck
 } from 'lucide-react';
 import {
   Sidebar,
@@ -60,6 +61,7 @@ export function AppSidebar({ userRole }: AppSidebarProps) {
     { icon: FormInput, label: 'Surveys', href: '/admin/survey-forms' },
     { icon: Package, label: 'Inventory', href: '/admin/inventory' },
     { icon: Zap, label: 'Chargers', href: '/admin/chargers' },
+    { icon: Truck, label: 'Dispatch', href: '/admin/dispatch' },
     { icon: User, label: 'Engineers', href: '/admin/engineers' },
     { icon: Users, label: 'Clients', href: '/admin/clients' },
     { icon: Users, label: 'Leads', href: '/admin/leads' },

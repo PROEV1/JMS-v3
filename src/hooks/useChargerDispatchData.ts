@@ -1,0 +1,190 @@
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { keepPreviousData } from '@tanstack/react-query';
+
+interface DispatchFilters {
+  dateFrom: string;
+  dateTo: string;
+  region: string;
+  engineer: string;
+  dispatchStatus: string;
+  jobType: string;
+}
+
+interface PaginationState {
+  page: number;
+  pageSize: number;
+  offset: number;
+}
+
+export function useChargerDispatchData({
+  pagination,
+  filters
+}: {
+  pagination: PaginationState;
+  filters: DispatchFilters;
+}) {
+  return useQuery({
+    queryKey: ['charger-dispatch-data', pagination, filters],
+    queryFn: async () => {
+      // Build the base query for orders that need dispatch management
+      let ordersQuery = supabase
+        .from('orders')
+        .select(`
+          id,
+          order_number,
+          scheduled_install_date,
+          status_enhanced,
+          created_at,
+          job_type,
+          clients!inner (
+            id,
+            full_name,
+            postcode,
+            address,
+            phone
+          ),
+          engineers (
+            id,
+            name,
+            region
+          ),
+          charger_dispatches (
+            id,
+            status,
+            dispatched_at,
+            delivered_at,
+            tracking_number,
+            notes,
+            created_at
+          )
+        `)
+        .not('scheduled_install_date', 'is', null)
+        .order('scheduled_install_date', { ascending: true });
+
+      // Apply filters
+      if (filters.dateFrom) {
+        ordersQuery = ordersQuery.gte('scheduled_install_date', filters.dateFrom);
+      }
+      
+      if (filters.dateTo) {
+        ordersQuery = ordersQuery.lte('scheduled_install_date', filters.dateTo);
+      }
+
+      if (filters.engineer !== 'all') {
+        ordersQuery = ordersQuery.eq('engineer_id', filters.engineer);
+      }
+
+      if (filters.dispatchStatus !== 'all') {
+        switch (filters.dispatchStatus) {
+          case 'not_required':
+            // Jobs that don't need chargers (could be based on job_type or other rules)
+            ordersQuery = ordersQuery.eq('job_type', 'service_call');
+            break;
+          case 'pending_dispatch':
+            // Jobs with no dispatch record yet
+            ordersQuery = ordersQuery.is('charger_dispatches', null);
+            break;
+          case 'dispatched':
+            ordersQuery = ordersQuery.not('charger_dispatches', 'is', null)
+              .eq('charger_dispatches.status', 'dispatched');
+            break;
+          case 'issue':
+            ordersQuery = ordersQuery.not('charger_dispatches', 'is', null)
+              .eq('charger_dispatches.status', 'issue');
+            break;
+        }
+      }
+
+      // Get count for pagination (without limit/offset)  
+      const countQuery = supabase
+        .from('orders')
+        .select('*', { count: 'exact', head: true })
+        .not('scheduled_install_date', 'is', null);
+      
+      // Apply same filters for count
+      if (filters.dateFrom) {
+        countQuery.gte('scheduled_install_date', filters.dateFrom);
+      }
+      if (filters.dateTo) {
+        countQuery.lte('scheduled_install_date', filters.dateTo);
+      }
+      if (filters.engineer !== 'all') {
+        countQuery.eq('engineer_id', filters.engineer);
+      }
+      
+      const { count } = await countQuery;
+      
+      // Get actual data with pagination
+      const { data: orders, error } = await ordersQuery
+        .range(pagination.offset, pagination.offset + pagination.pageSize - 1);
+
+      if (error) throw error;
+
+      // Calculate dispatch status and urgency for each order
+      const enrichedOrders = orders.map(order => {
+        const dispatchRecord = order.charger_dispatches?.[0];
+        const installDate = new Date(order.scheduled_install_date);
+        const daysUntilInstall = Math.ceil((installDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+        
+        // Determine dispatch status
+        let dispatchStatus = 'pending_dispatch';
+        if (order.job_type === 'service_call') {
+          dispatchStatus = 'not_required';
+        } else if (dispatchRecord) {
+          dispatchStatus = dispatchRecord.status;
+        }
+
+        // Calculate urgency
+        let urgencyLevel = 'normal';
+        if (daysUntilInstall <= 2 && dispatchStatus === 'pending_dispatch') {
+          urgencyLevel = 'urgent';
+        } else if (daysUntilInstall <= 5 && dispatchStatus === 'pending_dispatch') {
+          urgencyLevel = 'warning';
+        } else if (dispatchStatus === 'dispatched') {
+          urgencyLevel = 'success';
+        }
+
+        return {
+          ...order,
+          dispatch_status: dispatchStatus,
+          urgency_level: urgencyLevel,
+          days_until_install: daysUntilInstall,
+          dispatch_record: dispatchRecord
+        };
+      });
+
+      // Calculate stats
+      const stats = {
+        pendingDispatch: enrichedOrders.filter(o => o.dispatch_status === 'pending_dispatch').length,
+        dispatched: enrichedOrders.filter(o => o.dispatch_status === 'dispatched').length,
+        urgent: enrichedOrders.filter(o => o.urgency_level === 'urgent').length,
+        issues: enrichedOrders.filter(o => o.dispatch_status === 'issue').length
+      };
+
+      return {
+        orders: enrichedOrders,
+        totalCount: count || 0,
+        stats
+      };
+    },
+    placeholderData: keepPreviousData
+  });
+}
+
+// Hook to get engineers for filter dropdown
+export function useEngineersForDispatch() {
+  return useQuery({
+    queryKey: ['engineers-dispatch-filter'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('engineers')
+        .select('id, name, region')
+        .eq('is_active', true)
+        .order('name');
+
+      if (error) throw error;
+      return data;
+    }
+  });
+}

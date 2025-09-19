@@ -23,6 +23,7 @@ import AdminInventory from '@/pages/AdminInventory';
 import AdminSurveyForms from '@/pages/AdminSurveyForms';
 import AdminSurveyFormEdit from '@/pages/AdminSurveyFormEdit';
 import AdminChargers from '@/pages/AdminChargers';
+import AdminChargerDispatch from '@/pages/AdminChargerDispatch';
 import AdminPartners from '@/pages/AdminPartners';
 import AdminPartnerProfiles from '@/pages/AdminPartnerProfiles';
 import AdminPartnerUsers from '@/pages/AdminPartnerUsers';
@@ -139,6 +140,7 @@ function App() {
         <Route path="/admin/survey-forms" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><AdminSurveyForms /></Layout></RouteGuard>} />
         <Route path="/admin/survey-forms/:versionId/edit" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><AdminSurveyFormEdit /></Layout></RouteGuard>} />
         <Route path="/admin/chargers" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><AdminChargers /></Layout></RouteGuard>} />
+        <Route path="/admin/dispatch" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><AdminChargerDispatch /></Layout></RouteGuard>} />
         <Route path="/admin/partners" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><AdminPartners /></Layout></RouteGuard>} />
         <Route path="/admin/partners/:id/users" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><AdminPartnerUsers /></Layout></RouteGuard>} />
         <Route path="/admin/partners/:id/profiles" element={<RouteGuard allowedRoles={['admin', 'standard_office_user']}><Layout><AdminPartnerProfiles /></Layout></RouteGuard>} />
