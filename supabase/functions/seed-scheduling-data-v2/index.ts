@@ -670,8 +670,8 @@ serve(async (req) => {
             createdCounts.orders++;
             consecutiveErrors = 0;
             
-            // Create charger dispatch records for post-scheduled orders
-            if (['scheduled', 'completion_pending', 'completed'].includes(selectedBucket.type)) {
+            // Create charger dispatch records for truly post-scheduled orders (not scheduled)
+            if (['completion_pending', 'completed'].includes(selectedBucket.type)) {
               console.log(`Creating charger dispatch for post-scheduled order ${order.order_number}`);
               
               // Get a random charger item for dispatch
@@ -683,9 +683,7 @@ serve(async (req) => {
                 .limit(1);
               
               if (chargerItems && chargerItems.length > 0) {
-                const dispatchedDate = selectedBucket.type === 'scheduled' 
-                  ? new Date(scheduledDate.getTime() - (2 * 24 * 60 * 60 * 1000)) // 2 days before scheduled date
-                  : new Date(pastDate.getTime() - (3 * 24 * 60 * 60 * 1000)); // 3 days before past date
+                const dispatchedDate = new Date(pastDate.getTime() - (3 * 24 * 60 * 60 * 1000)); // 3 days before past date
                 
                 const { error: dispatchError } = await supabaseAdmin
                   .from('charger_dispatches')
