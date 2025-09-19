@@ -15,6 +15,7 @@ interface DeleteStats {
   order_completion_checklist: number;
   engineer_uploads: number;
   order_payments: number;
+  charger_dispatches: number;
   quotes: number;
   clients: number;
 }
@@ -163,6 +164,7 @@ serve(async (req) => {
           order_completion_checklist: 0,
           engineer_uploads: 0,
           order_payments: 0,
+          charger_dispatches: 0,
           quotes: 0,
           clients: 0
         }
@@ -178,6 +180,7 @@ serve(async (req) => {
       order_completion_checklist: 0,
       engineer_uploads: 0,
       order_payments: 0,
+      charger_dispatches: 0,
       quotes: 0,
       clients: 0
     }
@@ -190,6 +193,7 @@ serve(async (req) => {
         checklistCount,
         uploadsCount,
         paymentsCount,
+        chargerDispatchesCount,
         quotesCount
       ] = await Promise.all([
         supabase.from('job_offers').select('id', { count: 'exact', head: true }).in('order_id', orderIds),
@@ -197,6 +201,7 @@ serve(async (req) => {
         supabase.from('order_completion_checklist').select('id', { count: 'exact', head: true }).in('order_id', orderIds),
         supabase.from('engineer_uploads').select('id', { count: 'exact', head: true }).in('order_id', orderIds),
         supabase.from('order_payments').select('id', { count: 'exact', head: true }).in('order_id', orderIds),
+        supabase.from('charger_dispatches').select('id', { count: 'exact', head: true }).in('order_id', orderIds),
         supabase.from('quotes').select('id', { count: 'exact', head: true }).in('client_id', clientIds)
       ])
 
@@ -224,6 +229,7 @@ serve(async (req) => {
         order_completion_checklist: checklistCount.count || 0,
         engineer_uploads: uploadsCount.count || 0,
         order_payments: paymentsCount.count || 0,
+        charger_dispatches: chargerDispatchesCount.count || 0,
         quotes: quotesCount.count || 0,
         clients: totalClientsToDelete
       }
@@ -245,6 +251,7 @@ serve(async (req) => {
       order_completion_checklist: 0,
       engineer_uploads: 0,
       order_payments: 0,
+      charger_dispatches: 0,
       quotes: 0,
       clients: 0
     }
@@ -277,13 +284,15 @@ serve(async (req) => {
           activityResult,
           checklistResult,
           uploadsResult,
-          paymentsResult
+          paymentsResult,
+          chargerDispatchesResult
         ] = await Promise.all([
           supabase.from('job_offers').delete().in('order_id', batch),
           supabase.from('order_activity').delete().in('order_id', batch),
           supabase.from('order_completion_checklist').delete().in('order_id', batch),
           supabase.from('engineer_uploads').delete().in('order_id', batch),
-          supabase.from('order_payments').delete().in('order_id', batch)
+          supabase.from('order_payments').delete().in('order_id', batch),
+          supabase.from('charger_dispatches').delete().in('order_id', batch)
         ])
 
         // Handle errors
@@ -292,6 +301,7 @@ serve(async (req) => {
         if (checklistResult.error) console.error('Checklist deletion error:', checklistResult.error)
         if (uploadsResult.error) console.error('Uploads deletion error:', uploadsResult.error)
         if (paymentsResult.error) console.error('Payments deletion error:', paymentsResult.error)
+        if (chargerDispatchesResult.error) console.error('Charger dispatches deletion error:', chargerDispatchesResult.error)
 
         // Get client IDs for this batch
         const batchClientIds = orders?.filter(o => batch.includes(o.id)).map(o => o.client_id) || []
@@ -342,6 +352,7 @@ serve(async (req) => {
         totalStats.order_completion_checklist += batch.length  // Approximate
         totalStats.engineer_uploads += batch.length  // Approximate
         totalStats.order_payments += batch.length  // Approximate
+        totalStats.charger_dispatches += batch.length  // Approximate
         totalStats.quotes += batchClientIds.length  // Approximate
 
         const batchTime = performance.now() - batchStartTime

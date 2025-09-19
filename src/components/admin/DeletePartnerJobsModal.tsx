@@ -25,6 +25,7 @@ interface DeleteStats {
   order_completion_checklist: number;
   engineer_uploads: number;
   order_payments: number;
+  charger_dispatches: number;
   quotes: number;
   clients: number;
 }
@@ -274,6 +275,10 @@ export function DeletePartnerJobsModal({ isOpen, onClose, partnerId, partnerName
                   <div className="flex justify-between">
                     <span>Payments:</span>
                     <span>{previewStats.order_payments}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Charger Dispatches:</span>
+                    <span>{previewStats.charger_dispatches}</span>
                   </div>
                 </div>
                 <div className="space-y-2">
