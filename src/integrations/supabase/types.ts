@@ -1968,6 +1968,7 @@ export type Database = {
           agreement_document_url: string | null
           agreement_signed_at: string | null
           amount_paid: number
+          charger_model_id: string | null
           client_id: string | null
           created_at: string
           deposit_amount: number
@@ -1976,7 +1977,9 @@ export type Database = {
           engineer_signature_data: string | null
           engineer_signed_off_at: string | null
           estimated_duration_hours: number | null
+          expected_duration_days: number | null
           external_confirmation_source: string | null
+          groundworks_required: boolean | null
           id: string
           installation_date: string | null
           installation_notes: string | null
@@ -1986,7 +1989,9 @@ export type Database = {
           job_type: Database["public"]["Enums"]["order_job_type"]
           manual_status_notes: string | null
           manual_status_override: boolean | null
+          multiple_engineers_required: boolean | null
           order_number: string
+          part_required: boolean | null
           partner_confirmed_at: string | null
           partner_confirmed_externally: boolean | null
           partner_external_id: string | null
@@ -1997,10 +2002,13 @@ export type Database = {
           partner_status_raw: string | null
           postcode: string | null
           quote_id: string | null
+          quote_type: string | null
           scheduled_install_date: string | null
           scheduling_conflicts: Json | null
           scheduling_suppressed: boolean
           scheduling_suppressed_reason: string | null
+          specific_engineer_id: string | null
+          specific_engineer_required: boolean | null
           status: string
           status_enhanced:
             | Database["public"]["Enums"]["order_status_enhanced"]
@@ -2019,6 +2027,7 @@ export type Database = {
           agreement_document_url?: string | null
           agreement_signed_at?: string | null
           amount_paid?: number
+          charger_model_id?: string | null
           client_id?: string | null
           created_at?: string
           deposit_amount?: number
@@ -2027,7 +2036,9 @@ export type Database = {
           engineer_signature_data?: string | null
           engineer_signed_off_at?: string | null
           estimated_duration_hours?: number | null
+          expected_duration_days?: number | null
           external_confirmation_source?: string | null
+          groundworks_required?: boolean | null
           id?: string
           installation_date?: string | null
           installation_notes?: string | null
@@ -2037,7 +2048,9 @@ export type Database = {
           job_type?: Database["public"]["Enums"]["order_job_type"]
           manual_status_notes?: string | null
           manual_status_override?: boolean | null
+          multiple_engineers_required?: boolean | null
           order_number: string
+          part_required?: boolean | null
           partner_confirmed_at?: string | null
           partner_confirmed_externally?: boolean | null
           partner_external_id?: string | null
@@ -2048,10 +2061,13 @@ export type Database = {
           partner_status_raw?: string | null
           postcode?: string | null
           quote_id?: string | null
+          quote_type?: string | null
           scheduled_install_date?: string | null
           scheduling_conflicts?: Json | null
           scheduling_suppressed?: boolean
           scheduling_suppressed_reason?: string | null
+          specific_engineer_id?: string | null
+          specific_engineer_required?: boolean | null
           status?: string
           status_enhanced?:
             | Database["public"]["Enums"]["order_status_enhanced"]
@@ -2070,6 +2086,7 @@ export type Database = {
           agreement_document_url?: string | null
           agreement_signed_at?: string | null
           amount_paid?: number
+          charger_model_id?: string | null
           client_id?: string | null
           created_at?: string
           deposit_amount?: number
@@ -2078,7 +2095,9 @@ export type Database = {
           engineer_signature_data?: string | null
           engineer_signed_off_at?: string | null
           estimated_duration_hours?: number | null
+          expected_duration_days?: number | null
           external_confirmation_source?: string | null
+          groundworks_required?: boolean | null
           id?: string
           installation_date?: string | null
           installation_notes?: string | null
@@ -2088,7 +2107,9 @@ export type Database = {
           job_type?: Database["public"]["Enums"]["order_job_type"]
           manual_status_notes?: string | null
           manual_status_override?: boolean | null
+          multiple_engineers_required?: boolean | null
           order_number?: string
+          part_required?: boolean | null
           partner_confirmed_at?: string | null
           partner_confirmed_externally?: boolean | null
           partner_external_id?: string | null
@@ -2099,10 +2120,13 @@ export type Database = {
           partner_status_raw?: string | null
           postcode?: string | null
           quote_id?: string | null
+          quote_type?: string | null
           scheduled_install_date?: string | null
           scheduling_conflicts?: Json | null
           scheduling_suppressed?: boolean
           scheduling_suppressed_reason?: string | null
+          specific_engineer_id?: string | null
+          specific_engineer_required?: boolean | null
           status?: string
           status_enhanced?:
             | Database["public"]["Enums"]["order_status_enhanced"]
@@ -2117,6 +2141,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "orders_charger_model_id_fkey"
+            columns: ["charger_model_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_items"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "orders_client_id_fkey"
             columns: ["client_id"]
@@ -2143,6 +2174,13 @@ export type Database = {
             columns: ["quote_id"]
             isOneToOne: false
             referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_specific_engineer_id_fkey"
+            columns: ["specific_engineer_id"]
+            isOneToOne: false
+            referencedRelation: "engineers"
             referencedColumns: ["id"]
           },
         ]

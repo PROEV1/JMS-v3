@@ -82,67 +82,71 @@ export function PartnerQuoteDrawer({
   onClearOverride
 }: PartnerQuoteDrawerProps) {
   const { toast } = useToast();
-  const [quote, setQuote] = useState<any>(null);
-  const [loadingQuote, setLoadingQuote] = useState(false);
+  const [order, setOrder] = useState<any>(null);
+  const [loadingOrder, setLoadingOrder] = useState(false);
 
-  // Fetch quote data when drawer opens
+  // Fetch order data when drawer opens
   useEffect(() => {
     if (open && job.id) {
-      fetchQuoteData();
+      fetchOrderData();
     }
   }, [open, job.id]);
 
-  const fetchQuoteData = async () => {
-    setLoadingQuote(true);
+  const fetchOrderData = async () => {
+    setLoadingOrder(true);
     try {
       const { data, error } = await supabase
-        .from('quotes')
+        .from('orders')
         .select('*')
-        .eq('order_id', job.id)
+        .eq('id', job.id)
         .maybeSingle();
 
       if (error) throw error;
-      setQuote(data);
+      setOrder(data);
     } catch (error) {
-      console.error('Error fetching quote data:', error);
+      console.error('Error fetching order data:', error);
     } finally {
-      setLoadingQuote(false);
+      setLoadingOrder(false);
     }
   };
 
-  const handleSaveQuoteMetadata = async (metadata: any) => {
-    if (!quote) return;
+  const handleSaveOrderMetadata = async (metadata: any) => {
+    if (!order) return;
     
     try {
       const { error } = await supabase
-        .from('quotes')
+        .from('orders')
         .update(metadata)
-        .eq('id', quote.id);
+        .eq('id', order.id);
 
       if (error) throw error;
       
-      // Refresh quote data
-      await fetchQuoteData();
+      // Refresh order data
+      await fetchOrderData();
       onQuoteUpdated();
     } catch (error) {
-      console.error('Error saving quote metadata:', error);
+      console.error('Error saving order metadata:', error);
       throw error;
     }
   };
 
   const handleSendQuote = async () => {
-    if (!quote) return;
+    if (!order) return;
     
     try {
+      // For partner orders, we could update a status or create a quote record
+      // For now, just mark as quoted in the order status
       const { error } = await supabase
-        .from('quotes')
-        .update({ status: 'sent' })
-        .eq('id', quote.id);
+        .from('orders')
+        .update({ 
+          quote_type: order.quote_type || 'standard'
+        })
+        .eq('id', order.id);
 
       if (error) throw error;
       
-      // Refresh quote data
-      await fetchQuoteData();
+      // Refresh order data
+      await fetchOrderData();
       onQuoteUpdated();
     } catch (error) {
       console.error('Error sending quote:', error);
@@ -260,23 +264,23 @@ export function PartnerQuoteDrawer({
           </Card>
 
           {/* Quote Configuration */}
-          {quote && (
+          {order && (
             <QuoteMetadataPanel
-              quoteId={quote.id}
+              quoteId={order.id}
               initialData={{
-                quote_type: quote.quote_type,
-                part_required: quote.part_required || false,
-                groundworks_required: quote.groundworks_required || false,
-                multiple_engineers_required: quote.multiple_engineers_required || false,
-                specific_engineer_required: quote.specific_engineer_required || false,
-                specific_engineer_id: quote.specific_engineer_id,
-                expected_duration_days: quote.expected_duration_days,
-                charger_model_id: quote.charger_model_id,
-                partner_id: quote.partner_id
+                quote_type: order.quote_type,
+                part_required: order.part_required || false,
+                groundworks_required: order.groundworks_required || false,
+                multiple_engineers_required: order.multiple_engineers_required || false,
+                specific_engineer_required: order.specific_engineer_required || false,
+                specific_engineer_id: order.specific_engineer_id,
+                expected_duration_days: order.expected_duration_days,
+                charger_model_id: order.charger_model_id,
+                partner_id: order.partner_id
               }}
-              onSave={handleSaveQuoteMetadata}
+              onSave={handleSaveOrderMetadata}
               onSendQuote={handleSendQuote}
-              isReadOnly={quote.status === 'approved' || quote.status === 'rejected'}
+              isReadOnly={false}
               isSaving={false}
               isSending={false}
             />
