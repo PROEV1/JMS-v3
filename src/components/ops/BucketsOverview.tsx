@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { useOpsBuckets } from '@/hooks/useOpsBuckets';
 import { SchedulePipelineDashboard } from '@/components/scheduling/SchedulePipelineDashboard';
 import { useScheduleStatusCounts } from '@/hooks/useScheduleStatusCounts';
-import { Clock, FileText, CheckCircle, CreditCard } from 'lucide-react';
+import { Clock, FileText, CheckCircle, CreditCard, Package, UserCheck } from 'lucide-react';
 
 export function BucketsOverview() {
   const navigate = useNavigate();
@@ -60,6 +60,58 @@ export function BucketsOverview() {
 
         {/* Status Tiles Grid using actual counts */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {/* Awaiting Parts Order - CRITICAL */}
+          <Card 
+            className="bg-gradient-to-br from-red-50 to-red-100 border-red-200 hover:border-red-300 cursor-pointer transition-all duration-200 hover:shadow-md active:scale-[0.98]"
+            onClick={() => navigate('/admin/schedule/status/awaiting-parts-order')}
+          >
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-white/60 rounded-lg">
+                    <Package className="h-5 w-5 text-foreground" />
+                  </div>
+                  <h3 className="font-semibold text-sm text-foreground">Awaiting Parts Order</h3>
+                </div>
+              </div>
+              
+              <div className="space-y-3">
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-foreground mb-1">{scheduleStatusCounts.awaitingPartsOrder}</div>
+                  <div className="text-xs text-muted-foreground">
+                    Parts need ordering
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Manual Scheduling Required - CRITICAL */}
+          <Card 
+            className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 hover:border-purple-300 cursor-pointer transition-all duration-200 hover:shadow-md active:scale-[0.98]"
+            onClick={() => navigate('/admin/schedule/status/awaiting-manual-scheduling')}
+          >
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-white/60 rounded-lg">
+                    <UserCheck className="h-5 w-5 text-foreground" />
+                  </div>
+                  <h3 className="font-semibold text-sm text-foreground">Manual Scheduling Required</h3>
+                </div>
+              </div>
+              
+              <div className="space-y-3">
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-foreground mb-1">{scheduleStatusCounts.awaitingManualScheduling}</div>
+                  <div className="text-xs text-muted-foreground">
+                    Manual intervention needed
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Needs Scheduling */}
           <Card 
             className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200 hover:border-orange-300 cursor-pointer transition-all duration-200 hover:shadow-md active:scale-[0.98]"
