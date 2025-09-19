@@ -433,6 +433,14 @@ export default function AdminPartnerQuotes() {
     const filteredJobs = jobs.filter(job => {
       const normalizedStatus = normalizePartnerStatus(job.partner_status);
       
+      // CRITICAL FIX: Exclude jobs that have been quoted from needs_quotation bucket
+      if (statuses.includes('NEW_JOB') || statuses.includes('AWAITING_QUOTATION')) {
+        // If job has been quoted (has quote_type), it should not be in needs_quotation bucket
+        if (job.quote_type) {
+          return false;
+        }
+      }
+      
       // Check for quote overrides first
       if (job.quote_override) {
         if (job.quote_override.override_type === 'quoted_pending_approval') {
