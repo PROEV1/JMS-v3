@@ -39,7 +39,7 @@ export function OfferLinkWidget({ orderId }: OfferLinkWidgetProps) {
           status,
           offered_date,
           expires_at,
-          engineer:engineers!job_offers_engineer_id_fkey(name)
+          engineer:engineers!fk_job_offers_engineer_id(name)
         `)
         .eq('order_id', orderId)
         .order('created_at', { ascending: false })

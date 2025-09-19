@@ -80,7 +80,7 @@ export function EditPurchaseOrderModal({ open, onOpenChange, purchaseOrderId }: 
         .from('purchase_orders')
         .select(`
           *,
-          engineers!purchase_orders_engineer_id_fkey(id, name, email),
+          engineers!fk_purchase_orders_engineer(id, name, email),
           purchase_order_lines(
             id, 
             item_name, 

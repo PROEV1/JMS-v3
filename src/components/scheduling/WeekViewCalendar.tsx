@@ -68,7 +68,7 @@ export function WeekViewCalendar({
         .from('job_offers')
         .select(`
           *,
-          order:orders!job_offers_order_id_fkey(
+          order:orders!fk_job_offers_order_id(
             id,
             order_number,
             scheduled_install_date,

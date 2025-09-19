@@ -22,7 +22,7 @@ export function ChargerDispatchSection({ orderId }: ChargerDispatchSectionProps)
     queryFn: async () => {
       const { data, error } = await supabase
         .from('charger_dispatches')
-        .select('*, dispatched_by')
+        .select('*')
         .eq('order_id', orderId)
         .single();
 

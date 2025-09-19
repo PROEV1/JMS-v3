@@ -92,7 +92,7 @@ export function PurchaseOrdersList() {
         .select(`
           id, po_number, status, order_date, expected_delivery_date, total_amount, notes, created_at,
           supplier_id, created_by, engineer_id,
-          engineers!purchase_orders_engineer_id_fkey(id, name),
+          engineers!fk_purchase_orders_engineer(id, name),
           inventory_suppliers(id, name)
         `)
         .order('created_at', { ascending: sortOrder === 'oldest' });

@@ -58,12 +58,12 @@ export function useJobOffers(orderId?: string | string[]) {
           rejected_at,
           expired_at,
           created_at,
-          order:orders!job_offers_order_id_fkey(
+          order:orders!fk_job_offers_order_id(
             order_number,
             client_id,
             client:clients(full_name, email)
           ),
-          engineer:engineers!job_offers_engineer_id_fkey(name, email)
+          engineer:engineers!fk_job_offers_engineer_id(name, email)
         `)
         .order('created_at', { ascending: false });
 
