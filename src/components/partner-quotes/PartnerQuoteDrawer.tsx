@@ -146,7 +146,7 @@ export function PartnerQuoteDrawer({
       }
 
       // Ensure all boolean values are properly set (not undefined)
-      const sanitizedMetadata = {
+      const sanitizedMetadata: any = {
         quote_type: metadata.quote_type || null,
         part_required: Boolean(metadata.part_required),
         part_details: metadata.part_details || null,
@@ -157,6 +157,11 @@ export function PartnerQuoteDrawer({
         expected_duration_days: metadata.expected_duration_days ? parseFloat(metadata.expected_duration_days) : null,
         charger_model_id: metadata.charger_model_id || null,
       };
+
+      // If quote_type is being set and current status is AWAITING_QUOTATION, update partner_status
+      if (metadata.quote_type && order.partner_status === 'AWAITING_QUOTATION') {
+        sanitizedMetadata.partner_status = 'WAITING_FOR_APPROVAL';
+      }
 
       console.log('🔧 PartnerQuoteDrawer: Sanitized metadata for update:', sanitizedMetadata);
 
@@ -229,9 +234,14 @@ export function PartnerQuoteDrawer({
     try {
       // For partner orders, we could update a status or create a quote record
       // For now, just mark as quoted in the order status
-      const updateData = { 
+      const updateData: any = { 
         quote_type: order.quote_type || 'standard'
       };
+      
+      // If current status is AWAITING_QUOTATION, update to WAITING_FOR_APPROVAL
+      if (order.partner_status === 'AWAITING_QUOTATION') {
+        updateData.partner_status = 'WAITING_FOR_APPROVAL';
+      }
       
       console.log('🚀 PartnerQuoteDrawer: Updating order with:', updateData);
       
