@@ -830,6 +830,7 @@ export default function OrderDetail() {
                 partRequired={order.part_required}
                 partDetails={order.part_details}
                 partsOrdered={order.parts_ordered}
+                partsDelivered={order.parts_delivered}
                 onUpdate={fetchOrder}
               />
             )}

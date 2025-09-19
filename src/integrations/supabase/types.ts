@@ -1861,6 +1861,72 @@ export type Database = {
           },
         ]
       }
+      order_parts: {
+        Row: {
+          actual_delivery_date: string | null
+          created_at: string
+          created_by: string | null
+          expected_delivery_date: string | null
+          id: string
+          items_ordered: Json
+          net_cost: number
+          notes: string | null
+          order_id: string
+          order_number: string
+          ordered_at: string
+          status: string
+          supplier_id: string
+          updated_at: string
+        }
+        Insert: {
+          actual_delivery_date?: string | null
+          created_at?: string
+          created_by?: string | null
+          expected_delivery_date?: string | null
+          id?: string
+          items_ordered?: Json
+          net_cost?: number
+          notes?: string | null
+          order_id: string
+          order_number: string
+          ordered_at?: string
+          status?: string
+          supplier_id: string
+          updated_at?: string
+        }
+        Update: {
+          actual_delivery_date?: string | null
+          created_at?: string
+          created_by?: string | null
+          expected_delivery_date?: string | null
+          id?: string
+          items_ordered?: Json
+          net_cost?: number
+          notes?: string | null
+          order_id?: string
+          order_number?: string
+          ordered_at?: string
+          status?: string
+          supplier_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_parts_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_parts_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_payments: {
         Row: {
           amount: number
