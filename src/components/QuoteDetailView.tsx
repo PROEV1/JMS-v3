@@ -40,6 +40,7 @@ interface Quote {
   // New metadata fields
   quote_type?: 'standard' | 'custom' | null;
   part_required?: boolean;
+  part_details?: string | null;
   groundworks_required?: boolean;
   multiple_engineers_required?: boolean;
   specific_engineer_required?: boolean;
@@ -433,6 +434,7 @@ export const QuoteDetailView: React.FC<QuoteDetailViewProps> = ({ quote, onBack,
         .update({
           quote_type: metadata.quote_type,
           part_required: metadata.part_required,
+          part_details: metadata.part_details,
           groundworks_required: metadata.groundworks_required,
           multiple_engineers_required: metadata.multiple_engineers_required,
           specific_engineer_required: metadata.specific_engineer_required,
@@ -694,6 +696,7 @@ export const QuoteDetailView: React.FC<QuoteDetailViewProps> = ({ quote, onBack,
         initialData={{
           quote_type: quote.quote_type || null,
           part_required: quote.part_required || false,
+          part_details: quote.part_details || null,
           groundworks_required: quote.groundworks_required || false,
           multiple_engineers_required: quote.multiple_engineers_required || false,
           specific_engineer_required: quote.specific_engineer_required || false,

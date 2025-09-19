@@ -1991,6 +1991,7 @@ export type Database = {
           manual_status_override: boolean | null
           multiple_engineers_required: boolean | null
           order_number: string
+          part_details: string | null
           part_required: boolean | null
           partner_confirmed_at: string | null
           partner_confirmed_externally: boolean | null
@@ -2051,6 +2052,7 @@ export type Database = {
           manual_status_override?: boolean | null
           multiple_engineers_required?: boolean | null
           order_number: string
+          part_details?: string | null
           part_required?: boolean | null
           partner_confirmed_at?: string | null
           partner_confirmed_externally?: boolean | null
@@ -2111,6 +2113,7 @@ export type Database = {
           manual_status_override?: boolean | null
           multiple_engineers_required?: boolean | null
           order_number?: string
+          part_details?: string | null
           part_required?: boolean | null
           partner_confirmed_at?: string | null
           partner_confirmed_externally?: boolean | null
@@ -3359,6 +3362,7 @@ export type Database = {
           multiple_engineers_required: boolean | null
           notes: string | null
           order_id: string | null
+          part_details: string | null
           part_required: boolean | null
           partner_id: string | null
           product_details: string
@@ -3391,6 +3395,7 @@ export type Database = {
           multiple_engineers_required?: boolean | null
           notes?: string | null
           order_id?: string | null
+          part_details?: string | null
           part_required?: boolean | null
           partner_id?: string | null
           product_details: string
@@ -3423,6 +3428,7 @@ export type Database = {
           multiple_engineers_required?: boolean | null
           notes?: string | null
           order_id?: string | null
+          part_details?: string | null
           part_required?: boolean | null
           partner_id?: string | null
           product_details?: string

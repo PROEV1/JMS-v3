@@ -78,6 +78,8 @@ export interface Order {
   partner_external_url?: string;
   job_type?: 'installation' | 'assessment' | 'service_call' | string; // Updated to allow any string
   created_at?: string; // Added created_at field
+  part_required?: boolean;
+  part_details?: string;
   client?: {
     full_name: string;
     email: string;

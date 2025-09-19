@@ -142,6 +142,7 @@ export function PartnerQuoteDrawer({
       const sanitizedMetadata = {
         quote_type: metadata.quote_type || null,
         part_required: Boolean(metadata.part_required),
+        part_details: metadata.part_details || null,
         groundworks_required: Boolean(metadata.groundworks_required),
         multiple_engineers_required: Boolean(metadata.multiple_engineers_required),
         specific_engineer_required: Boolean(metadata.specific_engineer_required),
@@ -360,6 +361,7 @@ export function PartnerQuoteDrawer({
               initialData={{
                 quote_type: order.quote_type,
                 part_required: order.part_required || false,
+                part_details: order.part_details || null,
                 groundworks_required: order.groundworks_required || false,
                 multiple_engineers_required: order.multiple_engineers_required || false,
                 specific_engineer_required: order.specific_engineer_required || false,

@@ -1089,6 +1089,12 @@ export function ScheduleStatusListPage({
                               </Badge>
                             )}
                           </div>
+                          {/* Part Details */}
+                          {order.part_required && order.part_details && (
+                            <div className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded border border-blue-200 mt-1">
+                              <strong>Parts needed:</strong> {order.part_details}
+                            </div>
+                          )}
                         </div>
                       </div>
 

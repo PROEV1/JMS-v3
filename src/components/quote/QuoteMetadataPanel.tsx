@@ -5,6 +5,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Save, Send, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -25,6 +26,7 @@ interface ChargerModel {
 interface QuoteMetadata {
   quote_type: 'standard' | 'custom' | null;
   part_required: boolean;
+  part_details: string | null;
   groundworks_required: boolean;
   multiple_engineers_required: boolean;
   specific_engineer_required: boolean;
@@ -139,6 +141,16 @@ export const QuoteMetadataPanel: React.FC<QuoteMetadataPanelProps> = ({
 
   const handleSave = async () => {
     try {
+      // Validate part details if part required
+      if (metadata.part_required && !metadata.part_details?.trim()) {
+        toast({
+          title: "Validation Error",
+          description: "Please provide part details when part is required",
+          variant: "destructive",
+        });
+        return;
+      }
+
       await onSave(metadata);
       toast({
         title: "Success",
@@ -155,6 +167,16 @@ export const QuoteMetadataPanel: React.FC<QuoteMetadataPanelProps> = ({
 
   const handleSendQuote = async () => {
     try {
+      // Validate part details if part required
+      if (metadata.part_required && !metadata.part_details?.trim()) {
+        toast({
+          title: "Validation Error",
+          description: "Please provide part details when part is required",
+          variant: "destructive",
+        });
+        return;
+      }
+
       // Save current metadata first
       await onSave(metadata);
       
@@ -222,14 +244,35 @@ export const QuoteMetadataPanel: React.FC<QuoteMetadataPanelProps> = ({
           <div className="space-y-4">
             <Label className="text-sm font-medium">Quote Flags</Label>
             <div className="space-y-3">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="part-required"
-                  checked={metadata.part_required}
-                  onCheckedChange={(checked) => updateMetadata('part_required', checked)}
-                  disabled={isReadOnly}
-                />
-                <Label htmlFor="part-required" className="text-sm">Part Required</Label>
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="part-required"
+                    checked={metadata.part_required}
+                    onCheckedChange={(checked) => {
+                      updateMetadata('part_required', checked);
+                      if (!checked) {
+                        updateMetadata('part_details', null);
+                      }
+                    }}
+                    disabled={isReadOnly}
+                  />
+                  <Label htmlFor="part-required" className="text-sm">Part Required</Label>
+                </div>
+
+                {metadata.part_required && (
+                  <div className="ml-6 space-y-1">
+                    <Label htmlFor="part-details" className="text-xs text-muted-foreground">Part Details</Label>
+                    <Textarea
+                      id="part-details"
+                      value={metadata.part_details || ''}
+                      onChange={(e) => updateMetadata('part_details', e.target.value)}
+                      placeholder="Describe the specific parts needed for this installation..."
+                      className="h-20 text-sm"
+                      disabled={isReadOnly}
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center space-x-2">
