@@ -2000,6 +2000,7 @@ export type Database = {
           partner_metadata: Json
           partner_status: string | null
           partner_status_raw: string | null
+          parts_ordered: boolean | null
           postcode: string | null
           quote_id: string | null
           quote_type: string | null
@@ -2059,6 +2060,7 @@ export type Database = {
           partner_metadata?: Json
           partner_status?: string | null
           partner_status_raw?: string | null
+          parts_ordered?: boolean | null
           postcode?: string | null
           quote_id?: string | null
           quote_type?: string | null
@@ -2118,6 +2120,7 @@ export type Database = {
           partner_metadata?: Json
           partner_status?: string | null
           partner_status_raw?: string | null
+          parts_ordered?: boolean | null
           postcode?: string | null
           quote_id?: string | null
           quote_type?: string | null
@@ -4433,6 +4436,8 @@ export type Database = {
         | "awaiting_survey_review"
         | "survey_approved"
         | "survey_rework_requested"
+        | "awaiting_parts_order"
+        | "awaiting_manual_scheduling"
       partner_calendar_status:
         | "available"
         | "soft_hold"
@@ -4637,6 +4642,8 @@ export const Constants = {
         "awaiting_survey_review",
         "survey_approved",
         "survey_rework_requested",
+        "awaiting_parts_order",
+        "awaiting_manual_scheduling",
       ],
       partner_calendar_status: [
         "available",
