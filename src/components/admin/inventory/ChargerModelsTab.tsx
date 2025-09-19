@@ -36,9 +36,10 @@ export function ChargerModelsTab() {
   const [showBulkImportModal, setShowBulkImportModal] = useState(false);
   const [selectedModel, setSelectedModel] = useState<ChargerModel | null>(null);
 
-  const { data: chargerModels = [], isLoading } = useQuery({
+  const { data: chargerModels = [], isLoading, error: queryError } = useQuery({
     queryKey: ['charger-models'],
     queryFn: async () => {
+      console.log('Fetching charger models...');
       const { data: models, error } = await supabase
         .from('inventory_items')
         .select(`
@@ -50,15 +51,25 @@ export function ChargerModelsTab() {
         .eq('is_charger', true)
         .order('name');
 
-      if (error) throw error;
+      console.log('Charger models query result:', { models, error });
+
+      if (error) {
+        console.error('Error fetching charger models:', error);
+        throw error;
+      }
+
+      console.log(`Found ${models?.length || 0} charger models`);
 
       // Get unit counts for each model
       const modelsWithCounts = await Promise.all(
-        models.map(async (model) => {
+        (models || []).map(async (model) => {
+          console.log('Processing model:', model.name);
           const { data: units } = await supabase
             .from('charger_inventory')
             .select('id, status')
             .eq('charger_item_id', model.id);
+
+          console.log(`Model ${model.name} has ${units?.length || 0} units`);
 
           const unitsCount = units?.length || 0;
           const availableUnits = units?.filter(u => u.status === 'available').length || 0;
@@ -81,9 +92,14 @@ export function ChargerModelsTab() {
         })
       );
 
+      console.log('Final models with counts:', modelsWithCounts);
       return modelsWithCounts;
-    }
+    },
+    staleTime: 0, // Force fresh data
+    gcTime: 0 // Don't cache (was cacheTime in older versions)
   });
+
+  console.log('ChargerModelsTab render:', { chargerModels, isLoading, queryError });
 
   const deleteModelMutation = useMutation({
     mutationFn: async (modelId: string) => {
@@ -121,7 +137,7 @@ export function ChargerModelsTab() {
     }
   });
 
-  const filteredModels = chargerModels.filter(model =>
+  const filteredModels = (chargerModels || []).filter(model =>
     model.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     model.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (model.description && model.description.toLowerCase().includes(searchTerm.toLowerCase()))
