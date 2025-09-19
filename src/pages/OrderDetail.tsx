@@ -24,6 +24,7 @@ import { SurveyReviewSection } from '@/components/admin/sections/SurveyReviewSec
 import { ClientBlockedDatesSection } from '@/components/admin/sections/ClientBlockedDatesSection';
 import { OrderQuotesSection } from '@/components/admin/sections/OrderQuotesSection';
 import { EngineerMaterialsSection } from '@/components/admin/sections/EngineerMaterialsSection';
+import { PartsSection } from '@/components/admin/sections/PartsSection';
 import { OrderStatusEnhanced } from '@/components/admin/EnhancedJobStatusBadge';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -53,6 +54,9 @@ interface Order {
   admin_qa_notes: string | null;
   quote_id: string | null;
   client_id: string;
+  part_required?: boolean;
+  part_details?: string | null;
+  parts_ordered?: boolean;
   client: {
     id: string;
     full_name: string;
@@ -815,6 +819,17 @@ export default function OrderDetail() {
               <OrderQuotesSection 
                 order={order} 
                 onOrderUpdate={fetchOrder}
+              />
+            )}
+
+            {/* Parts Information */}
+            {order && orderId && (
+              <PartsSection 
+                orderId={orderId}
+                partRequired={order.part_required}
+                partDetails={order.part_details}
+                partsOrdered={order.parts_ordered}
+                onUpdate={fetchOrder}
               />
             )}
 
