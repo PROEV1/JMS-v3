@@ -9,7 +9,9 @@ import {
   Calendar, 
   MapPin, 
   Quote, 
-  Undo2
+  Undo2,
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react';
 import { 
   DropdownMenu, 
@@ -84,6 +86,7 @@ export function PartnerQuoteDrawer({
   const { toast } = useToast();
   const [order, setOrder] = useState<any>(null);
   const [loadingOrder, setLoadingOrder] = useState(false);
+  const [clientCollapsed, setClientCollapsed] = useState(true);
 
   // Fetch order data when drawer opens
   useEffect(() => {
@@ -209,23 +212,19 @@ export function PartnerQuoteDrawer({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-lg">
         <SheetHeader>
-          <SheetTitle>Job Details</SheetTitle>
+          <div className="flex items-center justify-between">
+            <SheetTitle>Job Details</SheetTitle>
+            <Badge className={getStatusColor(job.partner_status, job.quote_override)}>
+              {getStatusLabel(job.partner_status, job.quote_override)}
+            </Badge>
+          </div>
           <SheetDescription>{job.order_number} • {partnerName}</SheetDescription>
         </SheetHeader>
 
         <div className="space-y-6 mt-6">
-          {/* Status Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <span>Status</span>
-                <Badge className={getStatusColor(job.partner_status, job.quote_override)}>
-                  {getStatusLabel(job.partner_status, job.quote_override)}
-                </Badge>
-              </CardTitle>
-            </CardHeader>
-            {job.quote_override && (
-              <CardContent>
+          {job.quote_override && (
+            <Card>
+              <CardContent className="pt-4">
                 <div className="text-sm text-muted-foreground">
                   <p>Override created: {format(new Date(job.quote_override.created_at), 'PPp')}</p>
                   {job.quote_override.notes && (
@@ -233,34 +232,46 @@ export function PartnerQuoteDrawer({
                   )}
                 </div>
               </CardContent>
-            )}
-          </Card>
+            </Card>
+          )}
 
-          {/* Client Information */}
+          {/* Collapsible Client Information */}
           <Card>
-            <CardHeader>
-              <CardTitle>Client Information</CardTitle>
+            <CardHeader 
+              className="cursor-pointer" 
+              onClick={() => setClientCollapsed(!clientCollapsed)}
+            >
+              <CardTitle className="flex items-center justify-between">
+                <span>Client Information</span>
+                {clientCollapsed ? (
+                  <ChevronRight className="h-4 w-4" />
+                ) : (
+                  <ChevronDown className="h-4 w-4" />
+                )}
+              </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div className="font-medium">{job.client.full_name}</div>
-                <div className="text-sm text-muted-foreground">{job.client.email}</div>
-                <div className="flex items-center gap-1 text-sm">
-                  <MapPin className="h-4 w-4" />
-                  {job.client.postcode || job.postcode}
+            {!clientCollapsed && (
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="font-medium">{job.client.full_name}</div>
+                  <div className="text-sm text-muted-foreground">{job.client.email}</div>
+                  <div className="flex items-center gap-1 text-sm">
+                    <MapPin className="h-4 w-4" />
+                    {job.client.postcode || job.postcode}
+                  </div>
+                  <div className="text-sm">
+                    <span className="font-medium">Job Type:</span> {job.job_type.replace('_', ' ')}
+                  </div>
+                  <div className="text-sm">
+                    <span className="font-medium">Value:</span> £{job.total_amount.toFixed(2)}
+                  </div>
+                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                    <Calendar className="h-4 w-4" />
+                    Created: {format(new Date(job.created_at), 'PPp')}
+                  </div>
                 </div>
-                <div className="text-sm">
-                  <span className="font-medium">Job Type:</span> {job.job_type.replace('_', ' ')}
-                </div>
-                <div className="text-sm">
-                  <span className="font-medium">Value:</span> £{job.total_amount.toFixed(2)}
-                </div>
-                <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                  <Calendar className="h-4 w-4" />
-                  Created: {format(new Date(job.created_at), 'PPp')}
-                </div>
-              </div>
-            </CardContent>
+              </CardContent>
+            )}
           </Card>
 
           {/* Quote Configuration */}
